@@ -1,0 +1,6 @@
+Construct on-device vision uses MediaPipe Tasks 0.10.35 (The MediaPipe Authors; Apache-2.0).
+The tasks-core AAR is modified: the stats factory selects the provided dummy logger; remote stats logger implementations are removed. DataTransport dependencies are excluded. See scripts/local_mediapipe.py and third_party/mediapipe/TasksStatsLoggerFactory.java in the source.
+BlazeFace short-range v1 and EfficientDet Lite0 int8 v1 are downloaded from the official MediaPipe model distribution. They are upstream model assets, not relicensed as Construct MIT code.
+Model documentation/cards: https://ai.google.dev/edge/mediapipe/solutions/vision/face_detector and https://ai.google.dev/edge/mediapipe/solutions/vision/object_detector
+Runtime source/license: https://github.com/google-ai-edge/mediapipe
+Pinned URLs, sizes and SHA-256 hashes: scripts/vision-assets.json in the Construct source.

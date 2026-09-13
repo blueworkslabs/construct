@@ -41,3 +41,5 @@ runner.local.json
 *.key
 
 .venv/
+core/app/src/main/assets/vision/*.tflite
+core/app/libs/*.aar

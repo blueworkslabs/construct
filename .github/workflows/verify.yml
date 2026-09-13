@@ -44,5 +44,5 @@ jobs:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: false
-      - name: JVM, lint and safe-default APK
-        run: ./gradlew --no-daemon :core:app:testDebugUnitTest :core:app:lintDebug :core:app:assembleDebug --max-workers=1 -Dorg.gradle.jvmargs=-Xmx1500m
+      - name: JVM, lint and safe-default debug and optimized APKs
+        run: ./gradlew --no-daemon :core:app:testDebugUnitTest :core:app:lintDebug :core:app:assembleDebug :core:app:assemblePilot --max-workers=1 -Dorg.gradle.jvmargs=-Xmx1500m

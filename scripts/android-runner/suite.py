@@ -28,12 +28,14 @@ p.add_argument('--camera-sha256', help='Exact signed native camera launcher acce
 p.add_argument('--camera-version', default='0.1.0', help='Exact camera launcher version paired with its hash')
 p.add_argument('--camera-gallery-export', action='store_true', help='Also verify native gallery confirmation, exact copy and independent deletion (Android 10+)')
 p.add_argument('--camera-only', action='store_true', help='Only synthetic camera; host changes also need baseline')
+p.add_argument('--camera-vision-only', action='store_true', help='Only selected-photo face/object analysis using public-domain/CC0 fixtures; not full camera acceptance')
 p.add_argument('--camera-reopen-only', action='store_true', help='Bounded dialog/Reopen reproduction; not full camera acceptance')
 p.add_argument('--camera-fresh-launches', action='store_true', help='Camera regression with explicit host restarts after access changes; excludes known direct-Reopen accessibility issue')
 p.add_argument('--tone-consent-only', action='store_true', help='Start clean with tone and consent, omitting checklist/probe/renderer checks; optional module suites may follow')
 p.add_argument('--modules-only', action='store_true', help='Run explicitly supplied Focus/Snake/Contacts suites, excluding all host baseline checks')
 p.add_argument('--disable-digital-wellbeing', action='store_true', help='Disable only Google Digital Wellbeing on this disposable image; record the environment change')
 a = p.parse_args()
+if a.camera_vision_only and (not a.camera_only or not a.camera_sha256 or a.camera_gallery_export or a.camera_reopen_only): p.error('Vision scope requires camera-only/hash and cannot mix gallery or reopen scopes')
 if a.camera_gallery_export and (not a.camera_only or not a.camera_sha256 or a.camera_reopen_only): p.error('Gallery export requires full camera-only/hash acceptance, not reopen-only')
 if not __import__('re').fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', a.camera_version): p.error('Camera version must be a numeric release version')
 os.environ['CONSTRUCT_CAMERA_VERSION'] = a.camera_version
@@ -82,6 +84,7 @@ if a.contacts_only:
 if a.camera_only:
     receipt['scope'] = 'Synthetic emulated camera only; separate baseline required for host changes'
 if a.camera_gallery_export: receipt['scope'] += '; explicit gallery export, MediaStore publication and independent copy lifetime'
+if a.camera_vision_only: receipt['scope'] = 'Native selected-photo face/object analysis only, offline with public-domain/CC0 fixtures; camera and host baselines separate'
 
 if a.camera_reopen_only: receipt['scope']='Camera direct-Reopen only; not capture, quota or host regression acceptance'
 
@@ -147,7 +150,7 @@ try:
         children.append(('contacts.py', 'contacts-result.json'))
     if a.camera_sha256:
         os.environ['CONSTRUCT_CAMERA_SHA256'] = a.camera_sha256
-        children.append(('camera.py', 'camera-result.json'))
+        children.append(('vision.py' if a.camera_vision_only else 'camera.py', 'camera-result.json'))
     for script, result in children:
         with (run/(script+'.log')).open('w') as log:
             subprocess.run([str(BASE/'venv/bin/python'), str(BASE/script)], check=True,

@@ -19,11 +19,16 @@ import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -76,6 +81,8 @@ class CameraActivity : ComponentActivity() {
     private var deleteConfirm by mutableStateOf(false)
     private var exportConfirm by mutableStateOf(false)
     private var imageGeneration = 0
+    private val analysisGeneration = AnalysisGeneration()
+    private var analysis by mutableStateOf<PhotoAnalysis?>(null)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -108,6 +115,7 @@ class CameraActivity : ComponentActivity() {
     override fun onStop() {
         synchronized(session) { live = false }
         stopPreview(); imageGeneration++; bitmap = null
+        analysisGeneration.invalidate(); analysis = null
         super.onStop()
         // No unattended preview or automatic restart when returning from another app.
         finish()
@@ -215,7 +223,8 @@ class CameraActivity : ComponentActivity() {
         }
     }
     private fun loadPhoto() {
-        val generation = ++imageGeneration; bitmap = null
+        analysisGeneration.invalidate(); analysis = null
+        val generation = ++imageGeneration; bitmap = null; status = "Loading saved photo…"
         val file = saved.getOrNull(selected) ?: return
         io.execute {
             try {
@@ -225,8 +234,54 @@ class CameraActivity : ComponentActivity() {
                     decoder.setTargetSize((info.size.width * scale).toInt().coerceAtLeast(1), (info.size.height * scale).toInt().coerceAtLeast(1))
                     decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                 }
-                runOnUiThread { if (live && gallery && generation == imageGeneration) bitmap = image else image.recycle() }
+                runOnUiThread {
+                    if (live && gallery && generation == imageGeneration) {
+                        bitmap = image; status = "Saved photo ready. Analysis runs only when you choose."
+                    } else image.recycle()
+                }
             } catch (e: Exception) { runOnUiThread { if (live && generation == imageGeneration) error(ConstructError("CAMERA_IMAGE", "Saved photo could not be displayed. You can delete it.")) } }
+        }
+    }
+    private fun analyzePhoto(kind: AnalysisKind) {
+        if (busy || !live || !gallery) return
+        val image = bitmap ?: return
+        try { checkAccess() } catch (e: Exception) { error(e); return }
+        val token = analysisGeneration.invalidate()
+        analysis = null; busy = true; status = "Finding ${kind.title.lowercase()} on this phone…"
+        io.execute {
+            try {
+                synchronized(session) {
+                    checkRule(live && analysisGeneration.current(token), "CAMERA_CLOSED", "Photo analysis canceled.")
+                    checkAccess()
+                }
+                val result = PhotoAnalyzer.detect(applicationContext, image, kind)
+                runOnUiThread {
+                    busy = false
+                    if (!live || !gallery || !analysisGeneration.current(token)) return@runOnUiThread
+                    try {
+                        // A late result may never cross a revoked grant or closed selection.
+                        store.withCapability(installed, "camera.capture") {
+                            checkRule(hasPermission(this), "ANDROID_PERMISSION_DENIED", "Camera access changed; analysis discarded.")
+                            analysis = result
+                            status = if (result.boxes.isEmpty()) "No ${kind.title.lowercase()} detected above the threshold. This can miss things."
+                                else "${kind.title} found: ${result.boxes.size} · on-device estimate"
+                        }
+                        store.log("camera", "PHOTO_ANALYZED", installed.manifest, "User-requested local analysis completed; results and image details omitted")
+                    } catch (e: Exception) { analysis = null; error(e) }
+                }
+            } catch (e: LinkageError) {
+                android.util.Log.e("ConstructVision", "Native vision linkage failed", e)
+                runOnUiThread {
+                    busy = false
+                    if (live && analysisGeneration.current(token)) error(ConstructError("PHOTO_ANALYSIS_UNAVAILABLE", "On-device analysis is unavailable on this device. Your photos are unchanged."))
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ConstructVision", "Native vision request failed", e)
+                runOnUiThread {
+                    busy = false
+                    if (live && analysisGeneration.current(token)) error(if (e is ConstructError) e else ConstructError("PHOTO_ANALYSIS", "Could not analyze this photo. The original is unchanged; close and retry."))
+                }
+            }
         }
     }
     private fun exportPhoto() {
@@ -270,13 +325,32 @@ class CameraActivity : ComponentActivity() {
                 Text(status, color = MaterialTheme.colorScheme.primary)
                 Row {
                     TextButton(onClick = { finish() }) { Text("Close camera") }
-                    TextButton(enabled = !busy, onClick = { if (gallery) { imageGeneration++; bitmap = null; gallery = false; status = "Opening camera…" } else showGallery() }) { Text(if (gallery) "Back to camera" else "Saved photos") }
+                    TextButton(enabled = !busy, onClick = { if (gallery) { imageGeneration++; analysisGeneration.invalidate(); analysis = null; bitmap = null; gallery = false; status = "Opening camera…" } else showGallery() }) { Text(if (gallery) "Back to camera" else "Saved photos") }
                 }
                 if (gallery) {
                     Text("Saved photos: ${saved.size} / ${CameraPhotos.MAX_PHOTOS}")
-                    bitmap?.let { photo -> Image(photo.asImageBitmap(), "Saved photo preview", Modifier.weight(1f).fillMaxWidth(), contentScale = ContentScale.Fit) }
+                    bitmap?.let { photo ->
+                        Box(Modifier.weight(1f).fillMaxWidth()) {
+                            Image(photo.asImageBitmap(), "Saved photo preview", Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                            Canvas(Modifier.fillMaxSize()) {
+                                val fit = PhotoFit.fit(photo.width, photo.height, size.width, size.height)
+                                analysis?.boxes?.forEach { box ->
+                                    drawRect(Color.Cyan, Offset(fit.left + box.left * fit.width, fit.top + box.top * fit.height),
+                                        Size((box.right - box.left) * fit.width, (box.bottom - box.top) * fit.height), style = Stroke(2.dp.toPx()))
+                                }
+                            }
+                        }
+                    }
                         ?: Spacer(Modifier.weight(1f))
                     if (saved.isEmpty()) Text("No saved photos yet.")
+                    Row {
+                        OutlinedButton(enabled = !busy && bitmap != null, onClick = { analyzePhoto(AnalysisKind.FACES) }) { Text("Find faces") }
+                        OutlinedButton(enabled = !busy && bitmap != null, onClick = { analyzePhoto(AnalysisKind.OBJECTS) }) { Text("Find objects") }
+                    }
+                    analysis?.let { result ->
+                        Text(result.boxes.joinToString(" · ") { "${it.label} ${(it.score * 100).toInt()}%" }.ifEmpty { "No detections" }, style = MaterialTheme.typography.bodySmall)
+                        Text("Estimates can be wrong. No identity or emotion recognition. Results are not saved or exported.", style = MaterialTheme.typography.bodySmall)
+                    }
                     Row {
                         TextButton(enabled = !busy && selected > 0, onClick = { selected--; loadPhoto() }) { Text("Previous photo") }
                         TextButton(enabled = !busy && selected + 1 < saved.size, onClick = { selected++; loadPhoto() }) { Text("Next photo") }
@@ -300,7 +374,7 @@ class CameraActivity : ComponentActivity() {
             }, confirmButton = { TextButton(onClick = { exportConfirm = false; exportPhoto() }) { Text("Save copy") } },
                 dismissButton = { TextButton(onClick = { exportConfirm = false }) { Text("Keep private") } })
             if (deleteConfirm) AlertDialog(onDismissRequest = { deleteConfirm = false }, title = { Text("Delete this photo?") }, text = { Text("This permanently deletes the selected private photo. Any exported gallery copies remain.") }, confirmButton = { TextButton(onClick = {
-                deleteConfirm = false; val file = saved.getOrNull(selected) ?: return@TextButton; busy = true; imageGeneration++; bitmap = null
+                deleteConfirm = false; val file = saved.getOrNull(selected) ?: return@TextButton; busy = true; imageGeneration++; analysisGeneration.invalidate(); analysis = null; bitmap = null
                 io.execute { try { photos.delete(file); runOnUiThread { if (live) showGallery("Photo deleted.") } } catch (e: Exception) { runOnUiThread { busy = false; if (live) error(e) } } }
             }) { Text("Delete permanently") } }, dismissButton = { TextButton(onClick = { deleteConfirm = false }) { Text("Keep photo") } })
         }
