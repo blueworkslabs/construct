@@ -37,6 +37,12 @@ internal class CameraPhotos(context: Context, moduleId: String) {
         it.isFile && name.matches(it.name) && it.canonicalFile == it.absoluteFile
     }?.sortedWith(compareBy<File> { it.lastModified() }.thenBy { it.name }) ?: emptyList()
     fun list(): List<File> = synchronized(lock) { entries() }
+    fun <T> readSelected(photo: File, read: (java.io.InputStream, Long) -> T): T = synchronized(lock) {
+        checkRule(photo.parentFile == folder && name.matches(photo.name) && photo.canonicalFile == photo.absoluteFile && photo.isFile,
+            "CAMERA_STORAGE", "Invalid saved photo")
+        checkRule(photo.length() in 1..MAX_FILE, "CAMERA_IMAGE", "Saved photo is incomplete or too large.")
+        photo.inputStream().use { read(it, photo.length()) }
+    }
     private fun checkCapacity(extra: Long) {
         val all = entries()
         checkRule(all.size < MAX_PHOTOS && all.sumOf { it.length() } + extra <= MAX_MODULE,

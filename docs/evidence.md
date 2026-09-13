@@ -37,8 +37,9 @@ show layout, not proof of every lifecycle or security assertion.
 - The native tone capability is bounded; its grant is not universal control of
   every sound mechanism a WebView might expose.
 - Focus promises no background alarm or late completion tone.
-- Camera stores a limited private album. No system-gallery export, image stream to
-  JavaScript, face analysis, microphone or arbitrary file API is implemented.
+- Camera stores a limited private album. Alpha 12 adds selected-photo native
+  gallery export on Android 10+; see its [separate evidence](gallery-export.md).
+  No image stream to JavaScript, face analysis, microphone or arbitrary file API.
 - Modules sharing a data schema must handle updates/rollback sensibly; code rollback
   does not automatically undo changes already made to stored data.
 - The pilot uses development signing and a private registry. Production trust/key

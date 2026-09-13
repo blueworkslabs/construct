@@ -74,6 +74,7 @@ class CameraActivity : ComponentActivity() {
     private var selected by mutableStateOf(0)
     private var bitmap by mutableStateOf<android.graphics.Bitmap?>(null)
     private var deleteConfirm by mutableStateOf(false)
+    private var exportConfirm by mutableStateOf(false)
     private var imageGeneration = 0
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -228,12 +229,44 @@ class CameraActivity : ComponentActivity() {
             } catch (e: Exception) { runOnUiThread { if (live && generation == imageGeneration) error(ConstructError("CAMERA_IMAGE", "Saved photo could not be displayed. You can delete it.")) } }
         }
     }
+    private fun exportPhoto() {
+        if (busy || android.os.Build.VERSION.SDK_INT < 29) return
+        val photo = saved.getOrNull(selected) ?: return
+        try { checkAccess() } catch (e: Exception) { error(e); return }
+        busy = true; status = "Saving a copy to phone gallery…"
+        io.execute {
+            try {
+                photos.readSelected(photo) { input, size ->
+                    synchronized(session) {
+                        checkRule(live, "CAMERA_CLOSED", "Camera workspace closed; export canceled.")
+                        checkAccess()
+                    }
+                    GalleryExport.copy(input, size, MediaStorePhoto(contentResolver)) { publish ->
+                        synchronized(session) {
+                            store.withCapability(installed, "camera.capture") {
+                                checkRule(live, "CAMERA_CLOSED", "Camera workspace closed; export canceled.")
+                                checkRule(hasPermission(this), "ANDROID_PERMISSION_DENIED", "Camera access changed; export canceled.")
+                                publish()
+                            }
+                        }
+                    }
+                }
+                runCatching { store.log("camera", "PHOTO_EXPORTED", installed.manifest, "One user-selected copy saved to phone gallery; no image or location data logged") }
+                runOnUiThread { busy = false; if (live) status = "Copy saved to phone gallery · Pictures/Construct. Private original kept." }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    busy = false
+                    if (live) error(if (e is ConstructError) e else ConstructError("PHOTO_EXPORT", "Could not save to phone gallery. Check free space and retry; the private original is kept."))
+                }
+            }
+        }
+    }
     @Composable private fun Screen() {
         BackHandler { finish() }
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp)) {
                 Text("${installed.manifest.name} · Camera", style = MaterialTheme.typography.titleLarge)
-                Text("Private photos · no microphone, upload or gallery export", style = MaterialTheme.typography.bodySmall)
+                Text("Private photos · gallery copies only when you choose", style = MaterialTheme.typography.bodySmall)
                 Text(status, color = MaterialTheme.colorScheme.primary)
                 Row {
                     TextButton(onClick = { finish() }) { Text("Close camera") }
@@ -249,6 +282,9 @@ class CameraActivity : ComponentActivity() {
                         TextButton(enabled = !busy && selected + 1 < saved.size, onClick = { selected++; loadPhoto() }) { Text("Next photo") }
                     }
                     Button(enabled = !busy && saved.isNotEmpty(), onClick = { deleteConfirm = true }) { Text("Delete photo") }
+                    if (android.os.Build.VERSION.SDK_INT >= 29) {
+                        OutlinedButton(enabled = !busy && bitmap != null && saved.isNotEmpty(), onClick = { exportConfirm = true }) { Text("Save to phone gallery") }
+                    } else Text("Gallery export requires Android 10 or later. Private photos remain available here.", style = MaterialTheme.typography.bodySmall)
                 } else {
                     key(front) { AndroidView(factory = { PreviewView(it).apply { implementationMode = PreviewView.ImplementationMode.COMPATIBLE }.also { view -> bind(view) } }, modifier = Modifier.weight(1f).fillMaxWidth()) }
                     Row {
@@ -259,7 +295,11 @@ class CameraActivity : ComponentActivity() {
                 Text("Up to 8 photos / 20 MiB here. Closing, backgrounding or rotating closes the camera. Saved photos remain until you delete them.", style = MaterialTheme.typography.bodySmall)
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             }
-            if (deleteConfirm) AlertDialog(onDismissRequest = { deleteConfirm = false }, title = { Text("Delete this photo?") }, text = { Text("This permanently deletes the selected private photo.") }, confirmButton = { TextButton(onClick = {
+            if (exportConfirm) AlertDialog(onDismissRequest = { exportConfirm = false }, title = { Text("Save a gallery copy?") }, text = {
+                Text("Save this photo to Pictures/Construct? Other apps with photo access, including configured photo backup services, may read it. The private original stays here. Deleting it or uninstalling Construct will not remove the gallery copy. Each save creates a new copy.")
+            }, confirmButton = { TextButton(onClick = { exportConfirm = false; exportPhoto() }) { Text("Save copy") } },
+                dismissButton = { TextButton(onClick = { exportConfirm = false }) { Text("Keep private") } })
+            if (deleteConfirm) AlertDialog(onDismissRequest = { deleteConfirm = false }, title = { Text("Delete this photo?") }, text = { Text("This permanently deletes the selected private photo. Any exported gallery copies remain.") }, confirmButton = { TextButton(onClick = {
                 deleteConfirm = false; val file = saved.getOrNull(selected) ?: return@TextButton; busy = true; imageGeneration++; bitmap = null
                 io.execute { try { photos.delete(file); runOnUiThread { if (live) showGallery("Photo deleted.") } } catch (e: Exception) { runOnUiThread { busy = false; if (live) error(e) } } }
             }) { Text("Delete permanently") } }, dismissButton = { TextButton(onClick = { deleteConfirm = false }) { Text("Keep photo") } })

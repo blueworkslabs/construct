@@ -59,7 +59,7 @@ class CameraTest {
     }
     @Test fun moduleCannotTriggerShutterOrProvideAPath() {
         CameraActivity.validate(JSONObject().put("op", "open"))
-        for (p in listOf(JSONObject().put("op", "capture"), JSONObject().put("op", "open").put("path", "/x"), JSONObject())) {
+        for (p in listOf(JSONObject().put("op", "capture"), JSONObject().put("op", "export"), JSONObject().put("op", "open").put("path", "/x"), JSONObject())) {
             denied("INVALID_PARAMS") { CameraActivity.validate(p) }
         }
     }
@@ -71,6 +71,17 @@ class CameraTest {
         assertTrue(CameraPhotos(app, "dev.construct.other").list().isEmpty())
         denied("CAMERA_STORAGE") { CameraPhotos(app, "dev.construct.other").delete(file) }
         photos.delete(file); assertTrue(photos.list().isEmpty())
+    }
+    @Test fun nativeExportReadRejectsOtherModuleAndDeletedPhotos() {
+        val original = photos.commit(jpeg()) { }
+        val bytes = original.readBytes()
+        photos.readSelected(original) { input, size ->
+            assertEquals(bytes.size.toLong(), size); assertArrayEquals(bytes, input.readBytes())
+        }
+        assertArrayEquals(bytes, original.readBytes())
+        denied("CAMERA_STORAGE") { CameraPhotos(app, "dev.construct.other").readSelected(original) { _, _ -> fail("Cross-module read") } }
+        photos.delete(original)
+        denied("CAMERA_STORAGE") { photos.readSelected(original) { _, _ -> fail("Deleted photo read") } }
     }
     @Test fun revokedOrClosedAtFinalCommitPublishesNothing() {
         for (code in listOf("CAPABILITY_DENIED", "ANDROID_PERMISSION_DENIED", "CAMERA_CLOSED")) {

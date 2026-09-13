@@ -93,6 +93,12 @@ explicit hash-selected additions. Camera uses its separate synthetic snapshot an
 `--camera-only --camera-sha256 HASH --camera-fresh-launches`; that last option
 **excludes**, rather than passes, the documented direct-Reopen accessibility path.
 
+For alpha 12 gallery acceptance, also pass `--camera-gallery-export` and
+`--camera-version 0.1.1` with the exact matching launcher hash. This checks cancel,
+MediaStore MIME/pending state, byte-for-byte equality with the private original,
+and gallery-copy survival after private deletion. It does not verify a particular
+vendor photo application's UI or cloud-backup behavior.
+
 `results/RUN_ID` contains receipts, child logs and screenshots. Review every child
 and its scope: an earlier failed parent is never converted into success because
 some children passed. Tests may insert synthetic contacts or temporarily use root

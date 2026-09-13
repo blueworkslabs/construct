@@ -25,12 +25,18 @@ p.add_argument('--snake-only', action='store_true', help='Run only Snake accepta
 p.add_argument('--contacts-sha256', help='Append synthetic contacts and Android permission checks')
 p.add_argument('--contacts-only', action='store_true', help='Only contacts; also require full regression for a host change')
 p.add_argument('--camera-sha256', help='Exact signed native camera launcher acceptance')
+p.add_argument('--camera-version', default='0.1.0', help='Exact camera launcher version paired with its hash')
+p.add_argument('--camera-gallery-export', action='store_true', help='Also verify native gallery confirmation, exact copy and independent deletion (Android 10+)')
 p.add_argument('--camera-only', action='store_true', help='Only synthetic camera; host changes also need baseline')
 p.add_argument('--camera-reopen-only', action='store_true', help='Bounded dialog/Reopen reproduction; not full camera acceptance')
 p.add_argument('--camera-fresh-launches', action='store_true', help='Camera regression with explicit host restarts after access changes; excludes known direct-Reopen accessibility issue')
 p.add_argument('--tone-consent-only', action='store_true', help='Start clean with tone and consent, omitting checklist/probe/renderer checks; optional module suites may follow')
 p.add_argument('--modules-only', action='store_true', help='Run explicitly supplied Focus/Snake/Contacts suites, excluding all host baseline checks')
 a = p.parse_args()
+if a.camera_gallery_export and (not a.camera_only or not a.camera_sha256 or a.camera_reopen_only): p.error('Gallery export requires full camera-only/hash acceptance, not reopen-only')
+if not __import__('re').fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', a.camera_version): p.error('Camera version must be a numeric release version')
+os.environ['CONSTRUCT_CAMERA_VERSION'] = a.camera_version
+os.environ['CONSTRUCT_CAMERA_GALLERY_EXPORT'] = '1' if a.camera_gallery_export else '0'
 if a.modules_only and (a.tone_consent_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_sha256 or not (a.focus_sha256 or a.snake_sha256 or a.contacts_sha256)): p.error('Modules-only requires explicit non-camera module hashes and no other scope flag')
 if a.tone_consent_only and (a.focus_only or a.snake_only or a.contacts_only or a.camera_only or a.camera_sha256): p.error('Tone/consent scope cannot mix module-only or camera scope')
 if a.camera_fresh_launches and (not a.camera_only or not a.camera_sha256 or a.camera_reopen_only): p.error('Fresh-launch camera scope requires camera-only/hash and excludes strict reopen-only')
@@ -74,6 +80,7 @@ if a.contacts_only:
 
 if a.camera_only:
     receipt['scope'] = 'Synthetic emulated camera only; separate baseline required for host changes'
+if a.camera_gallery_export: receipt['scope'] += '; explicit gallery export, MediaStore publication and independent copy lifetime'
 
 if a.camera_reopen_only: receipt['scope']='Camera direct-Reopen only; not capture, quota or host regression acceptance'
 

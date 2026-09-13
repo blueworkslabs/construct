@@ -40,8 +40,9 @@ See [release provenance](docs/public-release.md) and [known limits](docs/evidenc
 
 Examples include **Pocket Checklist**, **Pocket Focus**, **Pocket Snake**,
 **Pocket Contacts**, and **Pocket Camera**. Focus is a foreground timer, not a
-background alarm. Camera photos stay in a bounded app-private album, not the system
-gallery. No contacts editing, camera export, face analysis or LAN discovery yet.
+background alarm. Camera photos start in a bounded app-private album; alpha 12
+adds explicit native gallery copies on Android 10+. No contacts editing, face
+analysis or LAN discovery yet. See [gallery export](docs/gallery-export.md).
 
 ## Two delivery lanes
 

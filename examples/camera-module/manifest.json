@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "dev.construct.camera",
   "name": "Pocket Camera",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A private native viewfinder and photo album. You press the shutter; no microphone, uploads or photo files exposed to module code.",
   "constructApi": {"min": "0.4.0", "target": "0.4.0"},
   "runtime": {"kind": "webview-js"},
