@@ -106,28 +106,9 @@ def no_camera_client():
 try:
     restart()
     url=CONFIG.test_catalog
-    def catalog_field():
-        fields=[n for n in nodes() if n.get('class')=='android.widget.EditText' and n.get('package')=='dev.construct.runtime']
-        if len(fields)!=1:raise RuntimeError('Unique catalog field missing')
-        return fields[0]
-    tap_node(catalog_field());previous=None;until=time.monotonic()+10
-    while time.monotonic()<until:
-        field=catalog_field();bounds=field.get('bounds')
-        if field.get('focused')=='true' and bounds==previous:break
-        previous=bounds;time.sleep(.4)
-    else:raise RuntimeError('Catalog field focus did not settle')
-    for attempt in range(2):
-        import ui
-        ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(url)
-        until=time.monotonic()+5
-        while time.monotonic()<until:
-            if catalog_field().get('text')==url:break
-            time.sleep(.3)
-        else:continue
-        break
-    else:raise RuntimeError('Catalog URL did not exactly match')
-    adb('shell','input','keyevent','4')
-    if catalog_field().get('text')!=url:raise RuntimeError('Catalog URL changed before refresh')
+    from catalog_input import replace_catalog
+    import ui
+    replace_catalog(nodes, lambda value: ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value), url)
     tap('Refresh catalog');find('Catalog refreshed.');select_after(heading,('Review & install',))
     find('Allow camera workspace')
     switches=[n for n in nodes() if n.get('content-desc')=='Allow camera workspace' and n.get('checkable')=='true']

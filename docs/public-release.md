@@ -29,7 +29,7 @@ without operator work.
 - 86 JVM/Robolectric tests passed; lint: zero errors, 17 warnings.
 - Safe-default debug APK built successfully. Its compiled network-security resource
   contains system trust only, and no operator CA is packaged.
-- 18 publisher/configuration/registry, 34 runner, one server and 42 module tests passed.
+- 18 publisher/configuration/registry, 38 runner, one server and 42 module tests passed.
 - Separately generated example catalogs passed served HTTPS, hash, signature and
   path/method checks against their matching publisher public key.
 - Operator-profile emulator verification and hosted CI results are recorded in the
