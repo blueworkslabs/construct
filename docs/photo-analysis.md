@@ -56,8 +56,8 @@ MIT code. See the official documentation/model cards for
 
 Local tests cover stale-result generations, malformed coordinates, Fit geometry,
 no-op logging and asset integrity. The optimized candidate below passed all seven
-offline vision checks; camera/gallery and host regression remain pending at this
-checkpoint. A blank-image pass is not positive detection proof.
+offline vision checks, followed by camera/gallery and host sections across the
+scoped runs below. A blank-image pass is not positive detection proof.
 
 The `--camera-only --camera-vision-only --camera-version … --camera-sha256 …`
 scope uses the disposable synthetic-camera AVD. It injects verified licensed
@@ -88,3 +88,28 @@ accessibility limitation is not claimed fixed.
 - Native camera screens retain screenshot protection. This receipt proves native
   result text and lifecycle behavior, not visual overlay alignment; the latter
   remains a focused physical-device check.
+
+### Camera/gallery and host follow-through
+
+All entries below use the same optimized APK hash above:
+
+- `20260913T221534Z-558d5cc7`: all 12 camera/gallery checks passed. Full scoped
+  receipt, non-root ADB restored, emulator stopped.
+- `20260913T222948Z-0c0cf4bf`: all five checklist checks, probes
+  **5 BLOCKED / 6 CONTAINED / 0 FAIL**, and renderer recovery passed. The parent
+  run later failed when navigating from Tones back to Diagnostics; it is not
+  reported as a complete suite pass.
+- `20260913T224113Z-eea8de4f`: clean continuation passed seven tone and five
+  consent checks, including the installed APK diagnostic hash. Complete scoped
+  receipt and stopped emulator. Physical audibility was not retested here.
+- Two earlier checklist runs and one tone continuation hit the existing missing
+  WebView accessibility descendants issue. Screenshots showed rendered content;
+  those failures were not converted to passes. Experimental observer restarts
+  were never invoked in the passing runs and were removed from the driver.
+
+Local verification: 96 JVM tests pass, lint has no errors (17 warnings), and
+39 runner tests pass. The app signer and module publisher remain unchanged for
+the operator pilot, with no added Android permission. The universal APK is about
+56 MB because it bundles both models and native runtimes for four ABIs. Model
+hashes, APK signature and 16 KB ZIP alignment were checked. Pixel detection quality
+and overlay placement remain pending; report behavior, not personal photos.
