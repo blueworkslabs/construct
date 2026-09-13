@@ -94,7 +94,7 @@ explicit hash-selected additions. Camera uses its separate synthetic snapshot an
 **excludes**, rather than passes, the documented direct-Reopen accessibility path.
 
 For alpha 12 gallery acceptance, also pass `--camera-gallery-export` and
-`--camera-version 0.1.1` with the exact matching launcher hash. This checks cancel,
+`--camera-version 0.1.2` with the exact matching launcher hash. This checks cancel,
 MediaStore MIME/pending state, byte-for-byte equality with the private original,
 and gallery-copy survival after private deletion. It does not verify a particular
 vendor photo application's UI or cloud-backup behavior.

@@ -19,7 +19,7 @@ separate copies. Android 10+ uses MediaStore without requesting storage/media-re
 permissions. Android 9 still supports the existing private album but does not
 offer gallery export in this slice.
 
-The camera launcher 0.1.1 updates explanatory copy only; it remains usable on
+The camera launcher 0.1.2 updates explanatory copy only; it remains usable on
 older hosts and explicitly describes gallery export as a supported-host feature.
 It still exposes just `camera.capture({op: 'open'})`. No new bridge operation,
 module-visible image bytes, paths or export authority were introduced.
