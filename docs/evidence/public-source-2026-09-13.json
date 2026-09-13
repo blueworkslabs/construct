@@ -1,0 +1,51 @@
+{
+  "sourceRevision": "c38ca721edeba48d964b95cb9d07dc48fd89b08c",
+  "date": "2026-09-13",
+  "environment": "Fresh source, fixtures and publisher identity; reused Linux toolchain and app-free Android 16 emulator snapshots. Separate configured runner directory and virtualenv. Not an empty-machine provisioning claim.",
+  "apkSha256": "b6889aa5ca97defbbcd6697de701f3bb6cea0da483a06115c4da386831f9821c",
+  "localChecks": {
+    "jvm": 86,
+    "pythonAndJavascript": 99,
+    "lintErrors": 0,
+    "lintWarnings": 17
+  },
+  "baseline": {
+    "complete": true,
+    "stopped": true,
+    "checklist": 5,
+    "probes": {
+      "BLOCKED": 5,
+      "CONTAINED": 6,
+      "FAIL": 0
+    },
+    "renderer": "CONTAINED",
+    "tone": 7,
+    "consent": 5,
+    "focus": 6,
+    "snake": 8,
+    "contacts": 9
+  },
+  "camera": {
+    "complete": true,
+    "stopped": true,
+    "checks": 9,
+    "syntheticSource": true,
+    "adbRestoredNonRoot": true,
+    "directReopenAccessibility": "excluded; fresh launches after access changes",
+    "jpeg": "bounded, decoded, nonblank; no GPS metadata"
+  },
+  "limits": [
+    "Bounded probes are not complete sandbox/egress proof.",
+    "Native camera direct-Reopen accessibility remains excluded from fresh-launch camera scopes.",
+    "Raw receipts, operator endpoints, keys and device data are not distributed."
+  ],
+  "failedDevelopmentRuns": [
+    {
+      "scope": "camera setup",
+      "checksCompleted": 0,
+      "stopped": true,
+      "cause": "Transient catalog accessibility field loss during focus transition; replaced focus/keypress setup with bounded accessibility text replacement."
+    }
+  ],
+  "cameraRunnerRevision": "cb671e1"
+}

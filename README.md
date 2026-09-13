@@ -1,5 +1,7 @@
 # Construct
 
+[![Verify source](https://github.com/blueworkslabs/construct/actions/workflows/verify.yml/badge.svg)](https://github.com/blueworkslabs/construct/actions/workflows/verify.yml)
+
 ### One Android host. Small downloadable tools. A testable development loop.
 
 Construct is an experimental Kotlin/Compose Android app that installs signed

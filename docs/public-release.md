@@ -32,8 +32,21 @@ without operator work.
 - 18 publisher/configuration/registry, 38 runner, one server and 42 module tests passed.
 - Separately generated example catalogs passed served HTTPS, hash, signature and
   path/method checks against their matching publisher public key.
-- Operator-profile emulator verification and hosted CI results are recorded in the
-  final release checkpoint below; they are not inferred from the private pilot.
+- A complete clean operator-profile run passed Checklist (5), probes (5 BLOCKED /
+  6 CONTAINED / 0 FAIL), renderer recovery, tone (7), consent (5), Focus (6), Snake
+  (8) and Contacts (9). The emulator stopped.
+- A separate same-APK camera run passed nine scoped checks, including a decoded,
+  nonblank synthetic JPEG without GPS metadata. It restored non-root ADB and stopped.
+  The direct-Reopen accessibility path remains excluded via explicit fresh launches.
+- The first camera setup attempt failed before any camera checkpoint on a transient
+  accessibility field loss. A bounded accessibility text-replacement fix and four
+  regression tests preceded the accepted rerun; that failure is not erased or
+  represented as a pass. No APK change was needed.
+
+See the [sanitized machine-readable summary](evidence/public-source-2026-09-13.json).
+Raw receipts remain private. The [hosted workflow status and logs](https://github.com/blueworkslabs/construct/actions/workflows/verify.yml)
+are separate evidence: CI builds fresh signed fixtures and runs local/JVM/lint/APK
+checks, not the external emulator suite.
 
 The reference screenshots and historical alpha11 acceptance described in
 [evidence.md](evidence.md) belong to the earlier private pilot, not a different
