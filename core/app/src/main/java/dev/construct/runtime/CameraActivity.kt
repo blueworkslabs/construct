@@ -276,6 +276,7 @@ class CameraActivity : ComponentActivity() {
                     if (live && analysisGeneration.current(token)) error(ConstructError("PHOTO_ANALYSIS_UNAVAILABLE", "On-device analysis is unavailable on this device. Your photos are unchanged."))
                 }
             } catch (e: Exception) {
+                android.util.Log.e("ConstructVision", "Native vision request failed", e)
                 runOnUiThread {
                     busy = false
                     if (live && analysisGeneration.current(token)) error(if (e is ConstructError) e else ConstructError("PHOTO_ANALYSIS", "Could not analyze this photo. The original is unchanged; close and retry."))

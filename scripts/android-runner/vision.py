@@ -65,7 +65,15 @@ try:
         if len(data) != entry['bytes'] or hashlib.sha256(data).hexdigest() != entry['sha256']: raise RuntimeError('Test image checksum mismatch')
     restart()
     replace_text(nodes, lambda value: ui._device(className='android.widget.EditText', packageName='dev.construct.runtime').set_text(value), CONFIG.test_catalog)
-    tap('Refresh catalog'); find('Catalog refreshed.'); select_after(heading, ('Review & install',))
+    tap('Refresh catalog')
+    try: find('Catalog refreshed.')
+    except RuntimeError:
+        if not any(t.startswith('[REGISTRY_NETWORK]') for t in labels()): raise
+        result['setupNetworkRetry'] = True
+        adb('shell', 'svc', 'wifi', 'enable'); adb('shell', 'svc', 'data', 'enable')
+        time.sleep(2)
+        tap('Refresh catalog'); find('Catalog refreshed.')
+    select_after(heading, ('Review & install',))
     tap('Allow & install'); installed_status()
     top(); installed = [e for e in diagnostics() if e.get('code') == 'INSTALLED_TRIAL' and e.get('moduleId') == 'dev.construct.camera']
     if len(installed) != 1 or installed[0].get('packageDigest') != os.environ['CONSTRUCT_CAMERA_SHA256']: raise RuntimeError('Wrong signed launcher')
