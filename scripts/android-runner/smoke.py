@@ -6,6 +6,8 @@ import socket
 import time
 from ui import adb, nodes, labels, tap, tap_node, find, capture, RESULTS
 from host_ui import select_after, installed_status
+from catalog_input import replace_text
+import ui
 
 require_runner()
 steps=[]
@@ -15,10 +17,9 @@ def done(name):
     (RESULTS/'smoke-result.json').write_text(json.dumps({'passed':steps,'complete':False},indent=2)+'\n')
 
 def edit(text):
-    for n in nodes():
-        if n.attrib.get('class')=='android.widget.EditText' and n.attrib.get('enabled')!='false':
-            tap_node(n); adb('shell','input','text',text); return
-    raise RuntimeError('No editable input')
+    replace_text(nodes, lambda value: ui._device(
+        className='android.widget.EditText', packageName='dev.construct.runtime'
+    ).set_text(value), text)
 
 def saved_item():
     try:
