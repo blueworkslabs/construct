@@ -41,13 +41,34 @@ module-visible image bytes, paths or export authority were introduced.
 
 ## Verification status
 
-Implementation is under acceptance. Targeted JVM checks cover exact copying,
-stream closure before publication, failed/partial writes, denied final
-authorization, cleanup failures and cross-module/deleted-file rejection. The
-camera runner adds cancel, actual MediaStore publication, exact JPEG comparison,
-and independent-copy lifetime checks to the existing camera scope.
+Native source `13a2984`: 92 JVM tests passed (no failures/skips), including exact
+copying, stream closure before publication, failed/partial writes, denied final
+authorization, cleanup failures and cross-module/deleted-file rejection. Lint has
+zero errors and 17 existing warnings. Publisher/configuration (18), optimized
+Python runner (38), and camera module (3) checks passed.
 
-Final APK/build, Android receipts and Pixel status will be recorded after the
-corresponding checks finish. The pre-existing direct-Reopen accessibility issue
-remains separate and is not claimed fixed here. Face analysis and LAN discovery
+The optimized operator-profile APK has SHA-256
+`3c5aede4a10b6f33d90b5d3d17127886a0acb966610bc98231456771f7b03cc1`.
+It preserves the original pilot APK signer, publisher key, bundled demos and
+Android permissions. No new storage/media-read permission is present. This is
+not a universal preconfigured public installer.
+
+Android 16 run `20260913T195556Z-6b8ff141` passed **12 camera/gallery checkpoints**
+on that exact APK and launcher 0.1.2. The actual published MediaStore JPEG was
+24,010 bytes, 1024×768, not pending, and byte-identical to the private original;
+its EXIF orientation was retained and no GPS metadata was found. Cancel created
+no visible copy, and private deletion left the exported file unchanged. The
+emulator stopped and ADB returned to non-root. These are synthetic-photo tests,
+not physical-camera or vendor-gallery UI acceptance.
+
+Two earlier runs remain failed: a package-download timeout before installation,
+then an unrelated Digital Wellbeing ANR obscuring the workshop. Acceptance used
+the explicit `--disable-digital-wellbeing` option on the disposable image;
+that environment override is recorded, not an app fix. An earlier launcher 0.1.1
+was test-only and superseded to clarify consent wording, without overwriting it.
+
+Host baseline regression on the same APK is pending at this checkpoint. Pixel
+gallery visibility and independent-copy behavior also remain pending. The
+pre-existing direct-Reopen accessibility issue is excluded through the documented
+fresh-launch camera scope, not claimed fixed. Face analysis and LAN discovery
 remain later milestones.

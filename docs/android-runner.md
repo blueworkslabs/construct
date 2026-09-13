@@ -99,6 +99,12 @@ MediaStore MIME/pending state, byte-for-byte equality with the private original,
 and gallery-copy survival after private deletion. It does not verify a particular
 vendor photo application's UI or cloud-backup behavior.
 
+If the disposable Google APIs image presents a Digital Wellbeing ANR after
+restoring an old snapshot, `--disable-digital-wellbeing` disables only
+`com.google.android.apps.wellbeing` for that run and records the change. It does
+not suppress Construct/system errors, change the stored snapshot, or touch a
+physical device. Preserve the failed receipt that motivated this override.
+
 `results/RUN_ID` contains receipts, child logs and screenshots. Review every child
 and its scope: an earlier failed parent is never converted into success because
 some children passed. Tests may insert synthetic contacts or temporarily use root

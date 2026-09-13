@@ -32,6 +32,7 @@ p.add_argument('--camera-reopen-only', action='store_true', help='Bounded dialog
 p.add_argument('--camera-fresh-launches', action='store_true', help='Camera regression with explicit host restarts after access changes; excludes known direct-Reopen accessibility issue')
 p.add_argument('--tone-consent-only', action='store_true', help='Start clean with tone and consent, omitting checklist/probe/renderer checks; optional module suites may follow')
 p.add_argument('--modules-only', action='store_true', help='Run explicitly supplied Focus/Snake/Contacts suites, excluding all host baseline checks')
+p.add_argument('--disable-digital-wellbeing', action='store_true', help='Disable only Google Digital Wellbeing on this disposable image; record the environment change')
 a = p.parse_args()
 if a.camera_gallery_export and (not a.camera_only or not a.camera_sha256 or a.camera_reopen_only): p.error('Gallery export requires full camera-only/hash acceptance, not reopen-only')
 if not __import__('re').fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', a.camera_version): p.error('Camera version must be a numeric release version')
@@ -119,6 +120,14 @@ try:
     # Also prove the restored snapshot is app-free, not stale acceptance state.
     if 'package:dev.construct.runtime' in adb('shell', 'pm', 'list', 'packages', 'dev.construct.runtime'):
         raise RuntimeError('Clean snapshot contains Construct; refusing stale-state acceptance')
+    if a.disable_digital_wellbeing:
+        package = 'com.google.android.apps.wellbeing'
+        present = 'package:'+package in adb('shell', 'pm', 'list', 'packages', package).splitlines()
+        if present:
+            adb('shell', 'pm', 'disable-user', '--user', '0', package)
+            if 'package:'+package not in adb('shell', 'pm', 'list', 'packages', '-d', package).splitlines():
+                raise RuntimeError('Digital Wellbeing environment override did not apply')
+        receipt['environmentOverrides'] = {'digitalWellbeing': 'disabled-user' if present else 'not installed'}
     receipt['fingerprint'] = adb('shell', 'getprop', 'ro.build.fingerprint').strip()
     receipt['webview'] = adb('shell', 'dumpsys', 'webviewupdate')
     receipt['emulatorVersion'] = subprocess.check_output([str(CONFIG.sdk/'emulator/emulator'), '-version'], text=True)
