@@ -67,8 +67,12 @@ the explicit `--disable-digital-wellbeing` option on the disposable image;
 that environment override is recorded, not an app fix. An earlier launcher 0.1.1
 was test-only and superseded to clarify consent wording, without overwriting it.
 
-Host baseline regression on the same APK is pending at this checkpoint. Pixel
-gallery visibility and independent-copy behavior also remain pending. The
+Host baseline `20260913T201650Z-97ed4007` passed on the same APK: five Checklist
+checkpoints, probes **5 BLOCKED / 6 CONTAINED / 0 FAIL**, renderer-loss recovery,
+seven tone lifecycle checks and five consent checks. The in-app APK hash matched,
+and the emulator stopped. The reusable-code commit `c75e2b9` also passed hosted
+CI. Pixel gallery visibility/orientation and independent-copy behavior remain
+pending. The
 pre-existing direct-Reopen accessibility issue is excluded through the documented
 fresh-launch camera scope, not claimed fixed. Face analysis and LAN discovery
 remain later milestones.
@@ -80,3 +84,22 @@ Checklist checks without restarting the module. That run then stopped before
 any probe verdict because the lab catalog lacked the public runner's exact
 probe 0.1.4. Publishing that immutable signed fixture corrected the setup; neither
 failure is treated as a complete host-baseline pass.
+
+Further retries retained a dropped-character setup failure and another missing
+dynamic accessibility row. Input now uses bounded idempotent accessibility text
+replacement, requiring the exact value before Add. The final accepted baseline
+did not need an experimental observer reconnect; that unused workaround was
+removed rather than presented as a fix. Passing one scoped run does not establish
+that the intermittent accessibility issue is resolved. No native source or APK
+changed during these runner corrections.
+
+## Review / phone checkpoint
+
+Review publication authorization, pending-item cleanup and independent-copy
+consent in [PR #1](https://github.com/blueworkslabs/construct/pull/1). The branch is
+review-ready; independent review and the Pixel check are not yet passes.
+Install the operator-provided alpha 12 pilot over the existing host, refresh its
+configured registry and update Pocket Camera to 0.1.2. Export one non-sensitive
+test photo, check the phone photo app's on-device **Pictures/Construct** folder
+and orientation, then verify deleting the private original leaves the exported
+copy. Behavior-only feedback is sufficient; no personal photo needs sharing.
