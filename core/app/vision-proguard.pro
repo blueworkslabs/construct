@@ -2,6 +2,10 @@
 # rules. Keep its Java bindings and generated graph types stable in pilot builds.
 # Remote logging classes were already removed from the locally prepared AAR.
 -keep class com.google.mediapipe.** { *; }
+# FluentLogger.forEnclosingClass discovers the caller by walking its own stack.
+# Inlining/merging it causes Graph static initialization to fail on Android.
+-keep class com.google.common.flogger.** { *; }
+-keepattributes SourceFile,LineNumberTable
 # Upstream core exposes optional graph-template/profiler APIs without packaging
 # their proto classes. Construct uses neither; retain JNI while allowing only
 # these two upstream missing-type warnings (not arbitrary missing dependencies).
