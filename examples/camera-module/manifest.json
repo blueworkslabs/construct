@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "dev.construct.camera",
   "name": "Pocket Camera",
-  "version": "0.1.2",
-  "description": "A private native viewfinder and photo album. You press the shutter; no microphone, uploads or photo files exposed to module code.",
+  "version": "0.1.3",
+  "description": "Native camera and private album, with optional local face/object analysis and explicit gallery copies on supported hosts.",
   "constructApi": {
     "min": "0.4.0",
     "target": "0.4.0"
@@ -15,7 +15,7 @@
   "capabilities": [
     {
       "id": "camera.capture",
-      "reason": "Open the native camera workspace. Only your shutter tap captures; gallery copies require separate native confirmation on supported hosts."
+      "reason": "Open the native camera workspace. Capture, local photo analysis and gallery copies each require your native UI action on supported hosts."
     }
   ]
 }

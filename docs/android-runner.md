@@ -99,6 +99,14 @@ MediaStore MIME/pending state, byte-for-byte equality with the private original,
 and gallery-copy survival after private deletion. It does not verify a particular
 vendor photo application's UI or cloud-backup behavior.
 
+For selected-photo inference use `--camera-only --camera-vision-only`, the exact
+launcher version/hash and the APK hash. First copy generated `dist/vision-fixtures`
+images and `scripts/vision-assets.json` into the runner's `vision-fixtures/` folder.
+This scope checks pinned public-domain/CC0 images, positive and negative results,
+EXIF orientation, clearing and original-byte preservation with networking disabled
+before first inference. It is not full camera/gallery or host acceptance. See
+[photo analysis](photo-analysis.md) for provenance and model limits.
+
 If the disposable Google APIs image presents a Digital Wellbeing ANR after
 restoring an old snapshot, `--disable-digital-wellbeing` disables only
 `com.google.android.apps.wellbeing` for that run and records the change. It does

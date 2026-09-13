@@ -10,10 +10,11 @@ android {
         applicationId = "dev.construct.runtime"
         minSdk = 28
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.1.0-alpha12"
+        versionCode = 13
+        versionName = "0.1.0-alpha13"
     }
     buildFeatures { compose = true; buildConfig = true }
+    androidResources { noCompress += "tflite" }
     buildTypes {
         create("pilot") {
             initWith(getByName("debug"))
@@ -48,6 +49,15 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
+    implementation("com.google.mediapipe:tasks-vision:0.10.35") {
+        exclude(group = "com.google.mediapipe", module = "tasks-core")
+    }
+    // Reproducibly patched by prepare_vision.py to use the upstream no-op logger.
+    implementation(files("libs/mediapipe-core-local.aar"))
+    implementation("com.google.flogger:flogger:0.6")
+    implementation("com.google.flogger:flogger-system-backend:0.6")
+    implementation("com.google.guava:guava:27.0.1-android")
+    implementation("com.google.protobuf:protobuf-javalite:4.26.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     testImplementation("org.robolectric:robolectric:4.14.1")

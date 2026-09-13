@@ -103,6 +103,13 @@ read or back them up according to the user's settings. Native private-photo
 deletion remains available with camera access off. Removing module code retains
 private data; clearing app data/uninstalling Construct removes that private data.
 
+Alpha 13 also offers native, user-requested face/common-object analysis of a
+selected private photo. Both models are bundled and run locally; no bridge
+operation exposes analysis or its results. Results are ephemeral and do not
+modify exported or private JPEGs. A final access check precedes display. This
+does not identify people or infer emotion; labels/scores can be wrong. See
+[photo analysis](photo-analysis.md).
+
 ## Lifecycle and module-first UI
 
 Real backgrounding/closing destroys the module runtime; reopening starts fresh.

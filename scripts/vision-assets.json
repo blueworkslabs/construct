@@ -1,0 +1,42 @@
+[
+  {
+    "name": "face.tflite",
+    "url": "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+    "kind": "model",
+    "bytes": 229746,
+    "sha256": "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f",
+    "license": "upstream MediaPipe model"
+  },
+  {
+    "name": "objects.tflite",
+    "url": "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0.tflite",
+    "kind": "model",
+    "bytes": 4602795,
+    "sha256": "0720bf247bd76e6594ea28fa9c6f7c5242be774818997dbbeffc4da460c723bb",
+    "license": "upstream MediaPipe model"
+  },
+  {
+    "name": "astronaut.png",
+    "url": "https://raw.githubusercontent.com/scikit-image/scikit-image/v0.19.3/skimage/data/astronaut.png",
+    "kind": "fixture",
+    "bytes": 791555,
+    "sha256": "88431cd9653ccd539741b555fb0a46b61558b301d4110412b5bc28b5e3ea6cb5",
+    "license": "Public domain (NASA; scikit-image data.astronaut)"
+  },
+  {
+    "name": "chelsea.png",
+    "url": "https://raw.githubusercontent.com/scikit-image/scikit-image/v0.19.3/skimage/data/chelsea.png",
+    "kind": "fixture",
+    "bytes": 240512,
+    "sha256": "596aa1e7cb875eb79f437e310381d26b338a81c2da23439704a73c4651e8c4bb",
+    "license": "CC0 (Stefan van der Walt; scikit-image data.chelsea)"
+  },
+  {
+    "name": "tasks-core-0.10.35.aar",
+    "url": "https://dl.google.com/dl/android/maven2/com/google/mediapipe/tasks-core/0.10.35/tasks-core-0.10.35.aar",
+    "kind": "runtime",
+    "bytes": 21342753,
+    "sha256": "4edf2f33c840d682c751b3ca951b1ae0465373734776d7fb37dcef936de28ad0",
+    "license": "Apache-2.0"
+  }
+]
