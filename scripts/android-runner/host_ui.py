@@ -44,7 +44,7 @@ def select_after(heading, choices):
             elif seen and text in choices and enabled(node, parents): return node
         return None
 
-    for _ in range(20):
+    for attempt in range(21):
         previous = candidate()
         if previous is not None:
             for _ in range(8):
@@ -55,6 +55,7 @@ def select_after(heading, choices):
                     tap_node(current)
                     return
                 previous = current
+        if attempt == 20: break
         adb('shell', 'input', 'swipe', '360', '1000', '360', '750', '500')
         time.sleep(.35)
     raise RuntimeError('No stable enabled action found within exact card: ' + heading)

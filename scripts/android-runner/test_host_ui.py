@@ -69,6 +69,14 @@ class CardSelectorTest(unittest.TestCase):
         self.ui.adb.assert_called_once()
         self.ui.find.assert_called_once_with('Installed. Open and test it, then mark it working.')
 
+    def test_checks_after_final_scroll_without_exceeding_scroll_limit(self):
+        target = tree()
+        self.ui.nodes.side_effect = [[] for _ in range(20)] + [target, target]
+        with patch.object(self.host.time, 'sleep'):
+            self.host.select_after('Pocket Tones · 0.1.0', ('Open',))
+        self.ui.tap_node.assert_called_once_with(target[-1])
+        self.assertEqual(self.ui.adb.call_count, 20)
+
     def test_open_consent_never_counts_as_installed(self):
         self.ui.labels.return_value = ['Allow & install']
         with patch.object(self.host.time, 'sleep'), self.assertRaises(RuntimeError):

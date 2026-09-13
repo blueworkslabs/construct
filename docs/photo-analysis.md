@@ -39,6 +39,14 @@ binary modification, not a claim about upstream defaults. See
 The compile-only Android type stub is not included in the AAR. A JVM regression
 requires the no-op logger. Runtime notices/license accompany the APK assets.
 
+Optimized builds also need `core/app/vision-proguard.pro`: MediaPipe JNI bindings,
+Flogger's stack-sensitive caller discovery and Protobuf Lite's reflective message
+fields must survive shrinking. Exact-build Android testing found two failures
+that debug inference did not: Flogger static initialization after inlining, then
+missing `Any.typeUrl_` during native graph serialization. Neither failed run is
+counted as a detector pass. Hosted CI now builds the optimized variant as well as
+debug; device inference remains a separate acceptance gate.
+
 The runtime is Apache-2.0; models remain upstream assets, not Construct-authored
 MIT code. See the official documentation/model cards for
 [faces](https://ai.google.dev/edge/mediapipe/solutions/vision/face_detector) and
