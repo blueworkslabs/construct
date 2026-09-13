@@ -10,8 +10,8 @@ android {
         applicationId = "dev.construct.runtime"
         minSdk = 28
         targetSdk = 35
-        versionCode = 11
-        versionName = "0.1.0-alpha11-public1"
+        versionCode = 12
+        versionName = "0.1.0-alpha12"
     }
     buildFeatures { compose = true; buildConfig = true }
     buildTypes {

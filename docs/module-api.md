@@ -89,10 +89,19 @@ controls. Backgrounding or rotation closes the camera; saved photos remain.
 
 JavaScript receives no camera frames, shutter API, file path, image bytes, album
 listing or export API. Photos remain in app-private per-module storage: at most
-eight photos, 4 MiB per file, 20 MiB per module and 64 MiB globally. They do not
-appear in the Android gallery. Native deletion remains available with camera
-access off. Removing module code retains its data; clearing app data/uninstalling
-Construct removes app-private data. This is not a backup or export facility.
+eight photos, 4 MiB per file, 20 MiB per module and 64 MiB globally. Starting in
+alpha 12, Android 10+ has a native **Save to phone gallery** action for the selected
+photo. It requires human confirmation and both existing camera gates, copies to
+Pictures/Construct through a pending MediaStore item, and checks session/access
+again before publication. JavaScript cannot invoke this action. No additional
+storage permission is requested. Android 9 retains private-album functionality
+but has no gallery export in this slice.
+
+Gallery copies are independent: deleting private photos, removing module code or
+uninstalling Construct does not remove exported copies. Gallery/photo apps may
+read or back them up according to the user's settings. Native private-photo
+deletion remains available with camera access off. Removing module code retains
+private data; clearing app data/uninstalling Construct removes that private data.
 
 ## Lifecycle and module-first UI
 
@@ -131,5 +140,5 @@ an automatic health certificate; rollback restores code, not historical data.
 
 See [architecture](architecture.md), [security](../SECURITY.md) and
 [evidence limits](evidence.md), including the known camera direct-Reopen
-accessibility issue. There is no background alarm/service, contacts write, gallery
-export, face analysis or general network API in this release.
+accessibility issue. There is no background alarm/service, contacts write, module
+gallery-export API, face analysis or general network API in this release.

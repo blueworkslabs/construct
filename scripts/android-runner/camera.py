@@ -15,7 +15,8 @@ pid=subprocess.check_output(['systemctl','--user','show',CONFIG.service,'-p','Ma
 args=Path('/proc/'+pid+'/cmdline').read_bytes().decode().split('\0')
 if '-camera-back' not in args or args[args.index('-camera-back')+1]!='emulated' or '-camera-front' not in args or args[args.index('-camera-front')+1]!='none':raise RuntimeError('Actual emulator camera command is not synthetic-only')
 if '-avd' not in args or args[args.index('-avd')+1]!='construct-camera36':raise RuntimeError('Camera suite requires its dedicated AVD')
-expected=os.environ['CONSTRUCT_CAMERA_SHA256'];heading='Pocket Camera · 0.1.0'
+expected=os.environ['CONSTRUCT_CAMERA_SHA256'];heading='Pocket Camera · '+os.environ.get('CONSTRUCT_CAMERA_VERSION','0.1.0')
+export_checks=os.environ.get('CONSTRUCT_CAMERA_GALLERY_EXPORT')=='1'
 result={'complete':False,'checks':[],'cameraSource':'Android emulator generated scene, no physical camera'}
 def done(name):result['checks'].append(name);print('PASS:',name,flush=True)
 def top():
@@ -103,7 +104,14 @@ def no_camera_client():
             result['releaseEvidence']=active.strip();return
         time.sleep(.5)
     raise RuntimeError('Construct still owns a camera client after leaving')
+def gallery_files():
+    output=adb('shell','if [ -d /sdcard/Pictures/Construct ]; then ls -A /sdcard/Pictures/Construct; fi')
+    names=output.split()
+    if any(not re.fullmatch(r'Construct-[a-f0-9-]{36}\.jpg',name) for name in names):
+        raise RuntimeError('Unexpected gallery contents on disposable baseline')
+    return names
 try:
+    if export_checks and gallery_files():raise RuntimeError('Gallery baseline is not empty; refusing stale export evidence')
     restart()
     url=CONFIG.test_catalog
     from catalog_input import replace_catalog
@@ -154,6 +162,15 @@ try:
     try:opened();workspace();tap('Saved photos');find('Saved photos: 1 / 8');find('Saved photo preview');tap('Close camera');no_camera_client()
     finally:adb('shell','svc','wifi','enable');adb('shell','svc','data','enable')
     done('Android revoke denies despite module grant; UI regrant restores capture and offline album')
+    if export_checks:
+        opened();workspace();tap('Saved photos');find('Saved photo preview')
+        tap('Save to phone gallery');find('Save a gallery copy?');tap('Keep private');find('Saved photo preview')
+        if gallery_files():raise RuntimeError('Canceled export created a visible gallery file')
+        done('Canceling native gallery confirmation keeps the photo private')
+        tap('Save to phone gallery');tap('Save copy');status('Copy saved to phone gallery')
+        exported=gallery_files()
+        if len(exported)!=1:raise RuntimeError('Expected exactly one explicit gallery copy')
+        find('Saved photos: 1 / 8');capture('camera-gallery-export');tap('Close camera')
     if adb('shell','getprop','ro.kernel.qemu').strip()!='1' or adb('shell','getprop','ro.build.type').strip()!='userdebug':raise RuntimeError('Artifact read requires synthetic userdebug emulator')
     try:
         adb('root',timeout=30);adb('wait-for-device',timeout=30)
@@ -169,16 +186,32 @@ try:
         if photo.getexif().get(34853):raise RuntimeError('Unexpected GPS metadata')
         (RESULTS/'camera-synthetic.jpg').write_bytes(blob)
         result['photo']={'sha256':hashlib.sha256(blob).hexdigest(),'bytes':len(blob),'width':photo.width,'height':photo.height,'gpsMetadata':False,'exifOrientation':photo.getexif().get(274)}
+        if export_checks:
+            exported_blob=adb('exec-out','cat','/sdcard/Pictures/Construct/'+exported[0],binary=True)
+            if exported_blob!=blob:raise RuntimeError('Gallery bytes differ from private JPEG')
+            rows=adb('shell','content','query','--uri','content://media/external/images/media','--projection','_display_name:mime_type:relative_path:is_pending')
+            matched=[line for line in rows.splitlines() if exported[0] in line]
+            if len(matched)!=1 or not all(value in matched[0] for value in ('mime_type=image/jpeg','relative_path=Pictures/Construct/','is_pending=0')):
+                raise RuntimeError('Gallery copy is not a published JPEG in MediaStore')
+            result['galleryExport']={'bytes':len(exported_blob),'sha256':hashlib.sha256(exported_blob).hexdigest(),'pending':False,'mimeType':'image/jpeg','matchesPrivateOriginal':True}
+            done('Published MediaStore JPEG exactly matches private photo; original remains and row is not pending')
     finally:
         adb('unroot',timeout=30);adb('wait-for-device',timeout=30)
         result['adbUnrooted']=adb('shell','id','-u').strip()!='0'
         if not result['adbUnrooted']:raise RuntimeError('ADB must return non-root')
     done('Private synthetic JPEG is bounded, decodable and nonblank, with no GPS metadata; ADB restored non-root')
+    if export_checks:
+        opened();workspace();tap('Saved photos');find('Saved photo preview');tap('Delete photo');tap('Delete permanently');find('Saved photos: 0 / 8')
+        tap('Close camera');no_camera_client()
+        if gallery_files()!=exported or adb('exec-out','cat','/sdcard/Pictures/Construct/'+exported[0],binary=True)!=exported_blob:
+            raise RuntimeError('Deleting the private photo changed the gallery copy')
+        done('Deleting private original and closing workspace leaves the independent gallery copy intact')
     restart();top();events=diagnostics();meta=[e for e in events if e.get('code')=='ENVIRONMENT']
     if len(meta)!=1:raise RuntimeError('Missing installed APK identity')
     result['environment']=meta[0]
     camera=[e for e in events if e.get('moduleId')=='dev.construct.camera'];codes=[e.get('code') for e in camera]
     if codes.count('CAMERA_SAVED')!=9 or 'CAMERA_QUOTA' not in codes:raise RuntimeError('Expected nine successful user captures and a quota rejection')
+    if export_checks and codes.count('PHOTO_EXPORTED')!=1:raise RuntimeError('Expected exactly one native export event')
     if any(c in ('JAVASCRIPT_ERROR','RENDERER_STOPPED','CAMERA_IMAGE','CAMERA_CAPTURE') for c in codes):raise RuntimeError('Unexpected camera runtime error')
     if any(t in json.dumps(events) for t in ('/camera-photos/','.jpg','data:image','Exif')):raise RuntimeError('Photo/path data in diagnostics')
     result['events']=camera

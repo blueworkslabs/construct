@@ -6,6 +6,8 @@ import socket
 import time
 from ui import adb, nodes, labels, tap, tap_node, find, capture, RESULTS
 from host_ui import select_after, installed_status
+from catalog_input import replace_text
+import ui
 
 require_runner()
 steps=[]
@@ -15,10 +17,9 @@ def done(name):
     (RESULTS/'smoke-result.json').write_text(json.dumps({'passed':steps,'complete':False},indent=2)+'\n')
 
 def edit(text):
-    for n in nodes():
-        if n.attrib.get('class')=='android.widget.EditText' and n.attrib.get('enabled')!='false':
-            tap_node(n); adb('shell','input','text',text); return
-    raise RuntimeError('No editable input')
+    replace_text(nodes, lambda value: ui._device(
+        className='android.widget.EditText', packageName='dev.construct.runtime'
+    ).set_text(value), text)
 
 def saved_item():
     try:
@@ -52,7 +53,9 @@ try:
         adb('shell','input','swipe','360','450','360','1050','300')
     else: raise RuntimeError('Could not return to Installed after update')
     installed_status()
-    tap('Open'); find('Clear completed'); saved_item()
+    # Let the existing bounded viewport refresh recover omitted descendants,
+    # then require both the retained item and the actual update-only control.
+    tap('Open'); saved_item(); find('Clear completed')
     capture('checklist-v02'); done('Downloaded update retained item and exposed new control')
     tap('Close module'); tap('Roll back'); tap('Restore'); tap('Open')
     saved_item()

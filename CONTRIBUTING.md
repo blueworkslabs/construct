@@ -2,6 +2,16 @@
 
 Construct is MIT-licensed; see [LICENSE.md](LICENSE.md). Contributions are welcome.
 
+## Source of truth
+
+The public repository is the canonical source for ongoing development. Make
+reusable host, module, runner and documentation changes here, on reviewable
+branches. Build private deployments from this source with the ignored operator
+profile and the operator's existing signing identities; do not maintain a second
+independently edited application tree. Historical private workbenches remain
+archives, not an upstream branch to merge wholesale. Keep keys, operator settings,
+raw device receipts and personal data outside public commits.
+
 Start with a small issue describing the behavior, lifecycle
 and capabilities involved. UI improvements, reproducibility work, additional
 synthetic tests and honest evidence are as useful as adding another native API.
