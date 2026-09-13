@@ -11,7 +11,9 @@
 
 Set `JAVA_HOME` to your JDK and `ANDROID_HOME` to your SDK. Alternatively put
 `sdk.dir=/absolute/path/to/android-sdk` in the ignored `local.properties` file.
-Accept Android SDK licenses yourself when provisioning the SDK.
+Accept Android SDK licenses when provisioning your SDK. The checked-in GitHub
+workflow explicitly provisions its SDK and accepts the SDK licenses for that CI
+environment; review that workflow before enabling it on your own fork.
 
 ```sh
 python3 -m venv .venv

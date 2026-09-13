@@ -39,6 +39,10 @@ jobs:
           node scripts/test_contacts.cjs
           node scripts/test_camera.cjs
       - name: Android SDK
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
       - name: JVM, lint and safe-default APK
         run: ./gradlew --no-daemon :core:app:testDebugUnitTest :core:app:lintDebug :core:app:assembleDebug --max-workers=1 -Dorg.gradle.jvmargs=-Xmx1500m

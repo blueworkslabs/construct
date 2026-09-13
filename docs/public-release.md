@@ -46,7 +46,9 @@ without operator work.
 See the [sanitized machine-readable summary](evidence/public-source-2026-09-13.json).
 Raw receipts remain private. The [hosted workflow status and logs](https://github.com/blueworkslabs/construct/actions/workflows/verify.yml)
 are separate evidence: CI builds fresh signed fixtures and runs local/JVM/lint/APK
-checks, not the external emulator suite.
+checks, not the external emulator suite. The first public CI attempt passed fixture
+and script checks but stopped because `sdkmanager` was absent. The workflow now
+provisions the Android SDK explicitly instead of assuming a runner image includes it.
 
 The reference screenshots and historical alpha11 acceptance described in
 [evidence.md](evidence.md) belong to the earlier private pilot, not a different
