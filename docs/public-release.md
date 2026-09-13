@@ -40,6 +40,15 @@ The reference screenshots and historical alpha11 acceptance described in
 build silently relabelled as this release. The known direct-Reopen accessibility
 limitation remains. No public release APK or shared signing identity is shipped.
 
+## Source audit
+
+The clean import starts with no private parents. A tracked-source pattern audit and
+a Git secret-detector scan found only the intentional credential-shaped URL in a
+rejection test; it is synthetic, not an operational credential. Credential validity
+probing was disabled. These are useful checks, not a guarantee that a scanner
+can recognize every secret or establish runtime security. Selected screenshots
+were visually reviewed, and generated deployment/signing/build files are excluded.
+
 ## Reproduction boundaries
 
 Linux/KVM, Android SDK licenses/images, app-free snapshots, HTTPS and access policy
