@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pocket Snake</title><link rel="stylesheet" href="/construct-host.css"><link rel="stylesheet" href="style.css"></head><body>
+<main>
+<header><h1>Pocket Snake</h1><div class="scores"><span id="score" class="chip">Score 0</span><span id="best" class="chip">Best 0</span></div></header>
+<div class="layout"><div id="board-wrap"><canvas id="board" aria-label="Game board" role="img"></canvas><div id="overlay"><div id="overlay-text">Loading…</div><div id="overlay-sub"></div></div></div>
+<section class="controls"><div class="toolbar"><button id="play" class="primary">Play</button><button id="pause">Pause</button><button id="new">New game</button></div>
+<div class="pad"><button id="left" aria-label="Turn left">◀</button><button id="up" aria-label="Turn up">▲</button><button id="down" aria-label="Turn down">▼</button><button id="right" aria-label="Turn right">▶</button></div>
+<p id="status" role="status">Loading saved game…</p><p class="hint">Swipe the board or use the arrows. Fruit makes you longer and faster. Reopening pauses.</p>
+<button id="retry" hidden>Retry loading saved game</button>
+<section id="repair" hidden><p>Saved data is unchanged.</p><button id="discard-open">Reset saved game and best</button><div id="confirm" hidden><p>Discard the saved game and best score?</p><button id="discard">Discard saved game</button><button id="keep">Keep saved game</button></div></section>
+</section></div><footer>On-device save · __VERSION__</footer>
+</main><script src="bridge.js"></script><script src="model.js"></script><script src="app.js"></script></body></html>

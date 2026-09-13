@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "dev.construct.hello",
+  "name": "Hello Module",
+  "description": "Minimal module used to prove install, load, host API calls, unload, and update flow.",
+  "version": "0.1.0",
+  "constructApi": {
+    "min": "0.1.0",
+    "target": "0.1.0"
+  },
+  "runtime": {
+    "kind": "webview-js"
+  },
+  "entry": "ui/index.html",
+  "capabilities": [
+    {
+      "id": "device.toast",
+      "reason": "Show a harmless hello message from the module."
+    },
+    {
+      "id": "log.write",
+      "reason": "Write startup and button-click diagnostics for testing."
+    },
+    {
+      "id": "storage.kv",
+      "reason": "Keep this module's counter between launches."
+    }
+  ],
+  "author": "Construct Runtime"
+}

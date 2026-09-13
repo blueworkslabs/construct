@@ -1,0 +1,6 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+function app(code){const elements=new Map(),calls=[];const el=id=>{if(!elements.has(id))elements.set(id,{disabled:false,textContent:''});return elements.get(id)};
+vm.runInNewContext(fs.readFileSync('examples/camera-module/ui/app.js','utf8'),{document:{getElementById:el},call:async(method,params)=>{calls.push({method,params});if(code)throw {code};return {opened:true}}});return {el,calls}}
+test('no camera call on load; explicit button only opens native workspace',async()=>{const a=app();assert.equal(a.calls.length,0);await a.el('open').onclick();assert.equal(a.calls.length,1);assert.equal(a.calls[0].method,'camera.capture');assert.equal(JSON.stringify(a.calls[0].params),'{"op":"open"}');});
+test('denial explains the distinct module and Android gates and permits retry',async()=>{for(const code of ['CAPABILITY_DENIED','ANDROID_PERMISSION_DENIED']){const a=app(code);await a.el('open').onclick();assert.match(a.el('status').textContent,new RegExp(code));assert.match(a.el('status').textContent,/Module access/);assert.equal(a.el('open').disabled,false)}});
+test('module scripts compile with the actual bridge',()=>{assert.doesNotThrow(()=>new vm.Script(['bridge.js','app.js'].map(n=>fs.readFileSync('examples/camera-module/ui/'+n,'utf8')).join('\n')))});

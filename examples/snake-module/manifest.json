@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "dev.construct.snake",
+  "name": "Pocket Snake",
+  "version": "0.1.5",
+  "description": "A swipe-and-button Snake game. Eat fruit, avoid walls and yourself, and keep your best score. Reopening always pauses.",
+  "constructApi": {
+    "min": "0.6.0",
+    "target": "0.6.0"
+  },
+  "runtime": {
+    "kind": "webview-js"
+  },
+  "entry": "ui/index.html",
+  "capabilities": [
+    {
+      "id": "storage.kv",
+      "reason": "Save each completed move and your best score on this phone.",
+      "optional": false
+    }
+  ],
+  "themeColor": "#0f1a21"
+}

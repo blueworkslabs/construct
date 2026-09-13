@@ -1,0 +1,9 @@
+# Example only: use YOUR DNS name, certificate files and private-network policy.
+# Install inside a TLS server block; never serve the source or signing directory.
+# A suitable access-control layer (VPN/firewall/auth proxy) is operator-owned.
+location /modules/ {
+    limit_except GET { deny all; }
+    proxy_pass http://127.0.0.1:8765/;
+}
+# The loopback Python origin rejects listing, symlinks, unexpected paths and queries.
+# Supply an analogous /module-tests/ origin on another port for signed test fixtures.

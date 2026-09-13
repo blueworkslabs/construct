@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "dev.construct.tone",
+  "name": "Pocket Tones",
+  "version": "0.1.0",
+  "constructApi": {
+    "min": "0.2.0",
+    "target": "0.2.0"
+  },
+  "runtime": {
+    "kind": "webview-js"
+  },
+  "entry": "ui/index.html",
+  "capabilities": [
+    {
+      "id": "device.tone",
+      "reason": "Play a short, quiet beep when you press a button. Starts off until you enable it."
+    }
+  ]
+}

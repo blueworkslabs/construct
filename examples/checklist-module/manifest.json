@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "dev.construct.checklist",
+  "name": "Pocket Checklist",
+  "description": "A small offline checklist. Version 0.2 adds Clear completed; the saved item format stays compatible.",
+  "version": "0.1.0",
+  "constructApi": {
+    "min": "0.1.0",
+    "target": "0.1.0"
+  },
+  "runtime": {
+    "kind": "webview-js"
+  },
+  "entry": "ui/index.html",
+  "capabilities": [
+    {
+      "id": "storage.kv",
+      "reason": "Keep up to 30 checklist items on this phone."
+    },
+    {
+      "id": "log.write",
+      "reason": "Report startup and technical failures without item text."
+    }
+  ],
+  "author": "Construct Runtime"
+}

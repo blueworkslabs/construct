@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "dev.construct.focus",
+  "name": "Pocket Focus",
+  "version": "0.1.2",
+  "description": "A saved focus countdown with an optional short completion tone. Keep open for sound; no background alarm.",
+  "constructApi": {
+    "min": "0.6.0",
+    "target": "0.6.0"
+  },
+  "runtime": {
+    "kind": "webview-js"
+  },
+  "entry": "ui/index.html",
+  "capabilities": [
+    {
+      "id": "storage.kv",
+      "reason": "Save the selected duration, pause state and deadline on this phone.",
+      "optional": false
+    },
+    {
+      "id": "device.tone",
+      "reason": "Play one short beep when a countdown finishes while this module is open. The timer also works silently.",
+      "optional": true
+    }
+  ],
+  "themeColor": "#101d20"
+}

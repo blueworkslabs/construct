@@ -1,0 +1,43 @@
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Build outputs
+build/
+dist/
+out/
+.gradle/
+node_modules/
+
+# Local/private config
+.env
+*.local.*
+
+# Module artifacts
+*.zip
+*.apk
+*.aab
+
+# Android prototype local tooling/generated trust assets
+**/build/
+local.properties
+core/app/src/main/assets/demo/
+core/app/src/main/assets/registry-public.der
+__pycache__/
+*.pyc
+.kotlin/
+*.keystore
+*.jks
+*.pem
+
+# Operator deployment and runner configuration
+core/app/src/deployment/
+runner.local.json
+**/runner.local.json
+*.p12
+*.pfx
+*.key
+
+.venv/

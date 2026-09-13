@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://construct.local/schemas/module-manifest.schema.json",
+  "title": "Construct Module Manifest",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "version",
+    "constructApi",
+    "runtime",
+    "entry",
+    "capabilities"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9-]*)+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)([-+][0-9A-Za-z.-]+)?$"
+    },
+    "constructApi": {
+      "type": "object",
+      "required": [
+        "min",
+        "target"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "min": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "declarative-ui",
+            "webview-js",
+            "trusted-native"
+          ]
+        }
+      }
+    },
+    "entry": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "optional": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    "author": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "homepage": {
+      "type": "string"
+    },
+    "themeColor": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "description": "Optional native window background colour; requires host API0.6.0."
+    }
+  }
+}

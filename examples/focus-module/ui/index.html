@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pocket Focus</title><link rel="stylesheet" href="/construct-host.css"><link rel="stylesheet" href="style.css"></head>
+<body><main>
+<header><p class="eyebrow">A LITTLE SPACE TO FOCUS</p><h1>Pocket Focus</h1></header>
+<p id="phase">Loading saved timer…</p><div id="clock" aria-label="Time remaining">25:00</div>
+<div class="presets"><button id="focus">25-minute focus</button><button id="break">5-minute break</button><button id="check">10-second check</button></div>
+<div class="actions"><button id="start" class="primary">Start timer</button><button id="pause">Pause timer</button><button id="reset">Reset timer</button></div>
+<p id="status" role="status" aria-live="polite">Loading…</p>
+<button id="retry" hidden>Retry loading saved timer</button>
+<section id="repair" hidden><p>The saved timer is unchanged. Reset only if you want to discard it.</p><button id="repair-open">Reset saved timer</button><div id="repair-confirm" hidden><p>Discard the saved timer and return to 25 minutes?</p><button id="repair-yes">Discard saved timer</button><button id="repair-no">Keep saved timer</button></div></section>
+<aside><strong>Keep open for the completion sound.</strong><p>Keep the screen awake. No background alarm or notification. Reopening catches up with the saved deadline without playing a late sound.</p><p>Tone access is optional. Enable it in Module access; silent/vibrate or Do Not Disturb can suppress it.</p></aside>
+<footer>Saved on this phone · __VERSION__</footer>
+</main><script src="bridge.js"></script><script src="model.js"></script><script src="app.js"></script></body></html>

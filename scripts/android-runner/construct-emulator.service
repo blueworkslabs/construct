@@ -1,0 +1,12 @@
+# Template: setup_runner.py writes the concrete unit for the selected root.
+[Unit]
+Description=On-demand disposable Construct Android emulator
+[Service]
+Type=simple
+ExecStart=/REPLACE_WITH_RUNNER_ROOT/start-emulator.sh
+MemoryMax=5G
+CPUQuota=180%
+TasksMax=512
+TimeoutStopSec=30
+Restart=no
+# Deliberately no Install section: do not enable boot autostart.
