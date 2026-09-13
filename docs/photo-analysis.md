@@ -55,8 +55,9 @@ MIT code. See the official documentation/model cards for
 ## Verification scope
 
 Local tests cover stale-result generations, malformed coordinates, Fit geometry,
-no-op logging and asset integrity. Exact-build Android acceptance is pending at
-this development checkpoint. A blank-image pass is not positive detection proof.
+no-op logging and asset integrity. The optimized candidate below passed all seven
+offline vision checks; camera/gallery and host regression remain pending at this
+checkpoint. A blank-image pass is not positive detection proof.
 
 The `--camera-only --camera-vision-only --camera-version … --camera-sha256 …`
 scope uses the disposable synthetic-camera AVD. It injects verified licensed
@@ -72,3 +73,18 @@ These are public test photos, not synthetic faces or operator personal data.
 They are not bundled in the phone APK. Physical detection quality and overlay
 alignment require a focused Pixel check. The pre-existing direct-Reopen
 accessibility limitation is not claimed fixed.
+
+### Optimized vision receipt
+
+- Native source: `e5d4ce8`; alpha 13 APK SHA-256:
+  `3093571752a82dd00a6f8ad6c6b5d65c4b80731e5d0eb71cca6a7c1969cb55dc`.
+- Android 16 emulator run `20260913T221106Z-a44eaabd`: seven checks passed,
+  complete receipt, non-root ADB restored, emulator stopped.
+- First face inference with networking disabled; rotated face positive; blank
+  face/object negatives; CC0 cat positive; background clearing; all four JPEGs
+  byte-identical; sanitized diagnostic completion events.
+- The earlier diagnostic debug run also passed, but is not reused as optimized
+  acceptance. Earlier linkage/protobuf/setup failures remain separately recorded.
+- Native camera screens retain screenshot protection. This receipt proves native
+  result text and lifecycle behavior, not visual overlay alignment; the latter
+  remains a focused physical-device check.
