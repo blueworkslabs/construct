@@ -270,6 +270,7 @@ class CameraActivity : ComponentActivity() {
                     } catch (e: Exception) { analysis = null; error(e) }
                 }
             } catch (e: LinkageError) {
+                android.util.Log.e("ConstructVision", "Native vision linkage failed", e)
                 runOnUiThread {
                     busy = false
                     if (live && analysisGeneration.current(token)) error(ConstructError("PHOTO_ANALYSIS_UNAVAILABLE", "On-device analysis is unavailable on this device. Your photos are unchanged."))

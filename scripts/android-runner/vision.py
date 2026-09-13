@@ -134,7 +134,7 @@ except Exception as error:
     result['error'] = str(error)
     try:
         capture('vision-failure')
-        (RESULTS/'vision-logcat.txt').write_text(adb('logcat', '-d', '-t', '300', 'AndroidRuntime:E', 'mediapipe:E', '*:S'))
+        (RESULTS/'vision-logcat.txt').write_text(adb('logcat', '-d', '-t', '300', 'AndroidRuntime:E', 'ConstructVision:E', 'mediapipe:E', 'linker:E', '*:S'))
     except Exception: pass
     raise
 finally:
