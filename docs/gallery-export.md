@@ -72,3 +72,11 @@ gallery visibility and independent-copy behavior also remain pending. The
 pre-existing direct-Reopen accessibility issue is excluded through the documented
 fresh-launch camera scope, not claimed fixed. Face analysis and LAN discovery
 remain later milestones.
+
+Baseline development receipts also retain an accessibility-tree failure after
+Checklist update (the screenshot rendered the controls). Reordering the existing
+bounded viewport refresh before the update-control assertion passed all five
+Checklist checks without restarting the module. That run then stopped before
+any probe verdict because the lab catalog lacked the public runner's exact
+probe 0.1.4. Publishing that immutable signed fixture corrected the setup; neither
+failure is treated as a complete host-baseline pass.
