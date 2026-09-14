@@ -139,9 +139,9 @@ try:
     # Review regression: a minimum line count was insufficient when messages wrapped.
     # Change only the disposable guest; configuration changes intentionally close the workspace.
     result['largeFontLayouts']=[]
-    for width,font_scale in [(720,'1.3'),(600,'1.3')]:
+    for width,height,font_scale in [(720,1280,'1.3'),(480,1600,'1.8')]:
         tap('Close measure')
-        adb('shell','wm','size',str(width)+'x1280')
+        adb('shell','wm','size',str(width)+'x'+str(height))
         adb('shell','settings','put','system','font_scale',font_scale)
         time.sleep(2)
         opened();entry=stage('measure-flat.png');pick();expect('Reference found.');size('100')
@@ -150,7 +150,7 @@ try:
         if abs(value-240)>4:raise RuntimeError('Large-font measurement outside 4 mm: '+str(value))
         tap('Clear endpoints')
         if find('Measurement photo: tap two endpoints').get('bounds')!=bounds:raise RuntimeError('Clearing status moved large-font photo')
-        result['largeFontLayouts'].append(dict(width=width,fontScale=font_scale,bounds=bounds,measuredMm=value))
+        result['largeFontLayouts'].append(dict(width=width,height=height,fontScale=font_scale,bounds=bounds,measuredMm=value))
         done('Photo bounds remain fixed across instructions, both taps, result and clear at width '+str(width)+' / font scale '+font_scale)
     tap('Close measure');adb('shell','wm','size','reset')
     if original_font_scale=='null':adb('shell','settings','delete','system','font_scale')

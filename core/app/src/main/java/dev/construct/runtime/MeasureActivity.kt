@@ -13,6 +13,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -191,7 +192,13 @@ class MeasureActivity : ComponentActivity() {
                     }
                 }
                 // Reserve the result/control space so setting A or B never resizes the photograph.
-                Text(lengthMm?.let { String.format(Locale.ROOT,"Length: %.1f cm",it/10) } ?: "Approximate length",style = MaterialTheme.typography.headlineSmall)
+                // The placeholder and numeric result must also occupy one stable line at
+                // large fonts. Horizontal scrolling keeps the full value readable.
+                key(lengthMm) {
+                    Text(lengthMm?.let { String.format(Locale.ROOT,"Length: %.1f cm",it/10) } ?: "Approximate length",
+                        style = MaterialTheme.typography.headlineSmall,maxLines = 1,
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()))
+                }
                 TextButton(enabled = sideMm != null,onClick = { clearMeasurement(); status = "Tap the first endpoint." }) { Text("Clear endpoints") }
                 val image = photo
                 if (image != null) {

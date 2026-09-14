@@ -41,8 +41,11 @@ The status now occupies a fixed three-line-height region at the current font sca
 Its full content remains scrollable; changing messages resets its scroll position.
 The region does not grow when an instruction/result wraps, so status changes cannot
 steal height from the photo. This is a focused bug fix, not the planned UX redesign.
+The result/placeholder row similarly remains one horizontally scrollable line,
+so a shorter numeric result cannot reclaim height from a wrapped placeholder.
 
-The device suite adds normal/narrow widths (720/600 pixels) at font scale 1.3,
+The device suite adds a 720×1280 / font-scale 1.3 layout and a deliberately narrow,
+tall 480×1600 / font-scale 1.8 stress layout (not a claim of testing another phone),
 checking exact photo bounds across both taps, result and clear, plus known length.
 It restores the disposable device configuration afterward.
 
