@@ -38,6 +38,9 @@ internal open class ModuleSessionView(context: Context) : WebView(context) {
         if (released) return
         released = true
         releaseSession()
+        // WebView requires removal from the view system before destroy(). In
+        // particular, let its accessibility provider detach while still alive.
+        (parent as? android.view.ViewGroup)?.removeView(this)
         super.destroy()
     }
     val gate = ModuleSessionGate()

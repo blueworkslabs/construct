@@ -58,4 +58,28 @@ class ModuleSessionViewTest {
         assertEquals(1, releases)
         assertEquals(false, view.gate.paused.get())
     }
+
+    @Test fun closeReleasesAuthorityThenDetachesBeforeNativeDestruction() {
+        var releases = 0
+        var removals = 0
+        val context = RuntimeEnvironment.getApplication()
+        val view = object : ModuleSessionView(context) {
+            override fun releaseSession() { releases++ }
+        }
+        val parent = object : android.widget.FrameLayout(context) {
+            override fun onViewRemoved(child: android.view.View) {
+                assertEquals(1, releases)
+                assertEquals(false, org.robolectric.Shadows.shadowOf(view).wasDestroyCalled())
+                removals++
+                super.onViewRemoved(child)
+            }
+        }
+        parent.addView(view)
+        view.destroy()
+        view.destroy()
+        assertEquals(null, view.parent)
+        assertEquals(1, removals)
+        assertEquals(1, releases)
+        assertEquals(true, org.robolectric.Shadows.shadowOf(view).wasDestroyCalled())
+    }
 }
