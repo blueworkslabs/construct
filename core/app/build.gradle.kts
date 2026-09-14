@@ -10,8 +10,8 @@ android {
         applicationId = "dev.construct.runtime"
         minSdk = 28
         targetSdk = 35
-        versionCode = 14
-        versionName = "0.1.0-alpha14"
+        versionCode = 15
+        versionName = "0.1.0-alpha15"
     }
     buildFeatures { compose = true; buildConfig = true }
     androidResources { noCompress += "tflite" }
@@ -45,6 +45,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material:material-icons-core")
+    implementation("org.opencv:opencv:4.12.0")
     implementation("androidx.webkit:webkit:1.12.1")
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")

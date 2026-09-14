@@ -103,7 +103,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             if (request.method != "GET") return reject("method")
             val path = request.url.path?.removePrefix("/") ?: return reject("path")
             if (!Packages.safePath(path)) return reject("path")
-            if (module.api == "0.6.0" && path == "construct-host.css") {
+            if (module.api in setOf("0.6.0", "0.7.0") && path == "construct-host.css") {
                 return WebResourceResponse("text/css", "UTF-8", 200, "OK",
                     mapOf("X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-store"),
                     ByteArrayInputStream(ModuleLayout.css.toByteArray()))
@@ -189,6 +189,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                 }
                 "storage.kv" -> store.storage(module.id, params)
                 "device.tone" -> tone.play(params)
+                "photo.measure" -> { MeasureActivity.open(context, store, installed, params); JSONObject().put("opened", true) }
                 "camera.capture" -> { CameraActivity.open(context, store, installed, params); JSONObject().put("opened", true) }
                 else -> throw ConstructError("CAPABILITY_DENIED", "Unsupported capability")
             }

@@ -1,0 +1,7 @@
+Pocket Measure uses OpenCV 4.12.0 (Apache License 2.0).
+Official Maven coordinate: org.opencv:opencv:4.12.0
+https://opencv.org/license/
+The upstream Android SDK includes native codec/math dependencies retaining their
+own notices; see https://github.com/opencv/opencv/tree/4.12.0/3rdparty
+and https://github.com/opencv/opencv/tree/4.12.0/platforms/android.
+No OpenCV Manager, runtime model download or OpenCV camera view is used.

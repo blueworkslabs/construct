@@ -1,0 +1,54 @@
+[
+  {
+    "name": "measure-flat.png",
+    "sha256": "a729f8cd8bb8dffcd73d27c744126c2c9662c1c82eaa410f4b9ebd7d52b6f706",
+    "bytes": 6593,
+    "width": 1200,
+    "height": 900,
+    "endpoints": [
+      [
+        150,
+        700
+      ],
+      [
+        870,
+        700
+      ]
+    ],
+    "expectedMm": 240,
+    "markerMm": 100
+  },
+  {
+    "name": "measure-angled.png",
+    "sha256": "4b9caf1514f4d95356dcc079540ff80b4c442c5cad4a26c52ca0ccfc625e9888",
+    "bytes": 26981,
+    "width": 1200,
+    "height": 900,
+    "endpoints": [
+      [
+        207.984130859375,
+        607.9277954101562
+      ],
+      [
+        888.5802001953125,
+        653.5771484375
+      ]
+    ],
+    "expectedMm": 240,
+    "markerMm": 100
+  },
+  {
+    "name": "measure-blank.png",
+    "sha256": "3d2bfc9395f1cb5ae9149a8cc6ac44ddbe7eec537ef80cc73a690c8610392df7",
+    "bytes": 5148,
+    "width": 1200,
+    "height": 900
+  },
+  {
+    "name": "measure-multiple.png",
+    "sha256": "b22899a2206026b35bf6ae9d4cee8cf397efb137f42e82fc6561d022c92431ee",
+    "bytes": 6233,
+    "width": 1200,
+    "height": 900
+  }
+]

@@ -37,7 +37,11 @@ p.add_argument('--disable-digital-wellbeing', action='store_true', help='Disable
 p.add_argument('--reliability-only', action='store_true', help='Repeated bundled-module lifecycle/accessibility checks only; not host or camera acceptance')
 p.add_argument('--webview-apk', type=Path, help='Optional Chromium com.android.webview provider for this disposable userdebug run')
 p.add_argument('--webview-sha256', help='Required checksum of the optional WebView provider APK')
+p.add_argument('--measure-only', action='store_true', help='Only synthetic native photo measurement; separate host baseline required')
+p.add_argument('--measure-sha256', help='Exact signed Pocket Measure 0.1.1 launcher')
 a = p.parse_args()
+if a.measure_only != bool(a.measure_sha256): p.error('Measure scope requires both measure-only and measure-sha256')
+if a.measure_only and any((a.camera_sha256,a.focus_sha256,a.snake_sha256,a.contacts_sha256,a.reliability_only,a.modules_only,a.tone_consent_only,a.camera_only,a.focus_only,a.snake_only,a.contacts_only)): p.error('Measure-only cannot mix other scopes')
 if a.reliability_only and any((a.camera_sha256, a.focus_sha256, a.snake_sha256, a.contacts_sha256, a.tone_consent_only, a.modules_only)): p.error('Reliability scope cannot mix other module scopes')
 if a.camera_vision_only and (not a.camera_only or not a.camera_sha256 or a.camera_gallery_export or a.camera_reopen_only): p.error('Vision scope requires camera-only/hash and cannot mix gallery or reopen scopes')
 if a.camera_gallery_export and (not a.camera_only or not a.camera_sha256 or a.camera_reopen_only): p.error('Gallery export requires full camera-only/hash acceptance, not reopen-only')
@@ -71,6 +75,8 @@ os.environ['CONSTRUCT_RESULTS'] = str(run)
 from ui import adb
 receipt = {'started': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'apkSha256': actual,
            'complete': False, 'scope': 'Checklist regression, classified bounded probes, injected renderer loss, and tone grant lifecycle; not complete sandbox/egress proof'}
+
+if a.measure_only: receipt['scope'] = 'Synthetic selected-photo planar measurement only; no real-camera accuracy claim or host baseline'
 
 if a.reliability_only: receipt['scope'] = 'Repeated bundled Hello lifecycle/accessibility transitions; no remote module or camera acceptance'
 
@@ -161,7 +167,7 @@ try:
     children = [('smoke.py', 'smoke-result.json'), ('probes.py', 'probe-summary.json'), ('renderer.py', 'renderer-result.json'), ('tone.py', 'tone-result.json'), ('consent.py', 'consent-result.json')]
     if a.tone_consent_only: children = children[3:]
     if a.reliability_only: children = [('reliability.py', 'reliability-result.json')]
-    if a.modules_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_only: children = []
+    if a.measure_only or a.modules_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_only: children = []
     if a.focus_sha256:
         os.environ['CONSTRUCT_FOCUS_SHA256'] = a.focus_sha256
         children.append(('focus.py', 'focus-result.json'))
@@ -174,13 +180,16 @@ try:
     if a.camera_sha256:
         os.environ['CONSTRUCT_CAMERA_SHA256'] = a.camera_sha256
         children.append(('vision.py' if a.camera_vision_only else 'camera.py', 'camera-result.json'))
+    if a.measure_only:
+        os.environ['CONSTRUCT_MEASURE_SHA256'] = a.measure_sha256
+        children.append(('measure.py', 'measure-result.json'))
     for script, result in children:
         with (run/(script+'.log')).open('w') as log:
             subprocess.run([str(BASE/'venv/bin/python'), str(BASE/script)], check=True,
                            stdout=log, stderr=subprocess.STDOUT, timeout=900)
         if not json.loads((run/result).read_text()).get('complete'):
             raise RuntimeError('Incomplete child receipt: '+result)
-    if not (a.reliability_only or a.modules_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_only):
+    if not (a.measure_only or a.reliability_only or a.modules_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_only):
         if not a.tone_consent_only:
             receipt['probeCounts'] = json.loads((run/'probe-summary.json').read_text())['counts']
             receipt['rendererVerdict'] = json.loads((run/'renderer-result.json').read_text())['verdict']
@@ -204,6 +213,9 @@ try:
         receipt['camera'] = json.loads((run/'camera-result.json').read_text())
         if receipt['camera']['environment']['apkSha256'] != actual:
             raise RuntimeError('Camera report APK hash mismatch')
+    if a.measure_only:
+        receipt['measure'] = json.loads((run/'measure-result.json').read_text())
+        if receipt['measure']['environment']['apkSha256'] != actual: raise RuntimeError('Measure APK hash mismatch')
     receipt['complete'] = True
 except Exception as error:
     receipt['error'] = str(error)

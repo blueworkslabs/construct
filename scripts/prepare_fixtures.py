@@ -24,7 +24,7 @@ def prepare(output):
     add('contacts-module',['0.1.0','0.2.0'],'contacts-registry')
     add('camera-module',['0.1.0'],'camera-registry')
     add('isolation-probe',[None],'probe-registry','test-registry',fixture=True)
-    for source in ('focus-module','snake-module','contacts-module','camera-module'):
+    for source in ('focus-module','snake-module','contacts-module','camera-module','measure-module'):
         add(source,[None],'home-registry','test-registry')
     print('Prepared complete JVM fixtures plus home/test catalogs under the selected output.')
 
