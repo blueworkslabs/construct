@@ -10,11 +10,11 @@ require_runner()
 camera_avd = CONFIG.profile(True)[0]
 config=(CONFIG.avd/(camera_avd+'.avd')/'config.ini').read_text()
 settings=dict(line.strip().split('=',1) for line in config.replace(' = ','=').splitlines() if '=' in line)
-if settings.get('hw.camera.back')!='emulated' or settings.get('hw.camera.front')!='none':raise RuntimeError('Only synthetic emulated camera is approved for this runner')
+if settings.get('hw.camera.back')!='emulated' or settings.get('hw.camera.front')!=CONFIG.front_camera(True):raise RuntimeError('Only synthetic emulated camera is approved for this runner')
 if not (CONFIG.root/'camera-emulated.flag').exists():raise RuntimeError('Camera suite must explicitly select generated backend')
 pid=subprocess.check_output(['systemctl','--user','show',CONFIG.service,'-p','MainPID','--value'],text=True).strip()
 args=Path('/proc/'+pid+'/cmdline').read_bytes().decode().split('\0')
-if '-camera-back' not in args or args[args.index('-camera-back')+1]!='emulated' or '-camera-front' not in args or args[args.index('-camera-front')+1]!='none':raise RuntimeError('Actual emulator camera command is not synthetic-only')
+if '-camera-back' not in args or args[args.index('-camera-back')+1]!='emulated' or '-camera-front' not in args or args[args.index('-camera-front')+1]!=CONFIG.front_camera(True):raise RuntimeError('Actual emulator camera command is not synthetic-only')
 if '-avd' not in args or args[args.index('-avd')+1]!=camera_avd:raise RuntimeError('Camera suite requires its configured synthetic-camera AVD')
 expected=os.environ['CONSTRUCT_CAMERA_SHA256'];heading='Pocket Camera · '+os.environ.get('CONSTRUCT_CAMERA_VERSION','0.1.0')
 export_checks=os.environ.get('CONSTRUCT_CAMERA_GALLERY_EXPORT')=='1'

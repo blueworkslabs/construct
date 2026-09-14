@@ -15,6 +15,7 @@ class RunnerConfigurationTests(unittest.TestCase):
         c=self.load(self.values())
         self.assertFalse(c.direct_memory)
         self.assertEqual(c.memory_mb,2048)
+        self.assertEqual(c.front_camera(True),'none')
         self.assertEqual(c.profile(),('construct-api36','clean',False))
         self.assertEqual(c.profile(True),('construct-camera36','camera-clean',True))
     def test_single_android17_snapshot_keeps_identical_hardware(self):
@@ -23,8 +24,15 @@ class RunnerConfigurationTests(unittest.TestCase):
         self.assertTrue(c.direct_memory)
         self.assertEqual(c.profile(),('construct-api37','clean',True))
         self.assertEqual(c.profile(),c.profile(True))
+    def test_generated_front_camera_never_enables_physical_sources(self):
+        r=self.values();r['emulate_front_camera']=True
+        c=self.load(r)
+        self.assertEqual(c.front_camera(False),'none')
+        self.assertEqual(c.front_camera(True),'emulated')
+        r['single_avd']=True;c=self.load(r)
+        self.assertEqual(c.front_camera(False),'emulated')
     def test_platform_options_fail_closed(self):
-        for key,value in [('api_level',True),('api_level','37'),('api_level',0),('single_avd','false'),('direct_memory','false'),('memory_mb',True),('memory_mb',512),('memory_mb','3072')]:
+        for key,value in [('emulate_front_camera','webcam0'),('api_level',True),('api_level','37'),('api_level',0),('single_avd','false'),('direct_memory','false'),('memory_mb',True),('memory_mb',512),('memory_mb','3072')]:
             r=self.values();r[key]=value
             with self.subTest(key=key,value=value),self.assertRaises(ValueError):self.load(r)
     def test_missing_config_never_authorizes_device_actions(self):

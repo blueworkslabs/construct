@@ -19,12 +19,13 @@ def main():
     p.add_argument('--avd-home',type=Path)
     p.add_argument('--api-level',type=int,default=36)
     p.add_argument('--single-avd',action='store_true',help='Share one app-free synthetic-camera snapshot across scopes')
+    p.add_argument('--emulate-front-camera',action='store_true',help='Provide a generated front camera as well; never a physical webcam')
     p.add_argument('--memory-mb',type=int,default=2048)
     p.add_argument('--enable-direct-memory',action='store_true',help='Enable required emulator graphics direct-memory/shared-slot features; record its evidence')
     p.add_argument('--service',default='construct-emulator-public.service')
     a=p.parse_args();root=a.root.expanduser().resolve()
     if root.exists():raise SystemExit('Runner root already exists; no files were replaced')
-    raw=dict(root=str(root),sdk=str((a.sdk or root/'sdk').expanduser().resolve()),avd=str((a.avd_home or root/'avd').expanduser().resolve()),host=a.expected_host,home_catalog=a.home_catalog,test_catalog=a.test_catalog,disposable=True,api_level=a.api_level,single_avd=a.single_avd,service=a.service,direct_memory=a.enable_direct_memory,memory_mb=a.memory_mb)
+    raw=dict(root=str(root),sdk=str((a.sdk or root/'sdk').expanduser().resolve()),avd=str((a.avd_home or root/'avd').expanduser().resolve()),host=a.expected_host,home_catalog=a.home_catalog,test_catalog=a.test_catalog,disposable=True,api_level=a.api_level,single_avd=a.single_avd,service=a.service,direct_memory=a.enable_direct_memory,memory_mb=a.memory_mb,emulate_front_camera=a.emulate_front_camera)
     spec=importlib.util.spec_from_file_location('runner_config',SOURCE/'config.py');module=importlib.util.module_from_spec(spec);sys.modules[spec.name]=module;spec.loader.exec_module(module)
     # Validate the chosen values before creating the target directory.
     import tempfile

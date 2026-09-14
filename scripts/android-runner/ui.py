@@ -89,6 +89,10 @@ def tap(text):
             break
         if time.monotonic() > deadline: raise RuntimeError('Unstable UI target: '+text)
         previous = current
+    if text == 'Close module':
+        # Do not let the next host-navigation read race the closing menu/tree.
+        # This is the native activity-result completion state, not a delay.
+        find('Module stopped.')
     print('Tapped:',text,flush=True)
 
 def capture(name):

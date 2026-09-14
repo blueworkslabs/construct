@@ -125,6 +125,8 @@ try:
         try:
             if adb('shell', 'getprop', 'sys.boot_completed', timeout=10).strip() == '1': break
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired): pass
+        service_state = subprocess.check_output(['systemctl','--user','show',CONFIG.service,'-p','ActiveState','--value'],text=True).strip()
+        if service_state == 'failed': raise RuntimeError('Emulator service failed during startup; inspect its journal')
         if time.monotonic() > deadline: raise RuntimeError('Android boot timed out')
         time.sleep(2)
     invocation=subprocess.check_output(['systemctl','--user','show',CONFIG.service,'-p','InvocationID','--value'],text=True).strip()

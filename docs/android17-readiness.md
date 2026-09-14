@@ -164,3 +164,37 @@ The first full 4 KiB run passed Checklist but stopped in probe setup with
 Probe setup now uses the existing exact-value `replace_text` helper and requires
 `Catalog refreshed.` before selecting the exact fixture. The clean rerun reached
 probe execution successfully; no app URL validation was relaxed.
+
+## Upstream memory-footprint fix under test
+
+Inspection of the pinned provider's crashing instruction found an intentional
+`ud2` arithmetic trap, including a checked resident-minus-shared page calculation,
+not an unsupported SIMD instruction. Chromium landed a matching defensive fix
+on 2026-09-14: [return nullopt for inconsistent private-memory readings](https://chromium.googlesource.com/chromium/src/+/7cde02997c20dbf455d80ca98b536092c577bded),
+commit position **1697321**. This is a strong lead; a successful matched runtime
+comparison is still required before attributing the observed failure to it.
+
+The official AndroidDesktop_x64 snapshot **1697462** contains that guard in its
+recorded source revision `e35794544a1e03e7d1f89b8ad1ac8970923c6f2b` (verified from
+`REVISIONS` and the source at that revision). Its exact test-provider APK is:
+
+- [Official archive](https://storage.googleapis.com/chromium-browser-snapshots/AndroidDesktop_x64/1697462/chrome-android-desktop.zip)
+- Member: `chrome-android-desktop/apks/SystemWebView.apk`
+- APK bytes: 412051160
+- APK SHA-256: `e4ded2f4d0f22dce452fd0d9f485a9b78926a9e2c3d4ffe64f4a385346d20497`
+
+This is a **development test provider for the disposable emulator**, not a phone
+WebView recommendation or a component embedded in Construct.
+
+The runner also supports `--emulate-front-camera`: only the literal generated
+front-camera mode is allowed; legacy profiles still use front `none`. Android 17
+CameraX reported missing advertised front hardware with the rear-only profile,
+so the replacement snapshot supplies **both generated cameras**. Guards verify
+the configured AVD and actual front/rear arguments; physical webcams remain
+excluded. A native Close-module completion assertion now prevents host navigation
+from racing the closing menu's old accessibility tree.
+
+Keeping both page-size comparisons exhausted the initial 16 GiB data volume's
+startup reserve. That new volume alone was expanded to **24 GiB**, restoring
+about 9 GiB headroom; no existing boot disk, Android-16 snapshot or recovery data
+was replaced. Startup now fails promptly when the emulator service fails.
