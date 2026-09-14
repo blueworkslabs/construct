@@ -120,6 +120,6 @@ internal data class MeasureViewport(
         val half = max(1, (loupePx / 2f / magnification * pixelsPerScreen).roundToInt())
         val cx = (point.x * imageWidth).roundToInt(); val cy = (point.y * imageHeight).roundToInt()
         val size = half * 2
-        return intArrayOf(cx - half, cy - half, min(size, imageWidth), min(size, imageHeight))
+        return intArrayOf(cx - half, cy - half, size, size)
     }
 }

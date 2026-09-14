@@ -1,10 +1,17 @@
 package dev.construct.runtime
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -33,10 +40,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.layout.onSizeChanged
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.atan2
 import kotlin.math.hypot
 
 /** Transient gesture bookkeeping. Owner-accepted positions are the only ones drawn. */
+private data class PendingTap(val position: Offset, val at: Long, val job: Job)
+
 private data class DragState(val revision: Long, val hit: HandleHit, val start: MeasurePoint, val finger: Offset, val accepted: MeasurePoint)
 
 /**
@@ -48,6 +60,7 @@ private data class DragState(val revision: Long, val hit: HandleHit, val start: 
 fun MeasureOverlay(
     photo: ImageBitmap,
     photoRevision: Long,
+    gestureRevision: Int = 0,
     enabled: Boolean,
     corners: List<MeasurePoint>,
     measurements: List<Measurement>,
@@ -64,9 +77,19 @@ fun MeasureOverlay(
     val loupeLift = with(density) { 72.dp.toPx() }
     val textMeasurer = rememberTextMeasurer()
 
+    var layoutSize by remember { mutableStateOf(IntSize.Zero) }
     var viewport by remember(photoRevision) { mutableStateOf<MeasureViewport?>(null) }
     var drag by remember(photoRevision) { mutableStateOf<DragState?>(null) }
-    var lastTap by remember(photoRevision) { mutableStateOf(0L to Offset.Zero) }
+    var pendingTap by remember(photoRevision) { mutableStateOf<PendingTap?>(null) }
+    val scope = rememberCoroutineScope()
+    val tapJobs = remember(photoRevision) { mutableListOf<Job>() }
+    fun cancelTaps() { tapJobs.toList().forEach { it.cancel() }; tapJobs.clear(); pendingTap=null }
+    val currentMeasurements by rememberUpdatedState(measurements)
+    val currentSelectedId by rememberUpdatedState(selectedId)
+    val place by rememberUpdatedState(onPlace)
+    val move by rememberUpdatedState(onMove)
+    val select by rememberUpdatedState(onSelect)
+    DisposableEffect(photoRevision,enabled,gestureRevision,layoutSize) { onDispose { cancelTaps() } }
 
     fun fitted(size: IntSize) = MeasureViewport.forView(photo.width, photo.height, size.width.toFloat(), size.height.toFloat())
     fun currentViewport(size: IntSize): MeasureViewport {
@@ -76,28 +99,32 @@ fun MeasureOverlay(
         return fitted(size).also { viewport = it }
     }
 
+    Box(modifier.fillMaxSize()) {
     Canvas(
-        modifier
-            .fillMaxSize()
-            .onSizeChanged { size -> if (size.width > 0 && size.height > 0) currentViewport(size) }
+        Modifier.fillMaxSize()
+            .onSizeChanged { size -> if (size.width > 0 && size.height > 0) { layoutSize = size; currentViewport(size) } }
             .semantics { contentDescription = "Measurement photo: tap to place an endpoint, drag a handle to adjust" }
-            .pointerInput(photoRevision, enabled) {
+            .pointerInput(photoRevision, enabled, gestureRevision, layoutSize) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val vp = currentViewport(size)
                     val revision = photoRevision
                     val startPosition = down.position
+                    val prior = pendingTap
+                    val doubleTap = prior != null && android.os.SystemClock.uptimeMillis()-prior.at < 300 &&
+                        (prior.position-startPosition).getDistance() < touchSlop*2
+                    if (doubleTap) { prior!!.job.cancel(); pendingTap=null }
                     var pastSlop = false
                     var pinching = false
                     var previous = listOf(down.position)
                     var previousDistance = 0f
 
                     // A finger that lands on a handle starts a drag immediately; the owner records the pre-drag value.
-                    val hit = if (enabled) vp.hitTest(measurements, selectedId, startPosition.x, startPosition.y, handleRadius) else null
-                    val startPoint = hit?.let { h -> measurements.firstOrNull { it.id == h.id }?.point(h.endpoint) }
+                    val hit = if (enabled && !doubleTap) vp.hitTest(currentMeasurements, currentSelectedId, startPosition.x, startPosition.y, handleRadius) else null
+                    val startPoint = hit?.let { h -> currentMeasurements.firstOrNull { it.id == h.id }?.point(h.endpoint) }
                     if (hit != null && startPoint != null) {
-                        onSelect(revision, hit.id)
-                        if (onMove(MoveRequest(revision, hit.id, hit.endpoint, DragPhase.BEGIN, null)) is EditResult.Accepted) {
+                        select(revision, hit.id)
+                        if (move(MoveRequest(revision, hit.id, hit.endpoint, DragPhase.BEGIN, null)) is EditResult.Accepted) {
                             drag = DragState(revision, hit, startPoint, startPosition, startPoint)
                         }
                     }
@@ -105,11 +132,11 @@ fun MeasureOverlay(
 
                     fun cancelDrag() {
                         val active = drag ?: return
-                        onMove(MoveRequest(active.revision, active.hit.id, active.hit.endpoint, DragPhase.CANCEL, null))
+                        move(MoveRequest(active.revision, active.hit.id, active.hit.endpoint, DragPhase.CANCEL, null))
                         drag = null
                     }
 
-                    while (true) {
+                    try { while (true) {
                         val event = awaitPointerEvent()
                         val pressed = event.changes.filter { it.pressed }
                         if (pressed.isEmpty()) {
@@ -117,22 +144,24 @@ fun MeasureOverlay(
                             when {
                                 active != null -> {
                                     // Commit the last owner-accepted preview; a rejected final position is never committed.
-                                    val result = onMove(MoveRequest(active.revision, active.hit.id, active.hit.endpoint, DragPhase.COMMIT, active.accepted))
+                                    val result = move(MoveRequest(active.revision, active.hit.id, active.hit.endpoint, DragPhase.COMMIT, active.accepted))
                                     if (result !is EditResult.Accepted) cancelDrag()
                                     drag = null
                                 }
                                 !pastSlop && !pinching && hit == null -> {
-                                    val now = System.currentTimeMillis()
-                                    val (lastTime, lastPosition) = lastTap
-                                    val doubleTap = now - lastTime < 300 && (lastPosition - startPosition).getDistance() < touchSlop * 2
-                                    lastTap = now to startPosition
+                                    val now = android.os.SystemClock.uptimeMillis()
                                     if (doubleTap) {
-                                        // Double tap toggles 1× / 3× around the tap; it never places a point.
-                                        viewport = if (vp.scale > 1.01f) vp.reset() else vp.zoomedBy(3f / vp.scale, startPosition.x, startPosition.y)
-                                        lastTap = 0L to Offset.Zero
+                                        viewport = if (vp.scale > 1.01f) vp.reset() else vp.zoomedBy(3f/vp.scale,startPosition.x,startPosition.y)
                                     } else if (enabled) {
-                                        val point = vp.toPhoto(startPosition.x, startPosition.y)
-                                        if (point != null) onPlace(revision, point) else onSelect(revision, null)
+                                        // Defer single-tap placement until it cannot be a double tap.
+                                        val point = vp.toPhoto(startPosition.x,startPosition.y)
+                                        val job = scope.launch {
+                                            delay(310)
+                                            if (point != null) place(revision,point) else select(revision,null)
+                                            if (pendingTap?.at == now) pendingTap=null
+                                        }
+                                        tapJobs.add(job); job.invokeOnCompletion { tapJobs.remove(job) }
+                                        pendingTap=PendingTap(startPosition,now,job)
                                     }
                                 }
                             }
@@ -142,6 +171,7 @@ fun MeasureOverlay(
                         if (pressed.size >= 2) {
                             // A second finger cancels any drag and never commits a placement.
                             if (drag != null) cancelDrag()
+                            cancelTaps()
                             pinching = true; pastSlop = true
                             val a = pressed[0].position; val b = pressed[1].position
                             val distance = hypot(a.x - b.x, a.y - b.y)
@@ -149,7 +179,7 @@ fun MeasureOverlay(
                             if (previous.size == 2 && previousDistance > 0f) {
                                 val previousCentroid = Offset((previous[0].x + previous[1].x) / 2, (previous[0].y + previous[1].y) / 2)
                                 val current = viewport ?: vp
-                                viewport = current.zoomedBy(distance / previousDistance, centroid.x, centroid.y)
+                                viewport = current.zoomedBy(distance / previousDistance, previousCentroid.x, previousCentroid.y)
                                     .pannedBy(centroid.x - previousCentroid.x, centroid.y - previousCentroid.y)
                             }
                             previous = listOf(a, b); previousDistance = distance
@@ -163,7 +193,7 @@ fun MeasureOverlay(
                             val candidate = (viewport ?: vp).toPhoto(position.x, position.y)
                             var accepted = active.accepted
                             if (candidate != null) {
-                                val result = onMove(MoveRequest(active.revision, active.hit.id, active.hit.endpoint, DragPhase.PREVIEW, candidate))
+                                val result = move(MoveRequest(active.revision, active.hit.id, active.hit.endpoint, DragPhase.PREVIEW, candidate))
                                 if (result is EditResult.Accepted) accepted = candidate
                             }
                             drag = active.copy(finger = position, accepted = accepted)
@@ -176,7 +206,7 @@ fun MeasureOverlay(
                         }
                         previous = listOf(position)
                         event.changes.forEach(PointerInputChange::consume)
-                    }
+                    } } finally { cancelDrag() }
                 }
             }
     ) {
@@ -201,10 +231,7 @@ fun MeasureOverlay(
             val selected = measurement.id == selectedId
             val colour = if (selected) Color(0xFFFFD84A) else Color(0xFF7AD0FF).copy(alpha = .8f)
             // Draw the owner's accepted positions; only the dragged endpoint follows the accepted preview.
-            fun shown(endpoint: MeasureEndpoint): MeasurePoint? {
-                val base = measurement.point(endpoint) ?: return null
-                return if (activeDrag != null && activeDrag.hit.id == measurement.id && activeDrag.hit.endpoint == endpoint) activeDrag.accepted else base
-            }
+            fun shown(endpoint: MeasureEndpoint) = measurement.point(endpoint)
             val a = shown(MeasureEndpoint.A) ?: continue
             val b = shown(MeasureEndpoint.B)
             if (b != null) {
@@ -217,6 +244,11 @@ fun MeasureOverlay(
         }
 
         activeDrag?.let { drawLoupe(photo, vp, it, loupeDiameter, loupeLift) }
+    }
+    TextButton(onClick = { cancelTaps(); viewport=viewport?.reset() },
+        enabled = drag == null && (viewport?.scale ?: 1f) > 1f, modifier = Modifier.align(Alignment.TopEnd)) {
+        Text("Zoom %.1f×".format(java.util.Locale.ROOT,viewport?.scale ?: 1f) + if ((viewport?.scale ?: 1f)>1f) " · Reset" else "")
+    }
     }
 }
 
@@ -247,16 +279,18 @@ private fun DrawScope.drawLabel(textMeasurer: androidx.compose.ui.text.TextMeasu
     drawText(layout, colour, position)
 }
 
-private fun DrawScope.drawLoupe(photo: ImageBitmap, vp: MeasureViewport, drag: DragState, diameter: Float, lift: Float) {
+private fun DrawScope.drawLoupe(photo: ImageBitmap, vp: MeasureViewport, drag: DragState, requestedDiameter: Float, lift: Float) {
+    val diameter = minOf(requestedDiameter, size.width, size.height)
     val magnification = 2.5f
     val radius = diameter / 2
     // Above the finger, flipped below when there is no room at the top edge.
-    val centre = if (drag.finger.y - lift - radius >= 0f) Offset(drag.finger.x, drag.finger.y - lift) else Offset(drag.finger.x, drag.finger.y + lift)
+    val centre = Offset(drag.finger.x.coerceIn(radius,size.width-radius),
+        (if (drag.finger.y-lift-radius >= 0f) drag.finger.y-lift else drag.finger.y+lift).coerceIn(radius,size.height-radius))
     val source = vp.loupeSource(drag.accepted, photo.width, photo.height, diameter, magnification)
     val srcLeft = source[0].coerceIn(0, photo.width - 1); val srcTop = source[1].coerceIn(0, photo.height - 1)
-    val srcWidth = source[2].coerceAtMost(photo.width - srcLeft); val srcHeight = source[3].coerceAtMost(photo.height - srcTop)
+    val srcWidth = (source[0]+source[2]).coerceAtMost(photo.width)-srcLeft; val srcHeight = (source[1]+source[3]).coerceAtMost(photo.height)-srcTop
     // Keep the crop centred on the point even near photo edges by shifting the destination.
-    val shiftX = (source[0] - srcLeft) * (diameter / source[2]); val shiftY = (source[1] - srcTop) * (diameter / source[3])
+    val shiftX = (srcLeft - source[0]) * (diameter / source[2]); val shiftY = (srcTop - source[1]) * (diameter / source[3])
     val clip = Path().apply { addOval(androidx.compose.ui.geometry.Rect(centre - Offset(radius, radius), Size(diameter, diameter))) }
     drawCircle(Color.Black.copy(alpha = .6f), radius + 3.dp.toPx(), centre)
     clipPath(clip) {

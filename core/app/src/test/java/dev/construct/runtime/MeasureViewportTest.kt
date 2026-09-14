@@ -68,4 +68,19 @@ class MeasureViewportTest {
         val zoomedCrop = vp.zoomedBy(2f, 400f, 500f).loupeSource(MeasurePoint(0.5, 0.5), 1600, 1200, 96f, 2.5f)
         assertTrue(zoomedCrop[2] < crop[2])                                // zoomed in: fewer source pixels per loupe
     }
+    @Test fun `moving pinch centroid keeps its photo point under the fingers`() {
+        val before=vp.toPhoto(400f,500f)!!
+        val after=vp.zoomedBy(2f,400f,500f).pannedBy(30f,-40f)
+        close(430f,after.toScreenX(before.x));close(460f,after.toScreenY(before.y))
+    }
+
+    @Test fun `edge and tiny photo loupe crops retain their centre and aspect`() {
+        val tiny=MeasureViewport.forView(20,10,800f,1000f)
+        for (p in listOf(MeasurePoint(0.0,0.0),MeasurePoint(1.0,1.0),MeasurePoint(.5,.5))) {
+            val crop=tiny.loupeSource(p,20,10,9600f,2.5f)
+            assertEquals(crop[2],crop[3])
+            assertEquals((p.x*20).toInt(),crop[0]+crop[2]/2)
+            assertEquals((p.y*10).toInt(),crop[1]+crop[3]/2)
+        }
+    }
 }

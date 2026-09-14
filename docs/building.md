@@ -32,6 +32,12 @@ node scripts/test_camera.cjs
 ./gradlew --no-daemon :core:app:testDebugUnitTest :core:app:lintDebug :core:app:assembleDebug --max-workers=1
 ```
 
+The fixture bootstrap also runs `scripts/local_mediapipe.py` to produce the ignored
+`core/app/libs/mediapipe-core-local.aar` from the pinned upstream runtime with the
+documented telemetry modification. For an existing operator checkout, run
+`python3 scripts/local_mediapipe.py` independently to prepare this dependency
+without regenerating publisher fixtures or signing identities.
+
 The fixture bootstrap generates signed Hello assets, the pinned publisher public
 key, JVM fixture catalogs and current example home/test catalogs. Its historical
 version labels are synthetic **current-source fixtures**, not reproductions of old

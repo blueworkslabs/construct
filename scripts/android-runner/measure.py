@@ -16,6 +16,7 @@ entries=json.loads((fixtures/'manifest.json').read_text())
 current=None
 current_entry=None
 stage_index=0
+PHOTO='Measurement photo: tap to place an endpoint, drag a handle to adjust'
 original_font_scale=adb('shell','settings','get','system','font_scale').strip()
 def done(text):result['checks'].append(text);print('PASS:',text,flush=True)
 def top():
@@ -34,7 +35,7 @@ def expect(prefix,timeout=60):
         time.sleep(.3)
     raise RuntimeError('Missing '+prefix+'; '+str(labels()))
 def opened():
-    restart();top();select_after(heading,('Open',));tap('Open measurement workspace');find('Choose photo')
+    restart();top();select_after(heading,('Open',));tap('Open measurement workspace');control('Choose photo')
 def stage(name):
     global current,current_entry,stage_index
     entry=next(e for e in entries if e['name']==name)
@@ -59,7 +60,7 @@ def stage(name):
     return entry
 
 def pick():
-    tap('Choose photo')
+    action('Choose photo')
     until=time.monotonic()+30
     while time.monotonic()<until:
         ns=nodes()
@@ -73,23 +74,56 @@ def pick():
         time.sleep(.4)
     capture('measure-picker-missing');raise RuntimeError('Synthetic photo missing in picker: '+str(labels()))
 
+def control(text):
+    # Scroll only the native controls sheet, never the photo gesture surface.
+    if 'Expand controls' in labels():tap('Expand controls')
+    for direction in [1,-1]:
+        for _ in range(8):
+            matches=[n for n in nodes() if text in (n.get('text'),n.get('content-desc')) and n.get('enabled')!='false']
+            if matches:return matches[0]
+            x1,y1,x2,y2=map(int,re.findall(r'\d+',find('Measurement controls').get('bounds')))
+            top=y1+max(20,(y2-y1)//6);bottom=y2-max(20,(y2-y1)//6)
+            adb('shell','input','swipe',str((x1+x2)//2),str(bottom if direction==1 else top),str((x1+x2)//2),str(top if direction==1 else bottom),'350')
+    raise RuntimeError('Control missing in bounded sheet scroll: '+text)
+
+def collapse():
+    if 'Expand controls' not in labels():tap_node(control('Collapse controls'))
+    time.sleep(.4)
+
+def action(text,collapse_after=False):
+    tap_node(control(text));time.sleep(.4)
+    if collapse_after:collapse()
+
 def size(value):
-    find('Marker side (mm)')
+    if 'Marker side (mm)' not in labels():
+        chip=next((x for x in labels() if x.startswith('Marker ') and x.endswith('mm ✓')),None)
+        if chip is None:
+            control('Collapse controls')
+            chip=next((x for x in labels() if x.startswith('Marker ') and x.endswith('mm ✓')),None)
+        if chip:tap(chip)
+    control('Marker side (mm)')
     ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value)
-    tap('Confirm size');expect('Tap the two ends')
+    # Hide only the keyboard (the app's Back policy is not used as navigation here).
+    if ui._device.info.get('currentPackageName') != 'dev.construct.runtime':raise RuntimeError('Lost measurement workspace')
+    action('Confirm size');expect('Tap the two ends');collapse()
+
+def screen_point(entry,point):
+    x1,y1,x2,y2=map(int,re.findall(r'\d+',find(PHOTO).get('bounds')))
+    scale=min((x2-x1)/entry['width'],(y2-y1)/entry['height'])
+    left=x1+((x2-x1)-entry['width']*scale)/2
+    top=y1+((y2-y1)-entry['height']*scale)/2
+    return round(left+point[0]*scale),round(top+point[1]*scale)
+
+def length():return float(expect('Length: ').split()[1])*10
 
 def endpoints(entry):
-    initial_bounds=find('Measurement photo: tap two endpoints').get('bounds')
-    for x,y in entry['endpoints']:
-        node=find('Measurement photo: tap two endpoints')
-        x1,y1,x2,y2=map(int,re.findall(r'\d+',node.get('bounds')))
-        scale=min((x2-x1)/entry['width'],(y2-y1)/entry['height'])
-        left=x1+((x2-x1)-entry['width']*scale)/2
-        top=y1+((y2-y1)-entry['height']*scale)/2
-        adb('shell','input','tap',str(round(left+x*scale)),str(round(top+y*scale)))
-        time.sleep(.6)
-        if find('Measurement photo: tap two endpoints').get('bounds')!=initial_bounds:raise RuntimeError('Photo area moved between endpoint taps')
-    return float(expect('Length: ').split()[1])*10
+    collapse();initial_bounds=find(PHOTO).get('bounds')
+    for point in entry['endpoints']:
+        x,y=screen_point(entry,point)
+        adb('shell','input','tap',str(x),str(y));time.sleep(.6)
+        if find(PHOTO).get('bounds')!=initial_bounds:raise RuntimeError('Photo area moved between endpoint taps')
+    return length()
+
 try:
     if adb('shell','getprop','ro.kernel.qemu').strip()!='1':raise RuntimeError('Requires disposable emulator')
     restart()
@@ -106,25 +140,65 @@ try:
     done('Native measurement cannot open before its explicit module grant')
     tap('Module access');find('Allow photo measurement');grant=next(n for n in nodes() if n.get('content-desc')=='Allow photo measurement' and n.get('checkable')=='true')
     if grant.get('checked')!='false':raise RuntimeError('Measurement grant was not off')
-    tap_node(grant);find('Allow photo measurement: on.');tap('Reopen module');tap('Open measurement workspace');find('Choose photo')
-    tap('Choose photo');adb('shell','input','keyevent','4');expect('No photo selected.')
+    tap_node(grant);find('Allow photo measurement: on.');tap('Reopen module');tap('Open measurement workspace');control('Choose photo')
+    action('Choose photo');adb('shell','input','keyevent','4');expect('No photo selected.')
     done('System picker cancellation reads no photo and returns to workspace')
     entry=stage('measure-flat.png')
     adb('shell','cmd','connectivity','airplane-mode','enable');adb('shell','svc','wifi','disable');adb('shell','svc','data','disable')
     if adb('shell','settings','get','global','airplane_mode_on').strip()!='1':raise RuntimeError('Offline setup failed')
     result['offlineBeforeFirstDetection']=True
     pick();expect('Reference found.')
-    find('Marker side (mm)');ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text('0');tap('Confirm size');expect('[SIZE_INVALID]')
+    find('Marker side (mm)');ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text('0');action('Confirm size');expect('[SIZE_INVALID]')
     done('Invalid marker size is rejected before endpoint measurement')
     size('100');value=endpoints(entry)
     if abs(value-entry['expectedMm'])>3:raise RuntimeError('Synthetic flat measurement outside 3 mm: '+str(value))
     result['flatMm']=value;capture('measure-flat');done('First offline native ArUco detection and two endpoint taps measure synthetic 240 mm within 3 mm')
+    # Multi-move drag creates one Undo action and reads the latest pair, not an old Compose closure.
+    x,y=screen_point(entry,entry['endpoints'][1]);nx,ny=screen_point(entry,(960,700))
+    adb('shell','input','swipe',str(x),str(y),str(nx),str(ny),'800');time.sleep(.6)
+    moved=length()
+    if abs(moved-270)>4:raise RuntimeError('Dragging B did not recompute the expected 270 mm: '+str(moved))
+    action('Undo',collapse_after=True)
+    if length()!=result['flatMm']:raise RuntimeError('One Undo did not restore the complete pre-drag pair')
+    action('Undo',collapse_after=True);expect('First endpoint set.')
+    if any(x.startswith('Length:') for x in labels()):raise RuntimeError('Drag recorded multiple Undo entries')
+    x,y=screen_point(entry,entry['endpoints'][1]);adb('shell','input','tap',str(x),str(y));time.sleep(.6)
+    done('Dragging an existing handle recomputes length; one Undo restores the prior pair and the next removes B')
+    x,y=screen_point(entry,entry['endpoints'][1]);nx,ny=screen_point(entry,(960,700))
+    ui._device.touch.down(x,y).move(nx,ny);time.sleep(.6)
+    if abs(length()-270)>4:raise RuntimeError('Held drag did not preview')
+    adb('shell','input','keyevent','4');ui._device.touch.up(nx,ny);time.sleep(.6)
+    if length()!=result['flatMm']:raise RuntimeError('Back did not cancel the active drag')
+    done('Back cancels a held drag, restores the pre-drag pair and keeps the workspace open')
+    action('Select endpoint B')
+    for _ in range(4):action('Nudge B left')
+    nudged=length()
+    if not result['flatMm']-3<=nudged<result['flatMm']:raise RuntimeError('Photo-pixel nudge did not reduce length')
+    for _ in range(4):action('Undo')
+    collapse()
+    if length()!=result['flatMm']:raise RuntimeError('Nudge Undo did not restore original measurement')
+    done('Accessible endpoint nudges use photo pixels and each nudge is individually undoable')
+    action('Clear',collapse_after=True)
+    x,y=screen_point(entry,(650,450))
+    ui._device.double_click(x,y,interval=.08);time.sleep(.6);expect('Zoom 3.0×')
+    if any(x.startswith(('Length:','First endpoint set.')) for x in labels()):raise RuntimeError('Double tap placed an endpoint')
+    ui._device.swipe(x,y,x-60,y-50,duration=.4);time.sleep(.4)
+    if any(x.startswith(('Length:','First endpoint set.')) for x in labels()):raise RuntimeError('Pan placed an endpoint')
+    tap('Zoom 3.0× · Reset');time.sleep(.4)
+    done('Double tap zooms to 3× without placement; zoomed pan creates no endpoint and Reset returns to fit')
+    ui._device(description=PHOTO).pinch_out(percent=40,steps=25);time.sleep(.6)
+    zoom=next((x for x in labels() if x.startswith('Zoom ') and 'Reset' in x),None)
+    if zoom is None:raise RuntimeError('Two-finger pinch did not zoom')
+    if any(x.startswith(('Length:','First endpoint set.')) for x in labels()):raise RuntimeError('Pinch placed an endpoint')
+    tap(zoom);time.sleep(.4)
+    if abs(endpoints(entry)-240)>3:raise RuntimeError('Reset after gestures changed photo coordinates')
+    done('Real two-pointer pinch zooms without placement; fit reset preserves calibrated photo coordinates')
     size('95');value=endpoints(entry)
     if abs(value-228)>3:raise RuntimeError('Measured marker-size scaling failed: '+str(value))
     result['scaledMm']=value;done('95 mm actual marker size scales the same endpoints to 228 mm and clears old results')
-    tap('Clear endpoints')
+    action('Clear',collapse_after=True)
     if any(x.startswith('Length:') for x in labels()):raise RuntimeError('Clear retained a result')
-    node=find('Measurement photo: tap two endpoints');x1,y1,x2,y2=map(int,re.findall(r'\d+',node.get('bounds')))
+    node=find(PHOTO);x1,y1,x2,y2=map(int,re.findall(r'\d+',node.get('bounds')))
     scaledHeight=(x2-x1)*entry['height']/entry['width']
     if (y2-y1)>scaledHeight+10:
         adb('shell','input','tap',str((x1+x2)//2),str(y1+2))
@@ -140,19 +214,19 @@ try:
     # Change only the disposable guest; configuration changes intentionally close the workspace.
     result['largeFontLayouts']=[]
     for width,height,font_scale in [(720,1280,'1.3'),(480,1600,'1.8')]:
-        tap('Close measure')
+        action('Close measure')
         adb('shell','wm','size',str(width)+'x'+str(height))
         adb('shell','settings','put','system','font_scale',font_scale)
         time.sleep(2)
         opened();entry=stage('measure-flat.png');pick();expect('Reference found.');size('100')
-        bounds=find('Measurement photo: tap two endpoints').get('bounds')
+        bounds=find(PHOTO).get('bounds')
         value=endpoints(entry)
         if abs(value-240)>4:raise RuntimeError('Large-font measurement outside 4 mm: '+str(value))
-        tap('Clear endpoints')
-        if find('Measurement photo: tap two endpoints').get('bounds')!=bounds:raise RuntimeError('Clearing status moved large-font photo')
+        action('Clear',collapse_after=True)
+        if find(PHOTO).get('bounds')!=bounds:raise RuntimeError('Clearing status moved large-font photo')
         result['largeFontLayouts'].append(dict(width=width,height=height,fontScale=font_scale,bounds=bounds,measuredMm=value))
         done('Photo bounds remain fixed across instructions, both taps, result and clear at width '+str(width)+' / font scale '+font_scale)
-    tap('Close measure');adb('shell','wm','size','reset')
+    action('Close measure');adb('shell','wm','size','reset')
     if original_font_scale=='null':adb('shell','settings','delete','system','font_scale')
     else:adb('shell','settings','put','system','font_scale',original_font_scale)
     time.sleep(2);opened()
@@ -165,11 +239,15 @@ try:
     if any(x.startswith('Length:') or x=='Confirm size' for x in labels()):raise RuntimeError('Background retained photo or result')
     done('Background closes workspace; reopening retains no selected image or measurement')
     entry=stage('measure-flat.png');pick();expect('Reference found.');size('100');endpoints(entry)
-    adb('shell','settings','put','system','accelerometer_rotation','0');adb('shell','settings','put','system','user_rotation','1');find('Installed')
-    adb('shell','settings','put','system','user_rotation','0');opened()
-    if any(x.startswith('Length:') or x=='Confirm size' for x in labels()):raise RuntimeError('Rotation retained a photo or result')
-    done('Rotation closes the native workspace rather than restoring a selected photo or pending request')
-    tap('Close measure');restart();top();select_after(heading,('Module access',));tap_node(next(n for n in nodes() if n.get('content-desc')=='Allow photo measurement' and n.get('checkable')=='true'));tap('Turn off');find('Allow photo measurement: off.')
+    pid=adb('shell','pidof','dev.construct.runtime').strip()
+    before=length();portrait=find(PHOTO).get('bounds')
+    adb('shell','settings','put','system','accelerometer_rotation','0');adb('shell','settings','put','system','user_rotation','1');time.sleep(2)
+    if find(PHOTO).get('bounds')==portrait:raise RuntimeError('Rotation did not resize the photo surface')
+    if length()!=before or adb('shell','pidof','dev.construct.runtime').strip()!=pid:raise RuntimeError('Rotation lost current work or restarted process')
+    adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
+    if length()!=before:raise RuntimeError('Portrait return changed measurement')
+    done('Rotation retains the same photo, calibration and endpoints in the same process; returning to portrait preserves length')
+    action('Close measure');restart();top();select_after(heading,('Module access',));tap_node(next(n for n in nodes() if n.get('content-desc')=='Allow photo measurement' and n.get('checkable')=='true'));tap('Turn off');find('Allow photo measurement: off.')
     tap('Reopen module');tap('Open measurement workspace');expect('[CAPABILITY_DENIED]')
     done('Revocation blocks reopening the workspace')
     restart();top();events=diagnostics();result['environment']=next(e for e in events if e.get('code')=='ENVIRONMENT')

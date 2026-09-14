@@ -11,27 +11,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.json.JSONObject
 import java.nio.ByteBuffer
@@ -64,10 +50,14 @@ class MeasureActivity : ComponentActivity() {
     private val generation = AnalysisGeneration()
     private var photo by mutableStateOf<Bitmap?>(null)
     private var corners by mutableStateOf(emptyList<MeasurePoint>())
-    private var endpoints by mutableStateOf(emptyList<MeasurePoint>())
+    private val editor = MeasureEditor()
+    private var gestureRevision by mutableStateOf(0)
+    private var editorVersion by mutableStateOf(0)
+    private var expanded by mutableStateOf(true)
+    private var error by mutableStateOf<String?>(null)
+    private var selectedEndpoint by mutableStateOf<MeasureEndpoint?>(null)
     private var sizeText by mutableStateOf("")
-    private var sideMm by mutableStateOf<Double?>(null)
-    private var lengthMm by mutableStateOf<Double?>(null)
+
     private var busy by mutableStateOf(false)
     private var status by mutableStateOf("Choose one saved photo with the reference card beside the item.")
     private val picker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -78,7 +68,7 @@ class MeasureActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        // Rotation or process recreation never restores sensitive photos or pending requests.
+        // Rotation is handled in place. Process recreation never restores sensitive photos.
         if (savedInstanceState != null) { finish(); return }
         store = ModuleStore.shared(this)
         try {
@@ -90,24 +80,47 @@ class MeasureActivity : ComponentActivity() {
     override fun onStart() { live = true; super.onStart() }
     override fun onStop() {
         live = false; generation.invalidate()
-        photo = null; corners = emptyList(); clearMeasurement(); busy = false
+        photo = null; corners = emptyList(); editor.reset(); editorVersion++; busy = false; error = null
         super.onStop()
         // Only the explicit system-picker handoff may return to this workspace.
         if (!choosingPhoto || isChangingConfigurations) finish()
     }
     override fun onDestroy() { generation.invalidate(); launched.set(false); super.onDestroy() }
     private fun checkAccess() = store.withCapability(installed,"photo.measure") { }
-    private fun clearMeasurement() { endpoints = emptyList(); lengthMm = null }
+    private fun refreshEditor() { editorVersion++ }
+    private fun edit(reportError: Boolean = true, action: () -> EditResult): EditResult {
+        if (!live || isFinishing || busy) return EditResult.Rejected("Workspace is not available.")
+        return try {
+            checkAccess()
+            val result = action()
+            if (reportError) { error = (result as? EditResult.Rejected)?.reason; if (error != null) expanded = true }
+            refreshEditor(); result
+        } catch (e: Exception) { failed(e); EditResult.Rejected(error ?: "Measurement is unavailable.") }
+    }
+    private fun ownerAction(action: () -> Unit) { gestureRevision++; edit { action(); EditResult.Accepted } }
+    private fun nudge(endpoint: MeasureEndpoint, dx: Int, dy: Int) {
+        val image = photo ?: return
+        val m = editor.measurement ?: return
+        val p = m.point(endpoint) ?: return
+        val token = editor.revision
+        val start = MoveRequest(token,m.id,endpoint,DragPhase.BEGIN,null)
+        if (edit { editor.move(start) } !is EditResult.Accepted) return
+        val next = MeasurePoint(p.x+dx.toDouble()/image.width,p.y+dy.toDouble()/image.height)
+        val result = edit { editor.move(start.copy(phase=DragPhase.COMMIT,point=next)) }
+        if (result !is EditResult.Accepted) { editor.cancelDrag(); refreshEditor() }
+    }
     private fun failed(e: Throwable) {
         val known = e as? ConstructError
-        status = "[${known?.code ?: "MEASURE_UNAVAILABLE"}] ${known?.message ?: "Could not read this photo. Try a smaller JPEG or PNG saved on this phone."}"
+        error = "[${known?.code ?: "MEASURE_UNAVAILABLE"}] ${known?.message ?: "Could not read this photo. Try a smaller JPEG or PNG saved on this phone."}"
+        expanded = true
         // No provider URI, image data, marker size, endpoints or measurement details in logs.
         runCatching { store.log("measure",known?.code ?: "MEASURE_UNAVAILABLE",installed.manifest,"Native measurement action failed; photo and result details omitted") }
-        if (known?.code == "CAPABILITY_DENIED") { photo = null; corners = emptyList(); clearMeasurement(); sideMm = null }
+        if (known?.code == "CAPABILITY_DENIED") { photo = null; corners = emptyList(); editor.reset(); refreshEditor() }
     }
     private fun choose() {
         try {
-            checkAccess(); generation.invalidate(); photo = null; corners = emptyList(); clearMeasurement(); sideMm = null
+            checkAccess(); generation.invalidate(); photo = null; corners = emptyList(); editor.reset(); refreshEditor()
+            error = null; expanded = true
             choosingPhoto = true
             picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         } catch (e: Exception) { choosingPhoto = false; failed(e) }
@@ -117,7 +130,7 @@ class MeasureActivity : ComponentActivity() {
             checkAccess()
             checkRule(workerBusy.compareAndSet(false,true),"MEASURE_BUSY","Previous photo is still finishing. Try again shortly.")
         } catch (e: Exception) { failed(e); return }
-        busy = true; status = "Reading photo and finding reference marker…"
+        busy = true; error = null; status = "Reading photo and finding reference marker…"
         val token = generation.invalidate()
         io.execute {
             var decoded: Bitmap? = null
@@ -136,7 +149,7 @@ class MeasureActivity : ComponentActivity() {
                 val result = decoded!!
                 runOnUiThread {
                     if (live && generation.current(token) && !isFinishing) {
-                        try { checkAccess(); photo = result; corners = found; status = "Reference found. Enter its measured outer black-square side in millimetres." }
+                        try { checkAccess(); photo = result; corners = found; expanded = true; status = "Reference found. Enter its measured outer black-square side in millimetres." }
                         catch (e: Exception) { result.recycle(); failed(e) }
                         busy = false
                     } else result.recycle()
@@ -152,71 +165,51 @@ class MeasureActivity : ComponentActivity() {
         try {
             checkAccess(); val size = MeasureInput.sideMm(sizeText)
             checkRule(corners.size == 4,"MARKER_NOT_FOUND","Choose a photo containing the reference card first.")
-            sideMm = size; clearMeasurement(); status = "Tap the two ends of a length in the photo. Keep both ends in the card’s plane."
-        } catch (e: Exception) { failed(e) }
-    }
-    private fun tap(point: MeasurePoint) {
-        try {
-            checkAccess()
-            val size = sideMm ?: return
-            val plane = MeasurePlane(corners); plane.project(point)
-            if (endpoints.size != 1) { endpoints = listOf(point); lengthMm = null; status = "First endpoint set. Tap the other end." }
-            else { val length = plane.lengthMm(endpoints[0],point,size); endpoints = endpoints + point; lengthMm = length; status = "Approximate tabletop length. Tap again to start a new measurement." }
+            editor.calibrate(corners,size); refreshEditor(); selectedEndpoint = null
+            error = null; expanded = false
+            status = "Tap the two ends of a length in the photo."
         } catch (e: Exception) { failed(e) }
     }
     @Composable private fun Screen() {
-        val focus = LocalFocusManager.current
-        val statusStyle = MaterialTheme.typography.bodySmall
-        val statusHeight = with(LocalDensity.current) { statusStyle.lineHeight.toDp() * 3 }
+        editorVersion // Read the owner mutation version for Compose invalidation.
+        val model = editor.measurement
+        val calibrated = editor.sideMm != null
+        val instruction = when {
+            !calibrated -> status
+            model == null -> "Tap the two ends of a length in the photo."
+            model.b == null -> "First endpoint set. Tap the other end."
+            else -> "Drag an endpoint to adjust, or Clear for another length."
+        }
+        BackHandler {
+            if (editor.isDragging) { gestureRevision++; editor.cancelDrag(); refreshEditor() }
+            else if (expanded) expanded = false else finish()
+        }
         Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp),verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Pocket Measure",style = MaterialTheme.typography.titleLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { choose() },enabled = !busy) { Text("Choose photo") }
-                    TextButton(onClick = { finish() }) { Text("Close measure") }
-                }
-                // Fixed for every message at this font scale/width. Long instructions remain
-                // scrollable/readable without moving the photo between endpoint taps.
-                Box(Modifier.fillMaxWidth().height(statusHeight)) {
-                    key(status) {
-                        Text(status,style = statusStyle,modifier = Modifier.fillMaxWidth()
-                            .verticalScroll(rememberScrollState()))
-                    }
-                }
-                if (corners.isNotEmpty()) {
-                    Row(Modifier.fillMaxWidth(),horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(value = sizeText,onValueChange = { sizeText = it.take(8); sideMm = null; clearMeasurement() },
-                            label = { Text("Marker side (mm)") },singleLine = true,modifier = Modifier.weight(1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                        Button(onClick = { focus.clearFocus(); confirmSize() }) { Text("Confirm size") }
-                    }
-                }
-                // Reserve the result/control space so setting A or B never resizes the photograph.
-                // The placeholder and numeric result must also occupy one stable line at
-                // large fonts. Horizontal scrolling keeps the full value readable.
-                key(lengthMm) {
-                    Text(lengthMm?.let { String.format(Locale.ROOT,"Length: %.1f cm",it/10) } ?: "Approximate length",
-                        style = MaterialTheme.typography.headlineSmall,maxLines = 1,
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()))
-                }
-                TextButton(enabled = sideMm != null,onClick = { clearMeasurement(); status = "Tap the first endpoint." }) { Text("Clear endpoints") }
+            BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val image = photo
-                if (image != null) {
-                    Box(Modifier.weight(1f).fillMaxWidth()) {
-                        Image(image.asImageBitmap(),contentDescription = null,modifier = Modifier.fillMaxSize(),contentScale = ContentScale.Fit)
-                        Canvas(Modifier.fillMaxSize().semantics { contentDescription = "Measurement photo: tap two endpoints" }
-                            .pointerInput(image,sideMm,endpoints) { detectTapGestures { p ->
-                                MeasureInput.fromTap(p.x,p.y,size.width.toFloat(),size.height.toFloat(),image.width,image.height)?.let { tap(it) }
-                            } }) {
-                            val fit = PhotoFit.fit(image.width,image.height,size.width,size.height)
-                            fun screen(p: MeasurePoint) = Offset(fit.left+(p.x*fit.width).toFloat(),fit.top+(p.y*fit.height).toFloat())
-                            corners.indices.forEach { i -> drawLine(Color.Cyan,screen(corners[i]),screen(corners[(i+1)%4]),3.dp.toPx()) }
-                            if (endpoints.size == 2) drawLine(Color.Yellow,screen(endpoints[0]),screen(endpoints[1]),3.dp.toPx())
-                            endpoints.forEach { p -> drawCircle(Color.Yellow,6.dp.toPx(),screen(p)) }
-                        }
-                    }
-                } else Spacer(Modifier.weight(1f))
-                Text("Estimate only • Flat surface, marker beside item • No photo or result saved",style = MaterialTheme.typography.labelSmall)
+                if (image != null) MeasureOverlay(
+                    photo = image.asImageBitmap(), photoRevision = editor.revision, gestureRevision = gestureRevision,
+                    enabled = live && calibrated && !busy, corners = corners,
+                    measurements = listOfNotNull(model), selectedId = model?.id,
+                    onPlace = { token,point -> edit { editor.place(token,point) } },
+                    onMove = { request -> edit(reportError=request.phase == DragPhase.BEGIN || request.phase == DragPhase.PREVIEW) { editor.move(request) } },
+                    onSelect = { token,_ -> if (token == editor.revision) selectedEndpoint = null },
+                    modifier = Modifier.fillMaxSize())
+                MeasureSheet(
+                    state = MeasureSheetState(instruction=instruction,result=model?.label,error=error,
+                        setupVisible=corners.isNotEmpty() && !calibrated,sizeText=sizeText,
+                        calibrationChip=editor.sideMm?.let { "Marker ${String.format(Locale.ROOT,"%.2f",it).trimEnd('0').trimEnd('.')} mm ✓" },
+                        measurement=model,selectedEndpoint=selectedEndpoint,canUndo=editor.canUndo,
+                        busy=busy,enabled=calibrated && !busy),
+                    actions = MeasureSheetActions(
+                        onSizeChange={ sizeText=it.take(8); editor.reset(); refreshEditor(); error=null },
+                        onConfirmSize={ confirmSize() },
+                        onReopenSetup={ ownerAction { editor.reset(); refreshEditor(); expanded=true } },
+                        onSelectEndpoint={ selectedEndpoint=it },onNudge={ e,x,y -> nudge(e,x,y) },
+                        onUndo={ ownerAction { editor.undo() } },onClear={ ownerAction { editor.clear() } },
+                        onChoosePhoto={ choose() },onClose={ finish() }),
+                    expanded=expanded,onExpandedChange={ expanded=it },
+                    modifier=Modifier.align(Alignment.BottomCenter).heightIn(max=maxHeight * 0.55f))
             }
         }
     }
