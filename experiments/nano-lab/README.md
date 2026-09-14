@@ -119,3 +119,12 @@ unchanged throughout these runs.
 inference/streaming/offline behavior. The emulator's real `UNAVAILABLE` result
 is only unavailable-path evidence, not proof of a working Nano model. The
 Construct host was not modified or re-tested for this standalone experiment.
+
+### Clipboard driver option
+
+`acceptance.py --paste-key` verifies the same real copied technical report using
+Android's native Paste key into the focused prompt field. The default still uses
+the floating Paste menu. This option exists because an API-37 test run did not
+expose that menu; it does not inject report text, read it from source, change the
+APK, or claim that the long-press menu was fixed. Both paths require the actual
+clipboard contents and absence of the synthetic prompt marker.
