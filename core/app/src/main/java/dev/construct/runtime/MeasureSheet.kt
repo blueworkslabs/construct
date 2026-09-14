@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
@@ -81,18 +82,17 @@ fun MeasureSheet(state: MeasureSheetState, actions: MeasureSheetActions, expande
                 .semantics { contentDescription = if (expanded) "Collapse controls" else "Expand controls" }) {
                 Text(if (expanded) "▾" else "▴")
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                state.calibrationChip?.let { chip ->
-                    FilterChip(selected = true, onClick = actions.onReopenSetup, label = { Text(chip) })
-                    Spacer(Modifier.width(8.dp))
-                }
-                Text(state.result ?: state.instruction, style = if (state.result != null) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f))
+            if (expanded) state.calibrationChip?.let { chip ->
+                FilterChip(selected = true, onClick = actions.onReopenSetup, label = { Text(chip) })
             }
-            if (state.result != null) Text(state.instruction, style = MaterialTheme.typography.bodySmall)
+            Text(state.result ?: state.instruction,
+                style = if (state.result != null) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.bodyMedium,
+                maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
+            if (expanded && state.result != null) Text(state.instruction, style = MaterialTheme.typography.bodySmall)
             state.error?.let { error ->
                 // Persistent and selectable, so long owner messages stay readable and copyable.
                 SelectionContainer { Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
+                    maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 4.dp).semantics { contentDescription = "Measurement error" }) }
             }
             if (expanded) Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
