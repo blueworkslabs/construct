@@ -61,7 +61,8 @@ do not send personal images into web modules just to make packaging easier.
 ## UX follow-up after the smaller pilot
 
 The user reports real-world Pocket Measure usefulness across multiple scenes.
-Once the optimized build has a Pixel confirmation, prepare a UX review with Fable:
+Once the optimized build has a Pixel confirmation, use the
+[UX review brief](pocket-measure-ux-brief.md) for a review with Fable:
 photo framing/zoom, precise endpoint placement and correction, marker-size entry,
 clear result/uncertainty wording, and small-screen/large-font accessibility.
 These are review topics, not promised implemented features. Reviewer mentions

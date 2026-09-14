@@ -49,12 +49,29 @@ tall 480×1600 / font-scale 1.8 stress layout (not a claim of testing another ph
 checking exact photo bounds across both taps, result and clear, plus known length.
 It restores the disposable device configuration afterward.
 
-## Acceptance status
+## Built candidates and verification contract
 
-Build and Android results for alpha 16 are pending. Historical alpha 15 receipts
-remain in [Pocket Measure](pocket-measure.md); they do not validate the new native
-bridge. Record new APK hashes and sizes, optimized offline measurement checks,
-host baseline, and existing vision regression before offering a candidate.
+Optimized operator-profile artifacts from app/packaging source `9a2959d`:
+
+- ARM64 phone: **23,265,389 bytes** (about 23.3 MB; 88.2% smaller than alpha 15),
+  SHA-256 `366f522999e9dc7693a4e6ca475af2978a04700bf3e053c06aed41506cc00a98`.
+- x86-64 emulator: **26,132,670 bytes**, SHA-256
+  `0c1a320405a888b875ae28efd2ae551dbf98c61915c7b81135bde8651dee687c`.
+- Trimmed measurement library: 3,045,168 bytes ARM64 / 3,379,720 bytes x86-64.
+  The previous ARM64 OpenCV library alone was 23,465,088 bytes.
+
+Both artifact checks passed: unchanged APK signing identity and permissions,
+nine unchanged publisher/demo/model assets, byte-identical MediaPipe native
+library, correct single architecture, 16 KB ELF load alignment and APK ZIP alignment.
+The installed NDK's strip tool initially rewrote eight bytes of MediaPipe section
+metadata; `keepDebugSymbols` now preserves that already-stripped upstream library.
+It does not disable stripping of our newly built measurement library.
+
+The [PR acceptance record](https://github.com/blueworkslabs/construct/pull/5)
+records the new exact-hash Android runs and their outcome before promotion:
+optimized offline measurement and large-font checks, host baseline, and existing
+vision regression. Historical alpha 15 receipts remain in
+[Pocket Measure](pocket-measure.md); they do not validate the new native bridge.
 
 The emulator tests x86-64. ARM64 packaging/signature/alignment checks are not a
 substitute for executing ARM64 on a phone. A focused Pixel check follows delivery.

@@ -49,11 +49,21 @@ def inspect(path, abi, max_mb):
         if 'libconstruct_measure.so' not in libraries:
             raise ValueError('Measurement bridge missing')
         manifest = Path(__file__).with_name('vision-assets.json')
-        for entry in json.loads(manifest.read_text()):
+        assets = json.loads(manifest.read_text())
+        for entry in assets:
             if entry['kind'] == 'model':
                 data = apk.read('assets/vision/' + entry['name'])
                 if len(data) != entry['bytes'] or hashlib.sha256(data).hexdigest() != entry['sha256']:
                     raise ValueError('Bundled vision model changed')
+        runtime = next(entry for entry in assets if entry['name'] == 'tasks-core-0.10.35.aar')
+        upstream = manifest.parent.parent/'dist/vision-runtime'/runtime['name']
+        data = upstream.read_bytes()
+        if len(data) != runtime['bytes'] or hashlib.sha256(data).hexdigest() != runtime['sha256']:
+            raise ValueError('Upstream vision runtime checksum mismatch')
+        with zipfile.ZipFile(upstream) as aar:
+            name = abi + '/libmediapipe_tasks_jni.so'
+            if aar.read('jni/' + name) != apk.read('lib/' + name):
+                raise ValueError('Pinned MediaPipe native library changed during packaging')
     return {'apk': path.name, 'bytes': size, 'abi': abi,
             'sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'native': libraries}
 
