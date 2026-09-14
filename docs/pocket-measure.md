@@ -1,8 +1,9 @@
 # Pocket Measure prototype
 
 Status: implementation, local checks and exact optimized Android measurement
-acceptance complete. Host/vision regressions and physical-phone acceptance pending.
-Not an accuracy guarantee.
+acceptance complete. Accompanying host/vision regression receipts are tracked in
+[the review checkpoint](https://github.com/blueworkslabs/construct/pull/5).
+Physical-phone acceptance remains pending. Not an accuracy guarantee.
 
 ## User flow
 
