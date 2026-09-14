@@ -48,7 +48,7 @@ target_include_directories(construct_measure PRIVATE
     "${OPENCV_SOURCE}/modules/core/include"
     "${OPENCV_SOURCE}/modules/imgproc/include"
     "${OPENCV_SOURCE}/modules/objdetect/include"
-    "${CMAKE_CURRENT_BINARY_DIR}/opencv")
+    "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(construct_measure PRIVATE opencv_objdetect opencv_imgproc opencv_core)
 target_link_options(construct_measure PRIVATE
     "-Wl,--gc-sections" "-Wl,--exclude-libs,ALL" "-Wl,-z,max-page-size=16384")
