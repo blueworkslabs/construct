@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
 import org.json.JSONObject
 import java.nio.ByteBuffer
 import java.util.Locale
@@ -90,12 +91,12 @@ class MeasureActivity : ComponentActivity() {
     override fun onDestroy() { generation.invalidate(); launched.set(false); super.onDestroy() }
     private fun checkAccess() = store.withCapability(installed,"photo.measure") { }
     private fun refreshEditor() { editorVersion++ }
-    private fun edit(reportError: Boolean = true, action: () -> EditResult): EditResult {
+    private fun edit(reportError: Boolean = true, expandOnError: Boolean = true, action: () -> EditResult): EditResult {
         if (!live || isFinishing || busy) return EditResult.Rejected("Workspace is not available.")
         return try {
             checkAccess()
             val result = action()
-            if (reportError) { error = (result as? EditResult.Rejected)?.reason; if (error != null) expanded = true }
+            if (reportError) { error = (result as? EditResult.Rejected)?.reason; if (error != null && expandOnError) expanded = true }
             refreshEditor(); result
         } catch (e: Exception) { failed(e); EditResult.Rejected(error ?: "Measurement is unavailable.") }
     }
@@ -188,15 +189,23 @@ class MeasureActivity : ComponentActivity() {
         }
         Surface(Modifier.fillMaxSize()) {
             BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding().displayCutoutPadding().semantics { contentDescription = "Measurement workspace" }) {
+                // Constant for this window/font size: results and errors must not move the photo.
+                val collapsedHeight = (64.dp + with(LocalDensity.current) {
+                    MaterialTheme.typography.headlineSmall.lineHeight.toDp() * 2
+                }).coerceAtMost(maxHeight * 0.55f)
                 val image = photo
+                Box(Modifier.fillMaxSize().padding(bottom=collapsedHeight)
+                    .semantics { contentDescription = "Measurement photo viewport" }) {
                 if (image != null) MeasureOverlay(
                     photo = image.asImageBitmap(), photoRevision = editor.revision, gestureRevision = gestureRevision,
                     enabled = live && calibrated && !busy, corners = corners,
                     measurements = listOfNotNull(model), selectedId = model?.id,
                     onPlace = { token,point -> edit { editor.place(token,point) } },
-                    onMove = { request -> edit(reportError=request.phase == DragPhase.BEGIN || request.phase == DragPhase.PREVIEW) { editor.move(request) } },
+                    onMove = { request -> edit(reportError=request.phase != DragPhase.CANCEL,
+                        expandOnError=request.phase != DragPhase.PREVIEW) { editor.move(request) } },
                     onSelect = { token,_ -> if (token == editor.revision) selectedEndpoint = null },
                     modifier = Modifier.fillMaxSize())
+                }
                 MeasureSheet(
                     state = MeasureSheetState(instruction=instruction,result=model?.label,error=error,
                         setupVisible=corners.isNotEmpty() && !calibrated,sizeText=sizeText,
@@ -211,7 +220,8 @@ class MeasureActivity : ComponentActivity() {
                         onUndo={ ownerAction { editor.undo() } },onClear={ ownerAction { editor.clear() } },
                         onChoosePhoto={ choose() },onClose={ finish() }),
                     expanded=expanded,onExpandedChange={ expanded=it },
-                    modifier=Modifier.align(Alignment.BottomCenter).imePadding().heightIn(max=maxHeight * 0.55f))
+                    modifier=Modifier.align(Alignment.BottomCenter).imePadding().then(
+                        if (expanded) Modifier.heightIn(max=maxHeight * 0.55f) else Modifier.height(collapsedHeight)))
             }
         }
     }

@@ -16,7 +16,7 @@ entries=json.loads((fixtures/'manifest.json').read_text())
 current=None
 current_entry=None
 stage_index=0
-WORKSPACE='Measurement workspace'
+WORKSPACE='Measurement photo viewport'
 PHOTO='Measurement photo: tap to place an endpoint, drag a handle to adjust'
 original_font_scale=adb('shell','settings','get','system','font_scale').strip()
 def done(text):result['checks'].append(text);print('PASS:',text,flush=True)
@@ -109,8 +109,8 @@ def size(value):
     if ui._device.info.get('currentPackageName') != 'dev.construct.runtime':raise RuntimeError('Lost measurement workspace')
     action('Confirm size');expect('Tap the two ends');collapse()
 
-# The overlapping sheet clips the Canvas accessibility node's uncovered bounds.
-# Its parent workspace covers the complete, actual Canvas layout and both siblings.
+# The viewport excludes the fixed collapsed controls reserve. Read it with controls
+# collapsed so temporary expanded-sheet occlusion cannot alter observed bounds.
 def screen_point(entry,point):
     x1,y1,x2,y2=map(int,re.findall(r'\d+',find(WORKSPACE).get('bounds')))
     scale=min((x2-x1)/entry['width'],(y2-y1)/entry['height'])
@@ -168,6 +168,18 @@ try:
     if any(x.startswith('Length:') for x in labels()):raise RuntimeError('Drag recorded multiple Undo entries')
     x,y=screen_point(entry,entry['endpoints'][1]);adb('shell','input','tap',str(x),str(y));time.sleep(.6)
     done('Dragging an existing handle recomputes length; one Undo restores the prior pair and the next removes B')
+    # A coincident preview is invalid. It must not open controls or interrupt the drag.
+    bx,by=screen_point(entry,entry['endpoints'][1]);ax,ay=screen_point(entry,entry['endpoints'][0])
+    bounds=find(WORKSPACE).get('bounds')
+    ui._device.touch.down(bx,by).move(ax,ay);time.sleep(.4)
+    expect('Choose two distinct nearby endpoints.')
+    if 'Expand controls' not in labels() or find(WORKSPACE).get('bounds')!=bounds:
+        raise RuntimeError('Rejected preview expanded controls or moved the photo')
+    ui._device.touch.move(bx,by);time.sleep(.4)
+    if any('Choose two distinct nearby endpoints.' in x for x in labels()):raise RuntimeError('Accepted preview retained error')
+    ui._device.touch.up(bx,by)
+    if length()!=result['flatMm']:raise RuntimeError('Rejected preview changed accepted measurement')
+    done('Rejected preview stays collapsed and fixed; continuing to a valid point clears the error')
     x,y=screen_point(entry,entry['endpoints'][1]);nx,ny=screen_point(entry,(960,700))
     ui._device.touch.down(x,y).move(nx,ny);time.sleep(.6)
     if abs(length()-270)>4:raise RuntimeError('Held drag did not preview')
@@ -188,20 +200,30 @@ try:
     if length()!=result['flatMm']:raise RuntimeError('Nudge Undo did not restore original measurement')
     done('Accessible endpoint nudges use photo pixels and each nudge is individually undoable')
     action('Clear',collapse_after=True)
-    x,y=screen_point(entry,(650,450))
-    ui._device.double_click(x,y,duration=.08);time.sleep(.6);expect('Zoom 3.0×')
-    if any(x.startswith(('Length:','First endpoint set.')) for x in labels()):raise RuntimeError('Double tap placed an endpoint')
-    ui._device.swipe(x,y,x-60,y-50,duration=.4);time.sleep(.4)
-    if any(x.startswith(('Length:','First endpoint set.')) for x in labels()):raise RuntimeError('Pan placed an endpoint')
-    tap('Zoom 3.0× · Reset');time.sleep(.4)
-    done('Double tap zooms to 3× without placement; zoomed pan creates no endpoint and Reset returns to fit')
+    # The entire fitted photo, including its bottom edge, is reachable without zoom.
+    x,y=screen_point(entry,(entry['width']*.5,entry['height']*.98))
+    sheet_top=int(re.findall(r'\d+',find('Measurement controls').get('bounds'))[1])
+    if y>=sheet_top:raise RuntimeError('Bottom of fitted photo is hidden by collapsed controls')
+    ui._device.click(x,y);expect('First endpoint set.')
+    action('Undo',collapse_after=True)
+    done('Bottom-edge endpoint is reachable at fit; collapsed sheet leaves the whole photo available')
+    # Rapid taps are placements, never a hidden double-tap zoom gesture.
+    ax,ay=screen_point(entry,entry['endpoints'][0]);bx,by=screen_point(entry,entry['endpoints'][1])
+    ui._device.touch.down(ax,ay).up(ax,ay).down(bx,by).up(bx,by)
+    if abs(length()-240)>3:raise RuntimeError('Rapid endpoint taps did not place the expected pair')
+    expect('Zoom 1.0×')
+    action('Clear',collapse_after=True)
+    done('Consecutive endpoint taps place immediately without double-tap zoom arbitration')
     ui._device(description=PHOTO).pinch_out(percent=40,steps=25);time.sleep(.6)
     zoom=next((x for x in labels() if x.startswith('Zoom ') and 'Reset' in x),None)
     if zoom is None:raise RuntimeError('Two-finger pinch did not zoom')
     if any(x.startswith(('Length:','First endpoint set.')) for x in labels()):raise RuntimeError('Pinch placed an endpoint')
+    x,y=screen_point(entry,(650,450))
+    ui._device.swipe(x,y,x-60,y-50,duration=.4);time.sleep(.4)
+    if any(x.startswith(('Length:','First endpoint set.')) for x in labels()):raise RuntimeError('Pan placed an endpoint')
     tap(zoom);time.sleep(.4)
     if abs(endpoints(entry)-240)>3:raise RuntimeError('Reset after gestures changed photo coordinates')
-    done('Real two-pointer pinch zooms without placement; fit reset preserves calibrated photo coordinates')
+    done('Real two-pointer pinch and zoomed pan create no endpoint; fit reset preserves calibrated photo coordinates')
     size('95');value=endpoints(entry)
     if abs(value-228)>3:raise RuntimeError('Measured marker-size scaling failed: '+str(value))
     result['scaledMm']=value;done('95 mm actual marker size scales the same endpoints to 228 mm and clears old results')

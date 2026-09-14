@@ -78,18 +78,19 @@ fun MeasureSheet(state: MeasureSheetState, actions: MeasureSheetActions, expande
     val focus = LocalFocusManager.current
     Surface(modifier.fillMaxWidth().semantics { contentDescription = "Measurement controls" }, tonalElevation = 3.dp, shadowElevation = 8.dp) {
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
-            TextButton(onClick = { onExpandedChange(!expanded) }, modifier = Modifier.fillMaxWidth()
+            TextButton(onClick = { onExpandedChange(!expanded) }, modifier = Modifier.fillMaxWidth().height(48.dp)
                 .semantics { contentDescription = if (expanded) "Collapse controls" else "Expand controls" }) {
                 Text(if (expanded) "▾" else "▴")
             }
             if (expanded) state.calibrationChip?.let { chip ->
                 FilterChip(selected = true, onClick = actions.onReopenSetup, label = { Text(chip) })
             }
-            Text(state.result ?: state.instruction,
+            Text(if (!expanded && state.error != null) state.error else state.result ?: state.instruction,
+                color = if (!expanded && state.error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 style = if (state.result != null) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.bodyMedium,
                 maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
             if (expanded && state.result != null) Text(state.instruction, style = MaterialTheme.typography.bodySmall)
-            state.error?.let { error ->
+            if (expanded) state.error?.let { error ->
                 // Persistent and selectable, so long owner messages stay readable and copyable.
                 SelectionContainer { Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
                     maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis,

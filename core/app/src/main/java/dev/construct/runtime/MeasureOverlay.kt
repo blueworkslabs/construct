@@ -10,8 +10,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -40,15 +38,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.layout.onSizeChanged
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.atan2
 import kotlin.math.hypot
 
 /** Transient gesture bookkeeping. Owner-accepted positions are the only ones drawn. */
-private data class PendingTap(val position: Offset, val at: Long, val job: Job)
-
 private data class DragState(val revision: Long, val hit: HandleHit, val start: MeasurePoint, val finger: Offset, val accepted: MeasurePoint)
 
 /**
@@ -80,16 +73,11 @@ fun MeasureOverlay(
     var layoutSize by remember { mutableStateOf(IntSize.Zero) }
     var viewport by remember(photoRevision) { mutableStateOf<MeasureViewport?>(null) }
     var drag by remember(photoRevision) { mutableStateOf<DragState?>(null) }
-    var pendingTap by remember(photoRevision) { mutableStateOf<PendingTap?>(null) }
-    val scope = rememberCoroutineScope()
-    val tapJobs = remember(photoRevision) { mutableListOf<Job>() }
-    fun cancelTaps() { tapJobs.toList().forEach { it.cancel() }; tapJobs.clear(); pendingTap=null }
     val currentMeasurements by rememberUpdatedState(measurements)
     val currentSelectedId by rememberUpdatedState(selectedId)
     val place by rememberUpdatedState(onPlace)
     val move by rememberUpdatedState(onMove)
     val select by rememberUpdatedState(onSelect)
-    DisposableEffect(photoRevision,enabled,gestureRevision,layoutSize) { onDispose { cancelTaps() } }
 
     fun fitted(size: IntSize) = MeasureViewport.forView(photo.width, photo.height, size.width.toFloat(), size.height.toFloat())
     fun currentViewport(size: IntSize): MeasureViewport {
@@ -110,17 +98,13 @@ fun MeasureOverlay(
                     val vp = currentViewport(size)
                     val revision = photoRevision
                     val startPosition = down.position
-                    val prior = pendingTap
-                    val doubleTap = prior != null && android.os.SystemClock.uptimeMillis()-prior.at < 300 &&
-                        (prior.position-startPosition).getDistance() < touchSlop*2
-                    if (doubleTap) { prior!!.job.cancel(); pendingTap=null }
                     var pastSlop = false
                     var pinching = false
                     var previous = listOf(down.position)
                     var previousDistance = 0f
 
                     // A finger that lands on a handle starts a drag immediately; the owner records the pre-drag value.
-                    val hit = if (enabled && !doubleTap) vp.hitTest(currentMeasurements, currentSelectedId, startPosition.x, startPosition.y, handleRadius) else null
+                    val hit = if (enabled) vp.hitTest(currentMeasurements, currentSelectedId, startPosition.x, startPosition.y, handleRadius) else null
                     val startPoint = hit?.let { h -> currentMeasurements.firstOrNull { it.id == h.id }?.point(h.endpoint) }
                     if (hit != null && startPoint != null) {
                         select(revision, hit.id)
@@ -139,7 +123,7 @@ fun MeasureOverlay(
                     try { while (true) {
                         val event = awaitPointerEvent()
                         // Compose synthetic cancellation releases are consumed; never commit them as a finger-up.
-                        if (event.changes.any { it.isConsumed }) { cancelDrag(); cancelTaps(); break }
+                        if (event.changes.any { it.isConsumed }) { cancelDrag(); break }
                         val pressed = event.changes.filter { it.pressed }
                         if (pressed.isEmpty()) {
                             val active = drag
@@ -151,19 +135,10 @@ fun MeasureOverlay(
                                     drag = null
                                 }
                                 !pastSlop && !pinching && hit == null -> {
-                                    val now = android.os.SystemClock.uptimeMillis()
-                                    if (doubleTap) {
-                                        viewport = if (vp.scale > 1.01f) vp.reset() else vp.zoomedBy(3f/vp.scale,startPosition.x,startPosition.y)
-                                    } else if (enabled) {
-                                        // Defer single-tap placement until it cannot be a double tap.
+                                    if (enabled) {
+                                        // Place immediately on release; pinch and Reset own zoom.
                                         val point = vp.toPhoto(startPosition.x,startPosition.y)
-                                        val job = scope.launch {
-                                            delay(310)
-                                            if (point != null) place(revision,point) else select(revision,null)
-                                            if (pendingTap?.at == now) pendingTap=null
-                                        }
-                                        tapJobs.add(job); job.invokeOnCompletion { tapJobs.remove(job) }
-                                        pendingTap=PendingTap(startPosition,now,job)
+                                        if (point != null) place(revision,point) else select(revision,null)
                                     }
                                 }
                             }
@@ -173,7 +148,6 @@ fun MeasureOverlay(
                         if (pressed.size >= 2) {
                             // A second finger cancels any drag and never commits a placement.
                             if (drag != null) cancelDrag()
-                            cancelTaps()
                             pinching = true; pastSlop = true
                             val a = pressed[0].position; val b = pressed[1].position
                             val distance = hypot(a.x - b.x, a.y - b.y)
@@ -247,7 +221,7 @@ fun MeasureOverlay(
 
         activeDrag?.let { drawLoupe(photo, vp, it, loupeDiameter, loupeLift) }
     }
-    TextButton(onClick = { cancelTaps(); viewport=viewport?.reset() },
+    TextButton(onClick = { viewport=viewport?.reset() },
         enabled = drag == null && (viewport?.scale ?: 1f) > 1f, modifier = Modifier.align(Alignment.TopEnd)) {
         Text("Zoom %.1f×".format(java.util.Locale.ROOT,viewport?.scale ?: 1f) + if ((viewport?.scale ?: 1f)>1f) " · Reset" else "")
     }

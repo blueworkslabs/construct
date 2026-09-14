@@ -7,15 +7,15 @@ one A–B measurement, no persistence and no gallery export. The existing
 
 ## Behaviour
 
-- The photo occupies a stable full-size surface behind a collapsible, internally
-  scrolling controls sheet. Changing instructions, results or control expansion
-  never changes the photo's coordinate system.
+- The photo fits above a stable collapsed-controls reserve. Expanding the internally
+  scrolling sheet may temporarily cover more of the image, but changing instructions,
+  results or control expansion never refits it or changes photo coordinates.
 - Confirming the measured marker size collapses setup. The chip preserves decimal
   sizes; reopening setup invalidates the previous calibration and measurements.
 - Tap places A, then B. Further taps do not silently replace the completed pair.
   Drag either handle to correct it, with a 2.5× crosshair loupe. Only accepted
   owner coordinates are drawn. Rejected positions retain the last accepted point.
-- Double tap toggles fit/3× without placing either tap; pinch supports 1×–6× and
+- Taps place immediately on release; double-tap zoom is intentionally absent. Pinch supports 1×–6× and
   one-finger pan works while zoomed. A zoom indicator offers an explicit fit reset.
 - Endpoint A/B buttons expose one decoded-photo-pixel nudges without requiring a
   precise drag. Each nudge is one Undo action.
@@ -37,8 +37,7 @@ bitmap lifetime. `MeasureOverlay` owns only display transforms and gestures.
 `MeasureSheet` is owner-driven; it does not independently retain measurement state.
 
 Integration additionally refreshes callback/state reads inside the long-lived
-pointer coroutine, waits out double-tap detection before single placement, cancels
-pending taps on viewport/session changes, and preserves a centred square loupe crop
+pointer coroutine and preserves a centred square loupe crop
 at photo edges. Pinch uses the previous focal point before translating to the new
 centroid. Owner revisions reject stale events without propagating exceptions to
 Compose. An independent gesture revision lets non-gesture actions cancel input
@@ -75,13 +74,30 @@ passing a debug run alone does not authorize a pilot handoff.
   test-driver double-tap keyword. None counts as a full pass.
 
 The keyboard correction uses resize insets and pads only the sheet for the IME.
-The runner uses the explicitly labelled parent workspace for full Canvas layout
-bounds: the sheet can change the child's *uncovered accessibility area* without
-changing the photo's actual layout. It still requires correct independent fixture
+The runner uses the labelled photo viewport with the controls collapsed. The
+viewport reserves the collapsed sheet height (including scaled text), independently
+of current result/error text or expanded controls. It still requires correct independent fixture
 lengths and fixed full workspace bounds across endpoint/result changes. Control
-taps wait for stable rectangles; double-tap uses the installed runner API's
-`duration` argument. No observer restart or screenshot-only pass is used.
+taps wait for stable rectangles. No observer restart or screenshot-only pass is used.
 
 Screenshots of this secure workspace may be blank; no visual acceptance is
 inferred from those captures. Physical finger/loupe feel remains a focused device
 check, separate from the synthetic geometry and lifecycle receipts.
+
+## Pre-merge UX review follow-up
+
+The alpha 17 Pixel placement/rotation check was reported successful. Fable and
+Codex reviewed `860a2b0`; the remaining three UI findings are addressed in the
+follow-up candidate (verification status lives on PR #7):
+
+- Immediate placement on release; pinch and Reset own zoom, with no timer or
+  delayed tap jobs.
+- Fit reserves a fixed, font-aware collapsed-controls height. Expanded controls
+  may temporarily cover the photo but do not refit it. Collapsed error feedback
+  uses the existing two-line text area, not an additional layout row.
+- Rejected PREVIEW updates feedback quietly; accepted previews clear it. Only
+  tap, BEGIN or COMMIT rejection expands controls. CANCEL preserves feedback.
+
+The Android checks now cover bottom-edge placement at fit, consecutive taps,
+quiet invalid drag previews, plus pinch/pan/Reset and the existing coordinate,
+large-font and lifecycle cases. Slice-2 suggestions remain deferred.
