@@ -6,6 +6,7 @@ import socket
 import time
 from ui import adb, labels, tap, find, capture, RESULTS
 from host_ui import restart, diagnostics
+from renderer_identity import selected_provider, renderer_candidates
 
 require_runner()
 RESULTS.mkdir(parents=True, exist_ok=True)
@@ -13,22 +14,15 @@ result = {'complete':False, 'verdict':'FAIL', 'method':'ADB root on userdebug em
 rooted = False
 
 def renderers():
-    lines = adb('shell','ps','-A','-o','PID,UID,ARGS').splitlines()
-    candidates = {}
-    for line in lines[1:]:
-        fields = line.split(None, 2)
-        if len(fields) != 3: continue
-        pid, uid, args = fields
-        if 'com.google.android.webview:sandboxed_process' not in args or 'SandboxedProcessService' not in args: continue
-        if not pid.isdigit(): raise RuntimeError('Invalid renderer PID')
-        if not (uid.startswith('u0_i') or (uid.isdigit() and 90000 <= int(uid) <= 99999)):
-            raise RuntimeError('Renderer is not an isolated UID')
-        candidates[pid] = {'uid':uid, 'args':args}
-    return candidates
+    if selected_provider(adb('shell', 'dumpsys', 'webviewupdate')) != provider:
+        raise RuntimeError('WebView provider changed during renderer injection')
+    return renderer_candidates(adb('shell','ps','-A','-o','PID,UID,ARGS'), provider)
 
 try:
     if adb('shell','getprop','ro.build.type').strip() != 'userdebug': raise RuntimeError('Requires disposable userdebug emulator')
     if not adb('shell','getprop','ro.kernel.qemu').strip() == '1': raise RuntimeError('Not an emulator')
+    provider = selected_provider(adb('shell', 'dumpsys', 'webviewupdate'))
+    result['webviewProvider'] = provider
     # No wildcard kill: host restart clears the previous view and we require a
     # single newly created isolated WebView renderer after opening the checklist.
     restart()
