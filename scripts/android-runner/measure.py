@@ -199,7 +199,7 @@ try:
     collapse()
     if length()!=result['flatMm']:raise RuntimeError('Nudge Undo did not restore original measurement')
     done('Accessible endpoint nudges use photo pixels and each nudge is individually undoable')
-    action('Select endpoint B')
+    control('Nudge B left')  # B is still selected from the nudge sequence above.
     action('Undo')
     expect('First endpoint set.')
     if any(x.startswith('Nudge B ') or x=='Select endpoint B' for x in labels()):
