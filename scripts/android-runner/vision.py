@@ -55,7 +55,7 @@ try:
     if not (CONFIG.root/'camera-emulated.flag').exists(): raise RuntimeError('Vision requires explicit synthetic-camera AVD')
     pid = subprocess.check_output(['systemctl', '--user', 'show', CONFIG.service, '-p', 'MainPID', '--value'], text=True).strip()
     command = Path('/proc/'+pid+'/cmdline').read_bytes().decode().split('\0')
-    for option, value in [('-avd', 'construct-camera36'), ('-camera-back', 'emulated'), ('-camera-front', 'none')]:
+    for option, value in [('-avd', CONFIG.profile(True)[0]), ('-camera-back', 'emulated'), ('-camera-front', 'none')]:
         if option not in command or command[command.index(option)+1] != value: raise RuntimeError('Camera source is not synthetic')
     fixtures = CONFIG.root/'vision-fixtures'
     locked = json.loads((fixtures/'vision-assets.json').read_text())

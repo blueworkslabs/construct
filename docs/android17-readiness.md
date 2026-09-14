@@ -135,7 +135,26 @@ background check or merely a missing accessibility node.
 
 A controlled comparison uses the existing explicitly pinned Chromium provider
 via `--webview-apk` / `--webview-sha256` on a fresh disposable snapshot. It changes
-no Construct bytes and no phone provider. Results remain pending. An earlier
+no Construct bytes and no phone provider. WebView 155.0.8058.0 reproduced a
+SIGILL in the same `onTrimMemory` path, so this is not isolated to provider 145. An earlier
 stock run also recorded an unrelated emulator Bluetooth hardware-error crash;
 it is retained separately rather than described as an app failure or an empty
 platform crash log.
+
+The 16 KiB vision run also stopped **before inference** with
+`CAMERA_UNAVAILABLE`. CameraX reported an expected front camera absent while the
+emulator exposed one rear camera. No detector success is inferred from this.
+The first vision attempt stopped even earlier because its guard still named
+the API-36 AVD; the guard now checks `CONFIG.profile(True)` while retaining the
+exact synthetic-camera constraints.
+
+An official API-37 Google APIs **4 KiB** x86-64 revision-6 image is being compared
+in a separate runner root/AVD home on the same dedicated data volume. Its first
+boot, stable system-server interval, UI initialization and app-free snapshot
+save passed. A focused native-host + real Checklist WebView launch, Home and
+10-second background interval then passed on stock WebView 145: unchanged host
+PID, empty crash buffer, verified stop. Full acceptance remains in progress;
+this is not yet a matched reproduction of the complete failing tone sequence. Only one emulator runs at a
+time, and neither Android-16 snapshot is replaced. A native-host-only launch
+and Home test survived on the 16 KiB image; the focused comparison must load a
+real WebView module before backgrounding to exercise the relevant path.
