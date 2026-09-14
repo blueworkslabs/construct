@@ -28,7 +28,8 @@ def expect(prefix):
     deadline = time.monotonic() + 60
     while time.monotonic() < deadline:
         current = labels()
-        if any(t.startswith('[PHOTO_ANALYSIS') for t in current): raise RuntimeError('Native detector failed: ' + str(current))
+        if any(t.startswith(('[PHOTO_ANALYSIS', '[CAMERA_UNAVAILABLE]')) for t in current):
+            raise RuntimeError('Native camera/analysis failed: ' + str(current))
         match = next((t for t in current if t.startswith(prefix)), None)
         if match: return match
         time.sleep(.25)

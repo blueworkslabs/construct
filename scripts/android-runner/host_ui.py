@@ -56,7 +56,8 @@ def select_after(heading, choices):
                     return
                 previous = current
         if attempt == 20: break
-        adb('shell', 'input', 'swipe', '360', '1000', '360', '750', '500')
+        # Stay within the content viewport while covering long versioned catalogs.
+        adb('shell', 'input', 'swipe', '360', '1000', '360', '625', '500')
         time.sleep(.35)
     raise RuntimeError('No stable enabled action found within exact card: ' + heading)
 

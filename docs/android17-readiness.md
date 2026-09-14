@@ -30,7 +30,8 @@ on 2026-09-14.
   on it. Do not pre-emptively add a permission to the current pilot. Certificate
   transparency/ECH changes also need testing with the intended trust profile.
 - **Native loading:** bundled libraries use normal APK loading, not writable
-  downloaded native code. Exercise both OpenCV and MediaPipe on a 16 KiB image.
+  downloaded native code. Exercise both OpenCV and MediaPipe on the selected image; report 4 KiB and
+  16 KiB execution separately, without inferring one from ELF alignment.
 - **Contacts:** explicit READ_CONTACTS and module grants precede bounded reads;
   the projection does not request account-name/type columns restricted in API 37.
   Verify synthetic browse/search/details/revocation rather than real contacts.
@@ -59,8 +60,8 @@ Provision image `system-images;android-37.0;google_apis_ps16k;x86_64` and follow
 using `-camera-back emulated`. The reference guest uses a 3 GiB sparse data partition (6 GiB could not be
 created within the original disk budget). A 3 GiB RAM snapshot also consumed the
 emulator's required free-space reserve, even after verified off-runner archival
-of historical staging APK copies. A dedicated 16 GiB virtual data volume was
-therefore added for the **new** AVD; its files are checksum-verified during the
+of historical staging APK copies. A dedicated virtual data volume (initially 16 GiB, now 24 GiB for both
+page-size profiles) was therefore added for the **new** AVD; its files are checksum-verified during the
 move and its absolute paths retained. Existing boot disks, Android-16 snapshots,
 current APK/provider files and recovery backups are not modified. Provision both
 actual image/snapshot capacity **and** the emulator's startup free-space reserve;
@@ -118,9 +119,24 @@ floating toolbar issue was fixed. Only the test driver changed; the APK did not.
 - System image: Google APIs 16 KiB revision 6, build `CE2A.260420.019`.
 - Emulator: 37.2.9; stock WebView 145.0.7632.218.
 
-Construct alpha 19 compatibility execution remains in progress. Existing APKs
-remain unchanged. Physical ARM64 behavior and enforced memory-limit behavior
-remain outside the emulator evidence.
+Construct alpha 19 passed its complete host baseline on **API 37 / 4 KiB** with
+Chromium snapshot 1697462 / WebView **155.0.8059.0**: Checklist 5/5, bounded probes
+5 BLOCKED / 6 CONTAINED / 0 FAIL, injected renderer-loss recovery, tones 7/7 and
+consent 5/5. The original background-stop assertions passed. No Construct native
+crash appears in this receipt; its separate Bluetooth hardware-error crash is
+retained, not described as an empty platform crash buffer. Native photo and other
+module scopes remain in progress.
+
+- Construct x86-64 APK SHA-256: `739289ca1f9aa0f7b82e6ede687c6f5cb76275fd51b25968400b21d5516ca303`
+- Host receipt: `20260914T223302Z-d490fcb1`, complete and emulator stopped.
+- Both APKs remain unchanged; only runner code/environment changed.
+- Physical ARM64 behavior and enforced memory-limit behavior remain outside this
+  emulator evidence. Both images report the limiter disabled by default; no
+  override was applied.
+- Android 17's installed-package dump reports an automatically granted
+  `ACCESS_LOCAL_NETWORK` compatibility permission (`REVOKE_WHEN_REQUESTED`) for
+  the target-35 host. This was not added to the APK and is not a tested target-37
+  runtime-consent flow.
 
 ## Construct runtime investigation
 
@@ -198,3 +214,17 @@ Keeping both page-size comparisons exhausted the initial 16 GiB data volume's
 startup reserve. That new volume alone was expanded to **24 GiB**, restoring
 about 9 GiB headroom; no existing boot disk, Android-16 snapshot or recovery data
 was replaced. Startup now fails promptly when the emulator service fails.
+
+The both-camera 4 KiB vision attempt (`20260914T224714Z-7672048b`) still returned
+`CAMERA_UNAVAILABLE` before preview/capture or inference. CameraX successfully
+listed both cameras and reached lens validation, unlike the earlier missing-front
+failure. This run is failed, not a native-inference pass. Further diagnosis uses
+an explicitly separate debug build to reveal the caught binding exception; it
+cannot substitute for acceptance of the unchanged optimized APK.
+
+The first measurement attempt also stopped before native work: the bounded
+catalog navigator exposed the final measurement heading but not its install
+button. Its scroll distance now covers more of the content viewport per step;
+the 20-scroll limit, exact module/version boundary and stable enabled-action
+requirements are unchanged. Camera/vision waiting also fails immediately on an
+explicit native camera error rather than waiting for a result that cannot arrive.
