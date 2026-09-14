@@ -50,10 +50,38 @@ projects, flattened exports, polygons, camera handoff and assisted outlines rema
 later slices. The same-plane/approximate-measurement limits still apply; no accuracy
 badge or inferred safe-area vignette is shown.
 
-## Verification checkpoint
+## Verification and acceptance record
 
-Implementation verification is in progress. Do not treat the UI component compile
-or pure unit tests alone as Android gesture/lifecycle acceptance. Exact artifact
-hashes, scoped device receipts, packaging/size checks and hosted CI will be recorded
-here before a pilot handoff. Screenshots of this secure workspace may be blank;
-no visual acceptance is inferred from such captures.
+The current exact-artifact delivery status, optimized Android receipts, artifact
+hashes and hosted CI are recorded in [integration PR #7](https://github.com/blueworkslabs/construct/pull/7).
+That checkpoint distinguishes diagnostic runs from optimized pilot acceptance;
+passing a debug run alone does not authorize a pilot handoff.
+
+- 121 JVM tests cover the existing host contracts plus viewport mapping, moving
+  pinch centroids, symmetric loupe crops and transactional owner edits. The runner
+  has 43 unit tests under optimized Python; 24 build/publisher script tests pass.
+- Diagnostic receipt `20260914T155152Z-3a035c70` passed all 22 measurement checks on
+  application source `20f4873`, APK SHA-256
+  `9c562a2fc5022966c1e863ba09bc4495b49b217f87199186ac2610a25eba4332`.
+  Flat, perspective and EXIF fixtures measured 240 mm; confirming a 95 mm marker
+  scaled the flat fixture to 228 mm. Both font layouts (720/1.3 and 480/1.8), drag
+  Undo, Back and pointer cancellation, nudges, double-tap/pinch/pan, rotation,
+  background/process cleanup, revocation and original-byte checks passed. The
+  emulator stopped cleanly. This is explicitly a **non-optimized diagnostic** run.
+- Earlier receipts are retained as failures: `20260914T152435Z-0053950d` exposed
+  Confirm being covered by the IME; `20260914T154302Z-7f4b893c` used the Canvas's
+  occlusion-clipped accessibility bounds as if they were its full layout;
+  `20260914T154830Z-629c145b` reached gesture passes but stopped on a mismatched
+  test-driver double-tap keyword. None counts as a full pass.
+
+The keyboard correction uses resize insets and pads only the sheet for the IME.
+The runner uses the explicitly labelled parent workspace for full Canvas layout
+bounds: the sheet can change the child's *uncovered accessibility area* without
+changing the photo's actual layout. It still requires correct independent fixture
+lengths and fixed full workspace bounds across endpoint/result changes. Control
+taps wait for stable rectangles; double-tap uses the installed runner API's
+`duration` argument. No observer restart or screenshot-only pass is used.
+
+Screenshots of this secure workspace may be blank; no visual acceptance is
+inferred from those captures. Physical finger/loupe feel remains a focused device
+check, separate from the synthetic geometry and lifecycle receipts.

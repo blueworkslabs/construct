@@ -189,7 +189,7 @@ try:
     done('Accessible endpoint nudges use photo pixels and each nudge is individually undoable')
     action('Clear',collapse_after=True)
     x,y=screen_point(entry,(650,450))
-    ui._device.double_click(x,y,interval=.08);time.sleep(.6);expect('Zoom 3.0×')
+    ui._device.double_click(x,y,duration=.08);time.sleep(.6);expect('Zoom 3.0×')
     if any(x.startswith(('Length:','First endpoint set.')) for x in labels()):raise RuntimeError('Double tap placed an endpoint')
     ui._device.swipe(x,y,x-60,y-50,duration=.4);time.sleep(.4)
     if any(x.startswith(('Length:','First endpoint set.')) for x in labels()):raise RuntimeError('Pan placed an endpoint')
