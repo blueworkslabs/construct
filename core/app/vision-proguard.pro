@@ -17,5 +17,5 @@
 -dontwarn com.google.mediapipe.proto.CalculatorProfileProto$CalculatorProfile
 -dontwarn com.google.mediapipe.proto.GraphTemplateProto$CalculatorGraphTemplate
 
-# OpenCV Java wrappers call native methods and pass wrapper class names through JNI.
--keep class org.opencv.** { *; }
+# Narrow, host-owned JNI bridge instead of the full OpenCV Java wrapper.
+-keep class dev.construct.runtime.MeasureNative { *; }

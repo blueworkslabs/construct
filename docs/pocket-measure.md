@@ -44,7 +44,7 @@ the sole background exception. Pending work is generation-checked and serialized
 The working bitmap is bounded to 1600 pixels on its longest side; reads are
 limited to 20 MiB and source dimensions to 12000 pixels per side.
 
-OpenCV Android 4.12.0 performs local ArUco detection; the model-free detector uses
+OpenCV 4.12.0 performs local ArUco detection; the model-free detector uses
 only DICT_4X4_50 ID 0 and rejects missing or duplicate target markers. At least
 40 working-image pixels per edge are required. Pure Kotlin solves a homography
 and rejects invalid/nonconvex quadrilaterals, projective horizons, invalid scale,
@@ -74,9 +74,14 @@ are normalized; fit/letterboxing is shared by rendering and input.
   controls, closure, revocation, unchanged original bytes and diagnostic privacy.
   Host baseline and existing native vision checks are separate receipts.
 
-The upstream full multi-ABI OpenCV runtime increases the installer size. See
+Alpha 16 builds a narrow native bridge from pinned OpenCV source and produces
+separate ARM64-phone and x86-64-emulator APKs instead of shipping the full multi-ABI
+Java/native package. See [building](building.md) and
 [third-party provenance](../third_party/README.md). No runtime downloads, OpenCV
 Manager, unrestricted module networking or automatic object recognition are added.
+
+The [capability-pack proposal](capability-packs.md) describes a future small-core
+direction; it is not an implemented native plugin downloader.
 
 ## Integration notes
 

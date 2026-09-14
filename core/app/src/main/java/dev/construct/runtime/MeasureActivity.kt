@@ -13,6 +13,8 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,6 +27,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -162,6 +165,8 @@ class MeasureActivity : ComponentActivity() {
     }
     @Composable private fun Screen() {
         val focus = LocalFocusManager.current
+        val statusStyle = MaterialTheme.typography.bodySmall
+        val statusHeight = with(LocalDensity.current) { statusStyle.lineHeight.toDp() * 3 }
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp),verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Pocket Measure",style = MaterialTheme.typography.titleLarge)
@@ -169,7 +174,14 @@ class MeasureActivity : ComponentActivity() {
                     Button(onClick = { choose() },enabled = !busy) { Text("Choose photo") }
                     TextButton(onClick = { finish() }) { Text("Close measure") }
                 }
-                Text(status,style = MaterialTheme.typography.bodySmall,minLines = 3)
+                // Fixed for every message at this font scale/width. Long instructions remain
+                // scrollable/readable without moving the photo between endpoint taps.
+                Box(Modifier.fillMaxWidth().height(statusHeight)) {
+                    key(status) {
+                        Text(status,style = statusStyle,modifier = Modifier.fillMaxWidth()
+                            .verticalScroll(rememberScrollState()))
+                    }
+                }
                 if (corners.isNotEmpty()) {
                     Row(Modifier.fillMaxWidth(),horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(value = sizeText,onValueChange = { sizeText = it.take(8); sideMm = null; clearMeasurement() },

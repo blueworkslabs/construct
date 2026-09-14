@@ -4,12 +4,14 @@ import argparse
 from pathlib import Path
 import build_demo
 import prepare_vision
+import prepare_opencv
 from publish_module import build, publish
 
 ROOT = Path(__file__).resolve().parents[1]
 
 def prepare(output):
     prepare_vision.prepare()
+    prepare_opencv.prepare()
     key = build_demo.signing_key()
     build_demo.main()
     def add(source, versions, *folders, fixture=False):

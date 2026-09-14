@@ -16,6 +16,7 @@ entries=json.loads((fixtures/'manifest.json').read_text())
 current=None
 current_entry=None
 stage_index=0
+original_font_scale=adb('shell','settings','get','system','font_scale').strip()
 def done(text):result['checks'].append(text);print('PASS:',text,flush=True)
 def top():
     for _ in range(15):
@@ -135,6 +136,26 @@ try:
     entry=stage('measure-oriented.jpg');pick();expect('Reference found.');size('100');value=endpoints(entry)
     if abs(value-240)>3:raise RuntimeError('EXIF-oriented endpoint measurement failed: '+str(value))
     result['orientedMm']=value;done('EXIF orientation is applied consistently to native marker detection, photo display and endpoint mapping')
+    # Review regression: a minimum line count was insufficient when messages wrapped.
+    # Change only the disposable guest; configuration changes intentionally close the workspace.
+    result['largeFontLayouts']=[]
+    for width,font_scale in [(720,'1.3'),(600,'1.3')]:
+        tap('Close measure')
+        adb('shell','wm','size',str(width)+'x1280')
+        adb('shell','settings','put','system','font_scale',font_scale)
+        time.sleep(2)
+        opened();entry=stage('measure-flat.png');pick();expect('Reference found.');size('100')
+        bounds=find('Measurement photo: tap two endpoints').get('bounds')
+        value=endpoints(entry)
+        if abs(value-240)>4:raise RuntimeError('Large-font measurement outside 4 mm: '+str(value))
+        tap('Clear endpoints')
+        if find('Measurement photo: tap two endpoints').get('bounds')!=bounds:raise RuntimeError('Clearing status moved large-font photo')
+        result['largeFontLayouts'].append(dict(width=width,fontScale=font_scale,bounds=bounds,measuredMm=value))
+        done('Photo bounds remain fixed across instructions, both taps, result and clear at width '+str(width)+' / font scale '+font_scale)
+    tap('Close measure');adb('shell','wm','size','reset')
+    if original_font_scale=='null':adb('shell','settings','delete','system','font_scale')
+    else:adb('shell','settings','put','system','font_scale',original_font_scale)
+    time.sleep(2);opened()
     for name in ['measure-blank.png','measure-multiple.png']:
         stage(name);pick();expect('[MARKER_NOT_FOUND]')
         if any(x.startswith('Length:') or x=='Confirm size' for x in labels()):raise RuntimeError('Invalid marker retained measurement controls')
@@ -162,6 +183,9 @@ except Exception as e:
     except Exception:pass
     raise
 finally:
+    adb('shell','wm','size','reset')
+    if original_font_scale=='null':adb('shell','settings','delete','system','font_scale')
+    else:adb('shell','settings','put','system','font_scale',original_font_scale)
     adb('shell','settings','put','system','user_rotation','0')
     adb('shell','cmd','connectivity','airplane-mode','disable');adb('shell','svc','wifi','enable');adb('shell','svc','data','enable')
     (RESULTS/'measure-result.json').write_text(json.dumps(result,indent=2)+'\n')

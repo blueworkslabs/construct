@@ -49,8 +49,10 @@ for scope and current verification status. Alpha 15 adds
 [Pocket Measure](docs/pocket-measure.md): choose one photo, confirm a printed
 reference marker’s actual size, and tap two endpoints for an approximate planar
 length. Processing stays native; no photo/result is exposed to module JavaScript.
-The prototype bundles the full OpenCV runtime, increasing the universal APK to
-approximately 198 MB.
+Alpha 15's universal prototype was approximately 198 MB. The alpha 16 build
+configuration replaces it with architecture-specific APKs and a trimmed OpenCV
+measurement bridge; see [building](docs/building.md). Optional
+[capability packs](docs/capability-packs.md) remain a design proposal.
 
 ## Two delivery lanes
 

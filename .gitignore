@@ -28,6 +28,7 @@ core/app/src/main/assets/registry-public.der
 __pycache__/
 *.pyc
 .kotlin/
+.cxx/
 *.keystore
 *.jks
 *.pem

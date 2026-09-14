@@ -6,15 +6,31 @@ plugins {
 android {
     namespace = "dev.construct.runtime"
     compileSdk = 35
+    ndkVersion = "27.2.12479018"
     defaultConfig {
         applicationId = "dev.construct.runtime"
         minSdk = 28
         targetSdk = 35
-        versionCode = 15
-        versionName = "0.1.0-alpha15"
+        versionCode = 16
+        versionName = "0.1.0-alpha16"
+        externalNativeBuild { cmake {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+            arguments += listOf("-DANDROID_STL=c++_static", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
+            targets += "construct_measure"
+        } }
     }
     buildFeatures { compose = true; buildConfig = true }
     androidResources { noCompress += "tflite" }
+    splits { abi {
+        isEnable = true
+        reset()
+        include("arm64-v8a", "x86_64")
+        isUniversalApk = false
+    } }
+    externalNativeBuild { cmake {
+        path = file("src/main/cpp/CMakeLists.txt")
+        version = "3.22.1"
+    } }
     buildTypes {
         create("pilot") {
             initWith(getByName("debug"))
@@ -45,7 +61,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material:material-icons-core")
-    implementation("org.opencv:opencv:4.12.0")
     implementation("androidx.webkit:webkit:1.12.1")
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
