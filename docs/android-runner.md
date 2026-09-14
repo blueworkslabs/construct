@@ -113,6 +113,17 @@ restoring an old snapshot, `--disable-digital-wellbeing` disables only
 not suppress Construct/system errors, change the stored snapshot, or touch a
 physical device. Preserve the failed receipt that motivated this override.
 
+For repeated module lifecycle observation use `--reliability-only`. It exercises
+the bundled Hello counter through ten menu/Diagnostics/access/close cycles,
+requiring real accessibility controls and preserved data without recovery taps.
+The reference WebView 133 image has a reproducible stale-descendant problem;
+`--webview-apk FILE --webview-sha256 HASH` supports an explicitly pinned Chromium
+provider comparison on a disposable userdebug image. The provider is installed
+after snapshot validation and its version/hash are recorded. This does not
+rewrite the snapshot or change a phone. See [reliability evidence and provider
+provenance](webview-reliability.md); do not conflate provider-specific results
+with a fix for every WebView version or a physical screen-reader test.
+
 `results/RUN_ID` contains receipts, child logs and screenshots. Review every child
 and its scope: an earlier failed parent is never converted into success because
 some children passed. Tests may insert synthetic contacts or temporarily use root
