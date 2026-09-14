@@ -65,5 +65,42 @@ install it on a personal phone. Extract the named member from the official ZIP,
 verify its SHA-256, and copy it to the disposable runner before using the flags.
 Production phone WebView updates remain Android/Google's normal update path.
 
-Investigation and final optimized acceptance are in progress. No claim of a
-complete accessibility fix is made by the evidence above.
+## Recorded comparison
+
+On the same optimized alpha 13 APK
+(`3093571752a82dd00a6f8ad6c6b5d65c4b80731e5d0eb71cca6a7c1969cb55dc`):
+
+- Original WebView `133.0.6943.137`: clean runs
+  `20260914T055121Z-9d7bfcae` and `20260914T055326Z-6c8c239b` failed on
+  the first cycle's normal close/reopen. The latter includes the failed
+  observer-only recovery experiment, not a passing retry.
+- Pinned WebView `155.0.8058.0`: `20260914T061343Z-79de64b8` completed all
+  **10 cycles / 51 checkpoints**, with the same host process and counter values
+  preserved. No recovery interventions were present. Emulator stopped.
+- On that provider, `20260914T061914Z-7c0182c3` also passed the focused camera
+  direct-Reopen scope after module grants, Android permission and native
+  cancellation dialogs, with revocation still enforced. No
+  `--camera-fresh-launches` override was used. This is not the full capture,
+  gallery or vision suite. Emulator stopped.
+
+This isolates the reference provider as a material cause of the observed
+failures; it is not an app-only fix for WebView 133.
+
+## Alpha 14 host correction and review
+
+The separate teardown correction is in native commit `2cb2d3f`, version
+`0.1.0-alpha14`. Its optimized APK SHA-256 is
+`03c32d601efc755464ce5501291d9fb62a29bbac2ccae1a9afad174cc0528414`.
+The existing APK signer, publisher identity, bundled modules, vision models and
+Android permissions are unchanged. Generated dex optimization profiles change
+with the compiled code and are not module/model assets.
+
+All 97 JVM tests pass, including release-before-detach-before-destroy ordering;
+lint has no errors. The renderer-loss driver resolves the selected provider
+instead of assuming Google's package name, still requiring one newly created
+isolated renderer, an unchanged provider/PID identity, and a different host PID
+before injection. Its identity/rejection cases are covered in the 43 runner tests.
+
+The current review status and **separate alpha 14 exact-build Android receipts**
+are recorded in [the reliability PR](https://github.com/blueworkslabs/construct/pull/4).
+The alpha 13 comparison above must not be reused as alpha 14 acceptance.
