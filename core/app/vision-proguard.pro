@@ -16,3 +16,6 @@
 # these two upstream missing-type warnings (not arbitrary missing dependencies).
 -dontwarn com.google.mediapipe.proto.CalculatorProfileProto$CalculatorProfile
 -dontwarn com.google.mediapipe.proto.GraphTemplateProto$CalculatorGraphTemplate
+
+# Narrow, host-owned JNI bridge instead of the full OpenCV Java wrapper.
+-keep class dev.construct.runtime.MeasureNative { *; }

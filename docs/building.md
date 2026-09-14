@@ -3,6 +3,8 @@
 ## Prerequisites
 
 - JDK 17; Android SDK platform 35 and build-tools 35.0.0.
+- Android NDK 27.2.12479018 and SDK CMake 3.22.1 (install with `sdkmanager
+  'ndk;27.2.12479018' 'cmake;3.22.1'`). Native builds use one compiler job at a time.
 - Python 3.10+ and `cryptography` 41+ in a virtual environment.
 - Node.js 20+ for deterministic module tests.
 - Linux is the reference build/runner environment. The Android minimum is API 28;
@@ -30,6 +32,13 @@ node scripts/test_camera.cjs
 ./gradlew --no-daemon :core:app:testDebugUnitTest :core:app:lintDebug :core:app:assembleDebug --max-workers=1
 ```
 
+The fixture bootstrap also runs `scripts/local_mediapipe.py` to produce the ignored
+`core/app/libs/mediapipe-core-local.aar` from the pinned upstream runtime with the
+documented telemetry modification. For an existing operator checkout, run
+`python3 scripts/prepare_vision.py` independently to verify the pinned vision assets
+and generate this dependency
+without regenerating publisher fixtures or signing identities.
+
 The fixture bootstrap generates signed Hello assets, the pinned publisher public
 key, JVM fixture catalogs and current example home/test catalogs. Its historical
 version labels are synthetic **current-source fixtures**, not reproductions of old
@@ -51,6 +60,33 @@ operator's APK. Debug and pilot builds are development-signed, not public releas
 signing. `assemblePilot` creates the optimized, non-debuggable pilot variant.
 A separately signed APK with the same application ID cannot update an existing
 installation signed by someone else; use a disposable emulator for reproduction.
+
+### Architecture-specific APKs and measurement engine
+
+The build produces separate `app-arm64-v8a-pilot.apk` (modern ARM64 phones) and
+`app-x86_64-pilot.apk` (reference emulator) under `core/app/build/outputs/apk/pilot`.
+They are standalone APKs, not a set of splits requiring a special installer. Use
+the matching architecture; there is no universal or 32-bit APK in this configuration.
+Both carry the same application ID/version/signing identity. A matching signed
+ARM64 APK can update an existing universal installation without removing user data.
+
+`prepare_fixtures.py` also runs `prepare_opencv.py`, which fetches checksum-pinned
+OpenCV 4.12.0 source into ignored `dist/native-source`. To preserve existing operator
+fixture/signing assets, run just `python3 scripts/prepare_opencv.py` when preparing
+this dependency. Do not regenerate operator fixture keys as part of an APK update.
+
+CMake builds upstream `objdetect` and its required core/imgproc/calib3d/features2d/
+flann dependencies as static libraries. The linker retains only code reachable from
+the narrow measurement JNI bridge. The full Java wrapper, DNN, codecs, OpenCV Manager
+and unused architectures are not shipped. The algorithm/dictionary/subpixel settings
+remain OpenCV 4.12.0's. See [provenance](../third_party/README.md).
+
+`scripts/check_apk_size.py APK --abi arm64-v8a --max-mb BUDGET` reports actual
+size/hash/native inventory and checks architecture, 16 KB ELF load alignment,
+the absence of full OpenCV JNI and unchanged bundled models. Run Android SDK
+`zipalign -c -P 16 -v 4 APK` and `apksigner verify --verbose --print-certs APK` too.
+Emulator receipts cover the x86-64 APK, not execution of ARM64 code: phone acceptance
+remains a separate, explicitly reported check.
 
 ## Optional operator profile
 

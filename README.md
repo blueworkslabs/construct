@@ -39,13 +39,21 @@ See [release provenance](docs/public-release.md) and [known limits](docs/evidenc
   delivery service, not a required backend for every module interaction.
 
 Examples include **Pocket Checklist**, **Pocket Focus**, **Pocket Snake**,
-**Pocket Contacts**, and **Pocket Camera**. Focus is a foreground timer, not a
+**Pocket Contacts**, **Pocket Camera**, and **Pocket Measure**. Focus is a foreground timer, not a
 background alarm. Camera photos start in a bounded app-private album; alpha 12
 adds explicit native gallery copies on Android 10+. Alpha 13 adds user-requested
 on-device face/common-object detection for selected photos, with bundled models.
 No identity recognition, contacts editing or LAN discovery. See
 [gallery export](docs/gallery-export.md) and [photo analysis](docs/photo-analysis.md)
-for scope and current verification status.
+for scope and current verification status. Alpha 15 adds
+[Pocket Measure](docs/pocket-measure.md): choose one photo, confirm a printed
+reference marker’s actual size, and tap two endpoints for an approximate planar
+length. Processing stays native; no photo/result is exposed to module JavaScript.
+Alpha 15's universal prototype was approximately 198 MB. Alpha 16's ARM64 pilot
+is about **23.3 MB**, using architecture-specific APKs and a trimmed OpenCV
+measurement bridge; see [size and verification details](docs/apk-optimization.md)
+and [building](docs/building.md). Optional
+[capability packs](docs/capability-packs.md) remain a design proposal.
 
 ## Two delivery lanes
 

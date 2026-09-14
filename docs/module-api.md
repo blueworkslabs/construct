@@ -1,7 +1,7 @@
 # Implemented module API
 
 The current host accepts exact `constructApi.min == constructApi.target` versions
-0.1.0 through 0.6.0. Module versions are three numeric components. See the
+0.1.0 through 0.7.0. Module versions are three numeric components. See the
 [manifest schema](../schemas/module-manifest.schema.json) and runnable
 [examples](../examples); the native validator is authoritative.
 
@@ -30,7 +30,7 @@ may be dropped. Check declaration, saved grant and relevant Android permission o
 every request. Sensitive asynchronous results are re-authorized at delivery.
 
 Legacy storage/log/toast access is approved at installation unless previously
-revoked. Tone, contacts and camera start off and require explicit native opt-in.
+revoked. Tone, contacts, camera and photo measurement start off and require explicit native opt-in.
 Updates/rollback preserve revoked access. Required access has confirmation before
 revocation. Native consent explains contacts plus storage when both are declared:
 a granted module can retain data it has read; revocation is not retroactive erasure.
@@ -149,3 +149,26 @@ See [architecture](architecture.md), [security](../SECURITY.md) and
 [evidence limits](evidence.md), including the known camera direct-Reopen
 accessibility issue. There is no background alarm/service, contacts write, module
 gallery-export API, face analysis or general network API in this release.
+
+## Photo measurement (API 0.7.0)
+
+`photo.measure` accepts **only** `{op:"open"}` and returns `{opened:true}`.
+It requires an explicit native grant, off by default. It opens Pocket Measure's
+native workspace, not a caller-selected URI or an automatic camera capture.
+Android's single-image photo picker (document-picker fallback on older devices)
+is the only image source. No broad gallery/storage permission is added.
+
+The user chooses a photo, confirms the actual printed marker side (10–300 mm),
+then taps two endpoints. OpenCV 4.12.0 detects DICT_4X4_50 marker ID 0; exactly one
+is required. A homography maps endpoints into its plane. Results are approximate
+straight-line lengths, not surface-following lengths or object heights. The
+reference and endpoints must be coplanar. There is no lens calibration, object
+recognition, export, saved measurement, or background processing contract.
+
+Reads are bounded to 20 MiB, decoded dimensions to 12000 per side, and the
+working bitmap to 1600 pixels on its longest side. Detector work is serialized;
+a new photo, closure or loss of authority invalidates pending results. Picker
+handoff is an explicit lifecycle exception; other backgrounding or rotation
+closes and clears the workspace. Process recreation does not restore it.
+No URI, pixels, marker size, endpoints or lengths are returned to JavaScript or
+written to diagnostics. User-selected originals are never modified.

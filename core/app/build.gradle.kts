@@ -6,15 +6,34 @@ plugins {
 android {
     namespace = "dev.construct.runtime"
     compileSdk = 35
+    ndkVersion = "27.2.12479018"
     defaultConfig {
         applicationId = "dev.construct.runtime"
         minSdk = 28
         targetSdk = 35
-        versionCode = 14
-        versionName = "0.1.0-alpha14"
+        versionCode = 19
+        versionName = "0.1.0-alpha19"
+        externalNativeBuild { cmake {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+            arguments += listOf("-DANDROID_STL=c++_static", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
+            targets += "construct_measure"
+        } }
     }
     buildFeatures { compose = true; buildConfig = true }
     androidResources { noCompress += "tflite" }
+    // Upstream MediaPipe is already stripped. Keep its pinned native bytes intact;
+    // the NDK strips only our newly compiled measurement bridge.
+    packaging { jniLibs.keepDebugSymbols += "**/libmediapipe_tasks_jni.so" }
+    splits { abi {
+        isEnable = true
+        reset()
+        include("arm64-v8a", "x86_64")
+        isUniversalApk = false
+    } }
+    externalNativeBuild { cmake {
+        path = file("src/main/cpp/CMakeLists.txt")
+        version = "3.22.1"
+    } }
     buildTypes {
         create("pilot") {
             initWith(getByName("debug"))

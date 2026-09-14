@@ -8,7 +8,7 @@ permissions:
 jobs:
   source-and-android:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -38,11 +38,16 @@ jobs:
           node scripts/test_focus.cjs
           node scripts/test_contacts.cjs
           node scripts/test_camera.cjs
+          node scripts/test_measure.cjs
       - name: Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0 ndk;27.2.12479018 cmake;3.22.1'
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: false
       - name: JVM, lint and safe-default debug and optimized APKs
         run: ./gradlew --no-daemon :core:app:testDebugUnitTest :core:app:lintDebug :core:app:assembleDebug :core:app:assemblePilot --max-workers=1 -Dorg.gradle.jvmargs=-Xmx1500m
+      - name: Architecture and native size budgets
+        run: |
+          python scripts/check_apk_size.py core/app/build/outputs/apk/pilot/app-arm64-v8a-pilot.apk --abi arm64-v8a --max-mb 40
+          python scripts/check_apk_size.py core/app/build/outputs/apk/pilot/app-x86_64-pilot.apk --abi x86_64 --max-mb 60
