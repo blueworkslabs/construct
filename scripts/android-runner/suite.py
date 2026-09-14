@@ -228,6 +228,9 @@ except Exception as error:
 finally:
     if receipt.get('logcatResetBeforeChildren'):
         try:
+            (run/'android-crashes.log').write_text(adb('logcat','-b','crash','-d'))
+            (run/'process-exits.txt').write_text(adb('shell','dumpsys','activity','exit-info','dev.construct.runtime'))
+            (run/'memory-at-end.txt').write_text(adb('shell','dumpsys','meminfo','dev.construct.runtime'))
             warnings = adb('logcat', '-d', '-s', 'cr_AwContents:W')
             (run/'webview-warnings.log').write_text(warnings)
             receipt['attachedDestroyWarnings'] = sum('destroy() called while WebView is still attached' in line for line in warnings.splitlines())

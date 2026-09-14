@@ -56,8 +56,15 @@ installing a candidate. Receipts record kernel page size and memory-limiter stat
 
 Provision image `system-images;android-37.0;google_apis_ps16k;x86_64` and follow
 [runner bootstrap](android-runner.md), substituting the configured AVD name and
-using `-camera-back emulated`. The reference runner uses a 3 GiB sparse data partition (6 GiB could not be
-created within its available disk); retain free space for snapshot growth.
+using `-camera-back emulated`. The reference guest uses a 3 GiB sparse data partition (6 GiB could not be
+created within the original disk budget). A 3 GiB RAM snapshot also consumed the
+emulator's required free-space reserve, even after verified off-runner archival
+of historical staging APK copies. A dedicated 16 GiB virtual data volume was
+therefore added for the **new** AVD; its files are checksum-verified during the
+move and its absolute paths retained. Existing boot disks, Android-16 snapshots,
+current APK/provider files and recovery backups are not modified. Provision both
+actual image/snapshot capacity **and** the emulator's startup free-space reserve;
+apparent sparse partition size is not sufficient capacity planning.
 Save only after Android setup and automation are
 ready, both apps are absent, and reboot/restore can be independently verified.
 
@@ -83,8 +90,11 @@ system-server. It is **not** a stable baseline or a successful UI-driver compari
 Emulator 37.2.9 is being tested in a separate SDK root; the shared API-36
 emulator remains pinned at 37.1.11. With the new binary and fresh 2 GiB guest,
 Android's low-memory killer removed setup/settings/permission-controller processes.
-The next baseline uses `--memory-mb 3072`, keeping the 5 GiB process cap and
-6 GiB VM unchanged. This is environment tuning, not an app fix. Stock Google WebView is 145.0.7632.218. The image reports its memory limiter
+The 3 GiB profile (`--memory-mb 3072`) then passed fresh boot, a stable
+system-server interval, UI-driver initialization and app-free snapshot save with
+empty startup and pre-snapshot crash buffers. The 5 GiB process cap and 6 GiB VM
+remain unchanged. Snapshot restoration/app execution are the next gates; these
+combined environment changes are not an app fix or isolated proof of one cause. Stock Google WebView is 145.0.7632.218. The image reports its memory limiter
 **disabled by default**; no override was applied, so this is not evidence of
 enforced app-memory-limit behavior.
 
