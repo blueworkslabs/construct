@@ -78,7 +78,7 @@ boot, before either candidate app was installed. Disabling `GLDMA`/`GLDMA2` did 
 removed. Android's `LOG_ALWAYS_FATAL_IF` condition actually signals *missing*
 required DMA support. The host advertises read-color-buffer DMA only when both
 `GLDirectMem` and `HasSharedSlotsHostMemoryAllocator` are enabled; its default
-GLDirectMem is off. A replacement baseline is being checked with explicit
+GLDirectMem is off. The replacement baseline uses explicit
 `--enable-direct-memory` (both features on), without updating the shared emulator
 binary or changing the API-36 profile.
 
@@ -87,16 +87,55 @@ and [host RenderControl](https://android.googlesource.com/platform/hardware/goog
 The direct-memory experiment passed one 45-second system-server check with an
 empty crash buffer, but UI automation timed out and the next cold boot restarted
 system-server. It is **not** a stable baseline or a successful UI-driver comparison.
-Emulator 37.2.9 is being tested in a separate SDK root; the shared API-36
+Emulator 37.2.9 runs in a separate SDK root; the shared API-36
 emulator remains pinned at 37.1.11. With the new binary and fresh 2 GiB guest,
 Android's low-memory killer removed setup/settings/permission-controller processes.
 The 3 GiB profile (`--memory-mb 3072`) then passed fresh boot, a stable
 system-server interval, UI-driver initialization and app-free snapshot save with
 empty startup and pre-snapshot crash buffers. The 5 GiB process cap and 6 GiB VM
-remain unchanged. Snapshot restoration/app execution are the next gates; these
+remain unchanged. Snapshot restoration and all seven Nano Lab checks subsequently passed. These
 combined environment changes are not an app fix or isolated proof of one cause. Stock Google WebView is 145.0.7632.218. The image reports its memory limiter
 **disabled by default**; no override was applied, so this is not evidence of
 enforced app-memory-limit behavior.
 
-Compatibility execution is in progress. No Android 17 app
-acceptance or Nano generation is claimed yet. Existing APKs remain unchanged.
+## Accepted compatibility evidence
+
+Nano Lab alpha 1 passed all seven checks on the restored API-37 snapshot:
+fresh launch without automatic work, real SDK `UNAVAILABLE`, disabled download
+and inference, genuine clipboard report privacy, background cleanup without
+process restart, rotation reset, and explicit Clear/Close. The run completed with
+an empty crash buffer and stopped emulator. This image has no AICore: **neither
+Nano generation nor Pixel eligibility is established**.
+
+The Android 17 floating text-selection toolbar did not expose Paste during the
+first UI run. The accepted run uses the optional native Paste key into a focused
+EditText, reads the actual clipboard report and retains the original privacy
+assertions. It does not substitute generated report text or claim that the
+floating toolbar issue was fixed. Only the test driver changed; the APK did not.
+
+- Nano APK SHA-256: `76230bd83a71db4674d5bf1457af7951b90d67a17b2525cd10d14168af4f7a67`
+- Platform: Android 17 / API 37, x86-64, 16384-byte pages.
+- System image: Google APIs 16 KiB revision 6, build `CE2A.260420.019`.
+- Emulator: 37.2.9; stock WebView 145.0.7632.218.
+
+Construct alpha 19 compatibility execution remains in progress. Existing APKs
+remain unchanged. Physical ARM64 behavior and enforced memory-limit behavior
+remain outside the emulator evidence.
+
+## Construct runtime investigation
+
+The initial stock-WebView run passed all five checklist checkpoints, probes at
+5 BLOCKED / 6 CONTAINED / 0 FAIL, renderer-loss recovery and the first six tone
+checks. Its final background check failed after a fixed 600 ms Home/return
+interval; that receipt remains failed. A second run observes a real launcher
+transition before returning and retains the cleanup assertions. The module
+activity finished, but **the host process then crashed**: SIGILL in WebView
+145's `libwebviewchromium.so`, called from `onTrimMemory`. This is not a passing
+background check or merely a missing accessibility node.
+
+A controlled comparison uses the existing explicitly pinned Chromium provider
+via `--webview-apk` / `--webview-sha256` on a fresh disposable snapshot. It changes
+no Construct bytes and no phone provider. Results remain pending. An earlier
+stock run also recorded an unrelated emulator Bluetooth hardware-error crash;
+it is retained separately rather than described as an app failure or an empty
+platform crash log.
