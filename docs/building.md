@@ -35,7 +35,8 @@ node scripts/test_camera.cjs
 The fixture bootstrap also runs `scripts/local_mediapipe.py` to produce the ignored
 `core/app/libs/mediapipe-core-local.aar` from the pinned upstream runtime with the
 documented telemetry modification. For an existing operator checkout, run
-`python3 scripts/local_mediapipe.py` independently to prepare this dependency
+`python3 scripts/prepare_vision.py` independently to verify the pinned vision assets
+and generate this dependency
 without regenerating publisher fixtures or signing identities.
 
 The fixture bootstrap generates signed Hello assets, the pinned publisher public

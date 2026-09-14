@@ -138,6 +138,8 @@ fun MeasureOverlay(
 
                     try { while (true) {
                         val event = awaitPointerEvent()
+                        // Compose synthetic cancellation releases are consumed; never commit them as a finger-up.
+                        if (event.changes.any { it.isConsumed }) { cancelDrag(); cancelTaps(); break }
                         val pressed = event.changes.filter { it.pressed }
                         if (pressed.isEmpty()) {
                             val active = drag
