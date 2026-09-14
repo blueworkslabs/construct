@@ -21,6 +21,9 @@ android {
     }
     buildFeatures { compose = true; buildConfig = true }
     androidResources { noCompress += "tflite" }
+    // Upstream MediaPipe is already stripped. Keep its pinned native bytes intact;
+    // the NDK strips only our newly compiled measurement bridge.
+    packaging { jniLibs.keepDebugSymbols += "**/libmediapipe_tasks_jni.so" }
     splits { abi {
         isEnable = true
         reset()
