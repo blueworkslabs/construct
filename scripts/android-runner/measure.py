@@ -102,7 +102,10 @@ def size(value):
         if chip is None:
             control('Collapse controls')
             chip=next((x for x in labels() if x.startswith('Marker ') and x.endswith('mm ✓')),None)
-        if chip:tap(chip)
+        if chip:
+            tap(chip);expect('Reference found. Enter its measured outer black-square side')
+            if any(x.startswith('Tap the two ends') for x in labels()):
+                raise RuntimeError('Reopened calibration still requests endpoint placement')
     control('Marker side (mm)')
     ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value)
     # Hide only the keyboard (the app's Back policy is not used as navigation here).

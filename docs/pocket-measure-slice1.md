@@ -117,3 +117,10 @@ restoring the original geometry. Cancellation failures remain suppressed. Back
 uses the same owner edit path so it also restores the valid displayed result;
 the Android checks cover rejected-preview cancellation through both Back and
 Android pointer CANCEL, with the controls remaining collapsed.
+
+### Connector review: reopened calibration guidance
+
+While a detected marker is uncalibrated, the instruction derives from that state
+and requests its measured size, including after reopening setup or editing the
+size. It no longer reuses the earlier endpoint-placement status. The size-change
+Android flow requires this prompt before confirming the new calibration.

@@ -183,7 +183,7 @@ class MeasureActivity : ComponentActivity() {
         val model = editor.measurement
         val calibrated = editor.sideMm != null
         val instruction = when {
-            !calibrated -> status
+            !calibrated -> if (corners.isNotEmpty()) "Reference found. Enter its measured outer black-square side in millimetres." else status
             model == null -> "Tap the two ends of a length in the photo."
             model.b == null -> "First endpoint set. Tap the other end."
             else -> "Drag an endpoint to adjust, or Clear for another length."
