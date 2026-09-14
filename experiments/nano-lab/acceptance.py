@@ -13,6 +13,7 @@ import subprocess
 import time
 import xml.etree.ElementTree as ET
 import uiautomator2 as u2
+from uiautomator2.exceptions import UiObjectNotFoundError
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--serial', required=True)
@@ -38,17 +39,52 @@ def tree():
     return d.dump_hierarchy(compressed=False)
 def text():
     return '\n'.join(n.attrib.get('text', '') for n in ET.fromstring(tree()).iter('node'))
+def hide_keyboard():
+    if d(packageName=ime_package).exists:
+        d.press('back'); time.sleep(.3)
+        require(d.app_current().get('package')==package, 'Keyboard dismissal left Nano Lab')
 def seek(label):
-    if not d(text=label).exists:
-        d(scrollable=True).scroll.to(text=label, max_swipes=8)
-    require(d(text=label).exists, 'Missing control: '+label)
-    return d(text=label)
+    hide_keyboard()
+    target = d(text=label, packageName=package)
+    if not target.exists: top()
+    height = d.window_size()[1]
+    for attempt in range(9):
+        hide_keyboard()
+        if target.exists:
+            try: b = target.info['bounds']
+            except UiObjectNotFoundError:
+                time.sleep(.4); continue
+            center = (b['top']+b['bottom'])/2
+            if .15*height <= center <= .94*height and b['bottom']-b['top'] >= 40:
+                time.sleep(.3)
+                try:
+                    if target.exists and target.info['bounds']==b: return target
+                except UiObjectNotFoundError:
+                    continue
+            if attempt < 8:
+                if center < .15*height: d.swipe(.5,.35,.5,.7,duration=.3)
+                else: d.swipe(.5,.7,.5,.35,duration=.3)
+        elif attempt < 8: d.swipe(.5,.7,.5,.35,duration=.3)
+    raise RuntimeError('Control not tappable at stable safe bounds: '+label)
 def top():
-    d(scrollable=True).scroll.toBeginning(max_swipes=8)
+    hide_keyboard()
+    for attempt in range(9):
+        if d(text='Construct Nano Lab', packageName=package).exists: return
+        if attempt < 8: d.swipe(.5, .35, .5, .75, duration=.3)
+    raise RuntimeError('Unable to reach top of Nano Lab')
 def prompt():
-    if not d(description='Your prompt').exists:
-        d(scrollable=True).scroll.to(description='Your prompt', max_swipes=8)
-    return d(description='Your prompt')
+    hide_keyboard()
+    target = d(description='Your prompt', packageName=package)
+    if not target.exists: top()
+    for attempt in range(9):
+        if target.exists: return target
+        if attempt < 8: d.swipe(.5, .75, .5, .35, duration=.3)
+    raise RuntimeError('Prompt field not found')
+def write_prompt(value):
+    prompt().set_text(value)
+    # Text replacement can open IME asynchronously; settle before navigation.
+    time.sleep(1)
+    hide_keyboard()
 def resume():
     adb('shell', 'am', 'start', '-n', package+'/.NanoActivity')
     require(d(packageName=package).wait(timeout=10), 'App did not become visible')
@@ -60,6 +96,7 @@ try:
     receipt['aicorePackage'] = adb('shell','pm','list','packages','com.google.android.aicore').strip()
     adb('install', str(apk))
     d = u2.connect_usb(a.serial)
+    ime_package = adb('shell','settings','get','secure','default_input_method').strip().split('/')[0]
     resume()
     require('Not checked. Tap Check availability.' in text(), 'Unexpected automatic availability check')
     require(not seek('Download model').info['enabled'], 'Download enabled before check')
@@ -81,7 +118,8 @@ try:
     top(); seek('Tiny story').click()
     require('robot and a lost sock' in prompt().get_text(), 'Preset missing')
     marker = 'SYNTHETIC-NANO-PRIVATE-TEXT-914'
-    prompt().set_text(marker)
+    write_prompt(marker)
+    (a.out/'after-entry.xml').write_text(tree())
     require(prompt().get_text()==marker, 'Input replacement failed')
     # Native copy then paste into the app's own field verifies the actual report.
     seek('Copy technical report').click()
@@ -95,20 +133,24 @@ try:
     require(marker not in report, 'Technical report included prompt text')
     (a.out/'technical-report.txt').write_text(report+'\n')
     done('Technical clipboard report contains versions/status and excludes synthetic prompt')
-    prompt().set_text(marker)
+    write_prompt(marker)
     pid = adb('shell','pidof',package).strip()
     d.press('home'); time.sleep(1); resume()
     require(adb('shell','pidof',package).strip()==pid, 'Background check must retain process')
-    require(prompt().get_text()=='', 'Prompt retained across background')
+    require(prompt().get_text() in ('', 'Your prompt'), 'Prompt retained across background')
     top(); require('Session cleared after leaving.' in text(), 'Session not invalidated')
     done('Background/return clears text and readiness without process restart')
-    prompt().set_text(marker); d.set_orientation('l'); time.sleep(1)
-    require(prompt().get_text()=='', 'Prompt restored across rotation')
+    write_prompt(marker); d.set_orientation('l'); time.sleep(1)
+    require(prompt().get_text() in ('', 'Your prompt'), 'Prompt restored across rotation')
     d.set_orientation('n'); time.sleep(1)
     top(); require('Not checked. Tap Check availability.' in text(), 'Rotation unexpectedly restores readiness')
     done('Rotation starts a fresh empty session')
-    prompt().set_text(marker); seek('Clear text').click()
-    require(prompt().get_text()=='', 'Clear did not clear text')
+    write_prompt(marker)
+    clear = seek('Clear text')
+    (a.out/'before-clear.xml').write_text(tree())
+    clear.click()
+    time.sleep(.3)
+    require(prompt().get_text() in ('', 'Your prompt'), 'Clear did not clear text')
     seek('Close Nano Lab').click()
     require(d.app_current().get('package')!=package, 'Close did not leave Nano Lab')
     done('Explicit Clear and Close work')

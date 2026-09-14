@@ -87,3 +87,35 @@ cancellation of a real inference, and offline operation remain device checks.
 Official references: [Prompt API](https://developers.google.com/ml-kit/genai/prompt/android),
 [setup](https://developers.google.com/ml-kit/genai/prompt/android/get-started),
 [foreground and quotas](https://developers.google.com/ml-kit/genai).
+
+## Alpha 1 verification checkpoint — 2026-09-14
+
+- App/build source: `5d56689548620385d96144a5655ab4ccd1704c80`.
+- Optimized, non-debuggable APK: **1,583,118 bytes**.
+- SHA-256: `76230bd83a71db4674d5bf1457af7951b90d67a17b2525cd10d14168af4f7a67`.
+- Five JVM lifecycle tests passed. Lint: zero errors, 30 warnings
+  (target-version and English-only localization warnings).
+- [Fresh-checkout probe CI passed](https://github.com/blueworkslabs/construct/actions/runs/34889705858),
+  including optimized packaging and actual APK permission/size checks.
+- Seven real Android 16 emulator checks passed on that exact APK, with no AICore
+  package installed. Emulator stopped; no emulator process remained.
+
+- Fresh launch makes no automatic check or download.
+- Real Prompt SDK returns UNAVAILABLE without crashing.
+- Unavailable state disables download and inference.
+- Technical clipboard report contains versions/status and excludes synthetic prompt.
+- Background/return clears text and readiness without process restart.
+- Rotation starts a fresh empty session.
+- Explicit Clear and Close work.
+
+Earlier incomplete receipts are retained separately. They exposed test-driver
+problems around the notification shade, asynchronous keyboard appearance and
+unstable/edge tap coordinates. The final driver settles text-entry transitions,
+dismisses only the detected keyboard, bounds scrolls, and requires stable tap
+rectangles. No failed receipt is counted as a complete pass; the APK remained
+unchanged throughout these runs.
+
+**Still unverified:** access on a physical device, offered model download and
+inference/streaming/offline behavior. The emulator's real `UNAVAILABLE` result
+is only unavailable-path evidence, not proof of a working Nano model. The
+Construct host was not modified or re-tested for this standalone experiment.
