@@ -148,7 +148,12 @@ try:
     tap('Module access');find('Allow photo measurement');grant=next(n for n in nodes() if n.get('content-desc')=='Allow photo measurement' and n.get('checkable')=='true')
     if grant.get('checked')!='false':raise RuntimeError('Measurement grant was not off')
     tap_node(grant);find('Allow photo measurement: on.');tap('Reopen module');tap('Open measurement workspace');control('Choose photo')
-    action('Choose photo');adb('shell','input','keyevent','4');expect('No photo selected.')
+    action('Choose photo')
+    picker = find('Photos')
+    if '.providers.media' not in picker.get('package', ''):
+        raise RuntimeError('Cancellation target is not the native media picker')
+    # Wait for the actual picker UI, not a fixed launch-animation delay.
+    adb('shell','input','keyevent','4');expect('No photo selected.')
     done('System picker cancellation reads no photo and returns to workspace')
     entry=stage('measure-flat.png')
     adb('shell','cmd','connectivity','airplane-mode','enable');adb('shell','svc','wifi','disable');adb('shell','svc','data','disable')

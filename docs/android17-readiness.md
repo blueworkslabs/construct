@@ -228,3 +228,22 @@ button. Its scroll distance now covers more of the content viewport per step;
 the 20-scroll limit, exact module/version boundary and stable enabled-action
 requirements are unchanged. Camera/vision waiting also fails immediately on an
 explicit native camera error rather than waiting for a result that cannot arrive.
+
+## Confirmed CameraX compatibility fix (alpha 20 candidate)
+
+The diagnostic build exposed the exact exception:
+`NullPointerException: Dynamic range profile cannot be converted to a DynamicRange object: 8192`
+in CameraX 1.4.2's `DynamicRangesCompatApi33Impl`, during `bindToLifecycle`.
+Google documents this [Android 17 dynamic-range compatibility issue](https://developer.android.com/jetpack/androidx/releases/camera#1.5.2)
+and recommends CameraX 1.5.2 or newer. The selected stable **1.5.3** source was
+checked: unknown profiles are logged/skipped rather than dereferenced. Its AAR
+requires compile SDK 35 and AGP 8.6, within the existing toolchain.
+
+Alpha 20 updates all three CameraX dependencies together to 1.5.3. No camera UI,
+permission, image-storage, model or target-SDK change is intended. The diagnostic
+logging patch is not in the candidate. Optimized exact-build acceptance remains
+required; a source-level match alone is not a camera pass.
+
+The measurement cancellation driver now waits for `Photos` in the actual native
+media-picker package before Back. A fixed post-tap delay had sent Back before the
+new picker appeared; the original cancellation-result assertion remains.
