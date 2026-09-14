@@ -13,7 +13,7 @@
             android:configChanges="orientation|screenSize|smallestScreenSize"
             android:windowSoftInputMode="adjustResize" />
         <activity android:name=".MeasureActivity" android:exported="false"
-            android:configChanges="orientation|screenSize|smallestScreenSize" android:windowSoftInputMode="adjustNothing" />
+            android:configChanges="orientation|screenSize|smallestScreenSize" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".CameraActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true"
             android:configChanges="orientation|screenSize|smallestScreenSize"

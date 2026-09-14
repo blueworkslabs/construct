@@ -185,7 +185,7 @@ class MeasureActivity : ComponentActivity() {
             else if (expanded) expanded = false else finish()
         }
         Surface(Modifier.fillMaxSize()) {
-            BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
+            BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding().displayCutoutPadding()) {
                 val image = photo
                 if (image != null) MeasureOverlay(
                     photo = image.asImageBitmap(), photoRevision = editor.revision, gestureRevision = gestureRevision,
@@ -209,7 +209,7 @@ class MeasureActivity : ComponentActivity() {
                         onUndo={ ownerAction { editor.undo() } },onClear={ ownerAction { editor.clear() } },
                         onChoosePhoto={ choose() },onClose={ finish() }),
                     expanded=expanded,onExpandedChange={ expanded=it },
-                    modifier=Modifier.align(Alignment.BottomCenter).heightIn(max=maxHeight * 0.55f))
+                    modifier=Modifier.align(Alignment.BottomCenter).imePadding().heightIn(max=maxHeight * 0.55f))
             }
         }
     }

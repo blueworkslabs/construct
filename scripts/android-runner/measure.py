@@ -87,11 +87,12 @@ def control(text):
     raise RuntimeError('Control missing in bounded sheet scroll: '+text)
 
 def collapse():
-    if 'Expand controls' not in labels():tap_node(control('Collapse controls'))
+    if 'Expand controls' not in labels():
+        control('Collapse controls');tap('Collapse controls')
     time.sleep(.4)
 
 def action(text,collapse_after=False):
-    tap_node(control(text));time.sleep(.4)
+    control(text);tap(text);time.sleep(.4)
     if collapse_after:collapse()
 
 def size(value):
