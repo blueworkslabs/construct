@@ -35,6 +35,9 @@ def saved_item():
 try:
     RESULTS.mkdir(parents=True,exist_ok=True)
     adb('shell','am','start','-n','dev.construct.runtime/.MainActivity')
+    # The initial asynchronous catalog load changes the native layout. Wait
+    # for its completion before measuring stable button bounds or tapping.
+    find('Catalog ready. Choose a module below.')
     tap('Use configured registry'); tap('Refresh catalog')
     find('Available · remote catalog'); done('Remote HTTPS catalog loaded')
     tap('Review & install'); tap('Allow & install'); tap('Open')
