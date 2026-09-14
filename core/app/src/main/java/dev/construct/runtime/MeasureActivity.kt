@@ -17,6 +17,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import org.json.JSONObject
@@ -185,7 +187,7 @@ class MeasureActivity : ComponentActivity() {
             else if (expanded) expanded = false else finish()
         }
         Surface(Modifier.fillMaxSize()) {
-            BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding().displayCutoutPadding()) {
+            BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding().displayCutoutPadding().semantics { contentDescription = "Measurement workspace" }) {
                 val image = photo
                 if (image != null) MeasureOverlay(
                     photo = image.asImageBitmap(), photoRevision = editor.revision, gestureRevision = gestureRevision,

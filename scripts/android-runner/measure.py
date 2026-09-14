@@ -16,6 +16,7 @@ entries=json.loads((fixtures/'manifest.json').read_text())
 current=None
 current_entry=None
 stage_index=0
+WORKSPACE='Measurement workspace'
 PHOTO='Measurement photo: tap to place an endpoint, drag a handle to adjust'
 original_font_scale=adb('shell','settings','get','system','font_scale').strip()
 def done(text):result['checks'].append(text);print('PASS:',text,flush=True)
@@ -108,8 +109,10 @@ def size(value):
     if ui._device.info.get('currentPackageName') != 'dev.construct.runtime':raise RuntimeError('Lost measurement workspace')
     action('Confirm size');expect('Tap the two ends');collapse()
 
+# The overlapping sheet clips the Canvas accessibility node's uncovered bounds.
+# Its parent workspace covers the complete, actual Canvas layout and both siblings.
 def screen_point(entry,point):
-    x1,y1,x2,y2=map(int,re.findall(r'\d+',find(PHOTO).get('bounds')))
+    x1,y1,x2,y2=map(int,re.findall(r'\d+',find(WORKSPACE).get('bounds')))
     scale=min((x2-x1)/entry['width'],(y2-y1)/entry['height'])
     left=x1+((x2-x1)-entry['width']*scale)/2
     top=y1+((y2-y1)-entry['height']*scale)/2
@@ -118,11 +121,11 @@ def screen_point(entry,point):
 def length():return float(expect('Length: ').split()[1])*10
 
 def endpoints(entry):
-    collapse();initial_bounds=find(PHOTO).get('bounds')
+    collapse();initial_bounds=find(WORKSPACE).get('bounds')
     for point in entry['endpoints']:
         x,y=screen_point(entry,point)
         adb('shell','input','tap',str(x),str(y));time.sleep(.6)
-        if find(PHOTO).get('bounds')!=initial_bounds:raise RuntimeError('Photo area moved between endpoint taps')
+        if find(WORKSPACE).get('bounds')!=initial_bounds:raise RuntimeError('Photo area moved between endpoint taps')
     return length()
 
 try:
@@ -204,7 +207,7 @@ try:
     result['scaledMm']=value;done('95 mm actual marker size scales the same endpoints to 228 mm and clears old results')
     action('Clear',collapse_after=True)
     if any(x.startswith('Length:') for x in labels()):raise RuntimeError('Clear retained a result')
-    node=find(PHOTO);x1,y1,x2,y2=map(int,re.findall(r'\d+',node.get('bounds')))
+    node=find(WORKSPACE);x1,y1,x2,y2=map(int,re.findall(r'\d+',node.get('bounds')))
     scaledHeight=(x2-x1)*entry['height']/entry['width']
     if (y2-y1)>scaledHeight+10:
         adb('shell','input','tap',str((x1+x2)//2),str(y1+2))
@@ -225,11 +228,11 @@ try:
         adb('shell','settings','put','system','font_scale',font_scale)
         time.sleep(2)
         opened();entry=stage('measure-flat.png');pick();expect('Reference found.');size('100')
-        bounds=find(PHOTO).get('bounds')
+        bounds=find(WORKSPACE).get('bounds')
         value=endpoints(entry)
         if abs(value-240)>4:raise RuntimeError('Large-font measurement outside 4 mm: '+str(value))
         action('Clear',collapse_after=True)
-        if find(PHOTO).get('bounds')!=bounds:raise RuntimeError('Clearing status moved large-font photo')
+        if find(WORKSPACE).get('bounds')!=bounds:raise RuntimeError('Clearing status moved large-font photo')
         result['largeFontLayouts'].append(dict(width=width,height=height,fontScale=font_scale,bounds=bounds,measuredMm=value))
         done('Photo bounds remain fixed across instructions, both taps, result and clear at width '+str(width)+' / font scale '+font_scale)
     action('Close measure');adb('shell','wm','size','reset')
@@ -246,9 +249,9 @@ try:
     done('Background closes workspace; reopening retains no selected image or measurement')
     entry=stage('measure-flat.png');pick();expect('Reference found.');size('100');endpoints(entry)
     pid=adb('shell','pidof','dev.construct.runtime').strip()
-    before=length();portrait=find(PHOTO).get('bounds')
+    before=length();portrait=find(WORKSPACE).get('bounds')
     adb('shell','settings','put','system','accelerometer_rotation','0');adb('shell','settings','put','system','user_rotation','1');time.sleep(2)
-    if find(PHOTO).get('bounds')==portrait:raise RuntimeError('Rotation did not resize the photo surface')
+    if find(WORKSPACE).get('bounds')==portrait:raise RuntimeError('Rotation did not resize the photo surface')
     if length()!=before or adb('shell','pidof','dev.construct.runtime').strip()!=pid:raise RuntimeError('Rotation lost current work or restarted process')
     adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
     if length()!=before:raise RuntimeError('Portrait return changed measurement')
