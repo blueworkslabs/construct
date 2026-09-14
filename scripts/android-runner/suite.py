@@ -34,7 +34,11 @@ p.add_argument('--camera-fresh-launches', action='store_true', help='Camera regr
 p.add_argument('--tone-consent-only', action='store_true', help='Start clean with tone and consent, omitting checklist/probe/renderer checks; optional module suites may follow')
 p.add_argument('--modules-only', action='store_true', help='Run explicitly supplied Focus/Snake/Contacts suites, excluding all host baseline checks')
 p.add_argument('--disable-digital-wellbeing', action='store_true', help='Disable only Google Digital Wellbeing on this disposable image; record the environment change')
+p.add_argument('--reliability-only', action='store_true', help='Repeated bundled-module lifecycle/accessibility checks only; not host or camera acceptance')
+p.add_argument('--webview-apk', type=Path, help='Optional Chromium com.android.webview provider for this disposable userdebug run')
+p.add_argument('--webview-sha256', help='Required checksum of the optional WebView provider APK')
 a = p.parse_args()
+if a.reliability_only and any((a.camera_sha256, a.focus_sha256, a.snake_sha256, a.contacts_sha256, a.tone_consent_only, a.modules_only)): p.error('Reliability scope cannot mix other module scopes')
 if a.camera_vision_only and (not a.camera_only or not a.camera_sha256 or a.camera_gallery_export or a.camera_reopen_only): p.error('Vision scope requires camera-only/hash and cannot mix gallery or reopen scopes')
 if a.camera_gallery_export and (not a.camera_only or not a.camera_sha256 or a.camera_reopen_only): p.error('Gallery export requires full camera-only/hash acceptance, not reopen-only')
 if not __import__('re').fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', a.camera_version): p.error('Camera version must be a numeric release version')
@@ -53,6 +57,8 @@ if a.snake_only and not a.snake_sha256: p.error('--snake-only requires --snake-s
 if (a.focus_only and a.snake_sha256) or (a.snake_only and a.focus_sha256): p.error('Module-only runs cannot include a second module')
 if a.contacts_only and not a.contacts_sha256: p.error('--contacts-only requires --contacts-sha256')
 if (a.contacts_only and (a.focus_sha256 or a.snake_sha256)) or ((a.focus_only or a.snake_only) and a.contacts_sha256): p.error('Module-only runs cannot include a second module')
+if bool(a.webview_apk) != bool(a.webview_sha256): p.error('WebView APK and checksum are required together')
+if a.webview_apk and hashlib.sha256(a.webview_apk.read_bytes()).hexdigest() != a.webview_sha256.lower(): p.error('WebView provider checksum mismatch')
 actual = hashlib.sha256(a.apk.read_bytes()).hexdigest()
 if actual != a.sha256.lower(): raise SystemExit('APK checksum mismatch; not starting emulator')
 lock = (BASE/'suite.lock').open('a')
@@ -65,6 +71,8 @@ os.environ['CONSTRUCT_RESULTS'] = str(run)
 from ui import adb
 receipt = {'started': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'apkSha256': actual,
            'complete': False, 'scope': 'Checklist regression, classified bounded probes, injected renderer loss, and tone grant lifecycle; not complete sandbox/egress proof'}
+
+if a.reliability_only: receipt['scope'] = 'Repeated bundled Hello lifecycle/accessibility transitions; no remote module or camera acceptance'
 
 if a.modules_only:
     receipt['scope'] = 'Only explicitly supplied Focus/Snake/Contacts module suites; no host baseline checks rerun'
@@ -132,12 +140,27 @@ try:
                 raise RuntimeError('Digital Wellbeing environment override did not apply')
         receipt['environmentOverrides'] = {'digitalWellbeing': 'disabled-user' if present else 'not installed'}
     receipt['fingerprint'] = adb('shell', 'getprop', 'ro.build.fingerprint').strip()
+    receipt['webviewBefore'] = adb('shell', 'dumpsys', 'webviewupdate')
+    if a.webview_apk:
+        if adb('shell', 'getprop', 'ro.debuggable').strip() != '1':
+            raise RuntimeError('Development WebView comparison requires a disposable userdebug image')
+        adb('install', '-r', str(a.webview_apk.resolve()), timeout=180)
+        selection = adb('shell', 'cmd', 'webviewupdate', 'set-webview-implementation', 'com.android.webview')
+        if 'Success' not in selection: raise RuntimeError('Chromium WebView provider selection failed: '+selection)
+        receipt['webviewOverride'] = {'package': 'com.android.webview', 'sha256': a.webview_sha256.lower(), 'selection': selection.strip()}
     receipt['webview'] = adb('shell', 'dumpsys', 'webviewupdate')
+    if a.webview_apk and 'Current WebView package (name, version): (com.android.webview,' not in receipt['webview']:
+        raise RuntimeError('Selected WebView is not the requested Chromium provider')
     receipt['emulatorVersion'] = subprocess.check_output([str(CONFIG.sdk/'emulator/emulator'), '-version'], text=True)
     adb('install', '-r', str(a.apk.resolve()), timeout=90)
     receipt['package'] = adb('shell', 'dumpsys', 'package', 'dev.construct.runtime')
+    # A RAM snapshot can retain logcat from before it became app-free. Do not
+    # attribute those historical warnings to the newly installed candidate.
+    adb('logcat', '-c')
+    receipt['logcatResetBeforeChildren'] = True
     children = [('smoke.py', 'smoke-result.json'), ('probes.py', 'probe-summary.json'), ('renderer.py', 'renderer-result.json'), ('tone.py', 'tone-result.json'), ('consent.py', 'consent-result.json')]
     if a.tone_consent_only: children = children[3:]
+    if a.reliability_only: children = [('reliability.py', 'reliability-result.json')]
     if a.modules_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_only: children = []
     if a.focus_sha256:
         os.environ['CONSTRUCT_FOCUS_SHA256'] = a.focus_sha256
@@ -157,7 +180,7 @@ try:
                            stdout=log, stderr=subprocess.STDOUT, timeout=900)
         if not json.loads((run/result).read_text()).get('complete'):
             raise RuntimeError('Incomplete child receipt: '+result)
-    if not (a.modules_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_only):
+    if not (a.reliability_only or a.modules_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_only):
         if not a.tone_consent_only:
             receipt['probeCounts'] = json.loads((run/'probe-summary.json').read_text())['counts']
             receipt['rendererVerdict'] = json.loads((run/'renderer-result.json').read_text())['verdict']
@@ -186,6 +209,13 @@ except Exception as error:
     receipt['error'] = str(error)
     raise
 finally:
+    if receipt.get('logcatResetBeforeChildren'):
+        try:
+            warnings = adb('logcat', '-d', '-s', 'cr_AwContents:W')
+            (run/'webview-warnings.log').write_text(warnings)
+            receipt['attachedDestroyWarnings'] = sum('destroy() called while WebView is still attached' in line for line in warnings.splitlines())
+        except Exception as error:
+            receipt['warningObservationError'] = str(error)
     try:
         receipt['resources'] = subprocess.check_output(['systemctl','--user','show',CONFIG.service,'-p','MemoryPeak','-p','MemoryCurrent','-p','NRestarts'],text=True)
         control('stop')
