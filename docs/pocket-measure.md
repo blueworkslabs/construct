@@ -1,7 +1,8 @@
 # Pocket Measure prototype
 
-Status: implementation and local checks complete; exact optimized Android
-acceptance and physical-phone acceptance pending. Not an accuracy guarantee.
+Status: implementation, local checks and exact optimized Android measurement
+acceptance complete. Host/vision regressions and physical-phone acceptance pending.
+Not an accuracy guarantee.
 
 ## User flow
 
@@ -75,3 +76,48 @@ are normalized; fit/letterboxing is shared by rendering and input.
 The upstream full multi-ABI OpenCV runtime increases the installer size. See
 [third-party provenance](../third_party/README.md). No runtime downloads, OpenCV
 Manager, unrestricted module networking or automatic object recognition are added.
+
+## Integration notes
+
+The selected photo's display rectangle is reserved across endpoint taps: status,
+result and clear-control space do not appear/disappear between A and B. Android
+acceptance checks unchanged canvas bounds after each endpoint, in addition to the
+numeric result, so a driver cannot silently compensate for a jumping photograph.
+
+An early exploratory fixture driver rewrote one PNG/media URI with successive
+images, including a differently oriented JPEG. That yielded an incorrect rotated
+fixture result. The corrected driver verifies each original's bytes, removes
+only that generated media row, then inserts a distinct file with the right
+extension and a fresh URI. With that correction the unchanged measurement code
+passed flat, angled and EXIF-oriented 240 mm controls. Those exploratory receipts
+remain separate from final candidate acceptance; no real-camera accuracy claim
+is inferred from them.
+
+## Optimized measurement acceptance
+
+Candidate source `5d86ce9`, host `0.1.0-alpha15`, universal APK 197794762 bytes:
+`1ea3d7bab2f2ff0e59ad99c62ff3255721760707495abd16c3b34e7f58f9fffc`.
+Pocket Measure 0.1.2 package:
+`645b93933776e8b6b4177d34f57e098b5fb471b21899c6eccd64bb75e9abca74`.
+
+- 105 JVM tests pass; lint has no errors (17 warnings). Publisher/configuration
+  Python checks: 20; runner contract tests: 43; measurement launcher checks: 3.
+- Run `20260914T111230Z-3556c6a0`: all **13 native measurement checkpoints**
+  passed on Android 16 / the pinned WebView 155 provider. Flat, independent
+  perspective and EXIF-oriented synthetic references each displayed **24.0 cm**;
+  entering 95 mm instead of 100 mm gave **22.8 cm**, as expected. Canvas bounds
+  remained unchanged after every A/B tap. First detection occurred offline.
+- Cancellation and invalid marker size are handled. Blank/duplicate-ID images
+  cannot enable measurement. Backgrounding and rotation close and clear it;
+  revoked access denies reopening. Original bytes remain unchanged, and photo
+  details/measurement results are absent from Construct diagnostics.
+- Suite completed and stopped the emulator. This result contains no diagnostic
+  exclusions; earlier failed/diagnostic APK runs are not counted as acceptance.
+- App signing identity, bundled publisher/demo/vision assets and Android
+  permissions are unchanged. The OpenCV native libraries match the official AAR;
+  APK 16 KiB ZIP alignment verifies. The universal installer is approximately
+  **198 MB**, due to the full multi-ABI native OpenCV runtime.
+
+These synthetic controls validate the implementation, not physical-camera
+accuracy. The physical-phone check is selection/overlay usability and approximate
+lengths on real flat objects, using the actual printed marker side.
