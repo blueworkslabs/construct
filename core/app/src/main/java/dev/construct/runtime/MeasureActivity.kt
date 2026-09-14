@@ -100,7 +100,8 @@ class MeasureActivity : ComponentActivity() {
         return try {
             checkAccess()
             val result = action()
-            if (reportError) { error = (result as? EditResult.Rejected)?.reason; if (error != null && expandOnError) expanded = true }
+            if (result is EditResult.Accepted) error = null
+            else if (reportError) { error = (result as EditResult.Rejected).reason; if (expandOnError) expanded = true }
             refreshEditor(); result
         } catch (e: Exception) { failed(e); EditResult.Rejected(error ?: "Measurement is unavailable.") }
     }
@@ -188,7 +189,7 @@ class MeasureActivity : ComponentActivity() {
             else -> "Drag an endpoint to adjust, or Clear for another length."
         }
         BackHandler {
-            if (editor.isDragging) { gestureRevision++; editor.cancelDrag(); refreshEditor() }
+            if (editor.isDragging) ownerAction { editor.cancelDrag() }
             else if (expanded) expanded = false else finish()
         }
         Surface(Modifier.fillMaxSize()) {

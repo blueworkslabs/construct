@@ -96,7 +96,7 @@ follow-up candidate (verification status lives on PR #7):
   may temporarily cover the photo but do not refit it. Collapsed error feedback
   uses the existing two-line text area, not an additional layout row.
 - Rejected PREVIEW updates feedback quietly; accepted previews clear it. Only
-  tap, BEGIN or COMMIT rejection expands controls. CANCEL preserves feedback.
+  tap, BEGIN or COMMIT rejection expands controls. Accepted CANCEL clears preview feedback; rejected cancellation does not replace it.
 
 The Android checks now cover bottom-edge placement at fit, consecutive taps,
 quiet invalid drag previews, plus pinch/pan/Reset and the existing coordinate,
@@ -109,3 +109,11 @@ now normalizes selection on every editor refresh (including cleanup/reset), keep
 only an endpoint present in the current measurement. The Android regression selects
 B then undoes its placement, repeats for A, and verifies Clear/Undo cannot revive
 stale nudge controls. Geometry and Undo history semantics are unchanged.
+
+### Connector review: feedback after cancelled previews
+
+An accepted cancellation now clears an earlier invalid-preview message while
+restoring the original geometry. Cancellation failures remain suppressed. Back
+uses the same owner edit path so it also restores the valid displayed result;
+the Android checks cover rejected-preview cancellation through both Back and
+Android pointer CANCEL, with the controls remaining collapsed.

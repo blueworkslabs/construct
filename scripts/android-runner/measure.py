@@ -191,6 +191,21 @@ try:
     adb('shell','input','touchscreen','motionevent','CANCEL',str(nx),str(ny));time.sleep(.6)
     if length()!=result['flatMm']:raise RuntimeError('Pointer cancellation committed a preview')
     done('Android pointer cancellation restores the pre-drag pair without committing a preview')
+    # Cancellation must discard invalid preview feedback as well as the preview geometry.
+    for cancel_kind in ('Back', 'Android pointer cancel'):
+        bx,by=screen_point(entry,entry['endpoints'][1]);ax,ay=screen_point(entry,entry['endpoints'][0])
+        ui._device.touch.down(bx,by).move(ax,ay);time.sleep(.4)
+        expect('Choose two distinct nearby endpoints.')
+        if cancel_kind=='Back':
+            adb('shell','input','keyevent','4');ui._device.touch.up(ax,ay)
+        else:
+            adb('shell','input','touchscreen','motionevent','CANCEL',str(ax),str(ay))
+        time.sleep(.6)
+        if any('Choose two distinct nearby endpoints.' in value for value in labels()):
+            raise RuntimeError(cancel_kind+' retained cancelled preview error')
+        if length()!=result['flatMm'] or 'Expand controls' not in labels():
+            raise RuntimeError(cancel_kind+' failed to restore the collapsed valid measurement')
+        done(cancel_kind+' clears rejected preview feedback and restores the valid length without expanding controls')
     action('Select endpoint B')
     for _ in range(4):action('Nudge B left')
     nudged=length()
