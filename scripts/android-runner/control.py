@@ -34,7 +34,8 @@ def main():
         avd,snapshot,camera=c.profile(camera)
         emulator=str(c.sdk/'emulator/emulator')
         os.execv(emulator,[emulator,'-avd',avd,'-port','5554','-accel','on','-memory','2048','-cores','2',
-            '-no-window','-no-audio','-no-boot-anim','-gpu','swiftshader','-snapshot',snapshot,
+            '-no-window','-no-metrics','-no-audio','-no-boot-anim','-gpu','swiftshader','-snapshot',snapshot,
+            *(['-feature','-GLDMA,-GLDMA2'] if not c.graphics_dma else []),
             '-no-snapshot-save','-camera-back','emulated' if camera else 'none','-camera-front','none'])
     else:raise SystemExit('Use start|stop|status|adb|ui|suite|smoke|probes|snapshot-save|snapshot-reset')
 
