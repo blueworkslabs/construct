@@ -148,3 +148,46 @@ Gesture vocabulary, chosen so nothing is ambiguous:
 Fable: Compose overlay and sheet (Tier 0, 1, list and units from Tier 2, polygon
 editor UI in Tier 3) on this branch, geometry untouched. Astra: save/sidecar and
 grant, rectangle inference, auto outline, camera hand-off, runner checks.
+
+## Adjustments accepted from Astra's review (2026-09-14)
+
+- Delivery in three slices: placement (Tier 0–1), multiple measurements and
+  saving (Tier 2), shapes (Tier 3). This PR scopes the first slice only.
+- Zoom, pan and rotation never alter underlying photo coordinates; the overlay
+  only ever emits normalised photo points.
+- Rotation retains work in memory; backgrounding and grant revocation keep the
+  existing explicit cleanup. No restore after process death.
+- Editable projects and gallery exports are separate things: a clean image plus
+  versioned calibration/geometry for reopening, and a flattened annotated copy
+  for export, each behind explicit consent.
+- The quality chip reports observable marker quality (pixels per side, tilt),
+  not an accuracy promise. The "safe area" vignette is dropped; rejection
+  messages remain the feedback for out-of-plane points.
+- Auto outline is a bounded experiment, always editable, never a one-tap result.
+
+## Interface between overlay and activity (proposal, slice 1)
+
+Fable owns `MeasureOverlay`, a composable that draws and handles gestures.
+Astra owns the state, lifecycle and coordinate contracts around it.
+
+```kotlin
+data class Measurement(val id: Int, val a: MeasurePoint, val b: MeasurePoint?, val lengthMm: Double?)
+
+@Composable fun MeasureOverlay(
+    photo: ImageBitmap,                 // decoded, already bounded to 1600px
+    corners: List<MeasurePoint>,        // marker outline, normalised
+    measurements: List<Measurement>,    // normalised photo coordinates only
+    selectedId: Int?,
+    onPlace: (MeasurePoint) -> Unit,    // tap on photo, normalised
+    onMove: (id: Int, which: Char, MeasurePoint) -> Unit, // drag end 'a'/'b'
+    onSelect: (Int?) -> Unit,
+    modifier: Modifier = Modifier,
+)
+```
+
+Rules: the overlay converts screen ↔ photo using one `PhotoFit` plus its own
+zoom/pan transform, and calls back only with `MeasurePoint` in [0,1]². It never
+computes lengths; `lengthMm` arrives from the activity via `MeasurePlane`.
+Rejected points (activity throws) are reported back by leaving the model
+unchanged, and the overlay snaps the handle to the last accepted position.
+The loupe samples `photo` directly. No bitmap, URI or value leaves the overlay.
