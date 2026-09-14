@@ -5,6 +5,10 @@ acceptance and physical-phone acceptance pending. Not an accuracy guarantee.
 
 ## User flow
 
+Print the [A4 reference card](assets/pocket-measure-reference-A4.pdf) at actual
+size, and check that the outer black square has equal measured width and height.
+The printed size may differ from the nominal 100 mm; enter the actual size.
+
 1. Install Pocket Measure and explicitly enable **Allow photo measurement**.
 2. Open the native workspace and choose one saved photo using Android's picker.
 3. The host detects DICT_4X4_50 marker ID 0. Confirm the actual measured outer
