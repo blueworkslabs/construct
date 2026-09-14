@@ -77,7 +77,14 @@ binary or changing the API-36 profile.
 
 Source: [guest mapper](https://android.googlesource.com/device/generic/goldfish/+/refs/heads/main/hals/gralloc/mapper.cpp)
 and [host RenderControl](https://android.googlesource.com/platform/hardware/google/gfxstream/+/refs/heads/main/host/RenderControl.cpp).
-Stock Google WebView is 145.0.7632.218. The image reports its memory limiter
+The direct-memory experiment passed one 45-second system-server check with an
+empty crash buffer, but UI automation timed out and the next cold boot restarted
+system-server. It is **not** a stable baseline or a successful UI-driver comparison.
+Emulator 37.2.9 is being tested in a separate SDK root; the shared API-36
+emulator remains pinned at 37.1.11. With the new binary and fresh 2 GiB guest,
+Android's low-memory killer removed setup/settings/permission-controller processes.
+The next baseline uses `--memory-mb 3072`, keeping the 5 GiB process cap and
+6 GiB VM unchanged. This is environment tuning, not an app fix. Stock Google WebView is 145.0.7632.218. The image reports its memory limiter
 **disabled by default**; no override was applied, so this is not evidence of
 enforced app-memory-limit behavior.
 

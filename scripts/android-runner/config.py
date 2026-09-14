@@ -23,6 +23,7 @@ class RunnerConfig:
     api_level: int = 36
     single_avd: bool = False
     direct_memory: bool = False
+    memory_mb: int = 2048
 
     def profile(self, camera=False):
         # A single space-saving AVD always uses synthetic camera hardware,
@@ -44,7 +45,7 @@ def load(path=None):
     if not path.exists():
         return RunnerConfig(SCRIPT_ROOT,SCRIPT_ROOT/'sdk',SCRIPT_ROOT/'avd','','','',False)
     raw=json.loads(path.read_text())
-    optional={'service','api_level','single_avd','direct_memory'}
+    optional={'service','api_level','single_avd','direct_memory','memory_mb'}
     fields={'root','sdk','avd','host','home_catalog','test_catalog','disposable'} | optional
     if set(raw)-fields or not fields-optional <= set(raw):raise ValueError('Missing or unexpected runner configuration fields')
     for key in ('root','sdk','avd'):
@@ -57,10 +58,12 @@ def load(path=None):
     api=raw.get('api_level',36)
     single=raw.get('single_avd',False)
     if type(api) is not int or not 28 <= api <= 99:raise ValueError('Expected integer Android API level 28..99')
+    memory=raw.get('memory_mb',2048)
+    if type(memory) is not int or not 1024 <= memory <= 4096:raise ValueError('Guest memory must be an integer from 1024 to 4096 MiB')
     dma=raw.get('direct_memory',False)
     if type(dma) is not bool:raise ValueError('Direct-memory flag must be a JSON boolean')
     if type(single) is not bool:raise ValueError('Single AVD flag must be a JSON boolean')
-    return RunnerConfig(*(Path(raw[k]).resolve() for k in ('root','sdk','avd')),raw['host'],catalog(raw['home_catalog']),catalog(raw['test_catalog']),raw['disposable'],service,api,single,dma)
+    return RunnerConfig(*(Path(raw[k]).resolve() for k in ('root','sdk','avd')),raw['host'],catalog(raw['home_catalog']),catalog(raw['test_catalog']),raw['disposable'],service,api,single,dma,memory)
 
 CONFIG=load()
 

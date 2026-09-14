@@ -146,6 +146,7 @@ try:
         receipt['environmentOverrides'] = {'digitalWellbeing': 'disabled-user' if present else 'not installed'}
     receipt['apiLevel'] = int(adb('shell','getprop','ro.build.version.sdk').strip())
     if receipt['apiLevel'] != CONFIG.api_level: raise RuntimeError('Restored Android API differs from configured test platform')
+    receipt['guestMemoryMiB'] = CONFIG.memory_mb
     receipt['directMemory'] = CONFIG.direct_memory
     receipt['pageSize'] = int(adb('shell','getconf','PAGESIZE').strip())
     receipt['memoryLimiter'] = adb('shell','am','memory-limiter','status') if CONFIG.api_level >= 37 else 'not queried'

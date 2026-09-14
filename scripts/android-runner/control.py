@@ -33,7 +33,7 @@ def main():
         camera=(c.root/'camera-emulated.flag').is_file()
         avd,snapshot,camera=c.profile(camera)
         emulator=str(c.sdk/'emulator/emulator')
-        os.execv(emulator,[emulator,'-avd',avd,'-port','5554','-accel','on','-memory','2048','-cores','2',
+        os.execv(emulator,[emulator,'-avd',avd,'-port','5554','-accel','on','-memory',str(c.memory_mb),'-cores','2',
             '-no-window','-no-metrics','-no-audio','-no-boot-anim','-gpu','swiftshader','-snapshot',snapshot,
             *(['-feature','GLDirectMem,HasSharedSlotsHostMemoryAllocator'] if c.direct_memory else []),
             '-no-snapshot-save','-camera-back','emulated' if camera else 'none','-camera-front','none'])
