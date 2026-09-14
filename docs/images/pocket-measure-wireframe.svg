@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="900" viewBox="0 0 1300 900" font-family="system-ui, sans-serif">
+<rect width="1300" height="900" fill="#0f1a21"/>
+<text x="650" y="40" fill="#e6f2ec" font-size="22" text-anchor="middle" font-weight="700">Pocket Measure · proposed layout (photo-first, bottom sheet)</text>
+<!-- Phone 1: measuring with loupe -->
+<g transform="translate(60,70)">
+<rect x="0" y="0" width="380" height="780" rx="28" fill="#000" stroke="#3a4a52" stroke-width="3"/>
+<clipPath id="p1"><rect x="6" y="6" width="368" height="768" rx="24"/></clipPath>
+<g clip-path="url(#p1)">
+<!-- photo area -->
+<rect x="6" y="6" width="368" height="560" fill="#6b5a45"/>
+<rect x="6" y="6" width="368" height="560" fill="url(#wood)"/>
+<defs><pattern id="wood" width="40" height="18" patternUnits="userSpaceOnUse"><rect width="40" height="18" fill="#7a6650"/><rect y="9" width="40" height="1" fill="#6a5744"/></pattern>
+<pattern id="grid" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M12 0H0V12" fill="none" stroke="#ffffff22"/></pattern></defs>
+<!-- marker card with perspective -->
+<polygon points="60,330 175,318 190,440 55,455" fill="#fff"/>
+<polygon points="78,345 160,336 172,425 72,437" fill="#111"/>
+<rect x="95" y="360" width="18" height="18" fill="#fff"/><rect x="128" y="360" width="18" height="18" fill="#fff"/><rect x="112" y="392" width="18" height="18" fill="#fff"/>
+<polygon points="78,345 160,336 172,425 72,437" fill="none" stroke="#39e2e8" stroke-width="3"/>
+<circle cx="78" cy="345" r="5" fill="#39e2e8"/><circle cx="160" cy="336" r="5" fill="#39e2e8"/><circle cx="172" cy="425" r="5" fill="#39e2e8"/><circle cx="72" cy="437" r="5" fill="#39e2e8"/>
+<!-- object: chopstick -->
+<polygon points="200,300 350,150 358,158 208,308" fill="#4f9a55"/>
+<!-- measurement A-B -->
+<line x1="204" y1="304" x2="354" y2="154" stroke="#0a0a0a" stroke-width="7" stroke-linecap="round" opacity=".7"/>
+<line x1="204" y1="304" x2="354" y2="154" stroke="#ffd84a" stroke-width="3" stroke-linecap="round"/>
+<circle cx="204" cy="304" r="11" fill="#ffd84a" stroke="#0a0a0a" stroke-width="2"/><text x="204" y="309" font-size="12" font-weight="700" text-anchor="middle" fill="#0a0a0a">A</text>
+<circle cx="354" cy="154" r="11" fill="#ffd84a" stroke="#0a0a0a" stroke-width="2"/><text x="354" y="159" font-size="12" font-weight="700" text-anchor="middle" fill="#0a0a0a">B</text>
+<rect x="246" y="212" width="88" height="26" rx="13" fill="#0a0a0acc"/><text x="290" y="230" font-size="14" font-weight="700" fill="#ffd84a" text-anchor="middle">24.3 cm</text>
+<!-- finger dragging B, loupe above -->
+<circle cx="354" cy="154" r="22" fill="none" stroke="#ffffff88" stroke-width="2"/>
+<g transform="translate(150,14)">
+<circle cx="64" cy="64" r="64" fill="#7a6650" stroke="#e6f2ec" stroke-width="3"/>
+<clipPath id="lp"><circle cx="64" cy="64" r="62"/></clipPath>
+<g clip-path="url(#lp)"><rect width="128" height="128" fill="url(#wood)"/><polygon points="-20,140 110,10 130,30 0,160" fill="#4f9a55"/><rect width="128" height="128" fill="url(#grid)"/></g>
+<line x1="64" y1="20" x2="64" y2="108" stroke="#ffd84a" stroke-width="2"/><line x1="20" y1="64" x2="108" y2="64" stroke="#ffd84a" stroke-width="2"/>
+<circle cx="64" cy="64" r="6" fill="none" stroke="#ffd84a" stroke-width="2"/>
+<text x="64" y="146" font-size="11" fill="#e6f2ec" text-anchor="middle">2.5× loupe while dragging B</text>
+</g>
+<!-- top chips -->
+<rect x="18" y="18" width="150" height="30" rx="15" fill="#0a0a0acc"/><text x="30" y="38" font-size="13" fill="#39e2e8">◼ Marker 95 mm ✓</text>
+<rect x="176" y="18" width="88" height="30" rx="15" fill="#0a0a0acc"/><text x="188" y="38" font-size="13" fill="#e6f2ec">Good · ±0.5</text>
+<!-- construct menu corner -->
+<circle cx="340" cy="34" r="24" fill="#00000059"/><text x="340" y="41" font-size="20" fill="#fff" text-anchor="middle">≡</text>
+<!-- bottom sheet -->
+<rect x="6" y="566" width="368" height="208" fill="#16262c"/>
+<rect x="170" y="574" width="40" height="4" rx="2" fill="#5b7078"/>
+<text x="24" y="604" font-size="13" fill="#9fb5ad">Measurements · 2</text>
+<rect x="24" y="616" width="332" height="36" rx="10" fill="#243a39" stroke="#ffd84a"/><circle cx="42" cy="634" r="7" fill="#ffd84a"/><text x="58" y="639" font-size="14" fill="#e6f2ec">A–B  chopstick</text><text x="300" y="639" font-size="15" font-weight="700" fill="#ffd84a" text-anchor="end">24.3 cm</text><text x="338" y="639" font-size="14" fill="#9fb5ad" text-anchor="middle">🗑</text>
+<rect x="24" y="658" width="332" height="36" rx="10" fill="#1b2c2c"/><circle cx="42" cy="676" r="7" fill="#7ad0ff"/><text x="58" y="681" font-size="14" fill="#e6f2ec">C–D</text><text x="300" y="681" font-size="15" font-weight="700" fill="#7ad0ff" text-anchor="end">14.7 cm</text><text x="338" y="681" font-size="14" fill="#9fb5ad" text-anchor="middle">🗑</text>
+<rect x="24" y="708" width="100" height="40" rx="12" fill="#243a39"/><text x="74" y="733" font-size="13" fill="#e6f2ec" text-anchor="middle">↶ Undo</text>
+<rect x="132" y="708" width="108" height="40" rx="12" fill="#243a39"/><text x="186" y="733" font-size="13" fill="#e6f2ec" text-anchor="middle">Shape ▭</text>
+<rect x="248" y="708" width="108" height="40" rx="12" fill="#c6eb9c"/><text x="302" y="733" font-size="13" font-weight="700" fill="#192a1e" text-anchor="middle">Save copy</text>
+<text x="190" y="766" font-size="10" fill="#7f958d" text-anchor="middle">Estimate · flat surface · tap photo for a new length</text>
+</g>
+</g>
+<text x="250" y="876" fill="#9fb5ad" font-size="12" text-anchor="middle">1 · Measure: tap = point, drag handle = adjust (loupe), pinch = zoom</text>
+
+<!-- Phone 2: setup / calibration -->
+<g transform="translate(470,70)">
+<rect x="0" y="0" width="380" height="780" rx="28" fill="#000" stroke="#3a4a52" stroke-width="3"/>
+<clipPath id="p2"><rect x="6" y="6" width="368" height="768" rx="24"/></clipPath>
+<g clip-path="url(#p2)">
+<rect x="6" y="6" width="368" height="500" fill="url(#wood)"/>
+<polygon points="110,230 260,220 275,360 100,375" fill="#fff"/>
+<polygon points="130,245 240,238 252,345 122,355" fill="#111"/>
+<polygon points="130,245 240,238 252,345 122,355" fill="none" stroke="#39e2e8" stroke-width="3"/>
+<!-- dimension arrow showing which side to measure -->
+<line x1="130" y1="225" x2="240" y2="218" stroke="#ffd84a" stroke-width="2"/><polygon points="130,225 138,220 138,230" fill="#ffd84a"/><polygon points="240,218 232,213 232,223" fill="#ffd84a"/>
+<rect x="150" y="192" width="70" height="20" rx="10" fill="#0a0a0acc"/><text x="185" y="206" font-size="11" fill="#ffd84a" text-anchor="middle">measure this</text>
+<circle cx="340" cy="34" r="24" fill="#00000059"/><text x="340" y="41" font-size="20" fill="#fff" text-anchor="middle">≡</text>
+<rect x="6" y="506" width="368" height="268" fill="#16262c"/>
+<rect x="170" y="514" width="40" height="4" rx="2" fill="#5b7078"/>
+<text x="24" y="548" font-size="17" font-weight="700" fill="#e6f2ec">Reference card found</text>
+<text x="24" y="570" font-size="13" fill="#9fb5ad">Measure the outer black square with a ruler.</text>
+<rect x="24" y="586" width="200" height="48" rx="12" fill="#243a39" stroke="#55716a"/><text x="40" y="616" font-size="18" fill="#e6f2ec">95</text><text x="200" y="616" font-size="13" fill="#9fb5ad" text-anchor="end">mm</text>
+<text x="24" y="652" font-size="11" fill="#9fb5ad">Last used 95 mm · prefilled, still needs Confirm</text>
+<rect x="236" y="586" width="120" height="48" rx="12" fill="#c6eb9c"/><text x="296" y="616" font-size="15" font-weight="700" fill="#192a1e" text-anchor="middle">Confirm</text>
+<rect x="24" y="672" width="332" height="32" rx="8" fill="#1b2c2c"/><text x="36" y="693" font-size="12" fill="#cfe3d9">Quality: Good · 118 px per side · 32° tilt</text>
+<rect x="24" y="716" width="160" height="40" rx="12" fill="#243a39"/><text x="104" y="741" font-size="13" fill="#e6f2ec" text-anchor="middle">Choose other photo</text>
+<rect x="196" y="716" width="160" height="40" rx="12" fill="#243a39"/><text x="276" y="741" font-size="13" fill="#e6f2ec" text-anchor="middle">📷 Take photo</text>
+</g>
+</g>
+<text x="660" y="876" fill="#9fb5ad" font-size="12" text-anchor="middle">2 · Setup: which edge to measure, prefilled size, quality hint</text>
+
+<!-- Phone 3: shape / area -->
+<g transform="translate(880,70)">
+<rect x="0" y="0" width="380" height="780" rx="28" fill="#000" stroke="#3a4a52" stroke-width="3"/>
+<clipPath id="p3"><rect x="6" y="6" width="368" height="768" rx="24"/></clipPath>
+<g clip-path="url(#p3)">
+<rect x="6" y="6" width="368" height="560" fill="url(#wood)"/>
+<polygon points="40,420 130,410 140,520 32,530" fill="#fff"/><polygon points="55,432 120,425 128,508 48,517" fill="#111"/>
+<polygon points="55,432 120,425 128,508 48,517" fill="none" stroke="#39e2e8" stroke-width="3"/>
+<!-- object: irregular flat item -->
+<path d="M180,200 C240,150 320,170 330,240 C340,320 260,380 200,350 C150,325 140,240 180,200Z" fill="#c9773a"/>
+<path d="M180,200 C240,150 320,170 330,240 C340,320 260,380 200,350 C150,325 140,240 180,200Z" fill="none" stroke="#0a0a0a" stroke-width="7" opacity=".7"/>
+<path d="M180,200 C240,150 320,170 330,240 C340,320 260,380 200,350 C150,325 140,240 180,200Z" fill="#7ad0ff22" stroke="#7ad0ff" stroke-width="3"/>
+<g fill="#7ad0ff" stroke="#0a0a0a" stroke-width="2"><circle cx="180" cy="200" r="9"/><circle cx="262" cy="160" r="9"/><circle cx="330" cy="240" r="9"/><circle cx="300" cy="340" r="9"/><circle cx="200" cy="350" r="9"/><circle cx="150" cy="280" r="9"/></g>
+<circle cx="292" cy="196" r="6" fill="none" stroke="#7ad0ff" stroke-width="2" stroke-dasharray="3 2"/>
+<text x="292" y="186" font-size="10" fill="#e6f2ec" text-anchor="middle">+ long-press edge</text>
+<rect x="196" y="262" width="96" height="40" rx="12" fill="#0a0a0acc"/><text x="244" y="279" font-size="13" font-weight="700" fill="#7ad0ff" text-anchor="middle">≈ 148 cm²</text><text x="244" y="295" font-size="11" fill="#e6f2ec" text-anchor="middle">edge 46 cm</text>
+<rect x="18" y="18" width="150" height="30" rx="15" fill="#0a0a0acc"/><text x="30" y="38" font-size="13" fill="#39e2e8">◼ Marker 95 mm ✓</text>
+<circle cx="340" cy="34" r="24" fill="#00000059"/><text x="340" y="41" font-size="20" fill="#fff" text-anchor="middle">≡</text>
+<rect x="6" y="566" width="368" height="208" fill="#16262c"/>
+<rect x="170" y="574" width="40" height="4" rx="2" fill="#5b7078"/>
+<text x="24" y="604" font-size="13" fill="#9fb5ad">Shape · 6 points · tap first point to close</text>
+<rect x="24" y="616" width="332" height="36" rx="10" fill="#243a39" stroke="#7ad0ff"/><text x="40" y="639" font-size="14" fill="#e6f2ec">Outline 1</text><text x="338" y="639" font-size="15" font-weight="700" fill="#7ad0ff" text-anchor="end">148 cm² · 46 cm</text>
+<rect x="24" y="666" width="104" height="40" rx="12" fill="#243a39"/><text x="76" y="691" font-size="13" fill="#e6f2ec" text-anchor="middle">↶ Undo</text>
+<rect x="136" y="666" width="104" height="40" rx="12" fill="#243a39"/><text x="188" y="691" font-size="13" fill="#e6f2ec" text-anchor="middle">Auto outline</text>
+<rect x="248" y="666" width="108" height="40" rx="12" fill="#c6eb9c"/><text x="302" y="691" font-size="13" font-weight="700" fill="#192a1e" text-anchor="middle">Done</text>
+<text x="190" y="736" font-size="10" fill="#7f958d" text-anchor="middle">Area assumes the outline lies in the card's plane</text>
+</g>
+</g>
+<text x="1070" y="876" fill="#9fb5ad" font-size="12" text-anchor="middle">3 · Shape: vertices, area + perimeter, auto outline as a start</text>
+</svg>
