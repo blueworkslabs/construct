@@ -247,3 +247,18 @@ required; a source-level match alone is not a camera pass.
 The measurement cancellation driver now waits for `Photos` in the actual native
 media-picker package before Back. A fixed post-tap delay had sent Back before the
 new picker appeared; the original cancellation-result assertion remains.
+
+Android 17 uses the separately packaged system photo picker
+`com.google.android.photopicker/com.android.photopicker.MainActivity`. The driver
+recognizes its observed package as well as legacy media-provider pickers. After
+selecting the single synthetic thumbnail, it either observes an immediate return
+(legacy behavior) or requires one selected photo before tapping native `Done`.
+It still requires real decoded/calibrated results afterward; selection alone is
+not a pass.
+
+A separate focused test catalog keeps only the exact probe, camera and measurement
+versions under test. It copies the original signed entries and verifies unchanged
+ZIP hashes; historical catalogs and the user's home catalog remain untouched.
+This avoids repeatedly traversing unrelated historical fixture versions during
+native acceptance. Full-catalog navigation remains represented by earlier host
+and failed-driver receipts.
