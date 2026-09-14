@@ -15,7 +15,7 @@ Today the photo sits under a title, two buttons, a three-line status box, the
 size field, a headline result and a "Clear endpoints" button. On a Pixel at the
 default font the photo gets roughly half the screen; at large fonts, less.
 
-- **Full-bleed photo** fills the workspace under the safe insets. The Construct
+- **Photo-first workspace** fits above a fixed collapsed-controls reserve (pre-merge review correction); expanded controls can temporarily overlap it. The Construct
   corner menu keeps its reserved top-right square; nothing of ours goes there.
 - **Bottom sheet** holds everything else. Collapsed height is one row (current
   result or the next instruction). Expanded shows the measurement list and
@@ -46,7 +46,7 @@ Gesture vocabulary, chosen so nothing is ambiguous:
 | Drag from a handle | Move that point, loupe shown while dragging |
 | One-finger drag on empty photo | Pan (only when zoomed in) |
 | Pinch | Zoom 1×–6× around the pinch centre |
-| Double tap | Toggle 1× / 3× zoom at that spot |
+| Double tap | No separate gesture in slice 1; taps place immediately, pinch/Reset handle zoom |
 | Undo | Remove the last placed or moved point |
 
 - **Loupe.** While a handle is being dragged, draw a 96dp circle offset 72dp
