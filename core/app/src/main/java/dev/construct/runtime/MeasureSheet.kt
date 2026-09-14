@@ -1,5 +1,7 @@
 package dev.construct.runtime
 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +34,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
@@ -69,36 +72,36 @@ data class MeasureSheetActions(
  * Bottom sheet content. Collapsed: drag handle plus one instruction/result row. Expanded: setup,
  * endpoint controls and actions, scrolling internally so the photo above never resizes.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun MeasureSheet(state: MeasureSheetState, actions: MeasureSheetActions, modifier: Modifier = Modifier) {
-    var expanded by rememberSaveable { mutableStateOf(true) }
+fun MeasureSheet(state: MeasureSheetState, actions: MeasureSheetActions, expanded: Boolean, onExpandedChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     val focus = LocalFocusManager.current
-    Surface(modifier.fillMaxWidth(), tonalElevation = 3.dp, shadowElevation = 8.dp) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            TextButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()
+    Surface(modifier.fillMaxWidth().semantics { contentDescription = "Measurement controls" }, tonalElevation = 3.dp, shadowElevation = 8.dp) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
+            TextButton(onClick = { onExpandedChange(!expanded) }, modifier = Modifier.fillMaxWidth().height(48.dp)
                 .semantics { contentDescription = if (expanded) "Collapse controls" else "Expand controls" }) {
                 Text(if (expanded) "▾" else "▴")
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                state.calibrationChip?.let { chip ->
-                    FilterChip(selected = true, onClick = actions.onReopenSetup, label = { Text(chip) })
-                    Spacer(Modifier.width(8.dp))
-                }
-                Text(state.result ?: state.instruction, style = if (state.result != null) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f))
+            if (expanded) state.calibrationChip?.let { chip ->
+                FilterChip(selected = true, onClick = actions.onReopenSetup, label = { Text(chip) })
             }
-            if (state.result != null) Text(state.instruction, style = MaterialTheme.typography.bodySmall)
-            state.error?.let { error ->
+            Text(if (!expanded && state.error != null) state.error else state.result ?: state.instruction,
+                color = if (!expanded && state.error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                style = if (state.result != null) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.bodyMedium,
+                maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
+            if (expanded && state.result != null) Text(state.instruction, style = MaterialTheme.typography.bodySmall)
+            if (expanded) state.error?.let { error ->
                 // Persistent and selectable, so long owner messages stay readable and copyable.
                 SelectionContainer { Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
+                    maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 4.dp).semantics { contentDescription = "Measurement error" }) }
             }
-            if (expanded) Column(Modifier.verticalScroll(rememberScrollState()).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (expanded) Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (state.setupVisible) {
                     Text("Measure the reference card's outer black square with a ruler.", style = MaterialTheme.typography.bodySmall)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(value = state.sizeText, onValueChange = actions.onSizeChange, label = { Text("Marker side (mm)") },
-                            singleLine = true, enabled = !state.busy, modifier = Modifier.weight(1f),
+                            singleLine = true, enabled = !state.busy, modifier = Modifier.fillMaxWidth(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
                         Button(onClick = { focus.clearFocus(); actions.onConfirmSize() }, enabled = !state.busy) { Text("Confirm size") }
                     }
@@ -119,7 +122,7 @@ fun MeasureSheet(state: MeasureSheetState, actions: MeasureSheetActions, modifie
                         }
                     }
                     state.selectedEndpoint?.let { endpoint ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             for ((label, dx, dy, description) in listOf(
                                 Nudge("◀", -1, 0, "left"), Nudge("▲", 0, -1, "up"), Nudge("▼", 0, 1, "down"), Nudge("▶", 1, 0, "right"))) {
                                 OutlinedButton(onClick = { actions.onNudge(endpoint, dx, dy) }, enabled = !state.busy,
@@ -129,10 +132,9 @@ fun MeasureSheet(state: MeasureSheetState, actions: MeasureSheetActions, modifie
                         Text("One photo pixel per tap. Drag the handle on the photo for larger moves.", style = MaterialTheme.typography.labelSmall)
                     }
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = actions.onUndo, enabled = state.canUndo && !state.busy) { Text("Undo") }
                     OutlinedButton(onClick = actions.onClear, enabled = state.measurement != null && !state.busy) { Text("Clear") }
-                    Spacer(Modifier.weight(1f))
                     OutlinedButton(onClick = actions.onChoosePhoto, enabled = !state.busy) { Text("Choose photo") }
                 }
                 TextButton(onClick = actions.onClose) { Text("Close measure") }
