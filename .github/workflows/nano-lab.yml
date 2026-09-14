@@ -1,0 +1,30 @@
+name: Verify Nano Lab
+on:
+  push:
+    paths: ['experiments/nano-lab/**', '.github/workflows/nano-lab.yml', 'gradle/wrapper/**', 'gradlew']
+  pull_request:
+    paths: ['experiments/nano-lab/**', '.github/workflows/nano-lab.yml', 'gradle/wrapper/**', 'gradlew']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  standalone-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+      - name: Lifecycle tests, lint and optimized standalone APK
+        run: ./gradlew -p experiments/nano-lab --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assemblePilot --max-workers=1 -Dorg.gradle.jvmargs=-Xmx1500m
+      - name: Check packaged permissions and size
+        run: python experiments/nano-lab/check_apk.py experiments/nano-lab/app/build/outputs/apk/pilot/app-pilot.apk
