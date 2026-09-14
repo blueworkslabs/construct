@@ -158,3 +158,9 @@ this is not yet a matched reproduction of the complete failing tone sequence. On
 time, and neither Android-16 snapshot is replaced. A native-host-only launch
 and Home test survived on the 16 KiB image; the focused comparison must load a
 real WebView module before backgrounding to exercise the relevant path.
+
+The first full 4 KiB run passed Checklist but stopped in probe setup with
+`REGISTRY_URL`: ADB simulated typing had produced invalid catalog input.
+Probe setup now uses the existing exact-value `replace_text` helper and requires
+`Catalog refreshed.` before selecting the exact fixture. The clean rerun reached
+probe execution successfully; no app URL validation was relaxed.

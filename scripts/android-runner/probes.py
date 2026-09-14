@@ -6,6 +6,8 @@ import socket
 import time
 from ui import adb, nodes, labels, tap, tap_node, find, capture, RESULTS
 from verdicts import PROBES, VERSION, verdict, counts
+from catalog_input import replace_text
+import ui
 require_runner()
 RESULTS.mkdir(parents=True, exist_ok=True)
 
@@ -14,15 +16,12 @@ from host_ui import restart, diagnostics, select_after, installed_status
 results = []
 try:
     restart()
-    for node in nodes():
-        if node.attrib.get('class') == 'android.widget.EditText':
-            tap_node(node)
-            adb('shell', 'input', 'keycombination', '113', '29')
-            adb('shell', 'input', 'text', CONFIG.test_catalog)
-            break
-    else: raise RuntimeError('Catalog field missing')
+    replace_text(nodes, lambda value: ui._device(
+        className='android.widget.EditText', packageName='dev.construct.runtime'
+    ).set_text(value), CONFIG.test_catalog)
     adb('shell', 'input', 'keyevent', '111')
     tap('Refresh catalog')
+    find('Catalog refreshed.')
     # Select an exact version, never whichever catalog card happens to come first.
     select_after('Isolation probes (test only) · ' + VERSION, ('Review & install', 'Review version'))
     tap('Allow & install')
