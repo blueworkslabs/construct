@@ -19,6 +19,7 @@ p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--serial', required=True)
 p.add_argument('--apk', type=Path, required=True)
 p.add_argument('--out', type=Path, required=True)
+p.add_argument('--paste-key', action='store_true', help='Verify real clipboard using native Paste key instead of a floating menu')
 a = p.parse_args()
 apk = a.apk.resolve()
 a.out.mkdir(parents=True, exist_ok=False)
@@ -124,10 +125,20 @@ try:
     # Native copy then paste into the app's own field verifies the actual report.
     seek('Copy technical report').click()
     seek('Clear text').click()
-    prompt().long_click()
-    require(d(text='Paste').wait(timeout=5), 'Native Paste menu missing')
-    d(text='Paste').click()
-    report = prompt().get_text()
+    if a.paste_key:
+        prompt().click()
+        adb('shell', 'input', 'keyevent', 'KEYCODE_PASTE')
+        receipt['clipboardInput'] = 'native Paste key into focused EditText'
+    else:
+        prompt().long_click()
+        require(d(text='Paste').wait(timeout=5), 'Native Paste menu missing')
+        d(text='Paste').click()
+        receipt['clipboardInput'] = 'native floating Paste menu'
+    deadline = time.monotonic()+5
+    while True:
+        report = prompt().get_text()
+        if 'Construct Nano Lab' in report or time.monotonic()>=deadline: break
+        time.sleep(.2)
     require('Construct Nano Lab 0.1.0-alpha1' in report, 'Technical report was not copied')
     require('SDK: genai-prompt 1.0.0-beta4' in report and 'Android:' in report, 'Missing report metadata')
     require(marker not in report, 'Technical report included prompt text')
