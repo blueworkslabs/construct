@@ -10,7 +10,7 @@ import hashlib,json,os,re,time
 
 require_runner()
 result={'complete':False,'checks':[],'source':'Generated non-personal ArUco tabletop fixtures'}
-heading='Pocket Measure · 0.1.1'
+heading='Pocket Measure · 0.1.2'
 fixtures=CONFIG.root/'measure-fixtures'
 entries=json.loads((fixtures/'manifest.json').read_text())
 current='/sdcard/Pictures/construct-measure-synthetic.png'
@@ -33,6 +33,7 @@ def expect(prefix,timeout=60):
 def opened():
     restart();top();select_after(heading,('Open',));tap('Open measurement workspace');find('Choose photo')
 def stage(name):
+    global current
     entry=next(e for e in entries if e['name']==name)
     path=fixtures/name
     if hashlib.sha256(path.read_bytes()).hexdigest()!=entry['sha256']:raise RuntimeError('Fixture checksum mismatch')
@@ -85,7 +86,7 @@ try:
     if len(installed)!=1 or installed[0].get('packageDigest')!=os.environ['CONSTRUCT_MEASURE_SHA256']:raise RuntimeError('Wrong signed measurement launcher')
     top();select_after(heading,('Open',));tap('Open measurement workspace');expect('[CAPABILITY_DENIED]')
     done('Native measurement cannot open before its explicit module grant')
-    tap('Module access');grant=find('Allow photo measurement')
+    tap('Module access');find('Allow photo measurement');grant=next(n for n in nodes() if n.get('content-desc')=='Allow photo measurement' and n.get('checkable')=='true')
     if grant.get('checked')!='false':raise RuntimeError('Measurement grant was not off')
     tap_node(grant);find('Allow photo measurement: on.');tap('Reopen module');tap('Open measurement workspace');find('Choose photo')
     tap('Choose photo');adb('shell','input','keyevent','4');expect('No photo selected.')
@@ -112,6 +113,9 @@ try:
     entry=stage('measure-angled.png');pick();expect('Reference found.');size('100');value=endpoints(entry)
     if abs(value-240)>4:raise RuntimeError('Synthetic perspective measurement outside 4 mm: '+str(value))
     result['angledMm']=value;capture('measure-angled');done('Independent perspective-warped synthetic endpoints recover 240 mm within 4 mm')
+    entry=stage('measure-oriented.jpg');pick();expect('Reference found.');size('100');value=endpoints(entry)
+    if abs(value-240)>3:raise RuntimeError('EXIF-oriented endpoint measurement failed: '+str(value))
+    result['orientedMm']=value;done('EXIF orientation is applied consistently to native marker detection, photo display and endpoint mapping')
     for name in ['measure-blank.png','measure-multiple.png']:
         stage(name);pick();expect('[MARKER_NOT_FOUND]')
         if any(x.startswith('Length:') or x=='Confirm size' for x in labels()):raise RuntimeError('Invalid marker retained measurement controls')
@@ -120,7 +124,7 @@ try:
     adb('shell','input','keyevent','3');opened()
     if any(x.startswith('Length:') or x=='Confirm size' for x in labels()):raise RuntimeError('Background retained photo or result')
     done('Background closes workspace; reopening retains no selected image or measurement')
-    tap('Close measure');restart();top();select_after(heading,('Module access',));tap('Allow photo measurement');tap('Revoke access');find('Allow photo measurement: off.')
+    tap('Close measure');restart();top();select_after(heading,('Module access',));tap_node(next(n for n in nodes() if n.get('content-desc')=='Allow photo measurement' and n.get('checkable')=='true'));tap('Turn off');find('Allow photo measurement: off.')
     tap('Reopen module');tap('Open measurement workspace');expect('[CAPABILITY_DENIED]')
     done('Revocation blocks reopening the workspace')
     restart();top();events=diagnostics();result['environment']=next(e for e in events if e.get('code')=='ENVIRONMENT')

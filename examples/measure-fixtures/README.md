@@ -8,3 +8,6 @@ perspective transform; the manifest records the transformed endpoints.
 Blank and duplicate-ID images must not enable measurement. SHA-256 locks in
 `manifest.json` identify the exact images pushed to the disposable emulator.
 These fixtures validate implementation, not real-camera accuracy.
+
+The oriented JPEG stores a 90-degree rotated raster with EXIF orientation 6;
+manifest endpoints refer to the correctly oriented display, not raw JPEG pixels.

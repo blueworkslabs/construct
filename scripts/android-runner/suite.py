@@ -38,7 +38,7 @@ p.add_argument('--reliability-only', action='store_true', help='Repeated bundled
 p.add_argument('--webview-apk', type=Path, help='Optional Chromium com.android.webview provider for this disposable userdebug run')
 p.add_argument('--webview-sha256', help='Required checksum of the optional WebView provider APK')
 p.add_argument('--measure-only', action='store_true', help='Only synthetic native photo measurement; separate host baseline required')
-p.add_argument('--measure-sha256', help='Exact signed Pocket Measure 0.1.1 launcher')
+p.add_argument('--measure-sha256', help='Exact signed Pocket Measure 0.1.2 launcher')
 a = p.parse_args()
 if a.measure_only != bool(a.measure_sha256): p.error('Measure scope requires both measure-only and measure-sha256')
 if a.measure_only and any((a.camera_sha256,a.focus_sha256,a.snake_sha256,a.contacts_sha256,a.reliability_only,a.modules_only,a.tone_consent_only,a.camera_only,a.focus_only,a.snake_only,a.contacts_only)): p.error('Measure-only cannot mix other scopes')

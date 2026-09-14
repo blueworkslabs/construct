@@ -50,5 +50,24 @@
     "bytes": 6233,
     "width": 1200,
     "height": 900
+  },
+  {
+    "name": "measure-oriented.jpg",
+    "sha256": "2f4e33bdabdbb541b77d30103d9a7ca317614c70f30689350e85350524d576fd",
+    "bytes": 36116,
+    "width": 1200,
+    "height": 900,
+    "endpoints": [
+      [
+        150,
+        700
+      ],
+      [
+        870,
+        700
+      ]
+    ],
+    "expectedMm": 240,
+    "markerMm": 100
   }
 ]

@@ -35,4 +35,8 @@ save('measure-angled.png',angled,points,240)
 save('measure-blank.png',np.full_like(image,255))
 multiple=image.copy();multiple[100:400,700:1000]=cv2.cvtColor(marker,cv2.COLOR_GRAY2BGR)
 save('measure-multiple.png',multiple)
+exif=Image.Exif();exif[274]=6
+rotated=ROOT/'measure-oriented.jpg'
+Image.fromarray(cv2.cvtColor(image,cv2.COLOR_BGR2RGB)).transpose(Image.Transpose.ROTATE_90).save(rotated,'JPEG',quality=95,exif=exif)
+entries.append(dict(name=rotated.name,sha256=hashlib.sha256(rotated.read_bytes()).hexdigest(),bytes=rotated.stat().st_size,width=1200,height=900,endpoints=[[150,700],[870,700]],expectedMm=240,markerMm=100))
 (ROOT/'manifest.json').write_text(json.dumps(entries,indent=2)+'\n')

@@ -59,7 +59,7 @@ are normalized; fit/letterboxing is shared by rendering and input.
   blank/duplicate-marker negative controls. These are entirely synthetic,
   MIT-licensed and SHA-256 locked. Regeneration instructions are in that folder.
 - Copy that folder to a configured disposable runner as `measure-fixtures`, and
-  publish Pocket Measure 0.1.1 into its test catalog. Run
+  publish Pocket Measure 0.1.2 into its test catalog. Run
   `runner.sh suite APK SHA256 --measure-only --measure-sha256 MODULE_SHA256`.
   Use the documented pinned WebView provider if the original emulator provider
   has the known accessibility issue. No physical-device ADB is supported.
