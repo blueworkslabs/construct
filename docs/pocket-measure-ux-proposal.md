@@ -21,12 +21,12 @@ default font the photo gets roughly half the screen; at large fonts, less.
   result or the next instruction). Expanded shows the measurement list and
   actions. Photo size never depends on sheet content, which is the brief's
   "image must not move" rule, now structural rather than reserved-height.
-- **Status becomes a top-left chip**, one line, truncating with a tap-to-expand
-  toast for long errors. Instruction text lives in the sheet header, not above
-  the photo.
+- **Status becomes a top-left chip**, one line. Long errors expand persistently
+  in the sheet as selectable text, not in an expiring toast. Instruction text
+  lives in the sheet header, not above the photo.
 - **Setup state collapses.** After "Confirm", the size field disappears into a
-  `◼ Marker 95 mm ✓` chip. Tapping the chip reopens setup. A second chip shows
-  calibration quality (below).
+  `◼ Marker 95 mm ✓` chip. Tapping the chip reopens setup. A quality chip is
+  deferred until the detector exposes observable diagnostics (see Tier X).
 - **Large fonts:** only the sheet scrolls. The photo, chips and handles are
   density-based, not text-based. This replaces the current `statusHeight`
   reservation and the `horizontalScroll` on the result.
@@ -42,7 +42,7 @@ Gesture vocabulary, chosen so nothing is ambiguous:
 
 | Gesture | Effect |
 |---|---|
-| Tap on photo | Place the next point (A, then B; then a new pair) |
+| Tap on photo | Place the next point (A, then B; slice 1 edits one pair) |
 | Drag from a handle | Move that point, loupe shown while dragging |
 | One-finger drag on empty photo | Pan (only when zoomed in) |
 | Pinch | Zoom 1×–6× around the pinch centre |
@@ -51,9 +51,10 @@ Gesture vocabulary, chosen so nothing is ambiguous:
 
 - **Loupe.** While a handle is being dragged, draw a 96dp circle offset 72dp
   above the finger (flipped below near the top edge) showing a 2.5× crop of the
-  source bitmap centred on the point, with a crosshair and 1-cm grid derived from
-  the marker plane. The loupe reads pixels from the decoded bitmap already in
-  memory; no new decode. Hidden on release.
+  source bitmap centred on the point, with a crosshair. No grid: a photo-space
+  grid cannot show constant physical spacing under perspective without owner
+  geometry. The loupe reads pixels from the decoded bitmap already in memory;
+  no new decode. Hidden on release.
 - **Handles.** 24dp touch radius, 6dp drawn radius, labelled A/B with the label
   offset away from the line so the finger never covers it. Selected pair is
   yellow, other pairs are muted (see Tier 2). Every line and handle is drawn
@@ -61,16 +62,19 @@ Gesture vocabulary, chosen so nothing is ambiguous:
   dark photos.
 - **Length label** sits at the line midpoint in a pill with a dark background,
   rotated to follow the line only when the angle is under 45°. It shows the
-  current unit and one decimal. Rounding rule: cm to one decimal under 100 cm,
-  whole cm above, never more digits than the ±0.5 cm evidence supports.
-- **Rejection feedback.** When `project()` rejects a point (horizon, far from
-  marker), the handle snaps back and the chip says why in the existing message.
-  Additionally, shade the photo region where projection is unreliable with a
-  faint vignette computed from the same bounds, so people see the safe area.
-- **Undo** replaces "Clear endpoints". Keep a small stack of the last ten
-  actions. "Clear all" lives in the sheet's overflow.
-- **Haptics:** a light tick on point placement and on handle release. Needs the
-  VIBRATE permission, which is normal-tier and prompt-free.
+  current unit and one decimal. Formatting and rounding come from the owner;
+  the overlay draws the string it is given.
+- **Rejection feedback.** When the owner rejects a point (horizon, far from
+  marker), the handle stays at the last accepted position and the sheet shows
+  the owner's reason. No inferred "safe area" shading: marker distance alone
+  does not establish where projection is trustworthy.
+- **Non-drag adjustment.** The sheet has selectable A/B endpoint controls with
+  nudge arrows, so fine placement does not depend on dragging or on a steady
+  hand. Each nudge is one owner move (begin, preview, commit).
+- **Undo** replaces "Clear endpoints". History lives in the owner; one complete
+  drag or one nudge is one entry. "Clear all" is an owner action in the sheet.
+- **Haptics:** only through the view's performHapticFeedback path, which honours
+  system settings and needs no permission. Deferred if it proves unreliable.
 
 ## Tier 2 — Multiple measurements and saving
 
@@ -81,16 +85,16 @@ Gesture vocabulary, chosen so nothing is ambiguous:
   draggable. Swipe left to delete, with undo.
 - **Units** toggle cm / mm / in, remembered as a preference in the host's
   existing shared preferences. Never round-trips through module JS.
-- **Save copy** writes a new JPEG with the overlay burned in to the module's
-  private album, reusing the camera album and gallery-export path that already
-  exist, plus a small JSON sidecar (marker size, units, points in normalised
-  photo coordinates, values). The original file is never touched. This needs
-  its own capability line in the manifest, `photo.measure.save`, off by default,
-  because the brief scopes saving separately and the current grant promises
-  "no photo or result saved". The workspace shows the button greyed with
-  "Enable saving in Module access" until granted.
-- **Reopen a saved copy**: the sidecar lets us restore editable measurements on
-  the saved JPEG. This is what makes "save" worth more than a screenshot.
+- **Projects and exports are separate.** A saved project is the clean decoded
+  image plus a versioned record of calibration and geometry (marker corners,
+  side length, points in normalised photo coordinates, units) in private module
+  storage, reopened as editable measurements. An export is a separate flattened
+  copy with the overlay drawn in, written through the existing gallery-export
+  path. Neither touches the original file. Each needs its own explicit consent
+  and manifest capability, off by default, because the current grant promises
+  "no photo or result saved". The workspace greys both buttons with "Enable in
+  Module access" until granted. Private project storage does not exist yet and
+  is owner work in slice 2.
 
 ## Tier 3 — Shapes and area
 
@@ -108,8 +112,10 @@ Gesture vocabulary, chosen so nothing is ambiguous:
   largest contour, simplify with Douglas-Peucker to at most 24 vertices, and hand
   the result to the manual editor. It is a starting point, never a result: the
   user always sees editable vertices and the sheet says "Auto outline, adjust as
-  needed". OpenCV is already bundled, so no size cost. Time-box to two seconds
-  on the worker; on timeout, offer manual outline.
+  needed". Alpha 16 links only reachable OpenCV code, so GrabCut and contour
+  operations can grow the native library and must be measured first. Native
+  work is not reliably cancellable by a timer alone; treat this as a bounded
+  experiment in slice 3, with manual outline as the fallback.
 - Area carries the same plane assumption as lengths, stated once in the sheet
   footer, not on every result.
 
@@ -118,10 +124,11 @@ Gesture vocabulary, chosen so nothing is ambiguous:
 - **Take photo here.** A camera button in setup that opens the existing
   `CameraActivity` capture and returns to the workspace, so the picker round
   trip disappears for the common case. Reuses the camera grant.
-- **Calibration quality chip.** From the detector we already know marker pixel
-  size and corner geometry. Map to Good / Fair / Poor with a hint ("move
-  closer", "less tilt") and an honest error band. Cheap and it teaches people
-  how to take better photos without a manual.
+- **Calibration quality chip.** Only from observable detector output: marker
+  pixels per side and corner-shape diagnostics. Map to hints such as "move
+  closer" or "reduce angle". No error band and no accuracy claim; the small
+  initial experiment did not establish a tolerance. Deferred until the detector
+  exposes those values.
 - **Remembered size** prefilled from last time but still requiring Confirm, per
   the brief. Show "Last used 95 mm" under the field.
 - **Recovery screens.** No marker: show the photo anyway with a card showing
@@ -165,29 +172,40 @@ grant, rectangle inference, auto outline, camera hand-off, runner checks.
   messages remain the feedback for out-of-plane points.
 - Auto outline is a bounded experiment, always editable, never a one-tap result.
 
-## Interface between overlay and activity (proposal, slice 1)
+## Interface between overlay and activity (agreed, slice 1)
 
-Fable owns `MeasureOverlay`, a composable that draws and handles gestures.
-Astra owns the state, lifecycle and coordinate contracts around it.
+Fable owns `MeasureOverlay.kt`, `MeasureSheet.kt` and `MeasureViewport.kt`
+(pure, testable fit/zoom/pan/hit-test helpers). Astra owns authoritative
+state, geometry validation, Undo history, `MeasureActivity` integration,
+rotation retention and the Android acceptance runner. The wireframe's list,
+save and shape screens are future states, not slice-1 acceptance.
 
 ```kotlin
-data class Measurement(val id: Int, val a: MeasurePoint, val b: MeasurePoint?, val lengthMm: Double?)
+enum class MeasureEndpoint { A, B }
+enum class DragPhase { BEGIN, PREVIEW, COMMIT, CANCEL }
+sealed class EditResult { object Accepted; data class Rejected(val reason: String) }
+data class MoveRequest(val photoRevision: Long, val id: Int, val endpoint: MeasureEndpoint,
+                       val phase: DragPhase, val point: MeasurePoint?)   // point required for PREVIEW/COMMIT
+data class Measurement(val id: Int, val a: MeasurePoint, val b: MeasurePoint?, val label: String?)
 
 @Composable fun MeasureOverlay(
-    photo: ImageBitmap,                 // decoded, already bounded to 1600px
-    corners: List<MeasurePoint>,        // marker outline, normalised
-    measurements: List<Measurement>,    // normalised photo coordinates only
-    selectedId: Int?,
-    onPlace: (MeasurePoint) -> Unit,    // tap on photo, normalised
-    onMove: (id: Int, which: Char, MeasurePoint) -> Unit, // drag end 'a'/'b'
-    onSelect: (Int?) -> Unit,
-    modifier: Modifier = Modifier,
-)
+    photo: ImageBitmap, photoRevision: Long, enabled: Boolean,
+    corners: List<MeasurePoint>, measurements: List<Measurement>, selectedId: Int?,
+    onPlace: (photoRevision: Long, MeasurePoint) -> EditResult,
+    onMove: (MoveRequest) -> EditResult,
+    onSelect: (photoRevision: Long, id: Int?) -> Unit,
+    modifier: Modifier = Modifier)
 ```
 
-Rules: the overlay converts screen ↔ photo using one `PhotoFit` plus its own
-zoom/pan transform, and calls back only with `MeasurePoint` in [0,1]². It never
-computes lengths; `lengthMm` arrives from the activity via `MeasurePlane`.
-Rejected points (activity throws) are reported back by leaving the model
-unchanged, and the overlay snaps the handle to the last accepted position.
+Rules: points are normalised coordinates of the orientation-correct decoded
+photo. Viewport and gesture state are keyed by `photoRevision`; every event
+carries the revision captured when its gesture began, and the owner ignores
+stale ones. The overlay never computes lengths or units; `label` is the owner's
+formatted string. Results are values, never exceptions across the pointer
+coroutine. The overlay displays only owner-accepted positions: a rejected
+preview leaves the handle where it was, CANCEL restores the drag-start point,
+one complete drag is one Undo entry on the owner side. Taps in padding, over
+the sheet or in reserved controls are ignored; crossing the photo edge never
+clamps to a new point; a second finger or pointer cancellation never commits
+a placement. Hit-testing, pinch/drag arbitration and the loupe are UI-only.
 The loupe samples `photo` directly. No bitmap, URI or value leaves the overlay.
