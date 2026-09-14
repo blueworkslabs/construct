@@ -169,7 +169,7 @@ class MeasureActivity : ComponentActivity() {
                     Button(onClick = { choose() },enabled = !busy) { Text("Choose photo") }
                     TextButton(onClick = { finish() }) { Text("Close measure") }
                 }
-                Text(status,style = MaterialTheme.typography.bodySmall)
+                Text(status,style = MaterialTheme.typography.bodySmall,minLines = 3)
                 if (corners.isNotEmpty()) {
                     Row(Modifier.fillMaxWidth(),horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(value = sizeText,onValueChange = { sizeText = it.take(8); sideMm = null; clearMeasurement() },
@@ -178,8 +178,9 @@ class MeasureActivity : ComponentActivity() {
                         Button(onClick = { focus.clearFocus(); confirmSize() }) { Text("Confirm size") }
                     }
                 }
-                lengthMm?.let { Text(String.format(Locale.ROOT,"Length: %.1f cm",it/10),style = MaterialTheme.typography.headlineSmall) }
-                if (sideMm != null) TextButton(onClick = { clearMeasurement(); status = "Tap the first endpoint." }) { Text("Clear endpoints") }
+                // Reserve the result/control space so setting A or B never resizes the photograph.
+                Text(lengthMm?.let { String.format(Locale.ROOT,"Length: %.1f cm",it/10) } ?: "Approximate length",style = MaterialTheme.typography.headlineSmall)
+                TextButton(enabled = sideMm != null,onClick = { clearMeasurement(); status = "Tap the first endpoint." }) { Text("Clear endpoints") }
                 val image = photo
                 if (image != null) {
                     Box(Modifier.weight(1f).fillMaxWidth()) {

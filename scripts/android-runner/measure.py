@@ -13,7 +13,9 @@ result={'complete':False,'checks':[],'source':'Generated non-personal ArUco tabl
 heading='Pocket Measure · 0.1.2'
 fixtures=CONFIG.root/'measure-fixtures'
 entries=json.loads((fixtures/'manifest.json').read_text())
-current='/sdcard/Pictures/construct-measure-synthetic.png'
+current=None
+current_entry=None
+stage_index=0
 def done(text):result['checks'].append(text);print('PASS:',text,flush=True)
 def top():
     for _ in range(15):
@@ -33,10 +35,22 @@ def expect(prefix,timeout=60):
 def opened():
     restart();top();select_after(heading,('Open',));tap('Open measurement workspace');find('Choose photo')
 def stage(name):
-    global current
+    global current,current_entry,stage_index
     entry=next(e for e in entries if e['name']==name)
     path=fixtures/name
     if hashlib.sha256(path.read_bytes()).hexdigest()!=entry['sha256']:raise RuntimeError('Fixture checksum mismatch')
+    if current is not None:
+        if hashlib.sha256(adb('exec-out','cat',current,binary=True)).hexdigest()!=current_entry['sha256']:raise RuntimeError('Selected source was modified')
+        # Delete only our previous generated fixture, by exact path, before inserting a
+        # new file/MediaStore row. Reusing a URI can retain picker orientation/transcode caches.
+        where="\"_data='"+current+"'\""
+        deleted=adb('shell','content','delete','--uri','content://media/external/images/media','--where',where)
+        remaining=adb('shell','content','query','--uri','content://media/external/images/media','--projection','_id','--where',where)
+        if 'No result found' not in remaining:raise RuntimeError('Previous synthetic media row remains: '+remaining)
+        adb('shell','test','!','-e',current)
+    stage_index+=1
+    current='/storage/emulated/0/Pictures/construct-measure-synthetic-'+str(stage_index)+path.suffix
+    current_entry=entry
     adb('shell','mkdir','-p','/sdcard/Pictures')
     adb('push',str(path),current)
     adb('shell','am','broadcast','-a','android.intent.action.MEDIA_SCANNER_SCAN_FILE','-d','file://'+current)
@@ -64,6 +78,7 @@ def size(value):
     tap('Confirm size');expect('Tap the two ends')
 
 def endpoints(entry):
+    initial_bounds=find('Measurement photo: tap two endpoints').get('bounds')
     for x,y in entry['endpoints']:
         node=find('Measurement photo: tap two endpoints')
         x1,y1,x2,y2=map(int,re.findall(r'\d+',node.get('bounds')))
@@ -72,6 +87,7 @@ def endpoints(entry):
         top=y1+((y2-y1)-entry['height']*scale)/2
         adb('shell','input','tap',str(round(left+x*scale)),str(round(top+y*scale)))
         time.sleep(.6)
+        if find('Measurement photo: tap two endpoints').get('bounds')!=initial_bounds:raise RuntimeError('Photo area moved between endpoint taps')
     return float(expect('Length: ').split()[1])*10
 try:
     if adb('shell','getprop','ro.kernel.qemu').strip()!='1':raise RuntimeError('Requires disposable emulator')
@@ -97,6 +113,8 @@ try:
     if adb('shell','settings','get','global','airplane_mode_on').strip()!='1':raise RuntimeError('Offline setup failed')
     result['offlineBeforeFirstDetection']=True
     pick();expect('Reference found.')
+    find('Marker side (mm)');ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text('0');tap('Confirm size');expect('[SIZE_INVALID]')
+    done('Invalid marker size is rejected before endpoint measurement')
     size('100');value=endpoints(entry)
     if abs(value-entry['expectedMm'])>3:raise RuntimeError('Synthetic flat measurement outside 3 mm: '+str(value))
     result['flatMm']=value;capture('measure-flat');done('First offline native ArUco detection and two endpoint taps measure synthetic 240 mm within 3 mm')
@@ -125,6 +143,11 @@ try:
     adb('shell','input','keyevent','3');opened()
     if any(x.startswith('Length:') or x=='Confirm size' for x in labels()):raise RuntimeError('Background retained photo or result')
     done('Background closes workspace; reopening retains no selected image or measurement')
+    entry=stage('measure-flat.png');pick();expect('Reference found.');size('100');endpoints(entry)
+    adb('shell','settings','put','system','accelerometer_rotation','0');adb('shell','settings','put','system','user_rotation','1');find('Installed')
+    adb('shell','settings','put','system','user_rotation','0');opened()
+    if any(x.startswith('Length:') or x=='Confirm size' for x in labels()):raise RuntimeError('Rotation retained a photo or result')
+    done('Rotation closes the native workspace rather than restoring a selected photo or pending request')
     tap('Close measure');restart();top();select_after(heading,('Module access',));tap_node(next(n for n in nodes() if n.get('content-desc')=='Allow photo measurement' and n.get('checkable')=='true'));tap('Turn off');find('Allow photo measurement: off.')
     tap('Reopen module');tap('Open measurement workspace');expect('[CAPABILITY_DENIED]')
     done('Revocation blocks reopening the workspace')
@@ -139,5 +162,6 @@ except Exception as e:
     except Exception:pass
     raise
 finally:
+    adb('shell','settings','put','system','user_rotation','0')
     adb('shell','cmd','connectivity','airplane-mode','disable');adb('shell','svc','wifi','enable');adb('shell','svc','data','enable')
     (RESULTS/'measure-result.json').write_text(json.dumps(result,indent=2)+'\n')

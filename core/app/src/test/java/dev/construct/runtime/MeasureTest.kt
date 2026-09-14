@@ -27,6 +27,12 @@ class MeasureTest {
         rejected { p.lengthMm(square[0],square[0],95.0) }
         rejected { p.lengthMm(square[0],square[1],Double.NaN) }
     }
+    @Test fun projectiveHorizonAndItsOppositeSideAreRejected() {
+        val p=MeasurePlane(listOf(MeasurePoint(.2,.3),MeasurePoint(.4,.3),MeasurePoint(.5,.5),MeasurePoint(.1,.5)))
+        p.project(MeasurePoint(.3,.4))
+        rejected { p.project(MeasurePoint(.3,.1)) }
+        rejected { p.project(MeasurePoint(.3,.05)) }
+    }
     @Test fun markerSizeSupportsDecimalCommaButRejectsAmbiguousInput() {
         assertEquals(95.0,MeasureInput.sideMm("95"),0.0)
         assertEquals(95.5,MeasureInput.sideMm("95,5"),0.0)
