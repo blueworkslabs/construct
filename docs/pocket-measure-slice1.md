@@ -101,3 +101,11 @@ follow-up candidate (verification status lives on PR #7):
 The Android checks now cover bottom-edge placement at fit, consecutive taps,
 quiet invalid drag previews, plus pinch/pan/Reset and the existing coordinate,
 large-font and lifecycle cases. Slice-2 suggestions remain deferred.
+
+### Connector review: endpoint selection after Undo
+
+The connector identified stale endpoint selection when Undo removed B. The owner
+now normalizes selection on every editor refresh (including cleanup/reset), keeping
+only an endpoint present in the current measurement. The Android regression selects
+B then undoes its placement, repeats for A, and verifies Clear/Undo cannot revive
+stale nudge controls. Geometry and Undo history semantics are unchanged.

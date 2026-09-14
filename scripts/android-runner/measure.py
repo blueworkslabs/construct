@@ -199,6 +199,22 @@ try:
     collapse()
     if length()!=result['flatMm']:raise RuntimeError('Nudge Undo did not restore original measurement')
     done('Accessible endpoint nudges use photo pixels and each nudge is individually undoable')
+    action('Select endpoint B')
+    action('Undo')
+    expect('First endpoint set.')
+    if any(x.startswith('Nudge B ') or x=='Select endpoint B' for x in labels()):
+        raise RuntimeError('Undo removed B but retained its selection/nudge controls')
+    action('Select endpoint A')
+    action('Undo')
+    if any(x.startswith('Nudge ') or x.startswith('Select endpoint ') for x in labels()):
+        raise RuntimeError('Undo removed A but retained endpoint controls')
+    collapse()
+    if abs(endpoints(entry)-240)>3:raise RuntimeError('Replacing endpoints after Undo changed measurement')
+    action('Select endpoint B');action('Clear');action('Undo')
+    # Restoring a cleared pair must not revive a selection from before Clear.
+    if any(x.startswith('Nudge ') for x in labels()):raise RuntimeError('Clear/Undo revived stale selection')
+    collapse()
+    done('Undo removes selection/nudges for deleted endpoints; Clear/Undo does not revive stale selection')
     action('Clear',collapse_after=True)
     # The entire fitted photo, including its bottom edge, is reachable without zoom.
     x,y=screen_point(entry,(entry['width']*.5,entry['height']*.98))

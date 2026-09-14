@@ -83,14 +83,18 @@ class MeasureActivity : ComponentActivity() {
     override fun onStart() { live = true; super.onStart() }
     override fun onStop() {
         live = false; generation.invalidate()
-        photo = null; corners = emptyList(); editor.reset(); editorVersion++; busy = false; error = null
+        photo = null; corners = emptyList(); editor.reset(); refreshEditor(); busy = false; error = null
         super.onStop()
         // Only the explicit system-picker handoff may return to this workspace.
         if (!choosingPhoto || isChangingConfigurations) finish()
     }
     override fun onDestroy() { generation.invalidate(); launched.set(false); super.onDestroy() }
     private fun checkAccess() = store.withCapability(installed,"photo.measure") { }
-    private fun refreshEditor() { editorVersion++ }
+    private fun refreshEditor() {
+        // Undo, Clear and resets can remove a selected endpoint. Never expose stale nudge controls.
+        selectedEndpoint = selectedEndpoint?.takeIf { editor.measurement?.point(it) != null }
+        editorVersion++
+    }
     private fun edit(reportError: Boolean = true, expandOnError: Boolean = true, action: () -> EditResult): EditResult {
         if (!live || isFinishing || busy) return EditResult.Rejected("Workspace is not available.")
         return try {
