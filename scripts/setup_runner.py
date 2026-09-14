@@ -17,9 +17,12 @@ def main():
     p.add_argument('--test-catalog',required=True)
     p.add_argument('--sdk',type=Path)
     p.add_argument('--avd-home',type=Path)
+    p.add_argument('--api-level',type=int,default=36)
+    p.add_argument('--single-avd',action='store_true',help='Share one app-free synthetic-camera snapshot across scopes')
+    p.add_argument('--service',default='construct-emulator-public.service')
     a=p.parse_args();root=a.root.expanduser().resolve()
     if root.exists():raise SystemExit('Runner root already exists; no files were replaced')
-    raw=dict(root=str(root),sdk=str((a.sdk or root/'sdk').expanduser().resolve()),avd=str((a.avd_home or root/'avd').expanduser().resolve()),host=a.expected_host,home_catalog=a.home_catalog,test_catalog=a.test_catalog,disposable=True)
+    raw=dict(root=str(root),sdk=str((a.sdk or root/'sdk').expanduser().resolve()),avd=str((a.avd_home or root/'avd').expanduser().resolve()),host=a.expected_host,home_catalog=a.home_catalog,test_catalog=a.test_catalog,disposable=True,api_level=a.api_level,single_avd=a.single_avd,service=a.service)
     spec=importlib.util.spec_from_file_location('runner_config',SOURCE/'config.py');module=importlib.util.module_from_spec(spec);sys.modules[spec.name]=module;spec.loader.exec_module(module)
     # Validate the chosen values before creating the target directory.
     import tempfile
@@ -31,7 +34,7 @@ def main():
             shutil.copy2(path,root/path.name)
     config=root/'runner.local.json';config.write_text(json.dumps(raw,indent=2)+'\n');config.chmod(0o600)
     unit=(SOURCE/'construct-emulator.service').read_text().replace('/REPLACE_WITH_RUNNER_ROOT',str(root))
-    (root/'construct-emulator-public.service').write_text(unit)
+    (root/a.service).write_text(unit)
     (root/'results').mkdir(mode=0o700)
     print('Runner staged. Provision the SDK, virtualenv and app-free AVD snapshots before installing/starting its on-demand user service.')
 

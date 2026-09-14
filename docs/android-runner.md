@@ -76,6 +76,12 @@ kill`. Repeat for `construct-camera36`, using `-camera-back emulated` and snapsh
 name `camera-clean`. Cold boot can take several minutes; do not save a setup/error
 screen. The snapshot and dependency versions are part of your evidence.
 
+## Additional Android platforms
+
+See [Android 17 readiness](android17-readiness.md) for isolated API-level/service
+profiles and the optional disk-saving shared synthetic-camera AVD. Existing
+API-36 installations and snapshots remain the default.
+
 ## Run and review
 
 Build an operator-profile pilot with your catalog shortcut/TLS configuration; see

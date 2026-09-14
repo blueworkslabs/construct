@@ -116,8 +116,7 @@ try:
     camera_flag = BASE/'camera-emulated.flag'
     if a.camera_sha256: camera_flag.write_text('emulated\n')
     else: camera_flag.unlink(missing_ok=True)
-    snapshot = 'camera-clean' if a.camera_sha256 else 'clean'
-    avd = 'construct-camera36' if a.camera_sha256 else 'construct-api36'
+    avd,snapshot,_ = CONFIG.profile(bool(a.camera_sha256))
     if not (CONFIG.avd/(avd+'.avd')/'snapshots'/snapshot/'snapshot.pb').is_file():
         raise RuntimeError('Required clean snapshot missing: '+snapshot)
     control('start')
@@ -145,6 +144,10 @@ try:
             if 'package:'+package not in adb('shell', 'pm', 'list', 'packages', '-d', package).splitlines():
                 raise RuntimeError('Digital Wellbeing environment override did not apply')
         receipt['environmentOverrides'] = {'digitalWellbeing': 'disabled-user' if present else 'not installed'}
+    receipt['apiLevel'] = int(adb('shell','getprop','ro.build.version.sdk').strip())
+    if receipt['apiLevel'] != CONFIG.api_level: raise RuntimeError('Restored Android API differs from configured test platform')
+    receipt['pageSize'] = int(adb('shell','getconf','PAGESIZE').strip())
+    receipt['memoryLimiter'] = adb('shell','am','memory-limiter','status') if CONFIG.api_level >= 37 else 'not queried'
     receipt['fingerprint'] = adb('shell', 'getprop', 'ro.build.fingerprint').strip()
     receipt['webviewBefore'] = adb('shell', 'dumpsys', 'webviewupdate')
     if a.webview_apk:
