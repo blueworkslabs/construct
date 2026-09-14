@@ -154,6 +154,10 @@ try:
     receipt['emulatorVersion'] = subprocess.check_output([str(CONFIG.sdk/'emulator/emulator'), '-version'], text=True)
     adb('install', '-r', str(a.apk.resolve()), timeout=90)
     receipt['package'] = adb('shell', 'dumpsys', 'package', 'dev.construct.runtime')
+    # A RAM snapshot can retain logcat from before it became app-free. Do not
+    # attribute those historical warnings to the newly installed candidate.
+    adb('logcat', '-c')
+    receipt['logcatResetBeforeChildren'] = True
     children = [('smoke.py', 'smoke-result.json'), ('probes.py', 'probe-summary.json'), ('renderer.py', 'renderer-result.json'), ('tone.py', 'tone-result.json'), ('consent.py', 'consent-result.json')]
     if a.tone_consent_only: children = children[3:]
     if a.reliability_only: children = [('reliability.py', 'reliability-result.json')]
@@ -205,6 +209,13 @@ except Exception as error:
     receipt['error'] = str(error)
     raise
 finally:
+    if receipt.get('logcatResetBeforeChildren'):
+        try:
+            warnings = adb('logcat', '-d', '-s', 'cr_AwContents:W')
+            (run/'webview-warnings.log').write_text(warnings)
+            receipt['attachedDestroyWarnings'] = sum('destroy() called while WebView is still attached' in line for line in warnings.splitlines())
+        except Exception as error:
+            receipt['warningObservationError'] = str(error)
     try:
         receipt['resources'] = subprocess.check_output(['systemctl','--user','show',CONFIG.service,'-p','MemoryPeak','-p','MemoryCurrent','-p','NRestarts'],text=True)
         control('stop')
