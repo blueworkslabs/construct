@@ -67,6 +67,7 @@ def stage(name):
 def pick():
     action('Choose photo')
     until=time.monotonic()+30
+    previous_bounds=None
     while time.monotonic()<until:
         ns=nodes()
         # Stock Android photo picker: the clean snapshot receives exactly one generated media item.
@@ -74,6 +75,9 @@ def pick():
         if not candidates:
             candidates=[n for n in ns if n.get('content-desc','').startswith('Photo taken')]
         if len(candidates)==1:
+            bounds=candidates[0].get('bounds')
+            if bounds!=previous_bounds:
+                previous_bounds=bounds;time.sleep(.4);continue
             tap_node(candidates[0])
             # Older pickers return immediately; Android 17 confirms one selection.
             selected_until=time.monotonic()+30

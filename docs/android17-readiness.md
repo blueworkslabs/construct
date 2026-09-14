@@ -262,3 +262,39 @@ ZIP hashes; historical catalogs and the user's home catalog remain untouched.
 This avoids repeatedly traversing unrelated historical fixture versions during
 native acceptance. Full-catalog navigation remains represented by earlier host
 and failed-driver receipts.
+
+## Alpha 20 candidate execution
+
+The optimized candidate passed 121 JVM tests and lint, preserves the existing APK
+signer, permissions, publisher/demo assets and vision models, and passes ABI/size
+and 16 KiB alignment checks. The two CameraX JNI libraries match the upstream
+1.5.3 AAR. OpenCV's source/configuration is unchanged, but its embedded build
+revision changed on recompilation, so its native bytes are not claimed identical.
+
+Initial Android execution passed native camera opening, synthetic capture and
+deletion, clearing the former profile-8192 failure. The same run then stopped
+**before inference** with an input-dispatch ANR while reopening the WebView module
+following offline setup. The recovered ANR stack is in framework drawing; the main
+thread had approximately 0.64 s of CPU execution and 6.42 s of runnable scheduler
+wait, with guest CPU pressure near 89%. This is consistent with resource
+contention, not proof that an app hang is fixed. The failed receipt is retained;
+a second unchanged-candidate run reproduced the same ANR under approximately
+90% CPU pressure. No ANR timeout or app assertion was relaxed and no VM CPU/RAM
+allocation was increased. Repeating that busy baseline was stopped.
+
+The task-created 4 KiB AVD was archived in full before preparing a settled
+baseline. Construct was removed, the exact pinned WebView APK hash was verified
+and its package precompiled (`cmd package compile -m speed`). Android setup was
+allowed to finish with the same 2-vCPU/6-GiB VM and 3-GiB guest. CPU pressure fell
+from approximately 95% to 6%; three consecutive samples met the bounded settling
+criteria (CPU PSI avg10 below 30%, load1 below 4), with unchanged system-server
+PID. Both apps were absent, the fresh crash buffer was empty, ADB returned to
+non-root, and the clean snapshot saved before the emulator stopped. This is an
+environment preparation result, not yet a candidate acceptance pass.
+
+When an explicitly requested test WebView is already present, the runner now
+reuses it only after hashing the actual installed base APK and matching the
+requested SHA-256. Otherwise it installs the verified artifact as before. The
+receipt distinguishes `reused-verified` from `installed`; provider selection and
+actual current-provider checks remain mandatory. This preserves precompilation
+without trusting version strings or changing default Android-16 behavior.

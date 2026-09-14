@@ -157,10 +157,19 @@ try:
     if a.webview_apk:
         if adb('shell', 'getprop', 'ro.debuggable').strip() != '1':
             raise RuntimeError('Development WebView comparison requires a disposable userdebug image')
-        adb('install', '-r', str(a.webview_apk.resolve()), timeout=180)
+        # Preserve a settled, precompiled provider only when its installed bytes
+        # match the requested artifact. A matching version alone is insufficient.
+        paths = adb('shell', 'pm', 'path', 'com.android.webview').splitlines()
+        installed_sha = None
+        if len(paths) == 1 and paths[0].startswith('package:/data/app/'):
+            installed_path = paths[0].removeprefix('package:').strip()
+            installed_sha = adb('shell', 'sha256sum', installed_path, timeout=90).split()[0]
+        reused = installed_sha == a.webview_sha256.lower()
+        if not reused:
+            adb('install', '-r', str(a.webview_apk.resolve()), timeout=180)
         selection = adb('shell', 'cmd', 'webviewupdate', 'set-webview-implementation', 'com.android.webview')
         if 'Success' not in selection: raise RuntimeError('Chromium WebView provider selection failed: '+selection)
-        receipt['webviewOverride'] = {'package': 'com.android.webview', 'sha256': a.webview_sha256.lower(), 'selection': selection.strip()}
+        receipt['webviewOverride'] = {'package': 'com.android.webview', 'sha256': a.webview_sha256.lower(), 'selection': selection.strip(), 'installation': 'reused-verified' if reused else 'installed'}
     receipt['webview'] = adb('shell', 'dumpsys', 'webviewupdate')
     if a.webview_apk and 'Current WebView package (name, version): (com.android.webview,' not in receipt['webview']:
         raise RuntimeError('Selected WebView is not the requested Chromium provider')
