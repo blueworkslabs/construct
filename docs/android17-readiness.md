@@ -67,9 +67,16 @@ An initial API-37/16-KiB snapshot booted but was **rejected**, not accepted:
 SurfaceFlinger aborted in GoldfishMapper::readFromHost with
 `!rcEnc->featureInfo()->hasReadColorBufferDma`; system-server/package-service
 failure prevented Nano Lab installation. The failure also appeared during first
-boot, before either candidate app was installed. A replacement baseline is being
-checked with the explicit emulator-only `--disable-graphics-dma` option
-(`GLDMA` and `GLDMA2` off). Existing API-36 settings remain unchanged.
+boot, before either candidate app was installed. Disabling `GLDMA`/`GLDMA2` did **not** fix it, and that experimental option was
+removed. Android's `LOG_ALWAYS_FATAL_IF` condition actually signals *missing*
+required DMA support. The host advertises read-color-buffer DMA only when both
+`GLDirectMem` and `HasSharedSlotsHostMemoryAllocator` are enabled; its default
+GLDirectMem is off. A replacement baseline is being checked with explicit
+`--enable-direct-memory` (both features on), without updating the shared emulator
+binary or changing the API-36 profile.
+
+Source: [guest mapper](https://android.googlesource.com/device/generic/goldfish/+/refs/heads/main/hals/gralloc/mapper.cpp)
+and [host RenderControl](https://android.googlesource.com/platform/hardware/google/gfxstream/+/refs/heads/main/host/RenderControl.cpp).
 Stock Google WebView is 145.0.7632.218. The image reports its memory limiter
 **disabled by default**; no override was applied, so this is not evidence of
 enforced app-memory-limit behavior.

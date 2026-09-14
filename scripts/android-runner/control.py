@@ -35,7 +35,7 @@ def main():
         emulator=str(c.sdk/'emulator/emulator')
         os.execv(emulator,[emulator,'-avd',avd,'-port','5554','-accel','on','-memory','2048','-cores','2',
             '-no-window','-no-metrics','-no-audio','-no-boot-anim','-gpu','swiftshader','-snapshot',snapshot,
-            *(['-feature','-GLDMA,-GLDMA2'] if not c.graphics_dma else []),
+            *(['-feature','GLDirectMem,HasSharedSlotsHostMemoryAllocator'] if c.direct_memory else []),
             '-no-snapshot-save','-camera-back','emulated' if camera else 'none','-camera-front','none'])
     else:raise SystemExit('Use start|stop|status|adb|ui|suite|smoke|probes|snapshot-save|snapshot-reset')
 

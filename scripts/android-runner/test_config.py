@@ -13,16 +13,17 @@ class RunnerConfigurationTests(unittest.TestCase):
             p=Path(d)/'runner.local.json';p.write_text(json.dumps(raw));return config.load(p)
     def test_platform_profiles_preserve_legacy_defaults(self):
         c=self.load(self.values())
-        self.assertTrue(c.graphics_dma)
+        self.assertFalse(c.direct_memory)
         self.assertEqual(c.profile(),('construct-api36','clean',False))
         self.assertEqual(c.profile(True),('construct-camera36','camera-clean',True))
     def test_single_android17_snapshot_keeps_identical_hardware(self):
-        r=self.values();r.update(api_level=37,single_avd=True,service='construct-emulator-api37.service')
+        r=self.values();r.update(api_level=37,single_avd=True,direct_memory=True,service='construct-emulator-api37.service')
         c=self.load(r)
+        self.assertTrue(c.direct_memory)
         self.assertEqual(c.profile(),('construct-api37','clean',True))
         self.assertEqual(c.profile(),c.profile(True))
     def test_platform_options_fail_closed(self):
-        for key,value in [('api_level',True),('api_level','37'),('api_level',0),('single_avd','false'),('graphics_dma','false')]:
+        for key,value in [('api_level',True),('api_level','37'),('api_level',0),('single_avd','false'),('direct_memory','false')]:
             r=self.values();r[key]=value
             with self.subTest(key=key,value=value),self.assertRaises(ValueError):self.load(r)
     def test_missing_config_never_authorizes_device_actions(self):

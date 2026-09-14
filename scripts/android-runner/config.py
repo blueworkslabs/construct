@@ -22,7 +22,7 @@ class RunnerConfig:
     service: str = 'construct-emulator-public.service'
     api_level: int = 36
     single_avd: bool = False
-    graphics_dma: bool = True
+    direct_memory: bool = False
 
     def profile(self, camera=False):
         # A single space-saving AVD always uses synthetic camera hardware,
@@ -44,7 +44,7 @@ def load(path=None):
     if not path.exists():
         return RunnerConfig(SCRIPT_ROOT,SCRIPT_ROOT/'sdk',SCRIPT_ROOT/'avd','','','',False)
     raw=json.loads(path.read_text())
-    optional={'service','api_level','single_avd','graphics_dma'}
+    optional={'service','api_level','single_avd','direct_memory'}
     fields={'root','sdk','avd','host','home_catalog','test_catalog','disposable'} | optional
     if set(raw)-fields or not fields-optional <= set(raw):raise ValueError('Missing or unexpected runner configuration fields')
     for key in ('root','sdk','avd'):
@@ -57,8 +57,8 @@ def load(path=None):
     api=raw.get('api_level',36)
     single=raw.get('single_avd',False)
     if type(api) is not int or not 28 <= api <= 99:raise ValueError('Expected integer Android API level 28..99')
-    dma=raw.get('graphics_dma',True)
-    if type(dma) is not bool:raise ValueError('Graphics DMA flag must be a JSON boolean')
+    dma=raw.get('direct_memory',False)
+    if type(dma) is not bool:raise ValueError('Direct-memory flag must be a JSON boolean')
     if type(single) is not bool:raise ValueError('Single AVD flag must be a JSON boolean')
     return RunnerConfig(*(Path(raw[k]).resolve() for k in ('root','sdk','avd')),raw['host'],catalog(raw['home_catalog']),catalog(raw['test_catalog']),raw['disposable'],service,api,single,dma)
 
