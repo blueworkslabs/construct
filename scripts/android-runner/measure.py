@@ -37,6 +37,7 @@ def stage(name):
     entry=next(e for e in entries if e['name']==name)
     path=fixtures/name
     if hashlib.sha256(path.read_bytes()).hexdigest()!=entry['sha256']:raise RuntimeError('Fixture checksum mismatch')
+    adb('shell','mkdir','-p','/sdcard/Pictures')
     adb('push',str(path),current)
     adb('shell','am','broadcast','-a','android.intent.action.MEDIA_SCANNER_SCAN_FILE','-d','file://'+current)
     time.sleep(2)
