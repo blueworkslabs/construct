@@ -1,7 +1,7 @@
 # Android 17 readiness
 
 This checkpoint distinguishes **running existing APKs on Android 17** from
-**targeting API 37**. Construct alpha 19 and Nano Lab alpha 1 currently target
+**targeting API 37**. Construct alpha 20 and Nano Lab alpha 1 currently target
 API 35. An OS update does not require rebuilding them or silently opting users
 into new permissions. Android 17 does not establish Gemini Nano eligibility.
 
@@ -129,7 +129,7 @@ module scopes remain in progress.
 
 - Construct x86-64 APK SHA-256: `739289ca1f9aa0f7b82e6ede687c6f5cb76275fd51b25968400b21d5516ca303`
 - Host receipt: `20260914T223302Z-d490fcb1`, complete and emulator stopped.
-- Both APKs remain unchanged; only runner code/environment changed.
+- These alpha 19/Nano receipts use unchanged APKs; alpha 20 is the separate CameraX fix below.
 - Physical ARM64 behavior and enforced memory-limit behavior remain outside this
   emulator evidence. Both images report the limiter disabled by default; no
   override was applied.
@@ -298,3 +298,28 @@ requested SHA-256. Otherwise it installs the verified artifact as before. The
 receipt distinguishes `reused-verified` from `installed`; provider selection and
 actual current-provider checks remain mandatory. This preserves precompilation
 without trusting version strings or changing default Android-16 behavior.
+
+
+### Settled-baseline vision result
+
+Alpha 20's optimized x86-64 APK passed all **seven** native vision checks on the
+restored settled API-37/4-KiB baseline (`20260914T235217Z-92351919`). This includes
+first-use offline face and EXIF-rotated-face detection, blank negatives for both
+models, CC0 cat labeling, clearing on background/reopening, byte-identical original
+JPEGs, and diagnostics excluding photo labels/boxes/contents. The receipt verifies
+`reused-verified` WebView installation, exact candidate hash, non-root ADB and
+stopped emulator. Runtime/process-exit review found no new Construct ANR or native
+crash; the independent Bluetooth hardware-error 0x42 remains in the platform log.
+Camera/gallery, measurement and host/module acceptance remain separate scopes.
+
+- Alpha 20 x86-64: 26362624 bytes, SHA-256 `b04970d2830b40ba75645dcc9bf6f8f5bc494430a61fc09102d85098e168eaa0`.
+- Alpha 20 ARM64: 23479039 bytes, SHA-256 `9f913d1b9241de68f891757757fc938faf8ad8ca2209d826e50007647a5ef54e`.
+- App source: `76f1f6e4dd9e14bbf6fe3fb748a9eecd19e7e4c6`; subsequent runner/documentation changes do not alter the APK.
+
+Alpha 20 also passed all **12 camera/gallery checks** in
+`20260914T235451Z-e7a378fb`: independent permission gates, direct Reopen,
+synthetic preview/capture, private-photo recovery, rotation, quota and deletion
+confirmation, background/revocation, Android permission re-grant, offline album,
+export cancellation, exact published JPEG bytes and independent-copy survival.
+The emulator stopped. Process exits match test force-stops, permission changes and
+isolated-renderer cleanup; the separate Bluetooth 0x42 crash remains recorded.
