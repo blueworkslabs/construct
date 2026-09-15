@@ -12,6 +12,10 @@ data class Installed(val manifest: ModuleManifest, val digest: String, val previ
 data class DamagedModule(val id: String, val code: String, val previousVersion: String?)
 data class Inventory(val modules: List<Installed>, val damaged: List<DamagedModule>, val indexError: String? = null)
 
+// A deployment supplies the initial choice, never a replacement for a saved choice.
+internal fun initialRegistry(saved: String?, configured: String): String =
+    saved ?: configured.takeIf { it.isNotBlank() } ?: "demo"
+
 class ModuleStore(private val context: Context) {
     companion object {
         @Volatile private var instance: ModuleStore? = null
@@ -29,7 +33,8 @@ class ModuleStore(private val context: Context) {
     val publicKey: ByteArray = context.assets.open("registry-public.der").use { it.readBytes() }
 
     var registry: String
-        get() = preferences.getString("registry", "demo") ?: "demo"
+        get() = initialRegistry(preferences.getString("registry", null),
+            context.getString(R.string.configured_registry))
         set(value) {
             if (value != "demo") validateRegistry(value)
             preferences.edit().putString("registry", value).apply()
