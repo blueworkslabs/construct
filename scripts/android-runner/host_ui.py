@@ -127,14 +127,25 @@ def library():
         if 'Library' in labels(): tap('Library')
         elif 'Back to Library' in labels(): tap('Back to Library')
         elif 'Back' in labels(): tap('Back')
+        elif 'Construct menu' in labels() and any(page in labels() for page in ('Settings','About')):
+            adb('shell','input','keyevent','4')
         else: raise RuntimeError('Not on a host page; refusing implicit module closure')
         find('Library'); find('Browse')
     scroll_top()
 
 
+def reveal_host_control(text):
+    for attempt in range(13):
+        current=nodes(); parents={child:parent for parent in current for child in parent}
+        if any(text in (n.get('text'),n.get('content-desc')) and enabled(n,parents)
+               and n.get('bounds') not in ('[0,0][0,0]',None) for n in current): return
+        if attempt<12: scroll_content('down')
+    raise RuntimeError('Native host control is not reachable: '+text)
+
+
 def catalog_settings():
     if _modern:
-        library(); tap('Construct menu'); tap('Settings'); find('Use catalog')
+        library(); tap('Construct menu'); tap('Settings'); reveal_host_control('Use catalog')
 
 
 def apply_catalog():

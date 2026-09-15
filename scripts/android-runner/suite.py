@@ -42,8 +42,11 @@ p.add_argument('--measure-only', action='store_true', help='Only synthetic nativ
 p.add_argument('--measure-sha256', help='Exact signed Pocket Measure launcher')
 for module, default in [('focus','0.1.2'),('snake','0.1.5'),('contacts','0.2.1'),('measure','0.1.2')]:
     p.add_argument('--'+module+'-version', default=default, help='Exact numeric version paired with the module hash')
+p.add_argument('--ux-layouts-only', action='store_true', help='Only native font/landscape continuation with the pinned Checklist fixture; other UX checks excluded')
 p.add_argument('--ux-candidates', type=Path, help='Only Library/Browse and eight refreshed package UI checks; JSON exact candidate metadata')
 a = p.parse_args()
+if a.ux_layouts_only and not a.ux_candidates: p.error('UX layout scope requires exact candidate metadata')
+os.environ['CONSTRUCT_UX_LAYOUTS_ONLY']='1' if a.ux_layouts_only else '0'
 if a.ux_candidates:
     if any((a.measure_only,a.camera_sha256,a.focus_sha256,a.snake_sha256,a.contacts_sha256,a.reliability_only,a.modules_only,a.tone_consent_only,a.camera_only,a.focus_only,a.snake_only,a.contacts_only)): p.error('UX-only cannot mix other scopes')
     ux_candidates=json.loads(a.ux_candidates.read_text())
@@ -94,7 +97,9 @@ from ui import adb
 receipt = {'started': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'apkSha256': actual,
            'complete': False, 'scope': 'Checklist regression, classified bounded probes, injected renderer loss, and tone grant lifecycle; not complete sandbox/egress proof'}
 
-if a.ux_candidates: receipt['scope']='Library/Browse latest-first, explicit signed versions, refreshed package identity, module layout and native font/rotation; not full module/native capability regression'
+if a.ux_layouts_only: receipt['scope']='Native font and landscape UX continuation only; previous Library/catalog/package/task checks are EXCLUDED, not rerun'
+
+if a.ux_candidates and not a.ux_layouts_only: receipt['scope']='Library/Browse latest-first, explicit signed versions, refreshed package identity, module layout and native font/rotation; not full module/native capability regression'
 
 if a.measure_only: receipt['scope'] = 'Synthetic selected-photo planar measurement only; no real-camera accuracy claim or host baseline'
 

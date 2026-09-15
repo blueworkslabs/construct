@@ -12,7 +12,8 @@ from catalog_input import replace_text
 
 require_runner()
 candidates = json.loads(os.environ['CONSTRUCT_UX_CANDIDATES'])
-result = {'complete': False, 'checks': [], 'candidates': candidates}
+layouts_only = os.environ.get('CONSTRUCT_UX_LAYOUTS_ONLY')=='1'
+result = {'complete': False, 'checks': [], 'candidates': candidates, 'scope': 'remaining native font and landscape layouts only' if layouts_only else 'full UX'}
 original_font = adb('shell','settings','get','system','font_scale').strip()
 
 def done(name):
@@ -40,59 +41,67 @@ def menu_clearance(action):
         raise RuntimeError('Module action overlaps native menu: '+action)
 
 try:
-    restart(); find('Your tools will appear here'); capture('ux-library-empty')
-    initial = diagnostics()
-    if any(e.get('code')=='CATALOG_READY' for e in initial): raise RuntimeError('Library implicitly loaded a catalog')
-    done('Fresh Library reads local inventory without a catalog fetch')
-    catalog_settings(); replace(CONFIG.test_catalog)
-    adb('shell','input','keyevent','111'); apply_catalog(); find('Catalog refreshed.')
-    # Inspect the actual full Browse hierarchy over a bounded scroll, never a mock.
-    seen = {}
-    for _ in range(16):
-        for n in nodes():
-            desc=n.get('content-desc','')
-            match=re.fullmatch(r'(.+), version (\d+\.\d+\.\d+)',desc)
-            if match: seen.setdefault(match[1],set()).add(match[2])
-        scroll_content('down')
-    for e in candidates:
-        if seen.get(e['name']) != {e['version']}: raise RuntimeError('Browse does not show exactly the latest candidate: '+e['name']+' '+repr(seen))
-    library(); tap('Browse'); capture('ux-browse-latest')
-    done('Browse exposes one latest candidate per module, not the historical version stack')
-    for e in candidates:
-        select(e,'Review & install'); find('Allow & install'); tap('Allow & install'); installed_status()
-        events=diagnostics()
-        installs=[event for event in events if event.get('code')=='INSTALLED_TRIAL' and event.get('moduleId')==e['id']]
-        if len(installs)!=1 or installs[0].get('packageDigest')!=e['sha256']: raise RuntimeError('Installed candidate identity mismatch: '+e['id'])
-    done('All eight refreshed packages install through explicit Versions, signature verification and consent')
-    library(); capture('ux-library-installed')
-    by_id={e['id']:e for e in candidates}
-    hello=by_id['dev.construct.hello']
-    select(hello,'Open'); find('Add one'); menu_clearance('Add one'); tap('Add one'); find('1')
-    tap('Mark working'); find('Marked working. You can now install an update.'); restart(); select(hello,'Open'); find('1'); close()
-    done('Hello task control clears the native corner and its count survives restart')
-    checklist=by_id['dev.construct.checklist']
-    select(checklist,'Open'); find('New item'); replace('UX literal <tag> & quotes')
-    tap('Add item'); find('UX literal <tag> & quotes'); adb('shell','input','keyevent','111')
-    menu_clearance('Add item'); capture('ux-checklist-keyboard-entry'); tap('Mark working'); find('Marked working. You can now install an update.')
-    adb('shell','svc','wifi','disable'); adb('shell','svc','data','disable')
-    try:
-        restart(); select(checklist,'Open'); find('UX literal <tag> & quotes'); close()
-    finally:
-        adb('shell','svc','wifi','enable'); adb('shell','svc','data','enable')
-    done('Checklist accepts literal text with the keyboard and reopens its retained item offline')
-    for module,action in [('tone','Play beep'),('camera','Open camera workspace'),('measure','Open measurement workspace')]:
-        select(by_id['dev.construct.'+module],'Open'); find(action); menu_clearance(action); tap(action)
-        deadline=time.monotonic()+20
-        while not any('CAPABILITY_DENIED' in label for label in labels()):
-            if time.monotonic()>deadline: raise RuntimeError('Missing explicit default-denial feedback: '+module)
-            time.sleep(.3)
-        capture('ux-'+module+'-denied'); close()
-    done('Tones, Camera and Measure keep visible default-denial feedback without obscuring native administration')
+    if layouts_only:
+        restart(); catalog_settings(); replace(CONFIG.test_catalog)
+        adb('shell','input','keyevent','111'); apply_catalog(); find('Catalog refreshed.')
+        by_id={e['id']:e for e in candidates}; checklist=by_id['dev.construct.checklist']
+        select(checklist,'Review & install'); tap('Allow & install'); installed_status()
+        installs=[e for e in diagnostics() if e.get('code')=='INSTALLED_TRIAL' and e.get('moduleId')==checklist['id']]
+        if len(installs)!=1 or installs[0].get('packageDigest')!=checklist['sha256']: raise RuntimeError('Layout fixture identity mismatch')
+    else:
+        restart(); find('Your tools will appear here'); capture('ux-library-empty')
+        initial = diagnostics()
+        if any(e.get('code')=='CATALOG_READY' for e in initial): raise RuntimeError('Library implicitly loaded a catalog')
+        done('Fresh Library reads local inventory without a catalog fetch')
+        catalog_settings(); replace(CONFIG.test_catalog)
+        adb('shell','input','keyevent','111'); apply_catalog(); find('Catalog refreshed.')
+        # Inspect the actual full Browse hierarchy over a bounded scroll, never a mock.
+        seen = {}
+        for _ in range(16):
+            for n in nodes():
+                desc=n.get('content-desc','')
+                match=re.fullmatch(r'(.+), version (\d+\.\d+\.\d+)',desc)
+                if match: seen.setdefault(match[1],set()).add(match[2])
+            scroll_content('down')
+        for e in candidates:
+            if seen.get(e['name']) != {e['version']}: raise RuntimeError('Browse does not show exactly the latest candidate: '+e['name']+' '+repr(seen))
+        library(); tap('Browse'); capture('ux-browse-latest')
+        done('Browse exposes one latest candidate per module, not the historical version stack')
+        for e in candidates:
+            select(e,'Review & install'); find('Allow & install'); tap('Allow & install'); installed_status()
+            events=diagnostics()
+            installs=[event for event in events if event.get('code')=='INSTALLED_TRIAL' and event.get('moduleId')==e['id']]
+            if len(installs)!=1 or installs[0].get('packageDigest')!=e['sha256']: raise RuntimeError('Installed candidate identity mismatch: '+e['id'])
+        done('All eight refreshed packages install through explicit Versions, signature verification and consent')
+        library(); capture('ux-library-installed')
+        by_id={e['id']:e for e in candidates}
+        hello=by_id['dev.construct.hello']
+        select(hello,'Open'); find('Add one'); menu_clearance('Add one'); tap('Add one'); find('1')
+        tap('Mark working'); find('Marked working. You can now install an update.'); restart(); select(hello,'Open'); find('1'); close()
+        done('Hello task control clears the native corner and its count survives restart')
+        checklist=by_id['dev.construct.checklist']
+        select(checklist,'Open'); find('New item'); replace('UX literal <tag> & quotes')
+        tap('Add item'); find('UX literal <tag> & quotes'); adb('shell','input','keyevent','111')
+        menu_clearance('Add item'); capture('ux-checklist-keyboard-entry'); tap('Mark working'); find('Marked working. You can now install an update.')
+        adb('shell','svc','wifi','disable'); adb('shell','svc','data','disable')
+        try:
+            restart(); select(checklist,'Open'); find('UX literal <tag> & quotes'); close()
+        finally:
+            adb('shell','svc','wifi','enable'); adb('shell','svc','data','enable')
+        done('Checklist accepts literal text with the keyboard and reopens its retained item offline')
+        for module,action in [('tone','Play beep'),('camera','Open camera workspace'),('measure','Open measurement workspace')]:
+            select(by_id['dev.construct.'+module],'Open'); find(action); menu_clearance(action); tap(action)
+            deadline=time.monotonic()+20
+            while not any('CAPABILITY_DENIED' in label for label in labels()):
+                if time.monotonic()>deadline: raise RuntimeError('Missing explicit default-denial feedback: '+module)
+                time.sleep(.3)
+            capture('ux-'+module+'-denied'); close()
+        done('Tones, Camera and Measure keep visible default-denial feedback without obscuring native administration')
     # Native Android font scale, not only browser CSS emulation. A 720px/320dpi
     # logical viewport is 360dp. Restore all overrides in finally.
     adb('shell','wm','size','720x1280'); adb('shell','wm','density','320')
     adb('shell','settings','put','system','font_scale','2.0'); restart()
-    catalog_settings(); find('Use catalog'); capture('ux-settings-360dp-font2')
+    catalog_settings(); bounds('Use catalog'); capture('ux-settings-360dp-font2')
     adb('shell','input','keyevent','111'); library(); tap('Browse'); find('Refresh catalog'); capture('ux-browse-360dp-font2')
     select(checklist,'Open'); find('New item'); menu_clearance('Add item'); capture('ux-checklist-360dp-font2'); close()
     adb('shell','settings','put','system','font_scale','1.0')
