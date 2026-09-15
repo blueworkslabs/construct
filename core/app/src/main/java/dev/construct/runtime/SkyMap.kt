@@ -23,7 +23,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlin.math.*
@@ -50,13 +50,15 @@ internal data class SkyTile(val z: Int,val x: Int,val y: Int)
         }.take(64)
     }
     LaunchedEffect(network,placements) {
+        // Wait for a pan burst to settle; fetch only its final visible viewport.
+        delay(180)
         tileError=false
         val needed=placements.map { it.first }.toSet()
         bitmaps.keys.filter { it !in needed }.toList().forEach { bitmaps.remove(it) }
         for(tile in needed) {
             ensureActive()
             if(tile !in bitmaps) try {
-                val bitmap=withContext(Dispatchers.IO) { network.tile(tile.z,tile.x,tile.y).asImageBitmap() }
+                val bitmap=withContext(network.tileDispatcher) { network.tile(tile.z,tile.x,tile.y).asImageBitmap() }
                 ensureActive(); bitmaps[tile]=bitmap
             } catch(e: kotlinx.coroutines.CancellationException) { throw e }
             catch(_: Exception) { tileError=true }

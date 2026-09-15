@@ -11,7 +11,6 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -79,7 +78,9 @@ class SkyActivity : ComponentActivity() {
         }
     }
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState); window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        super.onCreate(savedInstanceState)
+        // Maps may be captured by the user; avoid retaining their location in Recents.
+        if(android.os.Build.VERSION.SDK_INT>=33) setRecentsScreenshotEnabled(false)
         if(savedInstanceState!=null) { finish(); return }
         store=ModuleStore.shared(this)
         try {
@@ -256,9 +257,9 @@ class SkyActivity : ComponentActivity() {
                 }
                 Text(locationLabel,style=MaterialTheme.typography.labelSmall)
                 Text(status,style=MaterialTheme.typography.bodySmall)
-                TextButton(onClick={ sourceDetails=!sourceDetails }) { Text(if(sourceDetails) "Hide source details" else "Sources & status${if(feeds.any { !it.ok }) " · issue" else ""}") }
+                TextButton(onClick={ sourceDetails=!sourceDetails }) { Text(if(sourceDetails) "Hide source details" else "Sources & status${if(feeds.any { it.source in mode.sources && !it.ok }) " · issue" else ""}") }
                 if(sourceDetails) {
-                feeds.forEach { f -> Text("${f.source.label}: ${f.message}${f.remaining?.let { " · $it credits left" }.orEmpty()}",
+                feeds.filter { it.source in mode.sources }.forEach { f -> Text("${f.source.label}: ${f.message}${f.remaining?.let { " · $it credits left" }.orEmpty()}",
                     style=MaterialTheme.typography.labelSmall,color=if(f.ok) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error) }
                 if(SkySource.OPENSKY in mode.sources) Text("OpenSky public access: 400 credits/day shared by IP. Quotas may interrupt updates.",style=MaterialTheme.typography.labelSmall)
                 Text("Amber = position over 30 s old · incomplete coverage",style=MaterialTheme.typography.labelSmall)

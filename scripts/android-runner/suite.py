@@ -191,11 +191,8 @@ try:
             raise RuntimeError('Development WebView comparison requires a disposable userdebug image')
         # Preserve a settled, precompiled provider only when its installed bytes
         # match the requested artifact. A matching version alone is insufficient.
-        paths = adb('shell', 'pm', 'path', 'com.android.webview').splitlines()
-        installed_sha = None
-        if len(paths) == 1 and paths[0].startswith('package:/data/app/'):
-            installed_path = paths[0].removeprefix('package:').strip()
-            installed_sha = adb('shell', 'sha256sum', installed_path, timeout=90).split()[0]
+        from webview_provider import installed_provider_sha
+        installed_sha = installed_provider_sha(adb)
         reused = installed_sha == a.webview_sha256.lower()
         if not reused:
             adb('install', '-r', str(a.webview_apk.resolve()), timeout=180)

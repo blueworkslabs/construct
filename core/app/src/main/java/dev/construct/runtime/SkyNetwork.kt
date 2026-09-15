@@ -11,15 +11,18 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.ceil
+import java.util.concurrent.Executors
+import kotlinx.coroutines.asCoroutineDispatcher
 
 /** Fixed origins/paths only; no URL, headers or credentials can be supplied by a web module. */
 internal class SkyNetwork(context: Context, private val authorize: () -> Unit) : AutoCloseable {
+    internal val tileDispatcher=Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     private val closed=AtomicBoolean(false)
     private val connections=ConcurrentHashMap.newKeySet<HttpURLConnection>()
     private val prefs=context.getSharedPreferences("sky-provider-backoff",Context.MODE_PRIVATE)
     private val cache=File(context.cacheDir,"sky-map-tiles").apply { mkdirs() }
     private fun check() { checkRule(!closed.get(),"SKY_CLOSED","Sky Watch is closed."); authorize() }
-    override fun close() { closed.set(true); connections.forEach { it.disconnect() }; connections.clear() }
+    override fun close() { closed.set(true); connections.forEach { it.disconnect() }; connections.clear(); tileDispatcher.close() }
     private data class Reply(val bytes: ByteArray, val remaining: Int?, val maxAge: Long, val cacheable: Boolean)
     private fun get(url: URL, limit: Int, source: SkySource?=null): Reply {
         check()
@@ -51,7 +54,8 @@ internal class SkyNetwork(context: Context, private val authorize: () -> Unit) :
             val age=Regex("(?:^|,)\\s*max-age=(\\d+)",RegexOption.IGNORE_CASE).find(cc)?.groupValues?.get(1)?.toLongOrNull()
                 ?: c.getHeaderFieldDate("Expires",0).takeIf { it>System.currentTimeMillis() }?.let { (it-System.currentTimeMillis())/1000 }
                 ?: 604800L
-            return Reply(data,c.getHeaderField("X-Rate-Limit-Remaining")?.toIntOrNull(),age.coerceIn(0,2592000),
+            val responseAge=c.getHeaderField("Age")?.toLongOrNull()?.coerceAtLeast(0) ?: 0L
+            return Reply(data,c.getHeaderField("X-Rate-Limit-Remaining")?.toIntOrNull(),(age-responseAge).coerceIn(0,2592000),
                 !cc.contains("no-store",true) && !cc.contains("no-cache",true))
         } finally { connections.remove(c); c.disconnect() }
     }

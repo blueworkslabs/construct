@@ -408,7 +408,7 @@ class MainActivity : ComponentActivity() {
                         Text(cap.id, style = MaterialTheme.typography.bodySmall)
                         Text(cap.reason)
                     }
-                    Text("Existing access choices are kept unless you change them. New tone, contacts and camera access starts off. You can change access later in Module access.")
+                    Text("Existing access choices are kept unless you change them. New sensitive capabilities start off. You can change access later in Module access.")
                     if (verified.manifest.capabilities.any { it.id == "sky.watch" }) Text("Sky Watch shares your chosen area with the selected aircraft providers and OpenStreetMap. Phone location is optional and requested only when you tap Use my location. No location or aircraft data is shared with module code. Foreground only.")
                     if (verified.manifest.capabilities.any { it.id == "photo.measure" }) Text("You choose one image through Android’s photo picker. Measurement is local and approximate; photos and results are not shared with JavaScript or saved by this workspace.")
                     if (verified.manifest.capabilities.any { it.id == "camera.capture" }) Text("Camera also needs Android permission through Module access. Photos are saved privately by the native workspace, not shared with JavaScript. No microphone or general file access.")

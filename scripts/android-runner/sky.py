@@ -27,6 +27,15 @@ def contains(text,timeout=35):
         time.sleep(.5)
     raise RuntimeError('Expected text missing: '+text)
 
+def choice(options,timeout=30):
+    deadline=time.monotonic()+timeout
+    while time.monotonic()<deadline:
+        current=labels()
+        for value in options:
+            if value in current:return value
+        time.sleep(.25)
+    raise RuntimeError('Expected one of: '+repr(options))
+
 def scroll_panel():
     # Only the lower portrait native panel; do not drag the map.
     adb('shell','input','swipe','350','1350','350','1050','250')
@@ -98,13 +107,12 @@ try:
     adb('shell','settings','put','system','font_scale',font);time.sleep(2)
     done('Native map retained through landscape and Android 2x font; screenshots retained for visual review')
     tap('Close');open_sky();tap('Use my location');contains('location')
-    denial=next((v for v in ["Don’t allow","Don't allow"] if v in labels()),None)
-    if denial is None:raise RuntimeError('Expected Android location consent dialog')
+    denial=choice(["Don’t allow","Don't allow"])
     tap(denial);contains('Location permission not granted');capture('sky-location-denied')
     done('Android location denial leaves manual area available without closing workspace')
+    adb('shell','cmd','location','set-location-enabled','true')
     tap('Use my location')
-    allow=next((v for v in ['While using the app','Only this time'] if v in labels()),None)
-    if allow is None:raise RuntimeError('Expected Android foreground location allow control')
+    allow=choice(['While using the app','Only this time'])
     tap(allow)
     adb('shell','cmd','location','set-location-enabled','true')
     for _ in range(3):adb('emu','geo','fix','8.5622','50.0379');time.sleep(2)
