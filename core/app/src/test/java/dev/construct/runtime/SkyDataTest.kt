@@ -101,6 +101,15 @@ class SkyDataTest {
         }
         assertEquals(0.002,SkyProjection.deltaX(0.001,0.999),1e-9)
     }
+    @Test fun selectedMarkerAndLabelLeaveTheViewportTogether() {
+        assertTrue(SkyProjection.markerVisible(180f,120f,360f,240f))
+        assertTrue(SkyProjection.markerVisible(-30f,120f,360f,240f))
+        assertTrue(SkyProjection.markerVisible(390f,120f,360f,240f))
+        assertFalse(SkyProjection.markerVisible(-31f,120f,360f,240f))
+        assertFalse(SkyProjection.markerVisible(391f,120f,360f,240f))
+        assertFalse(SkyProjection.markerVisible(180f,-31f,360f,240f))
+        assertFalse(SkyProjection.markerVisible(180f,271f,360f,240f))
+    }
     @Test fun unknownFieldsRemainUnknownAndUntrustedLabelsAreBounded() {
         val a=SkyData.adsb(adsb("flight" to "\n<script>".repeat(20),"alt_baro" to JSONObject.NULL,"gs" to "fast","track" to -1),now).single()
         assertNull(a.altitudeM);assertNull(a.speedMps);assertNull(a.track)

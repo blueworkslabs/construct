@@ -117,6 +117,10 @@ internal object SkyData {
 
 /** Web Mercator in unit-world coordinates, with wrapped longitude. */
 internal object SkyProjection {
+    /** Shared culling for a marker and its attached label, including the glyph's edge allowance. */
+    fun markerVisible(x: Float,y: Float,width: Float,height: Float)=
+        x in -30f..(width+30) && y in -30f..(height+30)
+
     fun x(lon: Double)=(lon+180)/360
     fun y(lat: Double): Double { val s=sin(Math.toRadians(lat.coerceIn(-85.0,85.0))); return 0.5-ln((1+s)/(1-s))/(4*PI) }
     fun point(x: Double,y: Double)=SkyPoint(Math.toDegrees(atan(sinh(PI*(1-2*y.coerceIn(0.001638,0.998362))))).coerceIn(-85.0,85.0),((x%1+1)%1)*360-180)

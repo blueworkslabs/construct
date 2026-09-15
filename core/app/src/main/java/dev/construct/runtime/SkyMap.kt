@@ -120,7 +120,9 @@ private object SkyInk {
             val chosen=aircraft.firstOrNull { it.key==selected }
             aircraft.forEach { a -> if(a.key!=selected) marker(a,screen(a.point),now,false) }
             chosen?.let { a ->
-                val p=screen(a.point); marker(a,p,now,true)
+                val p=screen(a.point)
+                if(!SkyProjection.markerVisible(p.x,p.y,size.width,size.height)) return@let
+                marker(a,p,now,true)
                 // Ellipsize to the viewport and keep clamp bounds ordered, so a narrow map never throws.
                 val margin=4.dp.toPx(); val pad=6.dp.toPx()
                 val maxLabel=(size.width-2*margin-2*pad).toInt().coerceAtLeast(1)
@@ -159,7 +161,7 @@ private object SkyInk {
 
 /** Aircraft glyph: ground-track arrow, or a neutral dot when the track is unknown. */
 private fun DrawScope.marker(a: SkyAircraft, p: Offset, now: Double, chosen: Boolean) {
-    if(p.x !in -30f..(size.width+30) || p.y !in -30f..(size.height+30)) return
+    if(!SkyProjection.markerVisible(p.x,p.y,size.width,size.height)) return
     val stale=a.age(now)>SkyData.STALE_AGE
     val fill=if(stale) SkyInk.stale else SkyInk.fresh
     val outline=if(stale) SkyInk.fresh else SkyInk.halo
