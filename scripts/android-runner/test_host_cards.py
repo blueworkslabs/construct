@@ -1,6 +1,6 @@
 import unittest
 import xml.etree.ElementTree as ET
-from host_cards import card_action, matching_card
+from host_cards import card_action, matching_card, host_viewport
 
 
 def enabled(node, parents):
@@ -45,23 +45,19 @@ class HostCardTest(unittest.TestCase):
         with self.assertRaises(ValueError): matching_card(fixture(), 'Pocket Tones')
 
 
-if __name__ == '__main__': unittest.main()
 
-
-class HostViewportTest(__import__('unittest').TestCase):
+class HostViewportTest(unittest.TestCase):
     def test_status_bar_first_is_not_a_scroll_viewport(self):
-        from host_cards import host_viewport
-        from xml.etree.ElementTree import Element
-        current=[Element('node',{'package':'com.android.systemui','bounds':'[0,0][720,96]'}),
-                 Element('node',{'package':'dev.construct.runtime','bounds':'[0,96][720,1552]'}),
-                 Element('node',{'package':'dev.construct.runtime','bounds':'[24,200][690,400]'})]
+        current=[ET.Element('node',{'package':'com.android.systemui','bounds':'[0,0][720,96]'}),
+                 ET.Element('node',{'package':'dev.construct.runtime','bounds':'[0,96][720,1552]'}),
+                 ET.Element('node',{'package':'dev.construct.runtime','bounds':'[24,200][690,400]'})]
         self.assertEqual(host_viewport(current),[0,96,720,1552])
     def test_landscape_uses_construct_not_the_larger_system_window(self):
-        from host_cards import host_viewport
-        from xml.etree.ElementTree import Element
-        self.assertEqual(host_viewport([Element('node',{'package':'com.android.systemui','bounds':'[0,0][1600,720]'}),
-          Element('node',{'package':'dev.construct.runtime','bounds':'[0,48][1512,700]'})]),[0,48,1512,700])
+        self.assertEqual(host_viewport([ET.Element('node',{'package':'com.android.systemui','bounds':'[0,0][1600,720]'}),
+          ET.Element('node',{'package':'dev.construct.runtime','bounds':'[0,48][1512,700]'})]),[0,48,1512,700])
     def test_no_construct_window_fails_instead_of_swiping_system(self):
-        from host_cards import host_viewport
-        from xml.etree.ElementTree import Element
-        with self.assertRaises(RuntimeError):host_viewport([Element('node',{'package':'com.android.systemui','bounds':'[0,0][720,1600]'})])
+        with self.assertRaises(RuntimeError):host_viewport([ET.Element('node',{'package':'com.android.systemui','bounds':'[0,0][720,1600]'})])
+
+
+if __name__ == '__main__':
+    unittest.main()
