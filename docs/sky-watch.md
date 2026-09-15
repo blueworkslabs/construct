@@ -9,6 +9,8 @@ with host API **0.8.0** / **alpha23**. Camera/AR is deliberately deferred.
 - **Use my location** requests Android foreground location permission in response
   to that native button. Approximate location is supported. Alternatively enter a
   latitude/longitude; neither phone location nor permission is required then.
+  Location uses one recent fix, not continuous movement tracking. To update it,
+  choose **Area → Use my location** again.
 - Pick **ADSB.lol**, **OpenSky**, or **Combined**, and 10/25/50/100 km.
 - Pan, use zoom buttons, and **Search here** to move the search area. Panning alone
   does not change the aircraft-query center; the circle shows the actual radius.

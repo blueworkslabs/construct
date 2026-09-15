@@ -38,6 +38,22 @@ def choice(options,timeout=30):
         time.sleep(.25)
     raise RuntimeError('Expected one of: '+repr(options))
 
+def permission_tap(text):
+    # The location dialog can expose its tree before the input window is ready.
+    # Require its actual foreground focus and a stable package-owned target.
+    deadline=time.monotonic()+15; previous=None; stable_since=None
+    while time.monotonic()<deadline:
+        focused=adb('shell','dumpsys','window')
+        ready=any('mCurrentFocus=' in line and 'GrantPermissionsActivity' in line for line in focused.splitlines())
+        matches=[n for n in nodes() if n.get('text')==text and n.get('package')=='com.google.android.permissioncontroller' and n.get('enabled')=='true']
+        bounds=matches[0].get('bounds') if len(matches)==1 else None
+        if ready and bounds and bounds==previous:
+            if stable_since is not None and time.monotonic()-stable_since>=1.5:
+                tap_node(matches[0]);return
+        else:stable_since=time.monotonic() if ready and bounds else None
+        previous=bounds;time.sleep(.3)
+    raise RuntimeError('Android permission window did not settle: '+text)
+
 def scroll_panel():
     # Only the lower portrait native panel; do not drag the map.
     adb('shell','input','swipe','350','1350','350','1050','250')
@@ -112,12 +128,12 @@ try:
     if not location_only:tap('Close')
     open_sky();tap('Use my location')
     denial=choice(["Don’t allow","Don't allow"])
-    tap(denial);contains('Location permission not granted');capture('sky-location-denied')
+    permission_tap(denial);contains('Location permission not granted');capture('sky-location-denied')
     done('Android location denial leaves manual area available without closing workspace')
     adb('shell','cmd','location','set-location-enabled','true')
     tap('Use my location')
     allow=choice(['While using the app','Only this time'])
-    tap(allow)
+    permission_tap(allow)
     adb('shell','cmd','location','set-location-enabled','true')
     for _ in range(3):adb('emu','geo','fix','8.5622','50.0379');time.sleep(2)
     map_ready();contains('Phone location');capture('sky-synthetic-location')
