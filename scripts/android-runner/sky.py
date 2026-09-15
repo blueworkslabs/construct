@@ -12,7 +12,9 @@ from catalog_input import replace_text
 
 require_runner()
 EXPECTED=os.environ['CONSTRUCT_SKY_SHA256']
+location_only=os.environ.get('CONSTRUCT_SKY_LOCATION_ONLY')=='1'
 result={'complete':False,'checks':[],'scope':'Sky Watch manual/live dual-provider map and synthetic foreground location, not physical GPS or full host regression'}
+if location_only:result['scope']='Location/denial/background/offline/revoke continuation only; map/source/layout checks excluded'
 font=adb('shell','settings','get','system','font_scale').strip()
 
 def done(name):
@@ -87,26 +89,28 @@ try:
     library();select_after('Sky Watch · 0.1.0',('Open',));tap('Open aircraft map');contains('[CAPABILITY_DENIED]')
     capture('sky-default-denied');tap('Module access');find('Allow Sky Watch map and data');grant_switch();find('Allow Sky Watch map and data: on.');tap('Back')
     done('Exact signed launcher installed; sky.watch denied by default and explicitly granted')
-    open_sky();fields('91','8.5622');tap('Show aircraft');contains('Enter latitude −85 to 85')
-    fields();tap('Show aircraft');map_ready();tap('Automatic refresh every 30 seconds');source_status(['ADSB.lol: Updated'])
-    if app_permission('android.permission.ACCESS_FINE_LOCATION') or app_permission('android.permission.ACCESS_COARSE_LOCATION'):raise RuntimeError('Manual area unexpectedly granted location')
-    capture('sky-adsb-map');done('Manual reference area validates coordinates and loads live ADSB.lol without location permission')
-    mode('ADSB.lol','OpenSky');source_status(['OpenSky: Updated']);capture('sky-opensky-map')
-    done('Single-source OpenSky mode obtains live public state data')
-    # Respect the provider floor rather than forcing repeated calls.
-    time.sleep(16);mode('OpenSky','Combined');source_status(['ADSB.lol: Updated','OpenSky: Updated'])
-    capture('sky-combined-map');done('Combined mode receives both live providers; deterministic merge semantics tested separately')
-    time.sleep(16);tap('25 km');tap('50 km');map_ready();find('50 km');tap('Zoom in');tap('Zoom out');tap('Center')
-    capture('sky-radius-map');done('Radius and zoom/center controls remain usable with live data')
-    # Actual configuration changes, not CSS simulation.
-    adb('shell','settings','put','system','accelerometer_rotation','0');adb('shell','settings','put','system','user_rotation','1');time.sleep(2)
-    find('Sky Watch');find('50 km');find('Zoom in');capture('sky-landscape')
-    adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
-    adb('shell','settings','put','system','font_scale','2.0');time.sleep(2)
-    find('Sky Watch');find('50 km');find('Zoom in');capture('sky-font2')
-    adb('shell','settings','put','system','font_scale',font);time.sleep(2)
-    done('Native map retained through landscape and Android 2x font; screenshots retained for visual review')
-    tap('Close');open_sky();tap('Use my location');contains('location')
+    if not location_only:
+        open_sky();fields('91','8.5622');tap('Show aircraft');contains('Enter latitude −85 to 85')
+        fields();tap('Show aircraft');map_ready();tap('Automatic refresh every 30 seconds');source_status(['ADSB.lol: Updated'])
+        if app_permission('android.permission.ACCESS_FINE_LOCATION') or app_permission('android.permission.ACCESS_COARSE_LOCATION'):raise RuntimeError('Manual area unexpectedly granted location')
+        capture('sky-adsb-map');done('Manual reference area validates coordinates and loads live ADSB.lol without location permission')
+        mode('ADSB.lol','OpenSky');source_status(['OpenSky: Updated']);capture('sky-opensky-map')
+        done('Single-source OpenSky mode obtains live public state data')
+        # Respect the provider floor rather than forcing repeated calls.
+        time.sleep(16);mode('OpenSky','Combined');source_status(['ADSB.lol: Updated','OpenSky: Updated'])
+        capture('sky-combined-map');done('Combined mode receives both live providers; deterministic merge semantics tested separately')
+        time.sleep(16);tap('25 km');tap('50 km');map_ready();find('50 km');tap('Zoom in');tap('Zoom out');tap('Center')
+        capture('sky-radius-map');done('Radius and zoom/center controls remain usable with live data')
+        # Actual configuration changes, not CSS simulation.
+        adb('shell','settings','put','system','accelerometer_rotation','0');adb('shell','settings','put','system','user_rotation','1');time.sleep(2)
+        find('Sky Watch');find('50 km');find('Zoom in');capture('sky-landscape')
+        adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
+        adb('shell','settings','put','system','font_scale','2.0');time.sleep(2)
+        find('Sky Watch');find('50 km');find('Zoom in');capture('sky-font2')
+        adb('shell','settings','put','system','font_scale',font);time.sleep(2)
+        done('Native map retained through landscape and Android 2x font; screenshots retained for visual review')
+    if not location_only:tap('Close')
+    open_sky();tap('Use my location')
     denial=choice(["Don’t allow","Don't allow"])
     tap(denial);contains('Location permission not granted');capture('sky-location-denied')
     done('Android location denial leaves manual area available without closing workspace')
@@ -124,10 +128,10 @@ try:
     open_sky();find('Use my location')
     if any('Phone location' in x for x in labels()):raise RuntimeError('Location restored on fresh workspace')
     done('Real backgrounding closes Sky Watch; reopen does not restore prior coordinates')
-    fields();adb('shell','svc','wifi','disable');adb('shell','svc','data','disable')
+    fields();time.sleep(16);adb('shell','cmd','connectivity','airplane-mode','enable');adb('shell','svc','wifi','disable');adb('shell','svc','data','disable')
     tap('Show aircraft');map_ready();contains('Could not refresh');capture('sky-offline')
     done('Offline request ends with explicit unavailable status, not a fabricated live result')
-    adb('shell','svc','wifi','enable');adb('shell','svc','data','enable')
+    adb('shell','cmd','connectivity','airplane-mode','disable');adb('shell','svc','wifi','enable');adb('shell','svc','data','enable')
     tap('Close');restart();select_after('Sky Watch · 0.1.0',('Module access',));grant_switch()
     tap('Turn off');find('Allow Sky Watch map and data: off.');tap('Back');restart();select_after('Sky Watch · 0.1.0',('Open',));tap('Open aircraft map');contains('[CAPABILITY_DENIED]')
     done('Revoking native map access remains effective after process restart')
@@ -138,7 +142,7 @@ except Exception as e:
     except Exception:pass
     raise
 finally:
-    for command in [('settings','put','system','font_scale',font),('settings','put','system','user_rotation','0'),('svc','wifi','enable'),('svc','data','enable')]:
+    for command in [('cmd','connectivity','airplane-mode','disable'),('settings','put','system','font_scale',font),('settings','put','system','user_rotation','0'),('svc','wifi','enable'),('svc','data','enable')]:
         try:adb('shell',*command)
         except Exception:pass
     (RESULTS/'sky-result.json').write_text(json.dumps(result,indent=2)+'\n')

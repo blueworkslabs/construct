@@ -45,8 +45,11 @@ for module, default in [('focus','0.1.2'),('snake','0.1.5'),('contacts','0.2.1')
 p.add_argument('--ux-layouts-only', action='store_true', help='Only native font/landscape continuation with the pinned Checklist fixture; other UX checks excluded')
 p.add_argument('--ux-candidates', type=Path, help='Only Library/Browse and eight refreshed package UI checks; JSON exact candidate metadata')
 p.add_argument('--sky-only', action='store_true', help='Foreground Sky Watch map, provider, location and lifecycle acceptance only')
+p.add_argument('--sky-location-only', action='store_true', help='Only Sky Watch location/lifecycle continuation, excluding map/source/layout acceptance')
 p.add_argument('--sky-sha256', help='Exact signed Sky Watch 0.1.0 launcher')
 a = p.parse_args()
+if a.sky_location_only and not a.sky_only: p.error('Sky location continuation requires sky-only')
+os.environ['CONSTRUCT_SKY_LOCATION_ONLY']='1' if a.sky_location_only else '0'
 if a.sky_only != bool(a.sky_sha256): p.error('Sky scope requires both sky-only and sky-sha256')
 if a.sky_only and any((a.ux_candidates,a.measure_only,a.reliability_only,a.modules_only,a.tone_consent_only,a.focus_sha256,a.snake_sha256,a.contacts_sha256,a.camera_sha256,a.camera_only,a.focus_only,a.snake_only,a.contacts_only)): p.error('Sky-only cannot mix scopes')
 if a.sky_sha256 and not __import__('re').fullmatch(r'[0-9a-f]{64}',a.sky_sha256): p.error('Invalid Sky Watch hash')
@@ -103,6 +106,8 @@ receipt = {'started': datetime.datetime.now(datetime.timezone.utc).isoformat(), 
            'complete': False, 'scope': 'Checklist regression, classified bounded probes, injected renderer loss, and tone grant lifecycle; not complete sandbox/egress proof'}
 
 if a.sky_only: receipt['scope']='Sky Watch native foreground map, source switching, live provider responses, optional synthetic location and lifecycle; not physical GPS accuracy or host baseline'
+
+if a.sky_location_only: receipt['scope']='Sky Watch synthetic foreground location, denial, background, offline and revoke continuation only; map/source/layout checks excluded'
 
 if a.ux_layouts_only: receipt['scope']='Native font and landscape UX continuation only; previous Library/catalog/package/task checks are EXCLUDED, not rerun'
 

@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
@@ -37,13 +38,14 @@ internal data class SkyTile(val z: Int,val x: Int,val y: Int)
     var dimensions by remember { mutableStateOf(IntSize.Zero) }
     val bitmaps=remember(network) { mutableStateMapOf<SkyTile,ImageBitmap>() }
     var tileError by remember { mutableStateOf(false) }
-    val world=256.0*(1 shl zoom)
+    val tilePixels=with(LocalDensity.current) { 256.dp.toPx().toDouble() }
+    val world=tilePixels*(1 shl zoom)
     val cx=SkyProjection.x(view.lon)*world; val cy=SkyProjection.y(view.lat)*world
     val left=cx-dimensions.width/2; val top=cy-dimensions.height/2
-    val placements=remember(view,zoom,dimensions) {
+    val placements=remember(view,zoom,dimensions,tilePixels) {
         if(dimensions.width==0) emptyList() else buildList {
-            for(y in floor(top/256).toInt()..floor((top+dimensions.height)/256).toInt())
-                for(x in floor(left/256).toInt()..floor((left+dimensions.width)/256).toInt()) {
+            for(y in floor(top/tilePixels).toInt()..floor((top+dimensions.height)/tilePixels).toInt())
+                for(x in floor(left/tilePixels).toInt()..floor((left+dimensions.width)/tilePixels).toInt()) {
                     val n=1 shl zoom
                     if(y in 0 until n) add(Triple(SkyTile(zoom,((x%n)+n)%n,y),x,y))
                 }
@@ -72,11 +74,11 @@ internal data class SkyTile(val z: Int,val x: Int,val y: Int)
             .pointerInput(view,zoom,aircraft) { detectTapGestures { tap ->
                 aircraft.minByOrNull { (screen(it.point)-tap).getDistance() }?.let { if((screen(it.point)-tap).getDistance()<36.dp.toPx()) onSelect(it.key) }
             } }
-            .pointerInput(zoom) { detectDragGestures { change,drag ->
+            .pointerInput(zoom,tilePixels) { detectDragGestures { change,drag ->
                 change.consume()
                 view=SkyProjection.point(SkyProjection.x(view.lon)-drag.x/world,SkyProjection.y(view.lat)-drag.y/world)
             } }) {
-            placements.forEach { (tile,x,y) -> bitmaps[tile]?.let { drawImage(it,dstOffset=IntOffset((x*256-left).roundToInt(),(y*256-top).roundToInt()),dstSize=IntSize(256,256)) } }
+            placements.forEach { (tile,x,y) -> bitmaps[tile]?.let { drawImage(it,dstOffset=IntOffset((x*tilePixels-left).roundToInt(),(y*tilePixels-top).roundToInt()),dstSize=IntSize(tilePixels.roundToInt(),tilePixels.roundToInt())) } }
             val origin=screen(center)
             val radiusPx=radius*1000/(cos(Math.toRadians(center.lat))*40075016.686)*world
             drawCircle(Color(0xFF086F4F),radiusPx.toFloat(),origin,style=Stroke(2.dp.toPx()))
@@ -96,13 +98,15 @@ internal data class SkyTile(val z: Int,val x: Int,val y: Int)
             }
         }
         Text("N ↑",Modifier.align(Alignment.TopStart).padding(8.dp).background(MaterialTheme.colorScheme.surface).padding(5.dp))
-        Column(Modifier.align(Alignment.TopEnd).padding(6.dp),horizontalAlignment=Alignment.End) {
+        Row(Modifier.align(Alignment.TopEnd).padding(6.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
             FilledTonalButton(onClick={ if(zoom<13) zoom++ },enabled=zoom<13,modifier=Modifier.semantics { contentDescription="Zoom in" }) { Text("+") }
             FilledTonalButton(onClick={ if(zoom>2) zoom-- },enabled=zoom>2,modifier=Modifier.semantics { contentDescription="Zoom out" }) { Text("−") }
             FilledTonalButton(onClick={ view=center }) { Text("Center") }
         }
-        if(SkyData.distance(center,view)>0.1) Button(onClick={ onSearch(view) },enabled=enabled,modifier=Modifier.align(Alignment.BottomCenter).padding(bottom=30.dp)) { Text("Search here") }
         if(tileError) Text("Map tiles unavailable · aircraft still shown",Modifier.align(Alignment.TopCenter).background(MaterialTheme.colorScheme.surface).padding(6.dp),style=MaterialTheme.typography.labelSmall)
-        Text("© OpenStreetMap contributors · openstreetmap.org/copyright",Modifier.align(Alignment.BottomStart).fillMaxWidth().background(MaterialTheme.colorScheme.surface.copy(alpha=0.94f)).padding(4.dp),style=MaterialTheme.typography.labelSmall)
+        Column(Modifier.align(Alignment.BottomStart).fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally) {
+            if(SkyData.distance(center,view)>0.1) Button(onClick={ onSearch(view) },enabled=enabled) { Text("Search here") }
+            Text("© OpenStreetMap contributors · openstreetmap.org/copyright",Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface.copy(alpha=0.94f)).padding(4.dp),style=MaterialTheme.typography.labelSmall)
+        }
     }
 }
