@@ -5,6 +5,36 @@ This checkpoint distinguishes **running existing APKs on Android 17** from
 API 35. An OS update does not require rebuilding them or silently opting users
 into new permissions. Android 17 does not establish Gemini Nano eligibility.
 
+## Review checkpoint — 2026-09-15
+
+**Alpha 20 is a scoped Android-17 compatibility pilot, not a complete platform
+certification.** It fixes the confirmed CameraX profile-8192 failure without
+changing target SDK, permissions, models, signing identity or module versions.
+
+- **Passed on Android 17 / 4 KiB / pinned test WebView:** optimized vision 7,
+  camera/gallery 12, measurement 28, Checklist 5, probes 5 BLOCKED / 6 CONTAINED /
+  0 FAIL, renderer recovery, tones 7, consent 5, Focus 6 and synthetic Contacts 9.
+  These are documented separate runs, not one uninterrupted suite. Focus's child
+  passed before the combined run later failed in Snake.
+- **Passed separately:** unchanged Nano Lab's 7 unavailable-device/privacy/
+  lifecycle checks on Android 17 / 16 KiB. No AICore or Nano inference available.
+- **Still unverified:** full Snake gameplay on the API-37 emulator (interruption
+  pause reproduced twice), physical ARM64/Pixel behavior, matched fixed-provider
+  Construct execution on 16 KiB, and enforced platform memory limits. The image's
+  limiter is disabled by default; it was not overridden for testing.
+- **Environment:** separate on-demand Android-17 profiles; Android-16 binaries
+  and snapshots preserved. A settled app-free snapshot avoids repeating initial
+  setup under severe CPU pressure. The development WebView is emulator-only.
+- **Build:** 121 JVM tests and lint pass; both optimized ABI artifacts verified;
+  50 runner tests pass normally and with Python `-O`. Candidate-source CI is green;
+  later driver/documentation CI must be checked on the PR before merging.
+- **Pixel handoff:** install alpha 20 over the existing host; spot-check capture,
+  saved-photo analysis and measurement, then play Snake to distinguish physical
+  behavior from the runner limitation. No module update or new permission needed.
+  Recheck Nano Lab after system/AICore updates, without assuming new eligibility.
+
+The history below intentionally retains failed experiments and their limits.
+
 ## Platform audit
 
 Reviewed Google's [all-app changes](https://developer.android.com/about/versions/17/behavior-changes-all)
@@ -359,3 +389,32 @@ status-bar clock. Countdown and saved-remainder comparisons still require exact
 values; no generated timer state substitutes for UI evidence. Three additional
 unit cases cover old/new labels, status-bar exclusion and invalid/ambiguous
 clocks, bringing runner tests to **50**, passing normally and under Python `-O`.
+
+
+### Remaining gameplay limitation
+
+Focus passed all **six** checks in the complete Focus child of
+`20260915T002556Z-677d967d`; that combined run subsequently failed in Snake and is
+**not** represented as a complete module-suite pass. Focus's exact timer,
+pause/restart, single tone/no replay, menu/background silence, offline catch-up and
+storage revocation checks remain valid. Runtime/exit review found no app crash.
+
+Snake 0.1.5 rendered, moved four steps and collected one fruit, then its existing
+`elapsed > 1000` interruption protection paused the game. It did not reach the
+required game-over checkpoint. A bounded comparison that omitted hierarchy reads
+for five seconds reproduced the same pause (`20260915T003225Z-21d694b0`), with no
+app ANR/native crash. The unsuccessful observer change was removed. The interval
+includes asynchronous state persistence as well as rendering/scheduling, so the
+precise source of the delay is **not isolated**. No pause threshold was increased,
+auto-resume added or gameplay assertion weakened. Full Android-17 Snake gameplay
+acceptance remains **unverified** and needs a focused physical-device check or
+further separate runner profiling. Native photo/host acceptance is unaffected.
+
+
+Contacts passed all **nine** checks in `20260915T003412Z-78e46b2b`: default-denial
+and independent grants, real Android consent, bounded typed details, search and
+paging, tested accent/word-start matching, duplicate sort keys, alphabetical
+Browse across 26 synthetic records, independent revocation, landscape keyboard,
+offline reads and background/diagnostic privacy. The exact candidate receipt is
+complete/stopped. No app ANR/native crash was found; expected permission/force-stop
+and isolated-renderer exits are recorded separately from the Bluetooth 0x42 crash.
