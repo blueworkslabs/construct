@@ -44,7 +44,12 @@ for module, default in [('focus','0.1.2'),('snake','0.1.5'),('contacts','0.2.1')
     p.add_argument('--'+module+'-version', default=default, help='Exact numeric version paired with the module hash')
 p.add_argument('--ux-layouts-only', action='store_true', help='Only native font/landscape continuation with the pinned Checklist fixture; other UX checks excluded')
 p.add_argument('--ux-candidates', type=Path, help='Only Library/Browse and eight refreshed package UI checks; JSON exact candidate metadata')
+p.add_argument('--sky-only', action='store_true', help='Foreground Sky Watch map, provider, location and lifecycle acceptance only')
+p.add_argument('--sky-sha256', help='Exact signed Sky Watch 0.1.0 launcher')
 a = p.parse_args()
+if a.sky_only != bool(a.sky_sha256): p.error('Sky scope requires both sky-only and sky-sha256')
+if a.sky_only and any((a.ux_candidates,a.measure_only,a.reliability_only,a.modules_only,a.tone_consent_only,a.focus_sha256,a.snake_sha256,a.contacts_sha256,a.camera_sha256,a.camera_only,a.focus_only,a.snake_only,a.contacts_only)): p.error('Sky-only cannot mix scopes')
+if a.sky_sha256 and not __import__('re').fullmatch(r'[0-9a-f]{64}',a.sky_sha256): p.error('Invalid Sky Watch hash')
 if a.ux_layouts_only and not a.ux_candidates: p.error('UX layout scope requires exact candidate metadata')
 os.environ['CONSTRUCT_UX_LAYOUTS_ONLY']='1' if a.ux_layouts_only else '0'
 if a.ux_candidates:
@@ -96,6 +101,8 @@ os.environ['CONSTRUCT_RESULTS'] = str(run)
 from ui import adb
 receipt = {'started': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'apkSha256': actual,
            'complete': False, 'scope': 'Checklist regression, classified bounded probes, injected renderer loss, and tone grant lifecycle; not complete sandbox/egress proof'}
+
+if a.sky_only: receipt['scope']='Sky Watch native foreground map, source switching, live provider responses, optional synthetic location and lifecycle; not physical GPS accuracy or host baseline'
 
 if a.ux_layouts_only: receipt['scope']='Native font and landscape UX continuation only; previous Library/catalog/package/task checks are EXCLUDED, not rerun'
 
@@ -225,13 +232,16 @@ try:
         os.environ['CONSTRUCT_MEASURE_SHA256'] = a.measure_sha256
         children.append(('measure.py', 'measure-result.json'))
     if a.ux_candidates: children=[('ux.py','ux-result.json')]
+    if a.sky_only:
+        os.environ['CONSTRUCT_SKY_SHA256']=a.sky_sha256
+        children=[('sky.py','sky-result.json')]
     for script, result in children:
         with (run/(script+'.log')).open('w') as log:
             subprocess.run([str(BASE/'venv/bin/python'), str(BASE/script)], check=True,
                            stdout=log, stderr=subprocess.STDOUT, timeout=1800 if script=='ux.py' else 900)
         if not json.loads((run/result).read_text()).get('complete'):
             raise RuntimeError('Incomplete child receipt: '+result)
-    if not (a.ux_candidates or a.measure_only or a.reliability_only or a.modules_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_only):
+    if not (a.sky_only or a.ux_candidates or a.measure_only or a.reliability_only or a.modules_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_only):
         if not a.tone_consent_only:
             receipt['probeCounts'] = json.loads((run/'probe-summary.json').read_text())['counts']
             receipt['rendererVerdict'] = json.loads((run/'renderer-result.json').read_text())['verdict']
@@ -261,6 +271,9 @@ try:
     if a.ux_candidates:
         receipt['ux']=json.loads((run/'ux-result.json').read_text())
         if receipt['ux']['environment']['apkSha256'] != actual: raise RuntimeError('UX APK hash mismatch')
+    if a.sky_only:
+        receipt['sky']=json.loads((run/'sky-result.json').read_text())
+        if receipt['sky']['environment']['apkSha256'] != actual: raise RuntimeError('Sky APK hash mismatch')
     receipt['complete'] = True
 except Exception as error:
     receipt['error'] = str(error)
