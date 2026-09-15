@@ -83,15 +83,24 @@ not a new stable build or a claim that the separate UX review PR is merged.
 Retain the existing pilot app signer for update continuity. The public source is
 available at the release tag; third-party notices remain in the source and APK.
 
+The current public prerelease is [alpha22](https://github.com/blueworkslabs/construct/releases/tag/v0.1.0-alpha22),
+with frozen app source `aa1dd0b`. Its official APK selects the public catalog on
+fresh installs, without a startup network request. Open Browse and refresh to
+fetch the catalog. Explicit saved choices are preserved on upgrade; choose
+**Settings → Use configured registry → Use catalog** to switch an older saved
+catalog to the public one. Install over the existing app, without uninstalling,
+to preserve its modules and data. The pilot signer is unchanged.
+
 ## Cutover
 
 1. Verify public HTTPS index, all signed ZIPs, and the downloaded APK checksum.
 2. In the existing app, change the catalog URL in Settings and refresh Browse.
-   The existing APK's configured shortcut may still point to the old deployment;
-   use the explicit new URL. No reinstall or data reset is required.
+   In alpha21 and earlier the configured shortcut may still point to the old
+   deployment; use the explicit new URL. Alpha22 has the public shortcut.
+   No data reset is required.
 3. Test a module install/update from a phone off the home network and confirm
    existing data and offline use. Device acceptance is separate from HTTP checks.
-4. Update the configured catalog for future official APK builds.
+4. Keep the public catalog profile for future official APK builds (done for alpha22).
 5. Only then retire old production routes. Testing catalogs and other nginx
    consumers are separate; this migration does not authorize removing them.
 
