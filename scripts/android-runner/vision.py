@@ -4,6 +4,7 @@ from config import CONFIG, require_runner
 from ui import adb, nodes, labels, tap, tap_node, find, capture, RESULTS
 from host_ui import restart, select_after, installed_status, diagnostics, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern
 from catalog_input import replace_text
+from adb_identity import restore_shell_identity
 from pathlib import Path
 from PIL import Image
 import ui
@@ -50,8 +51,8 @@ def root():
 
 def unroot():
     global rooted
-    adb('unroot'); adb('wait-for-device')
-    if adb('shell', 'id', '-u').strip() == '0': raise RuntimeError('Could not restore non-root ADB')
+    reconnects=restore_shell_identity(adb)
+    if reconnects:result['unrootTransportCloses']=result.get('unrootTransportCloses',0)+reconnects
     rooted = False
 
 try:
