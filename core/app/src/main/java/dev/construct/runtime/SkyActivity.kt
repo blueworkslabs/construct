@@ -20,6 +20,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -72,9 +73,7 @@ class SkyActivity : ComponentActivity() {
     private var lonText by mutableStateOf("")
     private var now by mutableDoubleStateOf(System.currentTimeMillis()/1000.0)
     private var generation=0
-    private var permissionPending=false
     private val permission=registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-        permissionPending=false
         if(live && !isFinishing) {
             if(hasLocation()) locate() else status="Location permission not granted. Enter coordinates instead, or enable permission in Android Settings."
         }
@@ -103,10 +102,9 @@ class SkyActivity : ComponentActivity() {
         try {
             access()
             if(hasLocation()) locate() else {
-                permissionPending=true
                 permission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION))
             }
-        } catch(_: Exception) { permissionPending=false; status="Location unavailable. Enter coordinates instead." }
+        } catch(_: Exception) { status="Location unavailable. Enter coordinates instead." }
     }
     private fun stopLocation() {
         listener?.let { runCatching { (getSystemService(LOCATION_SERVICE) as LocationManager).removeUpdates(it) } }
@@ -246,7 +244,10 @@ class SkyActivity : ComponentActivity() {
         Text(status,style=MaterialTheme.typography.bodySmall)
     }
     @Composable private fun AircraftPanel(aircraft: List<SkyAircraft>,p: SkyPoint,modifier: Modifier) {
-        LazyColumn(modifier.padding(horizontal=12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+        var sourceDetails by remember { mutableStateOf(false) }
+        val listState=rememberLazyListState()
+        LaunchedEffect(selected) { if(selected!=null) listState.animateScrollToItem(1) }
+        LazyColumn(modifier.padding(horizontal=12.dp),state=listState,verticalArrangement=Arrangement.spacedBy(6.dp)) {
             item {
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Text("${aircraft.size} aircraft",style=MaterialTheme.typography.titleMedium,modifier=Modifier.weight(1f))
@@ -255,11 +256,14 @@ class SkyActivity : ComponentActivity() {
                 }
                 Text(locationLabel,style=MaterialTheme.typography.labelSmall)
                 Text(status,style=MaterialTheme.typography.bodySmall)
+                TextButton(onClick={ sourceDetails=!sourceDetails }) { Text(if(sourceDetails) "Hide source details" else "Sources & status${if(feeds.any { !it.ok }) " · issue" else ""}") }
+                if(sourceDetails) {
                 feeds.forEach { f -> Text("${f.source.label}: ${f.message}${f.remaining?.let { " · $it credits left" }.orEmpty()}",
                     style=MaterialTheme.typography.labelSmall,color=if(f.ok) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error) }
                 if(SkySource.OPENSKY in mode.sources) Text("OpenSky public access: 400 credits/day shared by IP. Quotas may interrupt updates.",style=MaterialTheme.typography.labelSmall)
                 Text("Amber = position over 30 s old · incomplete coverage",style=MaterialTheme.typography.labelSmall)
                 Text("Data: ${mode.sources.joinToString(" + ") { it.label }}${if(SkySource.ADSB in mode.sources) " (ADSB.lol: ODbL)" else ""}",style=MaterialTheme.typography.labelSmall)
+                }
                 if(aircraft.isEmpty()) Text(if(busy) "Looking for aircraft…" else "No recent aircraft positions in this radius. This does not mean the sky is empty.")
             }
             val chosen=aircraft.firstOrNull { it.key==selected }
