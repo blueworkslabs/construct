@@ -129,10 +129,13 @@ def tap(text):
             break
         if time.monotonic() > deadline: raise RuntimeError('Unstable UI target: '+text)
         previous = current
-    if text == 'Close module':
-        # Do not let the next host-navigation read race the closing menu/tree.
-        # This is the native activity-result completion state, not a delay.
-        find('Module stopped.')
+    if text in ('Close module', 'Mark working'):
+        # Observe the actual activity-result destination, then reveal its status.
+        # Library may retain a scroll position from the selected module card.
+        from host_ui import host_ready, modern, scroll_top
+        host_ready()
+        if modern(): scroll_top()
+        find('Module stopped.' if text == 'Close module' else 'Marked working. You can now install an update.')
     print('Tapped:',text,flush=True)
 
 def capture(name):
