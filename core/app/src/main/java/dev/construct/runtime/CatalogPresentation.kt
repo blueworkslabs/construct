@@ -11,14 +11,18 @@ internal data class CatalogModuleCard(
 internal object CatalogPresentation {
     // Packages.catalog already validates canonical major.minor.patch strings.
     // Compare decimal components without Int/Long overflow (schema permits 50 chars).
-    private val versionOrder = Comparator<CatalogVersion> { left, right ->
-        val a = left.version.split('.')
-        val b = right.version.split('.')
-        (0..2).firstNotNullOfOrNull { i ->
+    internal fun compareVersions(left: String, right: String): Int {
+        val a = left.split('.')
+        val b = right.split('.')
+        return (0..2).firstNotNullOfOrNull { i ->
             val result = a[i].length.compareTo(b[i].length).takeIf { it != 0 }
                 ?: a[i].compareTo(b[i])
             result.takeIf { it != 0 }
         } ?: 0
+    }
+
+    private val versionOrder = Comparator<CatalogVersion> { left, right ->
+        compareVersions(left.version, right.version)
     }
 
     fun cards(validatedCatalog: List<CatalogVersion>): List<CatalogModuleCard> =
