@@ -16,8 +16,9 @@ fun checkRule(ok: Boolean, code: String, message: String) {
 }
 
 data class Capability(val id: String, val reason: String, val optional: Boolean = false) {
-    val explicitOptIn: Boolean get() = id in setOf("device.tone", "contacts.read", "camera.capture", "photo.measure")
+    val explicitOptIn: Boolean get() = id in setOf("device.tone", "contacts.read", "camera.capture", "photo.measure", "sky.watch")
     val label: String get() = when (id) {
+        "sky.watch" -> "Allow Sky Watch map and data"
         "photo.measure" -> "Allow photo measurement"
         "camera.capture" -> "Allow camera workspace"
         "contacts.read" -> "Allow reading contacts"
@@ -36,7 +37,7 @@ object Packages {
     const val MAX_ZIP = 4 * 1024 * 1024
     const val MAX_EXPANDED = 12 * 1024 * 1024
     const val MAX_FILE = 2 * 1024 * 1024
-    val supported = setOf("device.toast", "log.write", "storage.kv", "device.tone", "contacts.read", "camera.capture", "photo.measure")
+    val supported = setOf("device.toast", "log.write", "storage.kv", "device.tone", "contacts.read", "camera.capture", "photo.measure", "sky.watch")
     private val idPattern = Regex("[a-z][a-z0-9]*(\\.[a-z][a-z0-9-]*)+")
     private val versionPattern = Regex("(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)")
     private val filePattern = Regex("[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*(?:/[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)*")
@@ -63,7 +64,7 @@ object Packages {
         checkRule(idPattern.matches(id) && versionPattern.matches(version), "MANIFEST_SCHEMA", "Invalid module identity or version")
         val api = m.getJSONObject("constructApi")
         keys(api, setOf("min", "target"), setOf("min", "target"))
-        checkRule(api.get("min") in setOf("0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0") && api.get("target") == api.get("min"), "API_INCOMPATIBLE", "This module needs a different Construct API")
+        checkRule(api.get("min") in setOf("0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0") && api.get("target") == api.get("min"), "API_INCOMPATIBLE", "This module needs a different Construct API")
         val runtime = m.getJSONObject("runtime")
         keys(runtime, setOf("kind"), setOf("kind"))
         checkRule(runtime.get("kind") == "webview-js", "RUNTIME_UNSUPPORTED", "Only WebView modules are supported")
@@ -79,17 +80,18 @@ object Packages {
             checkRule(capId in supported, "CAPABILITY_DENIED", "Unsupported capability: $capId")
             Capability(capId, string(cap, "reason", 240), cap.optBoolean("optional", false))
         }
-        checkRule(caps.none { it.id == "device.tone" } || api.get("min") in setOf("0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0"), "API_INCOMPATIBLE", "Tone requires Construct API 0.2.0")
-        checkRule(caps.none { it.id == "contacts.read" } || api.get("min") in setOf("0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0"), "API_INCOMPATIBLE", "Contacts require Construct API 0.3.0")
-        checkRule(caps.none { it.id == "camera.capture" } || api.get("min") in setOf("0.4.0", "0.5.0", "0.6.0", "0.7.0"), "API_INCOMPATIBLE", "Camera requires Construct API 0.4.0")
-        checkRule(caps.none { it.id == "photo.measure" } || api.get("min") == "0.7.0", "API_INCOMPATIBLE", "Photo measurement requires Construct API 0.7.0")
+        checkRule(caps.none { it.id == "device.tone" } || api.get("min") in setOf("0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0"), "API_INCOMPATIBLE", "Tone requires Construct API 0.2.0")
+        checkRule(caps.none { it.id == "contacts.read" } || api.get("min") in setOf("0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0"), "API_INCOMPATIBLE", "Contacts require Construct API 0.3.0")
+        checkRule(caps.none { it.id == "camera.capture" } || api.get("min") in setOf("0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0"), "API_INCOMPATIBLE", "Camera requires Construct API 0.4.0")
+        checkRule(caps.none { it.id == "photo.measure" } || api.get("min") in setOf("0.7.0", "0.8.0"), "API_INCOMPATIBLE", "Photo measurement requires Construct API 0.7.0")
+        checkRule(caps.none { it.id == "sky.watch" } || api.get("min") == "0.8.0", "API_INCOMPATIBLE", "Sky Watch requires Construct API 0.8.0")
         checkRule(caps.map { it.id }.distinct().size == caps.size, "MANIFEST_SCHEMA", "Duplicate capabilities")
         for ((field, max) in listOf("description" to 500, "author" to 120, "homepage" to 500)) {
             if (m.has(field)) checkRule(m.get(field) is String && m.getString(field).length <= max, "MANIFEST_SCHEMA", "Invalid $field")
         }
         val themeColor = if (m.has("themeColor")) string(m, "themeColor", 7) else null
         checkRule(themeColor == null || Regex("#[0-9a-fA-F]{6}").matches(themeColor), "MANIFEST_SCHEMA", "themeColor must be #RRGGBB")
-        checkRule(themeColor == null || api.get("min") in setOf("0.6.0", "0.7.0"), "API_INCOMPATIBLE", "Theme colour requires Construct API 0.6.0")
+        checkRule(themeColor == null || api.get("min") in setOf("0.6.0", "0.7.0", "0.8.0"), "API_INCOMPATIBLE", "Theme colour requires Construct API 0.6.0")
         return ModuleManifest(id, string(m, "name", 80), version, entry, caps, api.getString("min"), themeColor)
     }
 

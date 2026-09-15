@@ -20,6 +20,15 @@ class PublisherTest(unittest.TestCase):
         (self.source/'manifest.json').write_text(json.dumps(self.manifest))
         (self.source/'index.html').write_text('<h1>__VERSION__</h1>')
         self.output = self.root/'registry'
+    def test_sky_watch_requires_api08(self):
+        self.manifest['capabilities']=[dict(id='sky.watch',reason='Native foreground aircraft map')]
+        self.manifest['constructApi']=dict(min='0.7.0',target='0.7.0')
+        (self.source/'manifest.json').write_text(json.dumps(self.manifest))
+        with self.assertRaises(ValueError): build(self.source,self.key)
+        self.manifest['constructApi']=dict(min='0.8.0',target='0.8.0')
+        (self.source/'manifest.json').write_text(json.dumps(self.manifest))
+        build(self.source,self.key)
+
     def test_theme_colour_requires_versioned_contract_and_strict_hex(self):
         self.manifest['themeColor'] = '#12AbEF'
         (self.source/'manifest.json').write_text(json.dumps(self.manifest))
