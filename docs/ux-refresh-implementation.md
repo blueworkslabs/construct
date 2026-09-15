@@ -1,7 +1,9 @@
 # UX refresh: reviewed direction and implementation ownership
 
-Design reviewed at PR #11 commit `0135bf0`. This is the integration contract for
-PR #10, not a release announcement. Alpha 20 remains the current installer.
+Historical integration contract for PR #10, based on the PR #11 design review at
+`0135bf0`. Fable's corrected presentation slice has since been integrated. The
+[verification record](ux-refresh/verification.md) is the current source for
+candidate identity, completed checks and remaining phone review.
 
 ## Accepted direction
 
@@ -147,9 +149,9 @@ version is not a prominent Update. Explicit Versions may review older code;
 same version with different bytes says Review replacement. All paths still call
 prepare → signature verification → consent → install, with store-level gates.
 
-Twelve focused Kotlin/JUnit tests pass for the catalog projection and action
-rules. UI integration/build and Android acceptance remain pending. These tests
-are not a claim that the new UI runs yet.
+At contract freeze, twelve focused Kotlin/JUnit tests passed for the catalog
+projection and action rules; integration and Android acceptance were still
+pending. Current results are recorded separately in the verification record.
 
 Fable's handoff: compile the presentational files where tooling permits; exercise
 actual mockup clicks, 360px/2× and landscape states, literal checklist input,
@@ -159,10 +161,11 @@ on Android 16/17 as appropriate, including real permission dialogs, no-network
 Library launch, explicit historical installation, trial/repair/revocation,
 keyboard/menu clearance, and photo/measurement lifecycle regression. Preserve
 the existing documented Android 17 emulator Snake limitation; don't weaken game
-protection to obtain a pass. No new installer or module ZIP is published yet.
+protection to obtain a pass. These were the acceptance requirements before any
+new installer or module ZIP could be promoted.
 
 
-## Integrated candidate (acceptance pending)
+## Integrated UX refresh
 
 The presentation slice is integrated on `feat/ux-refresh`. The host now starts
 from local Library inventory, keeps catalog setup under Settings, and exposes one
@@ -186,6 +189,7 @@ UI scope with eight pinned package hashes; individual capability suites remain
 separate. Module version overrides pair each requested version with its exact
 hash. A UI render or unit-test pass is not Android acceptance.
 
-**Status:** optimized candidate build and Android acceptance are pending. No new
-phone release is claimed here. Android 17's previously documented emulator Snake
-interruption remains unresolved; this UX work does not relax that protection.
+The optimized candidate, actual Android renders and scoped acceptance results
+are recorded in [verification](ux-refresh/verification.md). Android 17's previously
+documented emulator Snake interruption remains unresolved; this UX work does not
+relax that protection.
