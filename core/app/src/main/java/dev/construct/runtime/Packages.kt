@@ -30,8 +30,6 @@ data class Capability(val id: String, val reason: String, val optional: Boolean 
 }
 data class ModuleManifest(val id: String, val name: String, val version: String,
     val entry: String, val capabilities: List<Capability>, val api: String = "0.1.0", val themeColor: String? = null)
-data class CatalogVersion(val id: String, val name: String, val version: String,
-    val artifact: String, val sha256: String, val signature: String, val testFixture: Boolean = false)
 data class VerifiedPackage(val manifest: ModuleManifest, val files: Map<String, ByteArray>, val digest: String)
 
 object Packages {
