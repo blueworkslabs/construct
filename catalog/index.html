@@ -1,35 +1,182 @@
 <!doctype html>
 <html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Construct · Module catalog</title>
+<meta name="description" content="Construct installs small, signed tools on your Android phone. Download the app and browse the tools in this catalog.">
+<meta name="theme-color" content="#0B1410">
+<title>Construct: small, signed tools for your Android phone</title>
 <style>
-  :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101813; color: #e6f0e9; }
-  body { max-width: 42rem; margin: 0 auto; padding: 3rem 1.25rem; line-height: 1.65; }
-  h1 { font-size: clamp(2.5rem, 8vw, 4rem); margin-bottom: .25rem; }
-  h2 { font-size: 1.3rem; margin-top: 2rem; }
-  a { color: #a5e8bc; text-underline-offset: .2em; }
-  a:focus-visible { outline: 3px solid #a5e8bc; outline-offset: 4px; }
-  .label { color: #a5e8bc; letter-spacing: .15em; text-transform: uppercase; font-size: .8rem; }
-  .note { color: #b8cbbf; }
+  /* Tokens are the app's own (docs/ux-refresh/design-tokens.md). Keep them in sync. */
+  :root {
+    color-scheme: dark;
+    --bg: #0B1410;
+    --surface: #122019;
+    --surface2: #18291F;
+    --border: #2E4638;
+    --control-border: #6F8C7C;
+    --text: #E6F0EA;
+    --muted: #9DB3A6;
+    --jade: #5FD3A0;
+    --jade-ink: #06110B;
+    --focus: #8CF0C4;
+    --amber: #E9C46A;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); color: var(--text); font: 400 1.0625rem/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-text-size-adjust: 100%; }
+  body { margin: 0; }
+  main { max-width: 64rem; margin: 0 auto; padding: 0 1.25rem 4rem; }
+  section { margin-top: 4rem; }
+  h1, h2, h3, p { margin: 0; }
+  h2 { font-size: 1.5rem; font-weight: 600; line-height: 1.25; margin-bottom: 1.25rem; }
+  h3 { font-size: 1.0625rem; font-weight: 600; }
+  p { max-width: 38rem; }
+  .muted { color: var(--muted); }
+  code { font: 0.9375em var(--mono); color: var(--muted); }
+  a { color: var(--jade); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .2em; }
+  a:hover { text-decoration-thickness: 2px; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+
+  /* Hero: the same header the app opens with, then the one action most visitors came for. */
+  .hero { padding-top: clamp(3rem, 10vh, 6rem); border-bottom: 1px solid var(--border); padding-bottom: 3rem; }
+  .hero h1 { font-size: clamp(2.75rem, 7vw, 4.5rem); font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+  .hero .lede { font-size: clamp(1.25rem, 2.4vw, 1.5rem); line-height: 1.4; margin-top: 1rem; max-width: 30ch; text-wrap: balance; }
+  .hero .lede + p { margin-top: 1rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; align-items: center; margin-top: 2rem; }
+  .button { display: inline-block; background: var(--jade); color: var(--jade-ink); font-weight: 600; text-decoration: none;
+            padding: .8rem 1.5rem; border-radius: 10px; min-height: 44px; line-height: 1.4; }
+  .button:hover { background: var(--focus); }
+  .actions .muted { font-size: .9375rem; }
+
+  /* Steps: a real sequence, so it is numbered. */
+  .steps { list-style: none; padding: 0; margin: 0; counter-reset: step; display: grid; gap: 1rem; }
+  .steps li { counter-increment: step; display: grid; grid-template-columns: 2.5rem 1fr; gap: .75rem; align-items: baseline; max-width: 40rem; }
+  .steps li::before { content: counter(step); font: 600 1.25rem/2.5rem var(--mono); text-align: center; color: var(--jade);
+                      background: var(--surface2); border-radius: 999px; width: 2.5rem; height: 2.5rem; align-self: start; }
+  .steps p { margin-top: .25rem; }
+  .aside { margin-top: 1.5rem; padding: 1rem 1.25rem; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); max-width: 40rem; }
+
+  /* Tools: the catalog, laid out the way Library shows it. */
+  .tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: .75rem; list-style: none; padding: 0; margin: 0; }
+  .tool { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; display: grid; gap: .5rem; align-content: start; }
+  .tool .meta { display: flex; align-items: center; gap: .625rem; }
+  .tool .version { font: 0.875rem var(--mono); color: var(--muted); }
+  .badge { font-size: .8125rem; line-height: 1; padding: .375rem .625rem; border-radius: 999px; border: 1px solid var(--amber); color: var(--amber); }
+  .tool p { font-size: .9375rem; color: var(--muted); }
+  .tool.new { border-color: var(--control-border); }
+  .tool.new p { color: var(--text); }
+
+  .address { font: 0.9375rem var(--mono); background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+             padding: .875rem 1rem; margin: 1rem 0; word-break: break-all; max-width: 40rem; color: var(--text); }
+
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); font-size: .9375rem; color: var(--muted); }
+  footer p + p { margin-top: .5rem; }
+  @media (max-width: 40rem) {
+    section { margin-top: 3rem; }
+    .hero { padding-bottom: 2.25rem; }
+  }
 </style>
+</head>
+<body>
 <main>
-  <p class="label">Small tools. Your device.</p>
-  <h1>Construct</h1>
-  <p>Install small, signed modules. Choose their access. Use focused tools on your phone.</p>
-  <h2>Get the Android app</h2>
-  <p><a href="https://github.com/blueworkslabs/construct/releases/tag/v0.1.0-alpha23">Download alpha23 from GitHub Releases</a></p>
-  <p class="note">An early-access build for ARM64 Android phones. Release notes include checksums and known limitations.</p>
-  <h2>New: Sky Watch</h2>
-  <p>Explore aircraft around your location or a chosen area. Select ADSB.lol, OpenSky, or Combined, with a 10–100 km radius. Phone location is optional; the chosen area goes to the selected data providers and map views to OpenStreetMap.</p>
-  <p class="note">Install alpha23 first, refresh Browse, and install Sky Watch. Enable its map-and-data access in Module access. Public feeds have gaps and quotas; camera/AR is not included.</p>
-  <h2>Connect the catalog</h2>
-  <p>New to alpha23? The public catalog is already selected. Open Browse and tap Refresh catalog.</p>
-  <p>Upgrading? Install the APK over your existing app to keep your modules and data. Saved catalog choices stay unchanged; to switch, open Settings, tap Use configured registry, then Use catalog.</p>
-  <p>On an older build, copy the full HTTPS address of the <a href="index.json">catalog index</a> into Settings, save it, and refresh Browse. No reinstall is needed just to change the catalog.</p>
-  <h2>Available modules</h2>
-  <p>Hello Module · Pocket Checklist · Pocket Tones · Pocket Focus · Pocket Snake · Pocket Contacts · Pocket Camera · Pocket Measure · Sky Watch</p>
-  <p class="note">Downloads contain module code, not your personal data. Many tools work offline; Sky Watch needs internet for live aircraft and uncached maps. Capabilities depend on your app version and the access you grant.</p>
-  <p><a href="https://github.com/blueworkslabs/construct">Source and documentation</a></p>
+  <header class="hero">
+    <h1>Construct</h1>
+    <p class="lede">Small, signed tools for your Android phone.</p>
+    <p class="muted">Install only what you need. Decide what each tool may access. Keep it all on the device.</p>
+    <div class="actions">
+      <a class="button" href="https://github.com/blueworkslabs/construct/releases/tag/v0.1.0-alpha23">Download alpha23 for Android</a>
+      <span class="muted">Early-access build for ARM64 phones. Release notes list checksums and known limits.</span>
+    </div>
+  </header>
+
+  <section aria-labelledby="start">
+    <h2 id="start">Get started</h2>
+    <ol class="steps">
+      <li>
+        <div>
+          <h3>Install the app</h3>
+          <p>Get the APK from GitHub Releases. Already using Construct? Install the new build over it; your tools and their data stay in place.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3>Refresh the catalog</h3>
+          <p>Open Browse and tap Refresh catalog. A fresh install already points at this catalog, so there is nothing to type.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3>Install a tool</h3>
+          <p>Pick one, read what it asks for, and tap Install. You can grant or refuse each kind of access later in Module access.</p>
+        </div>
+      </li>
+    </ol>
+    <p class="aside muted">Chose a different catalog earlier? Open Settings, tap Use configured registry, then Use catalog to switch to this one.</p>
+  </section>
+
+  <section aria-labelledby="tools-heading">
+    <h2 id="tools-heading">Tools in this catalog</h2>
+    <ul class="tools">
+      <li class="tool new">
+        <h3>Sky Watch</h3>
+        <div class="meta"><span class="badge">New</span><span class="version">0.1.0</span></div>
+        <p>Aircraft around you, or around any place you choose, on a north-up map. Pick ADSB.lol, OpenSky or both, and a radius from 10 to 100 km. Needs internet and the map and data access.</p>
+      </li>
+      <li class="tool">
+        <h3>Pocket Checklist</h3>
+        <div class="meta"><span class="version">0.3.0</span></div>
+        <p>An offline checklist for up to 30 items. Nothing leaves your phone.</p>
+      </li>
+      <li class="tool">
+        <h3>Pocket Focus</h3>
+        <div class="meta"><span class="version">0.1.3</span></div>
+        <p>A focus countdown that remembers where you left it, with an optional tone at the end.</p>
+      </li>
+      <li class="tool">
+        <h3>Pocket Contacts</h3>
+        <div class="meta"><span class="version">0.2.2</span></div>
+        <p>Browse and search your contacts, read only. No editing, no calling, no network.</p>
+      </li>
+      <li class="tool">
+        <h3>Pocket Camera</h3>
+        <div class="meta"><span class="version">0.1.4</span></div>
+        <p>The native camera with a private album. Gallery copies and on-device photo analysis happen only when you ask.</p>
+      </li>
+      <li class="tool">
+        <h3>Pocket Measure</h3>
+        <div class="meta"><span class="version">0.1.3</span></div>
+        <p>Estimate a tabletop length from a photo, a printed marker and two taps.</p>
+      </li>
+      <li class="tool">
+        <h3>Pocket Tones</h3>
+        <div class="meta"><span class="version">0.3.0</span></div>
+        <p>Short, quiet beeps on a button press. Off until you turn it on.</p>
+      </li>
+      <li class="tool">
+        <h3>Pocket Snake</h3>
+        <div class="meta"><span class="version">0.1.7</span></div>
+        <p>Swipe or tap to play, with your best score saved. Reopening always pauses.</p>
+      </li>
+      <li class="tool">
+        <h3>Hello Module</h3>
+        <div class="meta"><span class="version">0.3.0</span></div>
+        <p>The smallest possible tool. It exists to prove that install, update and roll back work.</p>
+      </li>
+    </ul>
+    <p class="muted" style="margin-top:1.25rem">Downloads contain tool code, never your data. Most tools work offline; Sky Watch needs internet for live aircraft and uncached maps. What a tool can do depends on your app version and the access you grant.</p>
+  </section>
+
+  <section aria-labelledby="address-heading">
+    <h2 id="address-heading">Catalog address</h2>
+    <p>This site is the catalog. The app reads one index file here, and every signed package next to it stays unchanged once published. If you run an older build or a self-built host, point Settings at this address and refresh Browse. No reinstall needed.</p>
+    <p class="address"><a href="index.json">https://construct-20x.pages.dev/index.json</a></p>
+  </section>
+
+  <footer>
+    <p><a href="https://github.com/blueworkslabs/construct">Source and documentation on GitHub</a></p>
+    <p>The <a href="publisher-public.der">publisher key</a> is published for checking signatures yourself. The app trusts only the key built into it.</p>
+  </footer>
 </main>
+</body>
 </html>
