@@ -33,6 +33,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -119,9 +121,12 @@ private object SkyInk {
             aircraft.forEach { a -> if(a.key!=selected) marker(a,screen(a.point),now,false) }
             chosen?.let { a ->
                 val p=screen(a.point); marker(a,p,now,true)
-                val text=measurer.measure(a.label,labelStyle)
-                val pad=6.dp.toPx(); val w=text.size.width+pad*2; val h=text.size.height+pad
-                val x=(p.x-w/2).coerceIn(4.dp.toPx(),(size.width-w-4.dp.toPx()).coerceAtLeast(0f))
+                // Ellipsize to the viewport and keep clamp bounds ordered, so a narrow map never throws.
+                val margin=4.dp.toPx(); val pad=6.dp.toPx()
+                val maxLabel=(size.width-2*margin-2*pad).toInt().coerceAtLeast(1)
+                val text=measurer.measure(a.label,labelStyle,overflow=TextOverflow.Ellipsis,maxLines=1,constraints=Constraints(maxWidth=maxLabel))
+                val w=text.size.width+pad*2; val h=text.size.height+pad
+                val x=(p.x-w/2).coerceIn(margin,max(margin,size.width-w-margin))
                 val y=if(p.y-24.dp.toPx()-h<0) p.y+22.dp.toPx() else p.y-24.dp.toPx()-h
                 drawRoundRect(ConstructColors.surface.copy(alpha=0.94f),Offset(x,y),Size(w,h),CornerRadius(h/2))
                 drawRoundRect(SkyInk.selection,Offset(x,y),Size(w,h),CornerRadius(h/2),style=Stroke(1.dp.toPx()))
