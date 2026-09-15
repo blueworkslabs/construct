@@ -107,10 +107,20 @@ def host_ready():
     raise RuntimeError('Host Library/legacy inventory did not become ready')
 
 
+def scroll_content(direction):
+    current=nodes()
+    if not current: raise RuntimeError('No native host viewport')
+    rect=list(map(int,re.findall(r'\d+',current[0].get('bounds',''))))
+    if len(rect)!=4 or rect[2]<=rect[0] or rect[3]<=rect[1]: raise RuntimeError('Invalid host viewport')
+    x1,y1,x2,y2=rect
+    x=(x1+x2)//2; top=y1+(y2-y1)*3//10; bottom=y1+(y2-y1)*4//5
+    start,end=(top,bottom) if direction=='up' else (bottom,top)
+    adb('shell','input','swipe',str(x),str(start),str(x),str(end),'250')
+
+
 def scroll_top():
-    # Scroll the content, not the status bar or bottom navigation.
-    for _ in range(6):
-        adb('shell','input','swipe','360','460','360','990','250')
+    # Use the current window, including landscape, without crossing system edges.
+    for _ in range(6): scroll_content('up')
     time.sleep(.25)
 
 
@@ -151,7 +161,7 @@ def _stable_card(heading, choices, any_version=False):
                     tap_node(current); return
                 previous = current
         if attempt == 20: break
-        adb('shell','input','swipe','360','990','360','460','350')
+        scroll_content('down')
         time.sleep(.35)
     raise RuntimeError('No stable enabled action inside exact Library card: ' + heading)
 

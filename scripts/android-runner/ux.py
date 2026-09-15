@@ -7,7 +7,7 @@ import time
 from config import CONFIG, require_runner
 import ui
 from ui import adb, nodes, labels, find, tap, capture, RESULTS
-from host_ui import restart, diagnostics, select_after, installed_status, catalog_settings, apply_catalog, library
+from host_ui import restart, diagnostics, select_after, installed_status, catalog_settings, apply_catalog, library, scroll_content
 from text_entry import replace_text
 
 require_runner()
@@ -53,7 +53,7 @@ try:
             desc=n.get('content-desc','')
             match=re.fullmatch(r'(.+), version (\d+\.\d+\.\d+)',desc)
             if match: seen.setdefault(match[1],set()).add(match[2])
-        adb('shell','input','swipe','360','990','360','460','250')
+        scroll_content('down')
     for e in candidates:
         if seen.get(e['name']) != {e['version']}: raise RuntimeError('Browse does not show exactly the latest candidate: '+e['name']+' '+repr(seen))
     library(); tap('Browse'); capture('ux-browse-latest')
