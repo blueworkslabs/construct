@@ -153,9 +153,9 @@ try:
         try:
             tap('Close camera');adb('shell','settings','put','system','font_scale','2.0')
             opened();workspace();tap('Saved photos');find('Saved photo preview')
-            tap('Save to phone gallery');find('Save a gallery copy?');tap('Keep private');capture('camera-font2-portrait')
+            tap('Save to phone gallery');find('Save a gallery copy?');capture('camera-font2-gallery-confirmation');tap('Keep private');capture('camera-font2-portrait')
             tap('Close camera');rotate(1);opened();workspace();tap('Saved photos');find('Saved photo preview')
-            tap('Delete photo');find('Delete this photo?');tap('Keep photo');capture('camera-font2-landscape')
+            tap('Delete photo');find('Delete this photo?');capture('camera-font2-delete-confirmation');tap('Keep photo');capture('camera-font2-landscape')
             tap('Close camera')
         finally:
             if original_font=='null':adb('shell','settings','delete','system','font_scale')
