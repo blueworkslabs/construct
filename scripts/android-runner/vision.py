@@ -28,7 +28,8 @@ def expect(prefix):
     deadline = time.monotonic() + 60
     while time.monotonic() < deadline:
         current = labels()
-        if any(t.startswith('[PHOTO_ANALYSIS') for t in current): raise RuntimeError('Native detector failed: ' + str(current))
+        if any(t.startswith(('[PHOTO_ANALYSIS', '[CAMERA_UNAVAILABLE]')) for t in current):
+            raise RuntimeError('Native camera/analysis failed: ' + str(current))
         match = next((t for t in current if t.startswith(prefix)), None)
         if match: return match
         time.sleep(.25)
@@ -55,7 +56,7 @@ try:
     if not (CONFIG.root/'camera-emulated.flag').exists(): raise RuntimeError('Vision requires explicit synthetic-camera AVD')
     pid = subprocess.check_output(['systemctl', '--user', 'show', CONFIG.service, '-p', 'MainPID', '--value'], text=True).strip()
     command = Path('/proc/'+pid+'/cmdline').read_bytes().decode().split('\0')
-    for option, value in [('-avd', 'construct-camera36'), ('-camera-back', 'emulated'), ('-camera-front', 'none')]:
+    for option, value in [('-avd', CONFIG.profile(True)[0]), ('-camera-back', 'emulated'), ('-camera-front', CONFIG.front_camera(True))]:
         if option not in command or command[command.index(option)+1] != value: raise RuntimeError('Camera source is not synthetic')
     fixtures = CONFIG.root/'vision-fixtures'
     locked = json.loads((fixtures/'vision-assets.json').read_text())

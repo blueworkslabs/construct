@@ -18,6 +18,10 @@ current_entry=None
 stage_index=0
 WORKSPACE='Measurement photo viewport'
 PHOTO='Measurement photo: tap to place an endpoint, drag a handle to adjust'
+PICKER_PACKAGES = {
+    'com.android.providers.media', 'com.android.providers.media.module',
+    'com.google.android.providers.media.module',
+    'com.android.photopicker', 'com.google.android.photopicker'}
 original_font_scale=adb('shell','settings','get','system','font_scale').strip()
 def done(text):result['checks'].append(text);print('PASS:',text,flush=True)
 def top():
@@ -63,6 +67,7 @@ def stage(name):
 def pick():
     action('Choose photo')
     until=time.monotonic()+30
+    previous_bounds=None
     while time.monotonic()<until:
         ns=nodes()
         # Stock Android photo picker: the clean snapshot receives exactly one generated media item.
@@ -70,7 +75,23 @@ def pick():
         if not candidates:
             candidates=[n for n in ns if n.get('content-desc','').startswith('Photo taken')]
         if len(candidates)==1:
-            tap_node(candidates[0]);return
+            bounds=candidates[0].get('bounds')
+            if bounds!=previous_bounds:
+                previous_bounds=bounds;time.sleep(.4);continue
+            tap_node(candidates[0])
+            # Older pickers return immediately; Android 17 confirms one selection.
+            selected_until=time.monotonic()+30
+            while time.monotonic()<selected_until:
+                selected=nodes()
+                picker_nodes=[n for n in selected if n.get('package') in PICKER_PACKAGES]
+                if not picker_nodes and any(n.get('package')=='dev.construct.runtime' for n in selected):return
+                confirmations=[n for n in picker_nodes if n.get('text')=='Done' and n.get('enabled')!='false']
+                if len(confirmations)==1:
+                    chosen=[n for n in picker_nodes if n.get('content-desc','').startswith('Selected Photo taken')]
+                    if len(chosen)!=1:raise RuntimeError('Picker confirmation lacks one selected synthetic photo')
+                    tap('Done');return
+                time.sleep(.3)
+            raise RuntimeError('Native picker did not return or offer single-photo confirmation')
         if len(candidates)>1:raise RuntimeError('Ambiguous picker content; refusing to guess which image')
         time.sleep(.4)
     capture('measure-picker-missing');raise RuntimeError('Synthetic photo missing in picker: '+str(labels()))
@@ -148,7 +169,12 @@ try:
     tap('Module access');find('Allow photo measurement');grant=next(n for n in nodes() if n.get('content-desc')=='Allow photo measurement' and n.get('checkable')=='true')
     if grant.get('checked')!='false':raise RuntimeError('Measurement grant was not off')
     tap_node(grant);find('Allow photo measurement: on.');tap('Reopen module');tap('Open measurement workspace');control('Choose photo')
-    action('Choose photo');adb('shell','input','keyevent','4');expect('No photo selected.')
+    action('Choose photo')
+    picker = find('Photos')
+    if picker.get('package', '') not in PICKER_PACKAGES:
+        raise RuntimeError('Cancellation target is not the native media picker')
+    # Wait for the actual picker UI, not a fixed launch-animation delay.
+    adb('shell','input','keyevent','4');expect('No photo selected.')
     done('System picker cancellation reads no photo and returns to workspace')
     entry=stage('measure-flat.png')
     adb('shell','cmd','connectivity','airplane-mode','enable');adb('shell','svc','wifi','disable');adb('shell','svc','data','disable')

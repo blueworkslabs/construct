@@ -7,6 +7,7 @@ import socket
 import time
 from ui import adb, nodes, labels, tap, tap_node, find, capture, RESULTS
 from host_ui import restart, diagnostics, select_after, installed_status
+from focus_clock import clock_value
 require_runner()
 expected = os.environ['CONSTRUCT_FOCUS_SHA256']
 result = {'complete':False, 'checks':[], 'moduleSha256':expected}
@@ -14,6 +15,15 @@ heading = 'Pocket Focus · 0.1.2'
 
 def done(name):
     result['checks'].append(name); print('PASS:',name,flush=True)
+
+def wait_clock(expected):
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        try:
+            if clock_value(nodes()) == expected: return
+        except RuntimeError: pass
+        time.sleep(.25)
+    raise RuntimeError('Expected exact Focus clock: ' + expected)
 
 def top():
     for _ in range(8):
@@ -65,16 +75,14 @@ try:
     es=events()
     installs=[e for e in es if e.get('code')=='INSTALLED_TRIAL']
     if len(installs)!=1 or installs[0].get('packageDigest') != expected: raise RuntimeError('Wrong focus package')
-    opened(); find('Time remaining: 25:00'); tap('10-second check'); find('Duration saved.')
+    opened(); wait_clock('25:00'); tap('10-second check'); find('Duration saved.')
     tap('Start timer'); find('Finished quietly — tone access is off.',timeout=25); find('Session finished')
     capture('focus-quiet'); tap('Close module')
     if native_counts() != (0,0): raise RuntimeError('Default denial produced native sound')
     done('Exact HTTPS candidate completes silently without optional tone access')
-    opened(); tap('Reset timer'); find('Timer reset.'); tap('5-minute break'); find('Time remaining: 05:00')
+    opened(); tap('Reset timer'); find('Timer reset.'); tap('5-minute break'); wait_clock('05:00')
     tap('Start timer'); time.sleep(1); tap('Pause timer'); find('Timer paused')
-    clocks=[s for s in labels() if s.startswith('Time remaining: ')]
-    if len(clocks)!=1: raise RuntimeError('Missing unique paused clock')
-    saved_clock=clocks[0]; tap('Close module'); restart(); opened(); find('Timer paused'); find(saved_clock)
+    saved_clock=clock_value(nodes()); tap('Close module'); restart(); opened(); find('Timer paused'); wait_clock(saved_clock)
     tap('Resume timer'); find('Focus in progress'); tap('Pause timer'); find('Timer paused')
     capture('focus-paused'); tap('Close module')
     done('Pause survives process restart; resume works from saved remainder')
@@ -104,7 +112,7 @@ try:
     finally:
         adb('shell','svc','wifi','enable'); adb('shell','svc','data','enable')
     done('Expired deadline catches up offline after background without a late alarm')
-    opened(); tap('Reset timer'); find('Timer reset.'); tap('25-minute focus'); find('Time remaining: 25:00')
+    opened(); tap('Reset timer'); find('Timer reset.'); tap('25-minute focus'); wait_clock('25:00')
     tap('Start timer'); find('Focus in progress')
     access('Allow saving data on this phone',False,required=True)
     find('Saved timer unavailable'); capture('focus-storage-denied')

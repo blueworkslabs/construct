@@ -1,0 +1,420 @@
+# Android 17 readiness
+
+This checkpoint distinguishes **running existing APKs on Android 17** from
+**targeting API 37**. Construct alpha 20 and Nano Lab alpha 1 currently target
+API 35. An OS update does not require rebuilding them or silently opting users
+into new permissions. Android 17 does not establish Gemini Nano eligibility.
+
+## Review checkpoint — 2026-09-15
+
+**Alpha 20 is a scoped Android-17 compatibility pilot, not a complete platform
+certification.** It fixes the confirmed CameraX profile-8192 failure without
+changing target SDK, permissions, models, signing identity or module versions.
+
+- **Passed on Android 17 / 4 KiB / pinned test WebView:** optimized vision 7,
+  camera/gallery 12, measurement 28, Checklist 5, probes 5 BLOCKED / 6 CONTAINED /
+  0 FAIL, renderer recovery, tones 7, consent 5, Focus 6 and synthetic Contacts 9.
+  These are documented separate runs, not one uninterrupted suite. Focus's child
+  passed before the combined run later failed in Snake.
+- **Passed separately:** unchanged Nano Lab's 7 unavailable-device/privacy/
+  lifecycle checks on Android 17 / 16 KiB. No AICore or Nano inference available.
+- **Still unverified:** full Snake gameplay on the API-37 emulator (interruption
+  pause reproduced twice), physical ARM64/Pixel behavior, matched fixed-provider
+  Construct execution on 16 KiB, and enforced platform memory limits. The image's
+  limiter is disabled by default; it was not overridden for testing.
+- **Environment:** separate on-demand Android-17 profiles; Android-16 binaries
+  and snapshots preserved. A settled app-free snapshot avoids repeating initial
+  setup under severe CPU pressure. The development WebView is emulator-only.
+- **Build:** 121 JVM tests and lint pass; both optimized ABI artifacts verified;
+  50 runner tests pass normally and with Python `-O`. Candidate-source CI is green;
+  later driver/documentation CI must be checked on the PR before merging.
+- **Pixel handoff:** install alpha 20 over the existing host; spot-check capture,
+  saved-photo analysis and measurement, then play Snake to distinguish physical
+  behavior from the runner limitation. No module update or new permission needed.
+  Recheck Nano Lab after system/AICore updates, without assuming new eligibility.
+
+The history below intentionally retains failed experiments and their limits.
+
+## Platform audit
+
+Reviewed Google's [all-app changes](https://developer.android.com/about/versions/17/behavior-changes-all)
+and [target-37 changes](https://developer.android.com/about/versions/17/behavior-changes-17)
+on 2026-09-14.
+
+- **Memory limits (all apps):** prioritize real native photo measurement and
+  offline face/object execution. Measure bounds encoded input to 20 MiB and
+  decodes to at most 1600 pixels per side; camera analysis previews to 1024.
+  These bounds are not proof of acceptable peak process memory. Record actual
+  platform/page size, memory-limiter status and process exits; do not disable
+  the limiter to obtain a pass.
+- **Background audio hardening (all apps):** Construct's fixed tones are
+  foreground-only and released when leaving. Verify grant/revoke, quiet modes
+  and background cleanup; emulator submission does not prove physical audibility.
+- **IME restoration (all apps):** Android no longer restores previous keyboard
+  visibility after an unhandled configuration change. Construct's module and
+  measurement activities handle rotation; Nano Lab deliberately clears a
+  recreated session. Check interactions, not an assumption that the IME remains.
+- **Networking:** current host uses HTTPS and network security configuration.
+  The API-37 `ACCESS_LOCAL_NETWORK` runtime permission must be designed into a
+  future target-SDK migration before LAN registry refresh or discovery relies
+  on it. Do not pre-emptively add a permission to the current pilot. Certificate
+  transparency/ECH changes also need testing with the intended trust profile.
+- **Native loading:** bundled libraries use normal APK loading, not writable
+  downloaded native code. Exercise both OpenCV and MediaPipe on the selected image; report 4 KiB and
+  16 KiB execution separately, without inferring one from ELF alignment.
+- **Contacts:** explicit READ_CONTACTS and module grants precede bounded reads;
+  the projection does not request account-name/type columns restricted in API 37.
+  Verify synthetic browse/search/details/revocation rather than real contacts.
+- **Screen content:** native camera/measurement/Nano Lab use FLAG_SECURE already;
+  they do not rely on the newly deprecated content-capture-disable method.
+- No SMS, widget, Bluetooth, pointer-capture or cross-profile loopback feature
+  is implemented in these apps. These are not new acceptance claims.
+
+## Isolated runner profile
+
+`setup_runner.py` accepts `--api-level 37`, a unique
+`--service construct-emulator-api37.service`, and optional `--single-avd`.
+The default API-36 names and separate normal/camera snapshots are unchanged.
+The new root and AVD home must be separate from existing baselines. A shared
+SDK installation can hold both images without updating the emulator binary.
+
+A single-AVD profile uses `construct-api37` and app-free `clean` for every scope,
+with an **emulated** rear camera even in baseline runs, so snapshot hardware
+stays identical. No physical webcam or phone is attached. Use only one emulator
+on the fixed local port at a time; never enable boot autostart. Start refuses an
+occupied emulator serial, and acceptance checks the actual SDK level before
+installing a candidate. Receipts record kernel page size and memory-limiter state.
+
+Provision image `system-images;android-37.0;google_apis_ps16k;x86_64` and follow
+[runner bootstrap](android-runner.md), substituting the configured AVD name and
+using `-camera-back emulated`. The reference guest uses a 3 GiB sparse data partition (6 GiB could not be
+created within the original disk budget). A 3 GiB RAM snapshot also consumed the
+emulator's required free-space reserve, even after verified off-runner archival
+of historical staging APK copies. A dedicated virtual data volume (initially 16 GiB, now 24 GiB for both
+page-size profiles) was therefore added for the **new** AVD; its files are checksum-verified during the
+move and its absolute paths retained. Existing boot disks, Android-16 snapshots,
+current APK/provider files and recovery backups are not modified. Provision both
+actual image/snapshot capacity **and** the emulator's startup free-space reserve;
+apparent sparse partition size is not sufficient capacity planning.
+Save only after Android setup and automation are
+ready, both apps are absent, and reboot/restore can be independently verified.
+
+## Execution status
+
+An initial API-37/16-KiB snapshot booted but was **rejected**, not accepted:
+SurfaceFlinger aborted in GoldfishMapper::readFromHost with
+`!rcEnc->featureInfo()->hasReadColorBufferDma`; system-server/package-service
+failure prevented Nano Lab installation. The failure also appeared during first
+boot, before either candidate app was installed. Disabling `GLDMA`/`GLDMA2` did **not** fix it, and that experimental option was
+removed. Android's `LOG_ALWAYS_FATAL_IF` condition actually signals *missing*
+required DMA support. The host advertises read-color-buffer DMA only when both
+`GLDirectMem` and `HasSharedSlotsHostMemoryAllocator` are enabled; its default
+GLDirectMem is off. The replacement baseline uses explicit
+`--enable-direct-memory` (both features on), without updating the shared emulator
+binary or changing the API-36 profile.
+
+Source: [guest mapper](https://android.googlesource.com/device/generic/goldfish/+/refs/heads/main/hals/gralloc/mapper.cpp)
+and [host RenderControl](https://android.googlesource.com/platform/hardware/google/gfxstream/+/refs/heads/main/host/RenderControl.cpp).
+The direct-memory experiment passed one 45-second system-server check with an
+empty crash buffer, but UI automation timed out and the next cold boot restarted
+system-server. It is **not** a stable baseline or a successful UI-driver comparison.
+Emulator 37.2.9 runs in a separate SDK root; the shared API-36
+emulator remains pinned at 37.1.11. With the new binary and fresh 2 GiB guest,
+Android's low-memory killer removed setup/settings/permission-controller processes.
+The 3 GiB profile (`--memory-mb 3072`) then passed fresh boot, a stable
+system-server interval, UI-driver initialization and app-free snapshot save with
+empty startup and pre-snapshot crash buffers. The 5 GiB process cap and 6 GiB VM
+remain unchanged. Snapshot restoration and all seven Nano Lab checks subsequently passed. These
+combined environment changes are not an app fix or isolated proof of one cause. Stock Google WebView is 145.0.7632.218. The image reports its memory limiter
+**disabled by default**; no override was applied, so this is not evidence of
+enforced app-memory-limit behavior.
+
+## Accepted compatibility evidence
+
+Nano Lab alpha 1 passed all seven checks on the restored API-37 snapshot:
+fresh launch without automatic work, real SDK `UNAVAILABLE`, disabled download
+and inference, genuine clipboard report privacy, background cleanup without
+process restart, rotation reset, and explicit Clear/Close. The run completed with
+an empty crash buffer and stopped emulator. This image has no AICore: **neither
+Nano generation nor Pixel eligibility is established**.
+
+The Android 17 floating text-selection toolbar did not expose Paste during the
+first UI run. The accepted run uses the optional native Paste key into a focused
+EditText, reads the actual clipboard report and retains the original privacy
+assertions. It does not substitute generated report text or claim that the
+floating toolbar issue was fixed. Only the test driver changed; the APK did not.
+
+- Nano APK SHA-256: `76230bd83a71db4674d5bf1457af7951b90d67a17b2525cd10d14168af4f7a67`
+- Platform: Android 17 / API 37, x86-64, 16384-byte pages.
+- System image: Google APIs 16 KiB revision 6, build `CE2A.260420.019`.
+- Emulator: 37.2.9; stock WebView 145.0.7632.218.
+
+Construct alpha 19 passed its complete host baseline on **API 37 / 4 KiB** with
+Chromium snapshot 1697462 / WebView **155.0.8059.0**: Checklist 5/5, bounded probes
+5 BLOCKED / 6 CONTAINED / 0 FAIL, injected renderer-loss recovery, tones 7/7 and
+consent 5/5. The original background-stop assertions passed. No Construct native
+crash appears in this receipt; its separate Bluetooth hardware-error crash is
+retained, not described as an empty platform crash buffer. Native photo and other
+module scopes remain in progress.
+
+- Construct x86-64 APK SHA-256: `739289ca1f9aa0f7b82e6ede687c6f5cb76275fd51b25968400b21d5516ca303`
+- Host receipt: `20260914T223302Z-d490fcb1`, complete and emulator stopped.
+- These alpha 19/Nano receipts use unchanged APKs; alpha 20 is the separate CameraX fix below.
+- Physical ARM64 behavior and enforced memory-limit behavior remain outside this
+  emulator evidence. Both images report the limiter disabled by default; no
+  override was applied.
+- Android 17's installed-package dump reports an automatically granted
+  `ACCESS_LOCAL_NETWORK` compatibility permission (`REVOKE_WHEN_REQUESTED`) for
+  the target-35 host. This was not added to the APK and is not a tested target-37
+  runtime-consent flow.
+
+## Construct runtime investigation
+
+The initial stock-WebView run passed all five checklist checkpoints, probes at
+5 BLOCKED / 6 CONTAINED / 0 FAIL, renderer-loss recovery and the first six tone
+checks. Its final background check failed after a fixed 600 ms Home/return
+interval; that receipt remains failed. A second run observes a real launcher
+transition before returning and retains the cleanup assertions. The module
+activity finished, but **the host process then crashed**: SIGILL in WebView
+145's `libwebviewchromium.so`, called from `onTrimMemory`. This is not a passing
+background check or merely a missing accessibility node.
+
+A controlled comparison uses the existing explicitly pinned Chromium provider
+via `--webview-apk` / `--webview-sha256` on a fresh disposable snapshot. It changes
+no Construct bytes and no phone provider. WebView 155.0.8058.0 reproduced a
+SIGILL in the same `onTrimMemory` path, so this is not isolated to provider 145. An earlier
+stock run also recorded an unrelated emulator Bluetooth hardware-error crash;
+it is retained separately rather than described as an app failure or an empty
+platform crash log.
+
+The 16 KiB vision run also stopped **before inference** with
+`CAMERA_UNAVAILABLE`. CameraX reported an expected front camera absent while the
+emulator exposed one rear camera. No detector success is inferred from this.
+The first vision attempt stopped even earlier because its guard still named
+the API-36 AVD; the guard now checks `CONFIG.profile(True)` while retaining the
+exact synthetic-camera constraints.
+
+An official API-37 Google APIs **4 KiB** x86-64 revision-6 image is being compared
+in a separate runner root/AVD home on the same dedicated data volume. Its first
+boot, stable system-server interval, UI initialization and app-free snapshot
+save passed. A focused native-host + real Checklist WebView launch, Home and
+10-second background interval then passed on stock WebView 145: unchanged host
+PID, empty crash buffer, verified stop. Full acceptance remains in progress;
+this is not yet a matched reproduction of the complete failing tone sequence. Only one emulator runs at a
+time, and neither Android-16 snapshot is replaced. A native-host-only launch
+and Home test survived on the 16 KiB image; the focused comparison must load a
+real WebView module before backgrounding to exercise the relevant path.
+
+The first full 4 KiB run passed Checklist but stopped in probe setup with
+`REGISTRY_URL`: ADB simulated typing had produced invalid catalog input.
+Probe setup now uses the existing exact-value `replace_text` helper and requires
+`Catalog refreshed.` before selecting the exact fixture. The clean rerun reached
+probe execution successfully; no app URL validation was relaxed.
+
+## Upstream memory-footprint fix under test
+
+Inspection of the pinned provider's crashing instruction found an intentional
+`ud2` arithmetic trap, including a checked resident-minus-shared page calculation,
+not an unsupported SIMD instruction. Chromium landed a matching defensive fix
+on 2026-09-14: [return nullopt for inconsistent private-memory readings](https://chromium.googlesource.com/chromium/src/+/7cde02997c20dbf455d80ca98b536092c577bded),
+commit position **1697321**. This is a strong lead; a successful matched runtime
+comparison is still required before attributing the observed failure to it.
+
+The official AndroidDesktop_x64 snapshot **1697462** contains that guard in its
+recorded source revision `e35794544a1e03e7d1f89b8ad1ac8970923c6f2b` (verified from
+`REVISIONS` and the source at that revision). Its exact test-provider APK is:
+
+- [Official archive](https://storage.googleapis.com/chromium-browser-snapshots/AndroidDesktop_x64/1697462/chrome-android-desktop.zip)
+- Member: `chrome-android-desktop/apks/SystemWebView.apk`
+- APK bytes: 412051160
+- APK SHA-256: `e4ded2f4d0f22dce452fd0d9f485a9b78926a9e2c3d4ffe64f4a385346d20497`
+
+This is a **development test provider for the disposable emulator**, not a phone
+WebView recommendation or a component embedded in Construct.
+
+The runner also supports `--emulate-front-camera`: only the literal generated
+front-camera mode is allowed; legacy profiles still use front `none`. Android 17
+CameraX reported missing advertised front hardware with the rear-only profile,
+so the replacement snapshot supplies **both generated cameras**. Guards verify
+the configured AVD and actual front/rear arguments; physical webcams remain
+excluded. A native Close-module completion assertion now prevents host navigation
+from racing the closing menu's old accessibility tree.
+
+Keeping both page-size comparisons exhausted the initial 16 GiB data volume's
+startup reserve. That new volume alone was expanded to **24 GiB**, restoring
+about 9 GiB headroom; no existing boot disk, Android-16 snapshot or recovery data
+was replaced. Startup now fails promptly when the emulator service fails.
+
+The both-camera 4 KiB vision attempt (`20260914T224714Z-7672048b`) still returned
+`CAMERA_UNAVAILABLE` before preview/capture or inference. CameraX successfully
+listed both cameras and reached lens validation, unlike the earlier missing-front
+failure. This run is failed, not a native-inference pass. Further diagnosis uses
+an explicitly separate debug build to reveal the caught binding exception; it
+cannot substitute for acceptance of the unchanged optimized APK.
+
+The first measurement attempt also stopped before native work: the bounded
+catalog navigator exposed the final measurement heading but not its install
+button. Its scroll distance now covers more of the content viewport per step;
+the 20-scroll limit, exact module/version boundary and stable enabled-action
+requirements are unchanged. Camera/vision waiting also fails immediately on an
+explicit native camera error rather than waiting for a result that cannot arrive.
+
+## Confirmed CameraX compatibility fix (alpha 20 candidate)
+
+The diagnostic build exposed the exact exception:
+`NullPointerException: Dynamic range profile cannot be converted to a DynamicRange object: 8192`
+in CameraX 1.4.2's `DynamicRangesCompatApi33Impl`, during `bindToLifecycle`.
+Google documents this [Android 17 dynamic-range compatibility issue](https://developer.android.com/jetpack/androidx/releases/camera#1.5.2)
+and recommends CameraX 1.5.2 or newer. The selected stable **1.5.3** source was
+checked: unknown profiles are logged/skipped rather than dereferenced. Its AAR
+requires compile SDK 35 and AGP 8.6, within the existing toolchain.
+
+Alpha 20 updates all three CameraX dependencies together to 1.5.3. No camera UI,
+permission, image-storage, model or target-SDK change is intended. The diagnostic
+logging patch is not in the candidate. Optimized exact-build acceptance remains
+required; a source-level match alone is not a camera pass.
+
+The measurement cancellation driver now waits for `Photos` in the actual native
+media-picker package before Back. A fixed post-tap delay had sent Back before the
+new picker appeared; the original cancellation-result assertion remains.
+
+Android 17 uses the separately packaged system photo picker
+`com.google.android.photopicker/com.android.photopicker.MainActivity`. The driver
+recognizes its observed package as well as legacy media-provider pickers. After
+selecting the single synthetic thumbnail, it either observes an immediate return
+(legacy behavior) or requires one selected photo before tapping native `Done`.
+It still requires real decoded/calibrated results afterward; selection alone is
+not a pass.
+
+A separate focused test catalog keeps only the exact probe, camera, measurement,
+Focus, Snake and Contacts versions under test. It copies the original signed entries and verifies unchanged
+ZIP hashes; historical catalogs and the user's home catalog remain untouched.
+This avoids repeatedly traversing unrelated historical fixture versions during
+native acceptance. Full-catalog navigation remains represented by earlier host
+and failed-driver receipts.
+
+## Alpha 20 candidate execution
+
+The optimized candidate passed 121 JVM tests and lint, preserves the existing APK
+signer, permissions, publisher/demo assets and vision models, and passes ABI/size
+and 16 KiB alignment checks. The two CameraX JNI libraries match the upstream
+1.5.3 AAR. OpenCV's source/configuration is unchanged, but its embedded build
+revision changed on recompilation, so its native bytes are not claimed identical.
+
+Initial Android execution passed native camera opening, synthetic capture and
+deletion, clearing the former profile-8192 failure. The same run then stopped
+**before inference** with an input-dispatch ANR while reopening the WebView module
+following offline setup. The recovered ANR stack is in framework drawing; the main
+thread had approximately 0.64 s of CPU execution and 6.42 s of runnable scheduler
+wait, with guest CPU pressure near 89%. This is consistent with resource
+contention, not proof that an app hang is fixed. The failed receipt is retained;
+a second unchanged-candidate run reproduced the same ANR under approximately
+90% CPU pressure. No ANR timeout or app assertion was relaxed and no VM CPU/RAM
+allocation was increased. Repeating that busy baseline was stopped.
+
+The task-created 4 KiB AVD was archived in full before preparing a settled
+baseline. Construct was removed, the exact pinned WebView APK hash was verified
+and its package precompiled (`cmd package compile -m speed`). Android setup was
+allowed to finish with the same 2-vCPU/6-GiB VM and 3-GiB guest. CPU pressure fell
+from approximately 95% to 6%; three consecutive samples met the bounded settling
+criteria (CPU PSI avg10 below 30%, load1 below 4), with unchanged system-server
+PID. Both apps were absent, the fresh crash buffer was empty, ADB returned to
+non-root, and the clean snapshot saved before the emulator stopped. This is an
+environment preparation result, not yet a candidate acceptance pass.
+
+When an explicitly requested test WebView is already present, the runner now
+reuses it only after hashing the actual installed base APK and matching the
+requested SHA-256. Otherwise it installs the verified artifact as before. The
+receipt distinguishes `reused-verified` from `installed`; provider selection and
+actual current-provider checks remain mandatory. This preserves precompilation
+without trusting version strings or changing default Android-16 behavior.
+
+
+### Settled-baseline vision result
+
+Alpha 20's optimized x86-64 APK passed all **seven** native vision checks on the
+restored settled API-37/4-KiB baseline (`20260914T235217Z-92351919`). This includes
+first-use offline face and EXIF-rotated-face detection, blank negatives for both
+models, CC0 cat labeling, clearing on background/reopening, byte-identical original
+JPEGs, and diagnostics excluding photo labels/boxes/contents. The receipt verifies
+`reused-verified` WebView installation, exact candidate hash, non-root ADB and
+stopped emulator. Runtime/process-exit review found no new Construct ANR or native
+crash; the independent Bluetooth hardware-error 0x42 remains in the platform log.
+Camera/gallery, measurement and host/module acceptance remain separate scopes.
+
+- Alpha 20 x86-64: 26362624 bytes, SHA-256 `b04970d2830b40ba75645dcc9bf6f8f5bc494430a61fc09102d85098e168eaa0`.
+- Alpha 20 ARM64: 23479039 bytes, SHA-256 `9f913d1b9241de68f891757757fc938faf8ad8ca2209d826e50007647a5ef54e`.
+- App source: `76f1f6e4dd9e14bbf6fe3fb748a9eecd19e7e4c6`; subsequent runner/documentation changes do not alter the APK.
+
+Alpha 20 also passed all **12 camera/gallery checks** in
+`20260914T235451Z-e7a378fb`: independent permission gates, direct Reopen,
+synthetic preview/capture, private-photo recovery, rotation, quota and deletion
+confirmation, background/revocation, Android permission re-grant, offline album,
+export cancellation, exact published JPEG bytes and independent-copy survival.
+The emulator stopped. Process exits match test force-stops, permission changes and
+isolated-renderer cleanup; the separate Bluetooth 0x42 crash remains recorded.
+
+All **28 measurement checks** passed on the same optimized candidate in
+`20260915T000135Z-b26cc66f`, including offline ArUco positive/negative controls,
+independent perspective and EXIF fixtures, 95 mm calibration, drag cancellation,
+Undo and stale selection, actual pinch/pan, accessible adjustment, large-font
+layout, rotation retention, background/process cleanup, revocation, unchanged
+originals and diagnostic privacy. Synthetic 240 mm reference tolerances (3 mm
+flat / 4 mm warped) are test-fixture thresholds, not a real-world accuracy promise.
+The accepted receipt is complete/stopped; no Construct ANR or native crash was
+found in its runtime/exit review. The platform Bluetooth crash remains separate.
+
+The complete alpha 20 host baseline also passed in
+`20260915T000931Z-54fb5c96`: Checklist **5/5**, probes **5 BLOCKED / 6 CONTAINED /
+0 FAIL**, injected renderer-loss recovery, tones **7/7** and consent **5/5**.
+The unknown-reason isolated-renderer exit matches the exact injected SIGKILL PID
+and timestamp; the host PID survived and Retry retained the saved item. Remaining
+host exits are expected test force-stops. No new Construct ANR/native crash was
+found; the independent Bluetooth failure remains recorded. The emulator stopped.
+
+
+The first final-module run stopped before installation because the focused catalog
+initially omitted Focus, Snake and Contacts. That setup failure is retained as
+`20260915T002109Z-16f2f40e`, not a module failure or pass. Their exact existing
+signed entries were added to that separate catalog, and all six served ZIP hashes
+verified. Historical/home catalogs, APK bytes and completed scopes were unchanged;
+only the unfinished module scope was rerun.
+
+The subsequent Focus run rendered the expected `25:00` clock, but the new WebView
+exposed visible text instead of the older `Time remaining: 25:00` accessibility
+label. That failed driver receipt (`20260915T002322Z-d774a77d`) is preserved.
+A narrowly scoped reader accepts either real label representation only inside
+Construct's package, rejects ambiguous/conflicting values, and excludes Android's
+status-bar clock. Countdown and saved-remainder comparisons still require exact
+values; no generated timer state substitutes for UI evidence. Three additional
+unit cases cover old/new labels, status-bar exclusion and invalid/ambiguous
+clocks, bringing runner tests to **50**, passing normally and under Python `-O`.
+
+
+### Remaining gameplay limitation
+
+Focus passed all **six** checks in the complete Focus child of
+`20260915T002556Z-677d967d`; that combined run subsequently failed in Snake and is
+**not** represented as a complete module-suite pass. Focus's exact timer,
+pause/restart, single tone/no replay, menu/background silence, offline catch-up and
+storage revocation checks remain valid. Runtime/exit review found no app crash.
+
+Snake 0.1.5 rendered, moved four steps and collected one fruit, then its existing
+`elapsed > 1000` interruption protection paused the game. It did not reach the
+required game-over checkpoint. A bounded comparison that omitted hierarchy reads
+for five seconds reproduced the same pause (`20260915T003225Z-21d694b0`), with no
+app ANR/native crash. The unsuccessful observer change was removed. The interval
+includes asynchronous state persistence as well as rendering/scheduling, so the
+precise source of the delay is **not isolated**. No pause threshold was increased,
+auto-resume added or gameplay assertion weakened. Full Android-17 Snake gameplay
+acceptance remains **unverified** and needs a focused physical-device check or
+further separate runner profiling. Native photo/host acceptance is unaffected.
+
+
+Contacts passed all **nine** checks in `20260915T003412Z-78e46b2b`: default-denial
+and independent grants, real Android consent, bounded typed details, search and
+paging, tested accent/word-start matching, duplicate sort keys, alphabetical
+Browse across 26 synthetic records, independent revocation, landscape keyboard,
+offline reads and background/diagnostic privacy. The exact candidate receipt is
+complete/stopped. No app ANR/native crash was found; expected permission/force-stop
+and isolated-renderer exits are recorded separately from the Bluetooth 0x42 crash.

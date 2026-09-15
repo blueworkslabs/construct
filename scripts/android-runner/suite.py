@@ -116,8 +116,7 @@ try:
     camera_flag = BASE/'camera-emulated.flag'
     if a.camera_sha256: camera_flag.write_text('emulated\n')
     else: camera_flag.unlink(missing_ok=True)
-    snapshot = 'camera-clean' if a.camera_sha256 else 'clean'
-    avd = 'construct-camera36' if a.camera_sha256 else 'construct-api36'
+    avd,snapshot,_ = CONFIG.profile(bool(a.camera_sha256))
     if not (CONFIG.avd/(avd+'.avd')/'snapshots'/snapshot/'snapshot.pb').is_file():
         raise RuntimeError('Required clean snapshot missing: '+snapshot)
     control('start')
@@ -126,6 +125,8 @@ try:
         try:
             if adb('shell', 'getprop', 'sys.boot_completed', timeout=10).strip() == '1': break
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired): pass
+        service_state = subprocess.check_output(['systemctl','--user','show',CONFIG.service,'-p','ActiveState','--value'],text=True).strip()
+        if service_state == 'failed': raise RuntimeError('Emulator service failed during startup; inspect its journal')
         if time.monotonic() > deadline: raise RuntimeError('Android boot timed out')
         time.sleep(2)
     invocation=subprocess.check_output(['systemctl','--user','show',CONFIG.service,'-p','InvocationID','--value'],text=True).strip()
@@ -145,15 +146,30 @@ try:
             if 'package:'+package not in adb('shell', 'pm', 'list', 'packages', '-d', package).splitlines():
                 raise RuntimeError('Digital Wellbeing environment override did not apply')
         receipt['environmentOverrides'] = {'digitalWellbeing': 'disabled-user' if present else 'not installed'}
+    receipt['apiLevel'] = int(adb('shell','getprop','ro.build.version.sdk').strip())
+    if receipt['apiLevel'] != CONFIG.api_level: raise RuntimeError('Restored Android API differs from configured test platform')
+    receipt['guestMemoryMiB'] = CONFIG.memory_mb
+    receipt['directMemory'] = CONFIG.direct_memory
+    receipt['pageSize'] = int(adb('shell','getconf','PAGESIZE').strip())
+    receipt['memoryLimiter'] = adb('shell','am','memory-limiter','status') if CONFIG.api_level >= 37 else 'not queried'
     receipt['fingerprint'] = adb('shell', 'getprop', 'ro.build.fingerprint').strip()
     receipt['webviewBefore'] = adb('shell', 'dumpsys', 'webviewupdate')
     if a.webview_apk:
         if adb('shell', 'getprop', 'ro.debuggable').strip() != '1':
             raise RuntimeError('Development WebView comparison requires a disposable userdebug image')
-        adb('install', '-r', str(a.webview_apk.resolve()), timeout=180)
+        # Preserve a settled, precompiled provider only when its installed bytes
+        # match the requested artifact. A matching version alone is insufficient.
+        paths = adb('shell', 'pm', 'path', 'com.android.webview').splitlines()
+        installed_sha = None
+        if len(paths) == 1 and paths[0].startswith('package:/data/app/'):
+            installed_path = paths[0].removeprefix('package:').strip()
+            installed_sha = adb('shell', 'sha256sum', installed_path, timeout=90).split()[0]
+        reused = installed_sha == a.webview_sha256.lower()
+        if not reused:
+            adb('install', '-r', str(a.webview_apk.resolve()), timeout=180)
         selection = adb('shell', 'cmd', 'webviewupdate', 'set-webview-implementation', 'com.android.webview')
         if 'Success' not in selection: raise RuntimeError('Chromium WebView provider selection failed: '+selection)
-        receipt['webviewOverride'] = {'package': 'com.android.webview', 'sha256': a.webview_sha256.lower(), 'selection': selection.strip()}
+        receipt['webviewOverride'] = {'package': 'com.android.webview', 'sha256': a.webview_sha256.lower(), 'selection': selection.strip(), 'installation': 'reused-verified' if reused else 'installed'}
     receipt['webview'] = adb('shell', 'dumpsys', 'webviewupdate')
     if a.webview_apk and 'Current WebView package (name, version): (com.android.webview,' not in receipt['webview']:
         raise RuntimeError('Selected WebView is not the requested Chromium provider')
@@ -223,6 +239,10 @@ except Exception as error:
 finally:
     if receipt.get('logcatResetBeforeChildren'):
         try:
+            (run/'android-crashes.log').write_text(adb('logcat','-b','crash','-d'))
+            (run/'android-runtime.log').write_text(adb('logcat','-d','-t','10000'))
+            (run/'process-exits.txt').write_text(adb('shell','dumpsys','activity','exit-info','dev.construct.runtime'))
+            (run/'memory-at-end.txt').write_text(adb('shell','dumpsys','meminfo','dev.construct.runtime'))
             warnings = adb('logcat', '-d', '-s', 'cr_AwContents:W')
             (run/'webview-warnings.log').write_text(warnings)
             receipt['attachedDestroyWarnings'] = sum('destroy() called while WebView is still attached' in line for line in warnings.splitlines())

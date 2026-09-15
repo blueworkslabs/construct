@@ -20,6 +20,21 @@ class RunnerConfig:
     test_catalog: str
     disposable: bool
     service: str = 'construct-emulator-public.service'
+    api_level: int = 36
+    single_avd: bool = False
+    direct_memory: bool = False
+    memory_mb: int = 2048
+    emulate_front_camera: bool = False
+
+    def profile(self, camera=False):
+        # A single space-saving AVD always uses synthetic camera hardware,
+        # including baseline runs, so snapshot hardware never changes.
+        dedicated_camera = camera and not self.single_avd
+        return (f'construct-camera{self.api_level}' if dedicated_camera else f'construct-api{self.api_level}',
+                'camera-clean' if dedicated_camera else 'clean', camera or self.single_avd)
+
+    def front_camera(self, camera=False):
+        return 'emulated' if self.emulate_front_camera and (camera or self.single_avd) else 'none'
 
 def catalog(value):
     if not isinstance(value,str) or not re.fullmatch(r'https://[A-Za-z0-9._:-]+/[A-Za-z0-9_./-]*index\.json',value):
@@ -34,8 +49,9 @@ def load(path=None):
     if not path.exists():
         return RunnerConfig(SCRIPT_ROOT,SCRIPT_ROOT/'sdk',SCRIPT_ROOT/'avd','','','',False)
     raw=json.loads(path.read_text())
-    fields={'root','sdk','avd','host','home_catalog','test_catalog','disposable','service'}
-    if set(raw)-fields or not fields-{'service'} <= set(raw):raise ValueError('Missing or unexpected runner configuration fields')
+    optional={'service','api_level','single_avd','direct_memory','memory_mb','emulate_front_camera'}
+    fields={'root','sdk','avd','host','home_catalog','test_catalog','disposable'} | optional
+    if set(raw)-fields or not fields-optional <= set(raw):raise ValueError('Missing or unexpected runner configuration fields')
     for key in ('root','sdk','avd'):
         if not isinstance(raw[key],str) or not Path(raw[key]).is_absolute() or re.search(r'\s|["\\%]',raw[key]):
             raise ValueError('Runner paths must be absolute and contain no whitespace, quotes, backslash or percent')
@@ -43,7 +59,17 @@ def load(path=None):
     if type(raw['disposable']) is not bool:raise ValueError('Disposable flag must be a JSON boolean')
     service=raw.get('service','construct-emulator-public.service')
     if not re.fullmatch(r'construct-emulator-[A-Za-z0-9_-]+\.service',service):raise ValueError('Explicit Construct emulator service required')
-    return RunnerConfig(*(Path(raw[k]).resolve() for k in ('root','sdk','avd')),raw['host'],catalog(raw['home_catalog']),catalog(raw['test_catalog']),raw['disposable'],service)
+    api=raw.get('api_level',36)
+    single=raw.get('single_avd',False)
+    front=raw.get('emulate_front_camera',False)
+    if type(front) is not bool:raise ValueError('Emulated front-camera flag must be a JSON boolean')
+    if type(api) is not int or not 28 <= api <= 99:raise ValueError('Expected integer Android API level 28..99')
+    memory=raw.get('memory_mb',2048)
+    if type(memory) is not int or not 1024 <= memory <= 4096:raise ValueError('Guest memory must be an integer from 1024 to 4096 MiB')
+    dma=raw.get('direct_memory',False)
+    if type(dma) is not bool:raise ValueError('Direct-memory flag must be a JSON boolean')
+    if type(single) is not bool:raise ValueError('Single AVD flag must be a JSON boolean')
+    return RunnerConfig(*(Path(raw[k]).resolve() for k in ('root','sdk','avd')),raw['host'],catalog(raw['home_catalog']),catalog(raw['test_catalog']),raw['disposable'],service,api,single,dma,memory,front)
 
 CONFIG=load()
 

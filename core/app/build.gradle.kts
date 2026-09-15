@@ -11,8 +11,8 @@ android {
         applicationId = "dev.construct.runtime"
         minSdk = 28
         targetSdk = 35
-        versionCode = 19
-        versionName = "0.1.0-alpha19"
+        versionCode = 20
+        versionName = "0.1.0-alpha20"
         externalNativeBuild { cmake {
             abiFilters += listOf("arm64-v8a", "x86_64")
             arguments += listOf("-DANDROID_STL=c++_static", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
@@ -65,9 +65,9 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.webkit:webkit:1.12.1")
-    implementation("androidx.camera:camera-camera2:1.4.2")
-    implementation("androidx.camera:camera-lifecycle:1.4.2")
-    implementation("androidx.camera:camera-view:1.4.2")
+    implementation("androidx.camera:camera-camera2:1.5.3")
+    implementation("androidx.camera:camera-lifecycle:1.5.3")
+    implementation("androidx.camera:camera-view:1.5.3")
     implementation("com.google.mediapipe:tasks-vision:0.10.35") {
         exclude(group = "com.google.mediapipe", module = "tasks-core")
     }

@@ -122,7 +122,23 @@ try:
     before = snapshot_events()
     opened(); tap('Play beep'); status('TONE_ACCEPTED:')
     adb('shell', 'input', 'keyevent', '3')
-    time.sleep(.6)
+    # HOME dispatch can return before the launcher transition completes. Observe
+    # a genuine background interval instead of foregrounding after a fixed 600ms.
+    deadline = time.monotonic() + 10
+    while True:
+        activity_state = adb('shell', 'dumpsys', 'activity', 'activities')
+        resumed = [line for line in activity_state.splitlines()
+                   if 'ResumedActivity:' in line or 'topResumedActivity=' in line]
+        if resumed and all('dev.construct.runtime' not in line for line in resumed):
+            break
+        if time.monotonic() > deadline:
+            raise RuntimeError('HOME did not move Construct out of the resumed activity')
+        time.sleep(.25)
+    (RESULTS/'tone-after-home.txt').write_text(activity_state)
+    # Leave the app in the background long enough for the stop transition;
+    # the following original checks still require actual session/native cleanup.
+    time.sleep(2)
+    (RESULTS/'tone-before-return.txt').write_text(adb('shell', 'dumpsys', 'activity', 'activities'))
     adb('shell', 'am', 'start', '-n', 'dev.construct.runtime/.MainActivity')
     find('Module stopped.')
     top(); find('Installed')
