@@ -26,6 +26,7 @@ def top():
     raise RuntimeError('Workshop top missing')
 
 def expect(prefix):
+    ui.camera_controls_top()
     deadline = time.monotonic() + 60
     while time.monotonic() < deadline:
         current = labels()
@@ -80,8 +81,16 @@ try:
     top(); installed = [e for e in diagnostics() if e.get('code') == 'INSTALLED_TRIAL' and e.get('moduleId') == 'dev.construct.camera']
     if len(installed) != 1 or installed[0].get('packageDigest') != os.environ['CONSTRUCT_CAMERA_SHA256']: raise RuntimeError('Wrong signed launcher')
     top(); select_after(heading, ('Module access',))
-    matches = [n for n in nodes() if n.get('content-desc') == 'Allow camera workspace' and n.get('checkable') == 'true']
-    if len(matches) != 1 or matches[0].get('checked') != 'false': raise RuntimeError('Unexpected initial grant')
+    find('Allow camera workspace')
+    previous=None;until=time.monotonic()+10
+    while time.monotonic()<until:
+        matches = [n for n in nodes() if n.get('content-desc') == 'Allow camera workspace' and n.get('checkable') == 'true']
+        if len(matches)==1:
+            if matches[0].get('bounds')==previous:break
+            previous=matches[0].get('bounds')
+        time.sleep(.3)
+    else:raise RuntimeError('Camera grant switch missing or moving')
+    if matches[0].get('checked') != 'false': raise RuntimeError('Unexpected initial grant')
     tap_node(matches[0]); find('Allow camera workspace: on.')
     tap('Allow Android camera access'); find('While using the app'); tap('While using the app'); find('Android camera access: allowed')
     opened(); tap('Take photo'); find('Saved photos: 1 / 8'); find('Saved photo preview')
