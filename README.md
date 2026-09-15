@@ -32,7 +32,9 @@ See [release provenance](docs/public-release.md) and [known limits](docs/evidenc
 [Android pilot APKs](https://github.com/blueworkslabs/construct/releases) are
 published as GitHub Release assets, with version notes and checksums. The signed
 module catalog lives in [`catalog/`](catalog/) and is deployed with Cloudflare
-Pages. See [hosting, verification, and migration](docs/public-catalog.md).
+Pages at <https://construct-20x.pages.dev/>. Set the app's catalog URL to
+`https://construct-20x.pages.dev/index.json`.
+See [hosting, verification, and migration](docs/public-catalog.md).
 Changing an existing app's catalog URL does not require reinstalling or resetting
 its data. The pilot signing identity is preserved; self-built hosts with a different
 publisher key need their own signed catalog.

@@ -5,6 +5,14 @@ module ZIPs, a public verification key, and a small static landing page. Cloudfl
 Pages serves this directory; Android APKs are separate GitHub Release assets.
 No server, Pages Functions, signing service, or GitHub Actions workflow is needed.
 
+Production site: <https://construct-20x.pages.dev/>
+
+In Construct Settings, use this exact catalog URL:
+
+```text
+https://construct-20x.pages.dev/index.json
+```
+
 ## Cloudflare Pages
 
 - Production branch: `main`
@@ -14,7 +22,7 @@ No server, Pages Functions, signing service, or GitHub Actions workflow is neede
 - Build output directory: `catalog`
 - Environment variables: none
 
-The catalog URL is `https://<project>.pages.dev/index.json`, not
+The production catalog URL is `https://construct-20x.pages.dev/index.json`, not
 `/catalog/index.json`. Use the final URL: Construct rejects redirects, non-HTTPS
 origins, credentials, query strings, and fragments in its catalog URL. Do not put
 an authentication challenge in front of these public static files.
@@ -49,7 +57,7 @@ Local verification (Python with `cryptography` installed):
 
 ```sh
 python3 scripts/verify_public_catalog.py
-python3 scripts/verify_public_catalog.py --url https://<project>.pages.dev/index.json
+python3 scripts/verify_public_catalog.py --url https://construct-20x.pages.dev/index.json
 ```
 
 The HTTPS check uses normal public CA validation, rejects redirects, checks every
