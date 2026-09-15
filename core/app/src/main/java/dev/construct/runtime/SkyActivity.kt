@@ -221,9 +221,10 @@ class SkyActivity : ComponentActivity() {
                     val aircraft=SkyData.merge(feeds,mode,p,radius,now)
                     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                         val wide=maxWidth>maxHeight*1.3f
+                        val panelWidth=(maxWidth*0.43f).coerceAtMost(330.dp)
                         if(wide) Row(Modifier.fillMaxSize()) {
                             SkyMap(network,p,radius,aircraft,selected,now,{ selected=it },{ choose(it) },!busy,Modifier.weight(1f).fillMaxHeight())
-                            AircraftPanel(aircraft,p,Modifier.width((maxWidth*0.43f).coerceAtMost(330.dp)).fillMaxHeight())
+                            AircraftPanel(aircraft,p,Modifier.width(panelWidth).fillMaxHeight())
                         } else Column(Modifier.fillMaxSize()) {
                             SkyMap(network,p,radius,aircraft,selected,now,{ selected=it },{ choose(it) },!busy,Modifier.weight(0.58f).fillMaxWidth())
                             AircraftPanel(aircraft,p,Modifier.weight(0.42f).fillMaxWidth())
