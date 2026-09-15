@@ -1,0 +1,54 @@
+# UX-refresh verification checkpoint
+
+**Candidate, not yet promoted.** These are actual Android screenshots using
+synthetic test state, not the clickable design mockup. No private photos or
+contact data are shown. Public main is unchanged while PR #10 is reviewed.
+
+![Library with eight newly installed trial tools](../media/ux-refresh/library.png)
+
+![Checklist at 360dp with Android font scale 2](../media/ux-refresh/checklist-font2.png)
+
+![Snake paused in landscape, native menu separate from task controls](../media/ux-refresh/snake-landscape.png)
+
+## Candidate identity
+
+App source: `4f19bf7`. Subsequent runner-only commits do not change app or module
+source. The optimized x86-64 APK SHA-256 is
+`c810926c3f5e54315756e39912b75008104f2d099517710adcb03364611dfff4`.
+The ARM64 counterpart is
+`00fe88c7aba5b51d931db7e1f658a0de9557938f89aa180865e5a922caaa88e8`
+(23,594,175 bytes). This operator-profile artifact preserves the existing app
+signer, permissions, publisher key, historical bundled demo files and models.
+Both packaged ABIs passed the 16 KB ZIP alignment check. Generated baseline
+profiles necessarily change with app code and are not treated as model assets.
+
+## Completed scopes
+
+- Final app source: 133 JVM tests, zero failures/errors; lint zero errors and
+  18 warnings. Runner: 59 unit checks, including status-bar/window ordering.
+- Android 16 UX, first six checks: local-only initial Library, one latest normal
+  candidate per tool, all eight exact signed packages installed via Versions and
+  consent, Hello counter restart, literal Checklist keyboard entry/offline
+  reopening, and visible Tones/Camera/Measure default denial with menu clearance.
+- Separate clean Android 16 layout continuation: the exact Checklist fixture,
+  native 360dp/font-scale-2 Settings/Browse and Checklist layouts, and landscape
+  navigation/controls. Screenshots reviewed; scrolling is expected for long text.
+- Android 16 Snake: all eight gameplay/state/menu/rotation/revocation checks pass.
+
+The UX evidence is deliberately **across documented runs**, not a claim that the
+initial full UX run passed. Failed runs were retained: a new test imported the
+wrong helper; a later driver used the status-bar window's bounds after restart;
+then the large-text test expected a Settings button above the fold. Corrections
+are in the runner. The final unfinished layout scope was run separately rather
+than reclassifying those failed runs as complete. The APK was unchanged.
+
+## Pending scopes
+
+Android 17 host baseline, Focus/Contacts and native camera/gallery, vision and
+measurement acceptance are running or pending. The previously documented Android
+17 software-emulator Snake timing limitation is not claimed fixed. ARM64 visual,
+physical input and native-camera confirmation remain a phone check after promotion.
+
+All runners restore disposable app-free snapshots and stop after each scope.
+Raw receipts stay operator-private because they contain deployment URLs and
+runtime metadata. See [runner setup](../android-runner.md) for reproduction.
