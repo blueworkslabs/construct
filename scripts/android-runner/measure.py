@@ -2,7 +2,7 @@
 """Native photo-picker/measurement acceptance with synthetic fixtures only."""
 from config import CONFIG, require_runner
 from ui import adb,nodes,labels,tap,tap_node,find,capture,RESULTS
-from host_ui import restart,select_after,installed_status,diagnostics
+from host_ui import restart,select_after,installed_status,diagnostics, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern
 from catalog_input import replace_text
 from pathlib import Path
 import ui
@@ -10,7 +10,7 @@ import hashlib,json,os,re,time
 
 require_runner()
 result={'complete':False,'checks':[],'source':'Generated non-personal ArUco tabletop fixtures'}
-heading='Pocket Measure · 0.1.2'
+heading='Pocket Measure · ' + os.environ.get('CONSTRUCT_MEASURE_VERSION', '0.1.2')
 fixtures=CONFIG.root/'measure-fixtures'
 entries=json.loads((fixtures/'manifest.json').read_text())
 current=None
@@ -25,6 +25,7 @@ PICKER_PACKAGES = {
 original_font_scale=adb('shell','settings','get','system','font_scale').strip()
 def done(text):result['checks'].append(text);print('PASS:',text,flush=True)
 def top():
+    if modern(): return library()
     for _ in range(15):
         if 'Use configured registry' in labels():return
         adb('shell','input','swipe','360','450','360','1050','250')
@@ -154,13 +155,13 @@ def endpoints(entry):
 
 try:
     if adb('shell','getprop','ro.kernel.qemu').strip()!='1':raise RuntimeError('Requires disposable emulator')
-    restart()
+    restart(); catalog_settings()
     replace_text(nodes,lambda value:ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value),CONFIG.test_catalog)
-    tap('Refresh catalog')
+    apply_catalog()
     try:find('Catalog refreshed.')
     except RuntimeError:
         if not any(t.startswith('[REGISTRY_NETWORK]') for t in labels()):raise
-        result['setupNetworkRetry']=True;time.sleep(2);tap('Refresh catalog');find('Catalog refreshed.')
+        result['setupNetworkRetry']=True;time.sleep(2);apply_catalog();find('Catalog refreshed.')
     select_after(heading,('Review & install',));tap('Allow & install');installed_status()
     top();events=diagnostics();installed=[e for e in events if e.get('code')=='INSTALLED_TRIAL' and e.get('moduleId')=='dev.construct.measure']
     if len(installed)!=1 or installed[0].get('packageDigest')!=os.environ['CONSTRUCT_MEASURE_SHA256']:raise RuntimeError('Wrong signed measurement launcher')

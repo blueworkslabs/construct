@@ -2,7 +2,7 @@
 """Offline native inference on licensed test photos, only inside a disposable emulator."""
 from config import CONFIG, require_runner
 from ui import adb, nodes, labels, tap, tap_node, find, capture, RESULTS
-from host_ui import restart, select_after, installed_status, diagnostics
+from host_ui import restart, select_after, installed_status, diagnostics, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern
 from catalog_input import replace_text
 from pathlib import Path
 from PIL import Image
@@ -19,6 +19,7 @@ def done(text):
     result['checks'].append(text); print('PASS:', text, flush=True)
 
 def top():
+    if modern(): return library()
     for _ in range(12):
         if 'Use configured registry' in labels(): return
         adb('shell', 'input', 'swipe', '360', '450', '360', '1050', '250')
@@ -64,16 +65,16 @@ try:
         if entry['kind'] != 'fixture': continue
         data = (fixtures/entry['name']).read_bytes()
         if len(data) != entry['bytes'] or hashlib.sha256(data).hexdigest() != entry['sha256']: raise RuntimeError('Test image checksum mismatch')
-    restart()
+    restart(); catalog_settings()
     replace_text(nodes, lambda value: ui._device(className='android.widget.EditText', packageName='dev.construct.runtime').set_text(value), CONFIG.test_catalog)
-    tap('Refresh catalog')
+    apply_catalog()
     try: find('Catalog refreshed.')
     except RuntimeError:
         if not any(t.startswith('[REGISTRY_NETWORK]') for t in labels()): raise
         result['setupNetworkRetry'] = True
         adb('shell', 'svc', 'wifi', 'enable'); adb('shell', 'svc', 'data', 'enable')
         time.sleep(2)
-        tap('Refresh catalog'); find('Catalog refreshed.')
+        apply_catalog(); find('Catalog refreshed.')
     select_after(heading, ('Review & install',))
     tap('Allow & install'); installed_status()
     top(); installed = [e for e in diagnostics() if e.get('code') == 'INSTALLED_TRIAL' and e.get('moduleId') == 'dev.construct.camera']

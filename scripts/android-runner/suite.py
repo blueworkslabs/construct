@@ -38,8 +38,19 @@ p.add_argument('--reliability-only', action='store_true', help='Repeated bundled
 p.add_argument('--webview-apk', type=Path, help='Optional Chromium com.android.webview provider for this disposable userdebug run')
 p.add_argument('--webview-sha256', help='Required checksum of the optional WebView provider APK')
 p.add_argument('--measure-only', action='store_true', help='Only synthetic native photo measurement; separate host baseline required')
-p.add_argument('--measure-sha256', help='Exact signed Pocket Measure 0.1.2 launcher')
+p.add_argument('--measure-sha256', help='Exact signed Pocket Measure launcher')
+for module, default in [('focus','0.1.2'),('snake','0.1.5'),('contacts','0.2.1'),('measure','0.1.2')]:
+    p.add_argument('--'+module+'-version', default=default, help='Exact numeric version paired with the module hash')
+p.add_argument('--ux-candidates', type=Path, help='Only Library/Browse and eight refreshed package UI checks; JSON exact candidate metadata')
 a = p.parse_args()
+if a.ux_candidates:
+    if any((a.measure_only,a.camera_sha256,a.focus_sha256,a.snake_sha256,a.contacts_sha256,a.reliability_only,a.modules_only,a.tone_consent_only,a.camera_only,a.focus_only,a.snake_only,a.contacts_only)): p.error('UX-only cannot mix other scopes')
+    ux_candidates=json.loads(a.ux_candidates.read_text())
+    if not isinstance(ux_candidates,list) or len(ux_candidates)!=8: p.error('UX requires eight exact candidate entries')
+    if len({entry['id'] for entry in ux_candidates})!=8: p.error('Duplicate UX module identity')
+    for entry in ux_candidates:
+        if not __import__('re').fullmatch(r'[0-9a-f]{64}',entry['sha256']): p.error('Invalid UX candidate hash')
+    os.environ['CONSTRUCT_UX_CANDIDATES']=json.dumps([{k:e[k] for k in ('id','name','version','sha256')} for e in ux_candidates])
 if a.measure_only != bool(a.measure_sha256): p.error('Measure scope requires both measure-only and measure-sha256')
 if a.measure_only and any((a.camera_sha256,a.focus_sha256,a.snake_sha256,a.contacts_sha256,a.reliability_only,a.modules_only,a.tone_consent_only,a.camera_only,a.focus_only,a.snake_only,a.contacts_only)): p.error('Measure-only cannot mix other scopes')
 if a.reliability_only and any((a.camera_sha256, a.focus_sha256, a.snake_sha256, a.contacts_sha256, a.tone_consent_only, a.modules_only)): p.error('Reliability scope cannot mix other module scopes')
@@ -47,6 +58,10 @@ if a.camera_vision_only and (not a.camera_only or not a.camera_sha256 or a.camer
 if a.camera_gallery_export and (not a.camera_only or not a.camera_sha256 or a.camera_reopen_only): p.error('Gallery export requires full camera-only/hash acceptance, not reopen-only')
 if not __import__('re').fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', a.camera_version): p.error('Camera version must be a numeric release version')
 os.environ['CONSTRUCT_CAMERA_VERSION'] = a.camera_version
+for module in ('focus','snake','contacts','measure'):
+    version = getattr(a, module+'_version')
+    if not __import__('re').fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version): p.error('Module version must be a canonical numeric release')
+    os.environ['CONSTRUCT_'+module.upper()+'_VERSION'] = version
 os.environ['CONSTRUCT_CAMERA_GALLERY_EXPORT'] = '1' if a.camera_gallery_export else '0'
 if a.modules_only and (a.tone_consent_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_sha256 or not (a.focus_sha256 or a.snake_sha256 or a.contacts_sha256)): p.error('Modules-only requires explicit non-camera module hashes and no other scope flag')
 if a.tone_consent_only and (a.focus_only or a.snake_only or a.contacts_only or a.camera_only or a.camera_sha256): p.error('Tone/consent scope cannot mix module-only or camera scope')
@@ -75,6 +90,8 @@ os.environ['CONSTRUCT_RESULTS'] = str(run)
 from ui import adb
 receipt = {'started': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'apkSha256': actual,
            'complete': False, 'scope': 'Checklist regression, classified bounded probes, injected renderer loss, and tone grant lifecycle; not complete sandbox/egress proof'}
+
+if a.ux_candidates: receipt['scope']='Library/Browse latest-first, explicit signed versions, refreshed package identity, module layout and native font/rotation; not full module/native capability regression'
 
 if a.measure_only: receipt['scope'] = 'Synthetic selected-photo planar measurement only; no real-camera accuracy claim or host baseline'
 
@@ -199,13 +216,14 @@ try:
     if a.measure_only:
         os.environ['CONSTRUCT_MEASURE_SHA256'] = a.measure_sha256
         children.append(('measure.py', 'measure-result.json'))
+    if a.ux_candidates: children=[('ux.py','ux-result.json')]
     for script, result in children:
         with (run/(script+'.log')).open('w') as log:
             subprocess.run([str(BASE/'venv/bin/python'), str(BASE/script)], check=True,
-                           stdout=log, stderr=subprocess.STDOUT, timeout=900)
+                           stdout=log, stderr=subprocess.STDOUT, timeout=1800 if script=='ux.py' else 900)
         if not json.loads((run/result).read_text()).get('complete'):
             raise RuntimeError('Incomplete child receipt: '+result)
-    if not (a.measure_only or a.reliability_only or a.modules_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_only):
+    if not (a.ux_candidates or a.measure_only or a.reliability_only or a.modules_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_only):
         if not a.tone_consent_only:
             receipt['probeCounts'] = json.loads((run/'probe-summary.json').read_text())['counts']
             receipt['rendererVerdict'] = json.loads((run/'renderer-result.json').read_text())['verdict']
@@ -232,6 +250,9 @@ try:
     if a.measure_only:
         receipt['measure'] = json.loads((run/'measure-result.json').read_text())
         if receipt['measure']['environment']['apkSha256'] != actual: raise RuntimeError('Measure APK hash mismatch')
+    if a.ux_candidates:
+        receipt['ux']=json.loads((run/'ux-result.json').read_text())
+        if receipt['ux']['environment']['apkSha256'] != actual: raise RuntimeError('UX APK hash mismatch')
     receipt['complete'] = True
 except Exception as error:
     receipt['error'] = str(error)

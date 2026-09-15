@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "dev.construct.contacts",
   "name": "Pocket Contacts",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Browse or search contacts and read phone/email details on this phone. No editing, saving, calling or network access.",
   "constructApi": {
     "min": "0.6.0",
@@ -19,5 +19,5 @@
       "optional": false
     }
   ],
-  "themeColor": "#121d25"
+  "themeColor": "#0B1410"
 }

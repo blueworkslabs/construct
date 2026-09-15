@@ -6,12 +6,12 @@ import os
 import socket
 import time
 from ui import adb, nodes, labels, tap, tap_node, find, capture, RESULTS
-from host_ui import restart, diagnostics, select_after, installed_status
+from host_ui import restart, diagnostics, select_after, installed_status, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern
 from focus_clock import clock_value
 require_runner()
 expected = os.environ['CONSTRUCT_FOCUS_SHA256']
 result = {'complete':False, 'checks':[], 'moduleSha256':expected}
-heading = 'Pocket Focus · 0.1.2'
+heading = 'Pocket Focus · ' + os.environ.get('CONSTRUCT_FOCUS_VERSION', '0.1.2')
 
 def done(name):
     result['checks'].append(name); print('PASS:',name,flush=True)
@@ -26,6 +26,7 @@ def wait_clock(expected):
     raise RuntimeError('Expected exact Focus clock: ' + expected)
 
 def top():
+    if modern(): return library()
     for _ in range(8):
         if 'Use configured registry' in labels(): return
         adb('shell','input','swipe','360','450','360','1050','300')
@@ -44,7 +45,7 @@ def native_counts():
     es=events(); return tuple(sum(e.get('code')==c for e in es) for c in ('TONE_STARTED','TONE_STOPPED'))
 
 def access(label,on,required=False):
-    if 'Construct menu' in labels() or 'Close module' in labels(): tap('Module access')
+    if ('Construct menu' in labels() or 'Close module' in labels()) and 'Library' not in labels(): tap('Module access')
     else: card('Module access')
     find(label)
     previous=None
@@ -63,13 +64,13 @@ def access(label,on,required=False):
     tap('Reopen module'); find('Pocket Focus')
 
 try:
-    restart()
+    restart(); catalog_settings()
     for n in nodes():
         if n.get('class')=='android.widget.EditText':
             tap_node(n); adb('shell','input','keycombination','113','29')
             adb('shell','input','text',CONFIG.test_catalog); break
     else: raise RuntimeError('No catalog field')
-    adb('shell','input','keyevent','111'); tap('Refresh catalog')
+    adb('shell','input','keyevent','111'); apply_catalog()
     select_after(heading,('Review & install',))
     find('Optional'); tap('Allow & install'); installed_status()
     es=events()

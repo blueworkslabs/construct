@@ -57,7 +57,7 @@ internal fun WorkshopCard(
     val accessibleTitle = model.version?.let { "${model.title}, version $it" } ?: model.title
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().semantics { contentDescription = "Module card ${model.id}" },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = ConstructColors.surface, contentColor = ConstructColors.text),
         border = BorderStroke(1.dp, ConstructColors.border),
@@ -77,7 +77,7 @@ internal fun WorkshopCard(
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     model.primary?.let { action ->
                         Button(onClick = { onAction(action.id) }, enabled = action.enabled,
-                            colors = ButtonDefaults.buttonColors(containerColor = ConstructColors.jade, contentColor = ConstructColors.jadeInk,
+                            colors = ButtonDefaults.buttonColors(containerColor = if (action.destructive) ConstructColors.error else ConstructColors.jade, contentColor = ConstructColors.jadeInk,
                                 disabledContainerColor = ConstructColors.surface2, disabledContentColor = ConstructColors.disabled)) { Text(action.label) }
                     }
                     versions?.let { action ->

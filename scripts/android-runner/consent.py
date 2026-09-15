@@ -5,7 +5,7 @@ import json
 import socket
 import time
 from ui import adb, nodes, labels, tap, tap_node, find, capture, RESULTS
-from host_ui import restart, diagnostics, select_after, installed_status
+from host_ui import restart, diagnostics, select_after, installed_status, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern
 require_runner()
 result = {'complete': False, 'checks': []}
 
@@ -13,6 +13,7 @@ def done(name):
     result['checks'].append(name); print('PASS:', name, flush=True)
 
 def top():
+    if modern(): return library()
     for _ in range(6):
         if 'Use configured registry' in labels(): return
         adb('shell', 'input', 'swipe', '360', '450', '360', '1050', '300')
@@ -46,7 +47,7 @@ def status(prefix):
     raise RuntimeError('Missing result: '+prefix)
 
 try:
-    restart(); tap('Use configured registry'); tap('Refresh catalog'); find('Catalog refreshed.')
+    restart(); configured_catalog(); find('Catalog refreshed.')
     select_after('Pocket Tones · 0.2.0', ('Review version',))
     find('Allow short tones'); find('Required for this module'); find('device.tone')
     checked(False); tap_node(switch()); checked(True); capture('consent-tone-on')

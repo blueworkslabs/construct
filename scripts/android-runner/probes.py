@@ -11,16 +11,16 @@ import ui
 require_runner()
 RESULTS.mkdir(parents=True, exist_ok=True)
 
-from host_ui import restart, diagnostics, select_after, installed_status
+from host_ui import restart, diagnostics, select_after, installed_status, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern
 
 results = []
 try:
-    restart()
+    restart(); catalog_settings()
     replace_text(nodes, lambda value: ui._device(
         className='android.widget.EditText', packageName='dev.construct.runtime'
     ).set_text(value), CONFIG.test_catalog)
     adb('shell', 'input', 'keyevent', '111')
-    tap('Refresh catalog')
+    apply_catalog()
     find('Catalog refreshed.')
     # Select an exact version, never whichever catalog card happens to come first.
     select_after('Isolation probes (test only) · ' + VERSION, ('Review & install', 'Review version'))

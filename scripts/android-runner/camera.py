@@ -5,7 +5,7 @@ import hashlib, io, json, os, re, socket, struct, subprocess, time
 from pathlib import Path
 from PIL import Image
 from ui import adb, nodes, labels, tap, tap_node, find, capture, RESULTS
-from host_ui import restart, diagnostics, select_after, installed_status
+from host_ui import restart, diagnostics, select_after, installed_status, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern
 require_runner()
 camera_avd = CONFIG.profile(True)[0]
 config=(CONFIG.avd/(camera_avd+'.avd')/'config.ini').read_text()
@@ -21,6 +21,7 @@ export_checks=os.environ.get('CONSTRUCT_CAMERA_GALLERY_EXPORT')=='1'
 result={'complete':False,'checks':[],'cameraSource':'Android emulator generated scene, no physical camera'}
 def done(name):result['checks'].append(name);print('PASS:',name,flush=True)
 def top():
+    if modern(): return library()
     for _ in range(12):
         if 'Use configured registry' in labels():return
         adb('shell','input','swipe','360','450','360','1050','300')
@@ -73,7 +74,7 @@ def reopen():
             except RuntimeError:result['recoveryDiagnostics']['menuReturn']=False
             before=adb('shell','pidof','dev.construct.runtime').strip()
             adb('shell','am','start','-n','dev.construct.runtime/.MainActivity','-f','0x04000000')
-            find('Installed');top();select_after(heading,('Open',));find('Pocket Camera')
+            host_ready();top();select_after(heading,('Open',));find('Pocket Camera')
             after=adb('shell','pidof','dev.construct.runtime').strip()
             result['recoveryDiagnostics']['sameProcess']=before==after
             try:find('Open camera workspace',timeout=8);result['recoveryDiagnostics']['activityRecreate']=True
@@ -113,12 +114,12 @@ def gallery_files():
     return names
 try:
     if export_checks and gallery_files():raise RuntimeError('Gallery baseline is not empty; refusing stale export evidence')
-    restart()
+    restart(); catalog_settings()
     url=CONFIG.test_catalog
     from catalog_input import replace_catalog
     import ui
     replace_catalog(nodes, lambda value: ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value), url)
-    tap('Refresh catalog');find('Catalog refreshed.');select_after(heading,('Review & install',))
+    apply_catalog();find('Catalog refreshed.');select_after(heading,('Review & install',))
     find('Allow camera workspace')
     switches=[n for n in nodes() if n.get('content-desc')=='Allow camera workspace' and n.get('checkable')=='true']
     if len(switches)!=1 or switches[0].get('checked')!='false':raise RuntimeError('Camera must default off')
@@ -143,7 +144,7 @@ try:
     done('Actual Android permission dialog enables streaming native preview and user-shutter capture')
     tap('Close camera');no_camera_client();opened();workspace();tap('Saved photos');find('Saved photos: 1 / 8');find('Saved photo preview')
     done('Private album retains a decoded photo across workspace and host restart; camera releases on close')
-    tap('Back to camera');status('Camera preview ready.');rotate(1);find('Installed');no_camera_client();rotate(0);find('Installed')
+    tap('Back to camera');status('Camera preview ready.');rotate(1);host_ready();no_camera_client();rotate(0);host_ready()
     opened();workspace();tap('Saved photos');find('Saved photos: 1 / 8');find('Saved photo preview')
     done('Real rotation closes native camera without losing the saved photo')
     for count in range(2,9):tap('Back to camera');status('Camera preview ready.');shutter(count)

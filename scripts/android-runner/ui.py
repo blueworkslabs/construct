@@ -71,7 +71,35 @@ def tap_node(n):
     if not (x2 > x1 and y2 > y1): raise RuntimeError('Element is not visible')
     adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2))
 
+CAMERA_CONTROLS = {'Close camera','Back to camera','Saved photos','Find faces','Find objects',
+                   'Previous photo','Next photo','Delete photo','Save to phone gallery',
+                   'Take photo','Switch camera','Camera help','Hide camera help'}
+
+
+def reveal_camera_control(text):
+    """Scroll only the identified native camera panel, never the photo or a WebView."""
+    if text not in CAMERA_CONTROLS: return
+    current = nodes()
+    panes = [n for n in current if n.get('content-desc') == 'Camera controls'
+             and n.get('package') == 'dev.construct.runtime']
+    if not panes: return  # Legacy camera layout; original selection rules apply.
+    if len(panes) != 1: raise RuntimeError('Ambiguous native camera control panel')
+    x1,y1,x2,y2=map(int,re.findall(r'\d+',panes[0].get('bounds','')))
+    if x2<=x1 or y2-y1<32:raise RuntimeError('Camera control panel has no usable viewport')
+    x=(x1+x2)//2; top=y1+(y2-y1)//5; bottom=y2-(y2-y1)//5
+    for direction, attempts in [('up',5),('down',10)]:
+        for _ in range(attempts):
+            current=nodes()
+            parents={child:parent for parent in current for child in parent}
+            if any(text in (n.get('text'),n.get('content-desc')) and enabled(n,parents)
+                   and n.get('bounds') not in ('[0,0][0,0]',None) for n in current): return
+            start,end=(top,bottom) if direction=='up' else (bottom,top)
+            adb('shell','input','swipe',str(x),str(start),str(x),str(end),'250')
+    raise RuntimeError('Native camera action not reachable: '+text)
+
+
 def tap(text):
+    reveal_camera_control(text)
     # Explicit native shell navigation, never an arbitrary retry of a missing module control.
     if text in ('Close module', 'Module access', 'Mark working', 'Diagnostics'):
         current = labels()

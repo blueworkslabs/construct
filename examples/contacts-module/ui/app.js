@@ -5,11 +5,11 @@ const errors={CAPABILITY_DENIED:'Allow reading contacts in Module access.',ANDRO
 function clearResults(){el('results').replaceChildren();el('detail').hidden=true;el('name').textContent='';el('phones').replaceChildren();el('emails').replaceChildren();nextPage=null;el('more').hidden=true;}
 function state(on){working=on;el('browse').disabled=on;el('go').disabled=on;el('query').disabled=on;el('more').disabled=on;for(const b of el('results').querySelectorAll('button'))b.disabled=on;}
 async function request(params,render){
-  if(working)return;state(true);el('status').textContent='Reading contacts…';
+  if(working)return;state(true);el('status').className='';el('status').textContent='Reading contacts…';
   try{
     const delay=Math.max(0,350-(Date.now()-lastRequest));if(delay)await new Promise(resolve=>setTimeout(resolve,delay));lastRequest=Date.now();
     const value=await call('contacts.read',params);render(value);
-  }catch(e){clearResults();el('status').textContent='['+(e.code||'REQUEST_FAILED')+'] '+(errors[e.code]||'Contacts unavailable. Try searching again.');}
+  }catch(e){clearResults();el('status').className='error';el('status').textContent='['+(e.code||'REQUEST_FAILED')+'] '+(errors[e.code]||'Contacts unavailable. Try searching again.');}
   finally{state(false);}
 }
 function search(more=false){

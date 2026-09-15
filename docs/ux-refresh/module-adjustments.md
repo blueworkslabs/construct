@@ -3,14 +3,14 @@
 Companion to `design-tokens.md`. "Now" = consistency work for this phase, done
 with the shared CSS and tokens, no behaviour change. "Later" = outside this phase.
 
-## Hello (API 0.1 → 0.7)
+## Hello (API 0.1 → 0.6)
 
 Now: adopt shared CSS, header with corner padding, footer version, help block.
 Manifest bump to the corner-aware API so the top strip disappears. Keep the two
 demo buttons; they are the smoke test.
 Later: nothing.
 
-## Checklist (API 0.1 → 0.7)
+## Checklist (API 0.1 → 0.6)
 
 Now: shared CSS; input and Add on one row that wraps at 360px; 48px rows with a
 24px checkbox and a quiet destructive delete with an accessible label; summary
@@ -20,7 +20,7 @@ input keeps focus after Add; the list scrolls, the input row stays visible above
 the keyboard. Manifest bump for the corner.
 Later: reorder, due dates. Not this phase.
 
-## Tones (API 0.2 → 0.7)
+## Tones (API 0.2 → 0.6)
 
 Now: shared CSS, two large primary-style pattern buttons in a row, status line
 uses the denied/muted rules with the exact Module access switch name. Manifest
@@ -29,9 +29,9 @@ Later: none.
 
 ## Focus (API 0.6)
 
-Now: align type and colours; the countdown stays mono at 40px; move the long
-"no background alarm" paragraph into help; keep the completion-tone toggle as a
-secondary control next to Start.
+Now: align type and colours; the countdown keeps its task-specific responsive monospace sizing; move the long
+"no background alarm" paragraph into help; keep the existing Start/Pause/Reset controls. Optional tone access remains in
+the native Module access screen; do not invent an in-module permission toggle.
 Later: notifications. Explicitly out of scope.
 
 ## Contacts (API 0.6)
@@ -43,7 +43,7 @@ gates in one line. Landscape with keyboard: results list scrolls under the
 fixed search row.
 Later: favourites, calling. Out of scope.
 
-## Camera launcher (API 0.4 → 0.7)
+## Camera launcher (API 0.4 → 0.6)
 
 Now: cut the launcher to purpose line, one primary action, status, expandable
 help containing the privacy and quota paragraphs. Replace the "Both access gates"
@@ -61,7 +61,7 @@ Now: same launcher cut as Camera. Fix stale copy: rotation retains the workspace
 sheet and buttons to tokens and use the shared badge for the calibration chip.
 Later: multiple measurements, saving, shapes (slices 2 and 3 of the measure plan).
 
-## Snake (API 0.5)
+## Snake (API 0.6)
 
 Now: header type and chip style to tokens; nothing else. Board, controls,
 animations and gestures unchanged.

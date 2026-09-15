@@ -5,7 +5,7 @@ import time
 import ui
 from config import require_runner
 from ui import adb, labels, tap, find, capture, RESULTS
-from host_ui import select_after
+from host_ui import select_after, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern, installed_status
 
 require_runner()
 result = {'complete': False, 'checks': []}
@@ -23,9 +23,9 @@ def check(name, count):
 
 try:
     adb('shell', 'am', 'start', '-n', 'dev.construct.runtime/.MainActivity')
-    tap('Use demo catalog'); tap('Refresh catalog')
+    host_ready(); catalog_settings(); tap('Use demo catalog'); apply_catalog()
     select_after('Hello Module · 0.1.0', ('Review & install',))
-    tap('Allow & install'); tap('Open')
+    tap('Allow & install'); installed_status(); select_after('Hello Module · 0.1.0', ('Open',))
     check('initial', 0)
     pid = adb('shell', 'pidof', 'dev.construct.runtime').strip()
     for cycle in range(1, 11):
@@ -36,7 +36,7 @@ try:
         check(f'{cycle}: diagnostics return', cycle)
         tap('Module access'); tap('Reopen module')
         check(f'{cycle}: access reopen', cycle)
-        tap('Close module'); tap('Open')
+        tap('Close module'); select_after('Hello Module · 0.1.0', ('Open',))
         check(f'{cycle}: close reopen', cycle)
         if adb('shell', 'pidof', 'dev.construct.runtime').strip() != pid:
             raise RuntimeError('Construct process changed during repeated transitions')

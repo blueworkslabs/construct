@@ -15,7 +15,7 @@ function render() {
     check.onchange = () => change(items.map((v, i) => i === index ? {...v, done:check.checked} : v));
     const text = document.createElement('span'); text.textContent = item.text;
     if (item.done) text.className = 'done';
-    const remove = document.createElement('button'); remove.textContent = 'Delete'; remove.disabled = busy;
+    const remove = document.createElement('button'); remove.textContent = 'Delete'; remove.setAttribute('aria-label', 'Delete ' + item.text); remove.disabled = busy;
     remove.onclick = () => change(items.filter((_, i) => i !== index));
     li.append(check, text, remove); list.append(li);
   });
@@ -41,6 +41,7 @@ document.querySelector('#add-form').onsubmit = async event => {
   if (!text || busy) return;
   await change([...items, {text, done:false}]);
   if (items.some(v => v.text === text)) input.value = '';
+  input.focus();
 };
 document.querySelector('#clear').onclick = () => change(items.filter(v => !v.done));
 (async () => {

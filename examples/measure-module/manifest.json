@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "dev.construct.measure",
   "name": "Pocket Measure",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Estimate a tabletop length using a printed reference marker and two endpoint taps.",
   "constructApi": {
     "min": "0.7.0",
@@ -18,5 +18,5 @@
       "reason": "Open the native photo picker and local measurement workspace. You choose the photo, confirm marker size and tap endpoints; no image or result reaches module code."
     }
   ],
-  "themeColor": "#102026"
+  "themeColor": "#0B1410"
 }

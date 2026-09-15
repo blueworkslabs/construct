@@ -160,3 +160,32 @@ Library launch, explicit historical installation, trial/repair/revocation,
 keyboard/menu clearance, and photo/measurement lifecycle regression. Preserve
 the existing documented Android 17 emulator Snake limitation; don't weaken game
 protection to obtain a pass. No new installer or module ZIP is published yet.
+
+
+## Integrated candidate (acceptance pending)
+
+The presentation slice is integrated on `feat/ux-refresh`. The host now starts
+from local Library inventory, keeps catalog setup under Settings, and exposes one
+normal release per module in Browse. Versions uses the existing verified-package
+consent and install path; rollback, trial health, damaged-index recovery and
+permission checks remain owned by the runtime.
+
+The shared theme is applied to the host, module menu, camera and measurement
+workspaces. All eight launchers use the shared CSS tokens and current reserved
+corner contract. The camera photo/control split adapts to portrait and landscape;
+controls scroll without moving the photo. This changes presentation, not capture,
+analysis, export or measurement algorithms.
+
+Candidate module versions: Hello/Checklist/Tones 0.3.0, Focus 0.1.3, Snake 0.1.7,
+Contacts 0.2.2, Camera 0.1.4, Measure 0.1.3. Historical signed packages remain
+immutable. The earlier Snake 0.1.6 layout candidate was not promoted.
+
+The runner retains legacy host navigation and adds exact module/version card
+selection for Library and Versions. `--ux-candidates` runs a separate real-device
+UI scope with eight pinned package hashes; individual capability suites remain
+separate. Module version overrides pair each requested version with its exact
+hash. A UI render or unit-test pass is not Android acceptance.
+
+**Status:** optimized candidate build and Android acceptance are pending. No new
+phone release is claimed here. Android 17's previously documented emulator Snake
+interruption remains unresolved; this UX work does not relax that protection.
