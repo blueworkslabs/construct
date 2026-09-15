@@ -78,13 +78,21 @@ CAMERA_CONTROLS = {'Close camera','Back to camera','Saved photos','Find faces','
 
 
 def camera_controls_top():
-    current=nodes()
-    panes=[n for n in current if n.get('content-desc')=='Camera controls' and n.get('package')=='dev.construct.runtime']
-    if not panes: return
-    if len(panes)!=1: raise RuntimeError('Ambiguous native camera control panel')
-    x1,y1,x2,y2=map(int,re.findall(r'\d+',panes[0].get('bounds','')))
-    if x2<=x1 or y2-y1<32: raise RuntimeError('Camera controls have no viewport')
-    for _ in range(5):
+    for attempt in range(6):
+        current=nodes()
+        panes=[n for n in current if n.get('content-desc')=='Camera controls' and n.get('package')=='dev.construct.runtime']
+        if not panes: return
+        if len(panes)!=1: raise RuntimeError('Ambiguous native camera control panel')
+        pane=panes[0]
+        x1,y1,x2,y2=map(int,re.findall(r'\d+',pane.get('bounds','')))
+        if x2<=x1 or y2-y1<32: raise RuntimeError('Camera controls have no viewport')
+        # Do not swipe a panel already at its top. Unnecessary gestures over
+        # non-scrolling action rows can activate an unrelated camera action.
+        for node in pane.iter('node'):
+            if not node.get('text','').endswith(' · Camera'):continue
+            bounds=list(map(int,re.findall(r'\d+',node.get('bounds',''))))
+            if len(bounds)==4 and x1<=bounds[0]<bounds[2]<=x2 and y1<=bounds[1]<bounds[3]<=y2:return
+        if attempt==5:raise RuntimeError('Native camera panel header is not reachable')
         adb('shell','input','swipe',str((x1+x2)//2),str(y1+(y2-y1)//5),str((x1+x2)//2),str(y2-(y2-y1)//5),'200')
 
 

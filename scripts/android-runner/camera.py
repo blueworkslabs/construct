@@ -20,6 +20,18 @@ expected=os.environ['CONSTRUCT_CAMERA_SHA256'];heading='Pocket Camera · '+os.en
 export_checks=os.environ.get('CONSTRUCT_CAMERA_GALLERY_EXPORT')=='1'
 result={'complete':False,'checks':[],'cameraSource':'Android emulator generated scene, no physical camera'}
 def done(name):result['checks'].append(name);print('PASS:',name,flush=True)
+def photo_layout(name):
+    current=nodes()
+    def rectangle(label):
+        matches=[n for n in current if n.get('package')=='dev.construct.runtime' and label in (n.get('text'),n.get('content-desc'))]
+        if len(matches)!=1:raise RuntimeError('Native layout node missing or ambiguous: '+label)
+        rect=list(map(int,re.findall(r'-?\d+',matches[0].get('bounds',''))))
+        if len(rect)!=4 or rect[0]<0 or rect[1]<0 or rect[2]-rect[0]<64 or rect[3]-rect[1]<64:raise RuntimeError('Native layout viewport is clipped: '+label)
+        return rect
+    photo=rectangle('Saved photo preview');panel=rectangle('Camera controls')
+    if min(photo[2],panel[2])>max(photo[0],panel[0]) and min(photo[3],panel[3])>max(photo[1],panel[1]):raise RuntimeError('Native photo and control viewports overlap')
+    result.setdefault('nativeLayoutBounds',{})[name]={'photo':photo,'controls':panel}
+    (RESULTS/(name+'-nodes.json')).write_text(json.dumps([dict(n.attrib) for n in current],indent=2)+'\n')
 def top():
     if modern(): return library()
     for _ in range(12):
@@ -153,9 +165,9 @@ try:
         try:
             tap('Close camera');adb('shell','settings','put','system','font_scale','2.0')
             opened();workspace();tap('Saved photos');find('Saved photo preview')
-            tap('Save to phone gallery');find('Save a gallery copy?');capture('camera-font2-gallery-confirmation');tap('Keep private');capture('camera-font2-portrait')
+            tap('Save to phone gallery');find('Save a gallery copy?');capture('camera-font2-gallery-confirmation');tap('Keep private');photo_layout('camera-font2-portrait');capture('camera-font2-portrait')
             tap('Close camera');rotate(1);opened();workspace();tap('Saved photos');find('Saved photo preview')
-            tap('Delete photo');find('Delete this photo?');capture('camera-font2-delete-confirmation');tap('Keep photo');capture('camera-font2-landscape')
+            tap('Delete photo');find('Delete this photo?');capture('camera-font2-delete-confirmation');tap('Keep photo');photo_layout('camera-font2-landscape');capture('camera-font2-landscape')
             tap('Close camera')
         finally:
             if original_font=='null':adb('shell','settings','delete','system','font_scale')
