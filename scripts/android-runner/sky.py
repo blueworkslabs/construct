@@ -48,8 +48,14 @@ def permission_tap(text):
         matches=[n for n in nodes() if n.get('text')==text and n.get('package')=='com.google.android.permissioncontroller' and n.get('enabled')=='true']
         bounds=matches[0].get('bounds') if len(matches)==1 else None
         if ready and bounds and bounds==previous:
-            if stable_since is not None and time.monotonic()-stable_since>=1.5:
-                tap_node(matches[0]);return
+            if stable_since is not None and time.monotonic()-stable_since>=4.0:
+                (RESULTS/('permission-'+str(len(result['checks']))+'-window.txt')).write_text(focused)
+                tap_node(matches[0])
+                until=time.monotonic()+12
+                while time.monotonic()<until:
+                    if not any(n.get('package')=='com.google.android.permissioncontroller' and n.get('text')==text for n in nodes()):return
+                    time.sleep(.3)
+                raise RuntimeError('Android permission dialog did not acknowledge the single settled tap')
         else:stable_since=time.monotonic() if ready and bounds else None
         previous=bounds;time.sleep(.3)
     raise RuntimeError('Android permission window did not settle: '+text)
@@ -137,6 +143,10 @@ try:
     adb('shell','cmd','location','set-location-enabled','true')
     for _ in range(3):adb('emu','geo','fix','8.5622','50.0379');time.sleep(2)
     map_ready();contains('Phone location');capture('sky-synthetic-location')
+    tap('Area')
+    fix=[n.get('text') for n in nodes() if n.get('class')=='android.widget.EditText' and n.get('package')=='dev.construct.runtime']
+    if fix!=['50.03790','8.56220']:raise RuntimeError('Location center did not match the injected public airport fixture')
+    tap('Cancel')
     done('Native foreground location uses an explicit Android grant and public synthetic GPS fix')
     adb('shell','input','keyevent','3');time.sleep(2)
     activities=adb('shell','dumpsys','activity','activities')
@@ -145,7 +155,8 @@ try:
     if any('Phone location' in x for x in labels()):raise RuntimeError('Location restored on fresh workspace')
     done('Real backgrounding closes Sky Watch; reopen does not restore prior coordinates')
     fields();time.sleep(16);adb('shell','cmd','connectivity','airplane-mode','enable');adb('shell','svc','wifi','disable');adb('shell','svc','data','disable')
-    tap('Show aircraft');map_ready();contains('Could not refresh');capture('sky-offline')
+    tap('Show aircraft');map_ready();contains('Could not refresh')
+    tap(choice(['Sources & status · issue','Sources & status']));contains('connection failed');capture('sky-offline')
     done('Offline request ends with explicit unavailable status, not a fabricated live result')
     adb('shell','cmd','connectivity','airplane-mode','disable');adb('shell','svc','wifi','enable');adb('shell','svc','data','enable')
     tap('Close');restart();select_after('Sky Watch · 0.1.0',('Module access',));grant_switch()

@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
@@ -68,7 +69,7 @@ internal data class SkyTile(val z: Int,val x: Int,val y: Int)
     }
     fun screen(p: SkyPoint)=Offset((dimensions.width/2+SkyProjection.deltaX(SkyProjection.x(p.lon),SkyProjection.x(view.lon))*world).toFloat(),
         (dimensions.height/2+(SkyProjection.y(p.lat)-SkyProjection.y(view.lat))*world).toFloat())
-    Box(modifier.background(Color(0xFF15251F))) {
+    Box(modifier.clipToBounds().background(Color(0xFF15251F))) {
         Canvas(Modifier.fillMaxSize().onSizeChanged { dimensions=it }
             .semantics { contentDescription="Aircraft map. North is up. Drag to pan; zoom buttons and aircraft list are available." }
             .pointerInput(view,zoom,aircraft) { detectTapGestures { tap ->
@@ -90,7 +91,9 @@ internal data class SkyTile(val z: Int,val x: Int,val y: Int)
                     val color=if(a.age(now)>SkyData.STALE_AGE) Color(0xFF795C16) else Color(0xFF073B2B)
                     if(chosen) drawCircle(Color(0xFFFFCD54),16.dp.toPx(),p)
                     val r=10.dp.toPx()
-                    rotate((a.track ?: 0.0).toFloat(),p) {
+                    if(a.track==null) {
+                        drawCircle(Color.White,r*0.7f,p); drawCircle(color,r*0.5f,p)
+                    } else rotate(a.track.toFloat(),p) {
                         val path=Path().apply { moveTo(p.x,p.y-r); lineTo(p.x+r*0.75f,p.y+r); lineTo(p.x,p.y+r*0.5f); lineTo(p.x-r*0.75f,p.y+r); close() }
                         drawPath(path,Color.White,style=Stroke(3.dp.toPx())); drawPath(path,color)
                     }

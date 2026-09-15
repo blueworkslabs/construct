@@ -15,7 +15,7 @@ with host API **0.8.0** / **alpha23**. Camera/AR is deliberately deferred.
 - Pan, use zoom buttons, and **Search here** to move the search area. Panning alone
   does not change the aircraft-query center; the circle shows the actual radius.
 - Tap a marker or list row for details. North is up; heading is ground track,
-  not the aircraft's nose direction. Altitude is barometric feet, not height above
+  not the aircraft's nose direction; an unknown track uses a neutral dot. Altitude is barometric feet, not height above
   the phone/terrain; speed is ground speed in km/h.
 - Automatic updates run every 30 seconds while open, with a manual refresh and an
   off switch. Individual providers have a process-wide/persisted 15-second floor.
