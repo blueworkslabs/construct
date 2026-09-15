@@ -21,17 +21,23 @@ export_checks=os.environ.get('CONSTRUCT_CAMERA_GALLERY_EXPORT')=='1'
 result={'complete':False,'checks':[],'cameraSource':'Android emulator generated scene, no physical camera'}
 def done(name):result['checks'].append(name);print('PASS:',name,flush=True)
 def photo_layout(name):
-    current=nodes()
-    def rectangle(label):
-        matches=[n for n in current if n.get('package')=='dev.construct.runtime' and label in (n.get('text'),n.get('content-desc'))]
-        if len(matches)!=1:raise RuntimeError('Native layout node missing or ambiguous: '+label)
-        rect=list(map(int,re.findall(r'-?\d+',matches[0].get('bounds',''))))
-        if len(rect)!=4 or rect[0]<0 or rect[1]<0 or rect[2]-rect[0]<64 or rect[3]-rect[1]<64:raise RuntimeError('Native layout viewport is clipped: '+label)
-        return rect
-    photo=rectangle('Saved photo preview');panel=rectangle('Camera controls')
+    previous=None;until=time.monotonic()+15
+    while time.monotonic()<until:
+        current=nodes()
+        (RESULTS/(name+'-nodes.json')).write_text(json.dumps([dict(n.attrib) for n in current],indent=2)+'\n')
+        rectangles=[]
+        for label in ('Saved photo preview','Camera controls'):
+            matches=[n for n in current if n.get('package')=='dev.construct.runtime' and label in (n.get('text'),n.get('content-desc'))]
+            if len(matches)!=1:break
+            rectangles.append(list(map(int,re.findall(r'-?\d+',matches[0].get('bounds','')))))
+        if len(rectangles)==2 and rectangles==previous:break
+        previous=rectangles;time.sleep(.3)
+    else:raise RuntimeError('Native photo/control layout did not settle after dialog dismissal')
+    photo,panel=rectangles
+    for rect in rectangles:
+        if len(rect)!=4 or rect[0]<0 or rect[1]<0 or rect[2]-rect[0]<64 or rect[3]-rect[1]<64:raise RuntimeError('Native photo/control viewport is clipped')
     if min(photo[2],panel[2])>max(photo[0],panel[0]) and min(photo[3],panel[3])>max(photo[1],panel[1]):raise RuntimeError('Native photo and control viewports overlap')
     result.setdefault('nativeLayoutBounds',{})[name]={'photo':photo,'controls':panel}
-    (RESULTS/(name+'-nodes.json')).write_text(json.dumps([dict(n.attrib) for n in current],indent=2)+'\n')
 def top():
     if modern(): return library()
     for _ in range(12):
