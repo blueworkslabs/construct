@@ -84,6 +84,16 @@ class SkyDataTest {
         assertTrue(SkyData.distance(p,SkyPoint(0.0,-179.99))<3)
         assertEquals(1,SkyData.boxes(center,100).size)
     }
+    @Test fun bearingAndCompassPointTheSpotter() {
+        assertEquals(0.0,SkyData.bearing(center,SkyPoint(51.0,8.0)),0.01)
+        assertEquals(90.0,SkyData.bearing(center,SkyPoint(50.0,8.5)),1.0)
+        assertEquals(180.0,SkyData.bearing(center,SkyPoint(49.0,8.0)),0.01)
+        assertEquals(270.0,SkyData.bearing(center,SkyPoint(50.0,7.5)),1.0)
+        assertEquals("N",SkyData.compass(0.0)); assertEquals("N",SkyData.compass(359.0)); assertEquals("N",SkyData.compass(22.4))
+        assertEquals("NE",SkyData.compass(22.5)); assertEquals("E",SkyData.compass(90.0)); assertEquals("SW",SkyData.compass(225.0))
+        assertEquals("NW",SkyData.compass(-45.0)); assertEquals("S",SkyData.compass(540.0))
+        assertEquals("E",SkyData.compass(SkyData.bearing(SkyPoint(0.0,179.9),SkyPoint(0.0,-179.9))))
+    }
     @Test fun projectionRoundTripAndWrap() {
         for(p in listOf(center,SkyPoint(84.0,-179.0),SkyPoint(-84.0,179.0))) {
             val actual=SkyProjection.point(SkyProjection.x(p.lon),SkyProjection.y(p.lat))
