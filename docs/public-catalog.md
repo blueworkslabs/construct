@@ -65,6 +65,12 @@ package's hash/signature/manifest identity, and compares deployed bytes with thi
 checkout. It intentionally does not reuse the local nginx-specific path/method
 checks in `check_registry.py`.
 
+The verifier identifies itself as `Construct-Catalog-Verifier/1.0`. The initial
+Pages deployment returned Cloudflare error 1010 for Python's generic urllib
+user agent, while this named verifier and an Android-style Dalvik user agent
+received HTTP 200. No server security setting was changed. A successful HTTP
+probe is not a substitute for testing the actual app on the phone.
+
 ## APKs
 
 Use tagged GitHub Releases with immutable APK filenames, release notes, and

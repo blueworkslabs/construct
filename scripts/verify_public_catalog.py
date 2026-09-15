@@ -29,6 +29,7 @@ def verify(directory, url=None):
         raise ValueError('Unexpected publisher key; compare with the official APK')
     key = serialization.load_der_public_key(public)
     opener = urllib.request.build_opener(NoRedirect())
+    opener.addheaders = [('User-Agent', 'Construct-Catalog-Verifier/1.0')]
     if url:
         parts = urlsplit(url)
         if (parts.scheme != 'https' or not parts.hostname or parts.username is not None
