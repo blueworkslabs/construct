@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.checklist",
+      "name": "Pocket Checklist",
+      "versions": [
+        {
+          "id": "dev.construct.checklist",
+          "name": "Pocket Checklist",
+          "version": "0.1.0",
+          "artifact": "dev.construct.checklist-0.1.0.zip",
+          "sha256": "751a0c351ebfbe5841b907607b7c810bc03a0552ba85afe85074a1a36ab30ad9",
+          "signature": "mZDbRT0zzgZPVokU9ND09V/V1DAosraIs+OS2Qza57Mt+AMun/VO7/V5M1v/QAvhhb5gI0Qcuh7HhfymKT9A7K3likac9yXOifJKIdXKGtgPWyCmHJ/zYmGW/Ym0E3Ywu1QBPns4QxyVqNpiEzjjI+RJ5sTLbs+Bcu1KJgw2KsIHhvk00utTECWF/snb8z6FlMKMOQOc1mu8urC7i3n7sIfDFUgwKUKWx3dAYZ6bhI+B568G2ogxNWOL/HxCjn2PnPP4DUaIU6o+vyZHmVRvcOs4uIj9WKiAoYIwKwxxeoFpn6mRkWhObec20z8h6qy9Vp8AcesCL4DR1Eugmo1lzA=="
+        },
+        {
+          "id": "dev.construct.checklist",
+          "name": "Pocket Checklist",
+          "version": "0.2.0",
+          "artifact": "dev.construct.checklist-0.2.0.zip",
+          "sha256": "c778504c9f8fae4c5d1a5cdcf1f6c40b091143d4568551bf5289327c96a0a678",
+          "signature": "WJW+iFisl5fTjrvxJLtRCwj6xtlI82XpyW5HwDbAXOeGESV3i+N7ye0JGyJRTQsCHVFHUAYMP3QKjs1tUZe005k2gML6KmW+ah1Bx+TI70Zq09vOPbWNEuhwYT/H499DASqx6FLxg5N3IgLhFVtd3wSbpqrNfLs5SUxM1mZ6I7Ld1z5T7ndKWekI0kXuRUIzUUHl5CtAlf5rccR8/rTqPwzX07CSbahunhOTTYJNve5CZcHl+bDYSgg5IIYzM6EeA/afG46XdBUi968GLHCxin0XMuD3hs4ZI/OmT/ks4yDASB0z5xLeM1bAxzB61L0M+J+PxcHLfEEXFFCy2yHt2Q=="
+        },
+        {
+          "id": "dev.construct.checklist",
+          "name": "Pocket Checklist",
+          "version": "0.3.0",
+          "artifact": "dev.construct.checklist-0.3.0.zip",
+          "sha256": "b5c312ebf38cd08701d3e89f3ccbd5909502545f3df7c65e29d866497454dcbb",
+          "signature": "RzLpbJEFFR9sJY3H/Y2tS7rO+1spdqE5RToa2SZvP9XwtnT49shyE3jEYvs25eIgH3+zqxVMk7fvdYTKdVnWRRQxVB+6Q25fFJkk6Sag2ttB/g3J6NJUBTBk7EtYEf0rDOK1wJGVylBM0RQ4Nn7Lj7ZiFU/NbwFpJujdlY+maE0xenOBYeepnQKdxiUctcv3lEHuNKzeNp4velSkv11qVoCmcXYmbd9YXsujwjokzQHKxvS7SzLTl0f29ZLicYqBxWL0x0fxTn+nzsDO55DLtxMPcm9j5x/l2eiAzkRKrPsyMpbIB1eHdqjpIedV3WG7IcUKjo4Bkq6S6BWEFu8IZw=="
+        }
+      ],
+      "latest": "0.3.0"
+    },
+    {
+      "id": "dev.construct.tone",
+      "name": "Pocket Tones",
+      "versions": [
+        {
+          "id": "dev.construct.tone",
+          "name": "Pocket Tones",
+          "version": "0.1.0",
+          "artifact": "dev.construct.tone-0.1.0.zip",
+          "sha256": "bb7f276d2f6adb4108460c79d5a6ec6c26fa9109ddf851a7aae81c4bc6c99aa4",
+          "signature": "g3xYZEgzffG8Hghd2Qw3YXY3xM5PRjdm3Ga0Kay8o2wVZSjTOuu1a/P13PZRynkXhTKjNBEqP+A4Ss204Rk2NVOSsN5E5zC5/WHGGT7ouhHxIgIlzSxhEq6KVlkBoiCvq/filP40j8HTze3sXkvPm2FrlNgA7wdghIkDrY229HHrN0dJ4deVQvOZ4YS2EZ1Os78Oh9qpx/27Nv2HkqRaYz2knloONELOabQQHvBz0nsyq43oyX0SLc3wuC/7e5cxdev7hiuLb2golMo4S1TbdsdvcrkMSlzXzTtV3c/XnDh2w6qofZz6JuEdCZ2S6vntSlMFqowv9wkyjUGTGHcvDQ=="
+        },
+        {
+          "id": "dev.construct.tone",
+          "name": "Pocket Tones",
+          "version": "0.2.0",
+          "artifact": "dev.construct.tone-0.2.0.zip",
+          "sha256": "896994329debf77bcfea1912f790e59a05bc1dfb21518e52a46f735b3f8752f6",
+          "signature": "NSvmic6FPTVHSw5NzCb6rxJu6vJAj4QvykQ444o04fJToEP6Ykty8jGCKbq/+bSgAHxupb4JGuHow3r06FPAzk1LBX1ET80rKF00Xt/p1R8h1RpGaAs0KjCwnRA4I46ML/jrwUfiqOcP28OSQHQHjqG2IlgnpOK2FV1cNWfI9CODH7G82pBt9OTHFi6PWXGQxulL2IrSYd5D3TuKB/TURIf9BCMLdwTMZ1fNHgj4bt/xPhPhlX9azFGr0ivFQHitQRERWwCSODpOfoOVV6dNV9r8zcUQfK4pUUmKIrGowMhiwgDky+Ju62ofLGVa5bQqOWrqCbmm4liT13fprRrwkA=="
+        },
+        {
+          "id": "dev.construct.tone",
+          "name": "Pocket Tones",
+          "version": "0.3.0",
+          "artifact": "dev.construct.tone-0.3.0.zip",
+          "sha256": "3e19064aaf4c6fb117a2d14cadfb9dc8a6e62b8cfc9af45c05a700a1d975f750",
+          "signature": "IVLDlyPr4BiKNDte7bjfZL0iS3I7pW8D7mpEUaF0uJC2Fo87myH2KRO24XZ9saSmqyAAiC3tC86enPlBChWSmOz3RdeEaPEN9Hcgvhq7kvnbarRJ8JUSSsic9qddYE998lUCLhPdVtLaxTqB9e5cNixRFGW5zrMEzS8S2pgDHF2eZoCZdxjeVD5thM1Zmk+wS+6PWIXkwdFWts/osweod7qkHfuCLlXOVtRRsV/oZhI6sb/6ri9fb9L18fghb9QE0Bn1xJwp1BqjPBGQ8PnV9tcqNp9pugTNhHn5H+tr3kIDMzlPdTocSjPQzrQIggN8cEtwmGMv3V0Ylv6sORxwyg=="
+        }
+      ],
+      "latest": "0.3.0"
+    },
+    {
+      "id": "dev.construct.focus",
+      "name": "Pocket Focus",
+      "versions": [
+        {
+          "id": "dev.construct.focus",
+          "name": "Pocket Focus",
+          "version": "0.1.1",
+          "artifact": "dev.construct.focus-0.1.1.zip",
+          "sha256": "58fec131ce54d9b001f1efc02de2db456f834b2fcf834681483bee6ac0f6f833",
+          "signature": "Rdbk1e4T7fru1Ym24zxy9UcEhOlw4El/i/TITLH2MT6gqg0j3mjqf3cSc0tLv8E7id2Lc/uwy165jdGgQo1VNVnVaL3Ok2xrtfQAzwrw88F4OXL839Mqcbe5Q1W6rHeNa21P3vNTCiD8bwcM8/KmqlMMNT64UJ8eBuozYWN5AuQzzvLawFC1DDfrYSwHl3iYAlSItRvWC08JPfV+9+cxvjDZ935PTen/eSTafo23QRvCo4RxFJfrw0d4PkUqcCCTrLHito5dJFZgPhTipEn3v32QdgtGEGyZy/F7ksFvo1m02e8uMKDK22kLlTrPXvREfc07t3J0xgqr7CebWW6omg=="
+        },
+        {
+          "id": "dev.construct.focus",
+          "name": "Pocket Focus",
+          "version": "0.1.2",
+          "artifact": "dev.construct.focus-0.1.2.zip",
+          "sha256": "ff5c1da9346f2beda1c9339d7bb670f65941bfd6ab92a6b1ca28f6547e196067",
+          "signature": "FHy2mtghG3SL9vhNzdfsO3cd7g1eADm5tThNoSsKlOyJwdcUNVFEYn79juvHUW5k5r5TdujxvDyp5kFh8evDafpAKCVtE54h+MKyPUYThBnRbUW9lDaPcxI39chlk/tmoaEI9tubLdbUhIGsYktZuqDwDMHGG2hrSLrnMnFmHyC9p23Jk9Cgs9IaXDRqa4rwGuidUFaUjennco7T/Vc1bfpmOSCKb3PSAugm7I04re+vTr76Hh/cCuCbq2U8iDenO3VkHOkOjvfAR0u/rUIg5f/bkre1OFSQXyEbznTpgkB+Z3GS00emxHg9wN3wCJlWM3tb0yw0tdWOgWagAaI9ug=="
+        },
+        {
+          "id": "dev.construct.focus",
+          "name": "Pocket Focus",
+          "version": "0.1.3",
+          "artifact": "dev.construct.focus-0.1.3.zip",
+          "sha256": "a254b31c818f0bfa219741078d3dee225f9085c5151d50a78c12d34d20e6a747",
+          "signature": "FWJEZeXuD3Mo08ebGIYljPOdPJMhCuBtiwvYfBzV6CogB0ciuwsgxjzfx01yAnPPMx5RJOeh+mzv4LhB/XR3wAYX2r0XsTkaC8LCfdRVrxi1Ql5MbN7CMPjbRFVJz3fz54C2hZRpXa9bE4gdjUtFmd9n2gXbwVGTdNbWj91idiC0WR6TMpGkHC6Q16fVjZp96WvOD6rzrbbNOUZiXWERixOERDK6xdw2OkhMLwI+qSbEykgL7NNKsxks/Dg/qhnV2dEyC+rkTYA/GbSrh+8jW4zMsPAKPQqJ6IS9kEK09tm1/wrqR0S87f3AqbjY8sfzSymwStkKyPDYeq8sjooKAQ=="
+        }
+      ],
+      "latest": "0.1.3"
+    },
+    {
+      "id": "dev.construct.snake",
+      "name": "Pocket Snake",
+      "versions": [
+        {
+          "id": "dev.construct.snake",
+          "name": "Pocket Snake",
+          "version": "0.1.2",
+          "artifact": "dev.construct.snake-0.1.2.zip",
+          "sha256": "38b4c8145470214ffef74cead601882a9770d45b4a618a9221beb7c3303da04f",
+          "signature": "BSAtBcwlCI1+LqH2sYrI4IxpPO+iiJQaGUxBhcqBmfev85U/ufcwtUoRki6USZ3vpgBCAnHHgaXOjZZSU0PwgCZtJVPJQfks08I8Dgjz+fVXi/SJp3tAd9SbJ1y1C/fyTdI/q6SR6qcNncHz/iZ4DZOCntVAFMJzVGQgAfr1HKa8X08WdEAclEkqMQ+bUDvZ0uYMpwxMkyzhFCIdanw6P3Q7sur+k/gmCWlq5QLvBL3GIln1OqoItar2WvC22xYWK+vKEsi0uh9VxPC30V/5HDuACgkzrLAK9bNEKCm6zYdX73TdCslqWcWb9NKKAG+A+NzklQt+wA+9se09ItiTiw=="
+        },
+        {
+          "id": "dev.construct.snake",
+          "name": "Pocket Snake",
+          "version": "0.1.3",
+          "artifact": "dev.construct.snake-0.1.3.zip",
+          "sha256": "85de652a1a62f9cdc1795df05c8576bde299ac95af85dd7e00e3e65ae2586823",
+          "signature": "WybhumbVohquqBNV9t0MGZ7o7mjugpjx5jem+FusRKpljJtLI60w2T04LMZi61qH62vBkvTsz3kfeyOiHBFkrC7Ot3l4oV9ScEb2aFP3+I+ClIw9EII3B36P/ys404Vu6o6WahHm5uJzMOngZrxZyzYIUpJs0275U0fKMk+MwltVPA0nH7E4I6Y1eVEDvepwUWWXiJBoGaogs0p/4S5mBSf+lF6sxrrmUlhl7dFgGWIOlYZmOZmNz336vG7elFj1KsIfEBzESK9R1MV0Bwq/YYcMayGU6yHlxi/qsXDBhGNVW59WbYu9ApamrYPFbz/tU6z1N6a1wXh+F+OSO7Z5bA=="
+        },
+        {
+          "id": "dev.construct.snake",
+          "name": "Pocket Snake",
+          "version": "0.1.4",
+          "artifact": "dev.construct.snake-0.1.4.zip",
+          "sha256": "fb1d63a2cf41cb3631faef69efc8f6abd7eafc5e276ab26530cb30abba5a83de",
+          "signature": "UXR/gMH5TNYXA3rGsbLbYD1hel3+Mj44DSVxPu+su2v3OGspxodGL99yy3Ye8zk4qGJs51QqHfpcHVhcByQvpjaVfmqcyO8bMV91MAb2OBueqM0HTVUH68051dm2dLPkFIEiOZ61kfbP/oMNw7CwKniONdxFTt6ogGoW7XeQsN0ed8eRWMxaAnXiTc1JBJcqAI3BTL+XQdkJ6PyPPSG63dxv/RdexOOdfPBHnVhWspQYermNUoxI+SqPNFMVyLVlcFQwNm3pPao6sjqYjkLvBmgZCetfk0ez9L6ReZvgFiF15XvHkDtmg5hSuQgWRMEc6+EoQ68vD9bJGl3YDxa9oQ=="
+        },
+        {
+          "id": "dev.construct.snake",
+          "name": "Pocket Snake",
+          "version": "0.1.5",
+          "artifact": "dev.construct.snake-0.1.5.zip",
+          "sha256": "42a0b89f4877a7111e8c92e6c3e8c00addeebca18fd87d463e7c76756c083bb2",
+          "signature": "Wt3Gpos/bXMdsHzoeJn08BnUqvU1giV9/bl3qKxjHi8XXPeYRt6G0B7wP34iBjm2BUGoN8OuscJGErJAlVNQLclaAiiaN4z4M0EyReib3oCFdMesXjnpf4xQspFyh9Swzm/ck6SeC/0oMgeNqaYzFV28NgeDVP2jYraFVpMj0rNzLBzmmcRPEkKvOL5jx/vFKA1bqKEomSnDkv9Tl7bjNUsqQgcXpnPt/17y6sTbC4YaxPFnWnrYnhHhXtfZleGHAoGdJY5s3jYiGFbP8JriFl8gOeeha9RCQupXH0HC1DoBR6Bs+JLZiizOZySjl5ZQSX3BKIus6u7M8VInResyBA=="
+        },
+        {
+          "id": "dev.construct.snake",
+          "name": "Pocket Snake",
+          "version": "0.1.7",
+          "artifact": "dev.construct.snake-0.1.7.zip",
+          "sha256": "6617d1b3e5d1bb0c524c754b7e55c73bd666d290301fcff9e5ab5b368db95f30",
+          "signature": "amz74Atz14MIMwlJe3snpTc1QbC5xUgsZVCUk8xDJHbqIIno14v316zFBjTg10S1pV9iw8TErwQBGSu2SnJMWyqFUkZi2k8Ary101B9AZSEcFBMFY4Y04GZa3Yk0qpL2ldQZpYys/+C/c3rp9qMyoP1dp+CfprMkR8dnfB9ersG/SE/WZd3Ny4g3HpfLPwDO3Ku8ZqETUXRyN2JW+Ol7fusapR7FST18E4ahEof5/A2YKsj83zTJYk7t1wlZCG4yw4GhMYQ0CfUkx+x3LxGuJcjAUUrfbkDZMivZEZJdnFPDIz5HCjM2lHL+d81RVuk6AXdcG93MeHQON7pAhOXNDg=="
+        }
+      ],
+      "latest": "0.1.7"
+    },
+    {
+      "id": "dev.construct.contacts",
+      "name": "Pocket Contacts",
+      "versions": [
+        {
+          "id": "dev.construct.contacts",
+          "name": "Pocket Contacts",
+          "version": "0.1.0",
+          "artifact": "dev.construct.contacts-0.1.0.zip",
+          "sha256": "193aecc538a848484f8e311a30a301df4d83152275cefd04e0ed415fd888b843",
+          "signature": "LzEmJIJ52ZK6qsPDJ02Hxxpu/ySv/atWQZkLLUWJIJwaQ5nIwweYyM/L/hxFxHOuBUh/I0Dv3+jtlclQHfUGOHaigOJwYt52doGehBCBnpHeMQyK0eWyrDUxb5vYoN1psLSecPna+dZ33kGZ7kOPpAZ5Y5zj7RGKXUd96lVcEnxZNo1Tg4RLVy5Eyr3o2eGr1sfF3Iy8bJatMwU5pic5yCVLcgklnFIAq2NKZZ5FcDjcg6p4B8YeDaVQKMo735KZ645qmGfKscIxBa3zvjQyYYeIxdi/4sE45DxJKYYvHmoxk2MQk66zpzFXop4nBS7u7CkUN5/t970nGEtDYkhftw=="
+        },
+        {
+          "id": "dev.construct.contacts",
+          "name": "Pocket Contacts",
+          "version": "0.2.0",
+          "artifact": "dev.construct.contacts-0.2.0.zip",
+          "sha256": "3119c104e208963f2f770246a98035c2a860189e7d24517b6059ce33f5e11182",
+          "signature": "j7q1xVLgmwskj4sNUinVzQAbgwDdUbpsTHIuQfuyi++uM6Mg8n+GOBnskvjwkAqgOgLgGpA2+XOX2o2XAadD2SS4I7TojTxH2nLl3u/EbU4RHB4+nQfRyoYW6xOSkzNA81XCH25WKxn3m5F4Ogo8dfXXmfvW9X4JyXeUm/XQ0P9ElrxLkuwQrH3vg1BkEzg+DcWkX4s2P7l+RJKP1O8GSYCxADIO70xp5f1UQrjcTZKOgSBcQ0dymxyftIqXCsX8Ty7KyJMCy2XsTP84Qq2iWzUStR4BVwRHwsrNmq76CHspEC6JZ6vwWRFKAPq+IuVks92eEvdCDNbquXvDPldj3Q=="
+        },
+        {
+          "id": "dev.construct.contacts",
+          "name": "Pocket Contacts",
+          "version": "0.2.1",
+          "artifact": "dev.construct.contacts-0.2.1.zip",
+          "sha256": "76c672923c1ef3de274d56100607da636b7cd6281119bcef9593d689ae1eee8e",
+          "signature": "RdoOQJoR+WwcKwVu/QFdOh4uuIKpwatZcjVdVWdcrOnIY2dhzr9qetGc5hCtB45PCcnc9ZHiV3EfzU0gXNFxNxnhE6Qf1+NWgC4zJHe9vv6VAgOhNvwAPDa7PnylFMtjWWyRJ1uGHRIHtGJ3b5KNHuwbFyvcAvk6ZdOFvo/BBn/6O60u67EXtcQVuAQ1bJOmvYv5m3411+fUFtVD/N6oag9v/wmUZ294WOCtAzrMZyWpJgXHWIcB1SR9S6otLwaDSFqMMiXoICyQ2GOnO7il0G5ET2lrS1Pmq6FJqdW1Ws5hGDTq57jshuiyZqQp+dINsi3YIliDEaWvPVJg0rW+RQ=="
+        },
+        {
+          "id": "dev.construct.contacts",
+          "name": "Pocket Contacts",
+          "version": "0.2.2",
+          "artifact": "dev.construct.contacts-0.2.2.zip",
+          "sha256": "dd4da5560a4e833a0d40b4bc68f19374a39d29efc4b98c6902bf62285a0d1198",
+          "signature": "l+QfmCKUsw7Xmwol7qHvMByUIwn3Y/W/hee6zXX80rmjgZWIi28/xgnYVDbIBXVFKukOIbaUCH6/nIfatDmMAv9A8yAcoMRvpwl3PXhFCkDqRSik+OTfBDfEwEmFplzylajrdl6IxI5PZXTJphHo6r8x9DisNGtffh4ne7NMcLWgKtGzKbvIAmKJpqhbdW6KB9VoCAMoaZpgN+YJczZhNNHE7Mw92BxGg7FS77WKZAtfY68mX5Gxbwqnr+oVcJOXVxNxwhaXHkIazgO9Ws+j3Qadsz+YPz7eV0poBR27toTXEG5mTyqV9MhiPwXaVKQl4zz3TrDrCVI4y5egQHpb6g=="
+        }
+      ],
+      "latest": "0.2.2"
+    },
+    {
+      "id": "dev.construct.camera",
+      "name": "Pocket Camera",
+      "versions": [
+        {
+          "id": "dev.construct.camera",
+          "name": "Pocket Camera",
+          "version": "0.1.0",
+          "artifact": "dev.construct.camera-0.1.0.zip",
+          "sha256": "6b0b8c83107c19f312ca74abe5692a753850f61181a6d66e82dba625697968d7",
+          "signature": "XJsMwCl1uecfdZM7cMOBuo3RHPYyLXqskHOyvRR5alUYBD7Rv9VK9BTtOxUNjsJfeqpzhJJnmq1gAYvCSxdaJUNpgpcyU8LL+pYcqUZ8Izk2AD71TxM4vmgjKq2AnbjXJkS73BMIGuLiL82t+FamTt5F6dN7ZrwBTaDwxD1sdL6cQ//HaWs8isj7ytBN/LcebmKLbG9RXWeYpeuuY23l890b7hleGn7lNYhpsk+/KtWC++cw9tFekXKyMz1w7N6PKYt5tFZuG2mdZfCnPaVZMev7pO8bpyV12ADLAbp5XXNjYaZV9GgSxYaTmeMcbRpUVp8bGgzPTvrvZT6WGTCypA=="
+        },
+        {
+          "id": "dev.construct.camera",
+          "name": "Pocket Camera",
+          "version": "0.1.2",
+          "artifact": "dev.construct.camera-0.1.2.zip",
+          "sha256": "e7dcb01687ecc0254ddb7e7ab478212a9375e55f09f3505a112ff184b9571ad6",
+          "signature": "hsbpJGSIyUBKJzkvYIC1gS70SeevbKE3Ng+yiI9aEZB6N9SdmUFpnrL4AMGv8/hFpqylxkWujFGvHULahQnnNMGdMtkLLg3rpVzieSogAfkc7DNnctpcIGMXWAUxrBKXHWn/dUmsWn6KOu2ZZbs1aIWWK0n57MkadjBMZCGU6o80g0iKTEXMDTcJ4pn6ev7hj7ZdhH72D+TWDM4oA0zZ6Eoa6zZT+E/MXLlJIFmpQwSjv3IFAJM47fImWf9cWa8SGgZwP8FrceKnvNDRj6Cf0Pa3fg2mUoELBb7jNdwXIM+nBIVBrMT2CmtL5FH3nm1O/r9SYKvD8Hp11TioZ/MP3g=="
+        },
+        {
+          "id": "dev.construct.camera",
+          "name": "Pocket Camera",
+          "version": "0.1.3",
+          "artifact": "dev.construct.camera-0.1.3.zip",
+          "sha256": "04729ba0a40a908328551bd91ea40fd9342f0e2c3391c3d5a2211a0236e239d3",
+          "signature": "ivx0Xvhw2DYfBc8SLbbmphjs3Xmmbog/mX9YOiVKJelF0N6GmEev3/2QYjvCfo4sxVxpM2MkSdrth6yDLXNhW/+PVxOejv6UFBgikkg4V5WuNA0LGzqclqHfurKVNilOZrz5UjoecwyFvU6/s9cG/vAvhrqUc/v9lNH6zFeC1aaXQAryiGoHx0NbRxnDUP8PBbsd6mNra7xqDHhF5o2rN2cH+aYTBZVVtI4xJHR1N37oKpJQ8YIzqeoYsna/BMHhTYwUy4RdLxO2ElZg5TmArNyRiBHGt5WyC5RiSgk039DcISxxQSRPsgOxbhSFSy/b6SeZtPGqpDzOqt3UB/hFFQ=="
+        },
+        {
+          "id": "dev.construct.camera",
+          "name": "Pocket Camera",
+          "version": "0.1.4",
+          "artifact": "dev.construct.camera-0.1.4.zip",
+          "sha256": "bdf5275090b701346673bcfacddb88e3d955b9b42e2cef84e09a7cd6d8d33de6",
+          "signature": "EbkEEGbAwv+2Ks8E7BoUGkfDw6701fX4WkQfXp9bJ7Hta46ooUCphMuV23dVw3fw1D690WCXpgQxE6rna0DLUusyOqhsYDj7duDyGEJnjqkJ8VK5P3BdIfmYl1q2MV1C6qUKPi1bAT+kb87aEpLo/xEgPiJHgDr1HaKLi/qYEcJoU0TmV1N7ZD/m5lFq5XKRbzCOw9kmOA5pus4xko0m74DHXRot7/ZfBFcN8JIET7Z5hm5S6fOxVotZhLDre5dGdHxdogeivAb+Z+kX5jYnxzUNv+OEvc5FO1ydovY/jQDqWdBYHFi2iujhrMDkYFcq8f3pAR3nt52xYHW8owBIQA=="
+        }
+      ],
+      "latest": "0.1.4"
+    },
+    {
+      "id": "dev.construct.measure",
+      "name": "Pocket Measure",
+      "versions": [
+        {
+          "id": "dev.construct.measure",
+          "name": "Pocket Measure",
+          "version": "0.1.2",
+          "artifact": "dev.construct.measure-0.1.2.zip",
+          "sha256": "645b93933776e8b6b4177d34f57e098b5fb471b21899c6eccd64bb75e9abca74",
+          "signature": "EOqwoGiCWiRl9zeMYVboZBncIGE/bfhL8oGWK2h5D5v8Yc58gA3kfR2dTp4ZaO05xxuIANt6F0kGom0fZdop0DQ6AOGMskA7gw79Zn37bijF6ggD9kksqt2E3hzE8aQPsaz8w8UVI2uUeVTi+eM5eE4wEcKQKYzfAu23iKj7eqTY4y4trYYnXTAb64rtAS85NQt0iRhGBOJJfFR2XvzZ0+hvTKmtgrNey/EEtbqECq85YOqtG5oMwTdR8n0M/Kcw/N2r9BcncoQzIQ0bVbTayBCyBZeL/sYv4Q7y+PKVu9cHCc4RsNcRrPePbp1iUyDW1KB+XYRueDlrm3qG4ohQSg=="
+        },
+        {
+          "id": "dev.construct.measure",
+          "name": "Pocket Measure",
+          "version": "0.1.3",
+          "artifact": "dev.construct.measure-0.1.3.zip",
+          "sha256": "3d0f8fa2af250239926d5a463181c21414a4188f94ea9fc2e575c42e800f052f",
+          "signature": "Rqn1mgL1dQklmfKhmHwhngwTlHLwygM0GYWEN3WSekvhTjEnE0/UpKnSMUT4p12deu8x131tkFOj2pwccCcUIjJatnSyNoVtQKl1sI+7mVGywlzsEM/gWSFm8WbgFe9NJ/EHakuyFc/QMFd23x3bBmk0cJSrgZ7kfx7IDh///VhO4ztT9BEiTNYmKeDasgVvJxVs6Y8MuN1NEFIlQwTLBhJ3SRRDkf3lqMMj3T+o2cbCf3+BXOKl6vdHfKsbdfu+rmsmrSep73OFOqefISuba8kRF+ZfijstMKoo9KCwP1tTA4Icwih08OQp82oDp6ZQWxUK8/Htf3wURQCa9azr1w=="
+        }
+      ],
+      "latest": "0.1.3"
+    },
+    {
+      "id": "dev.construct.hello",
+      "name": "Hello Module",
+      "versions": [
+        {
+          "id": "dev.construct.hello",
+          "name": "Hello Module",
+          "version": "0.3.0",
+          "artifact": "hello-module-0.3.0.zip",
+          "sha256": "e561223d234b3721bb1a7534c196aadcf4bc24782d28c460c3172fa74d214204",
+          "signature": "Uk/PwO7cRMVVTJmiDdTF6OWdo+CIJoYc2QFLXXEhwGm7nYyxfF8o9V/Qehh5kyZpqAYEB3CFoTm+BIt93uHSR56R+qWcGPl3UZiJBO54EablCD10A+qZg7Y97Iq4bXX1TxQ32XPUgcziAGvMPtYM7ixjMcZH3wzHhwkGkDgGhrkypnVRx+NmDPab4Q0+MCYccj0IRWPdT2VUlibH885SZDMBZgv7utOx5u1c1WAv6M6riAsukodcK7ztXpMbJbCxbM3BkXMMEbHmKy4DQgKKXoP5ErwZnHiTQfAA8f+tjzlvXfLG/zjxo5WA4BuX4AK9qrJQ1PIZv21JV/63HGECgg=="
+        }
+      ],
+      "latest": "0.3.0"
+    }
+  ]
+}

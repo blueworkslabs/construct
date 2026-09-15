@@ -8,7 +8,8 @@ Construct is an experimental Kotlin/Compose Android app that installs signed
 HTML/CSS/JavaScript modules and gives them a small, versioned set of native APIs.
 The companion workflow takes a request from an agent-assisted workshop through
 local tests, a disposable Android emulator, artifact verification and a private
-module registry—then onto a real phone.
+module registry—then onto a real phone. Released modules can also be served from
+the public static catalog, without a local server.
 
 ![Pocket Snake running in the module-first Android shell, in landscape](docs/media/snake-landscape.png)
 
@@ -25,6 +26,16 @@ See [release provenance](docs/public-release.md) and [known limits](docs/evidenc
 [Reproduction guide](docs/reproduce.md) ·
 [Evidence and limits](docs/evidence.md) ·
 [Module API](docs/module-api.md)
+
+## Downloads and public catalog
+
+[Android pilot APKs](https://github.com/blueworkslabs/construct/releases) are
+published as GitHub Release assets, with version notes and checksums. The signed
+module catalog lives in [`catalog/`](catalog/) and is deployed with Cloudflare
+Pages. See [hosting, verification, and migration](docs/public-catalog.md).
+Changing an existing app's catalog URL does not require reinstalling or resetting
+its data. The pilot signing identity is preserved; self-built hosts with a different
+publisher key need their own signed catalog.
 
 ## What it can do today
 

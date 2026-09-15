@@ -44,3 +44,6 @@ runner.local.json
 .venv/
 core/app/src/main/assets/vision/*.tflite
 core/app/libs/*.aar
+
+# Explicitly published, signed module artifacts only
+!catalog/*.zip
