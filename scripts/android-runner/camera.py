@@ -27,6 +27,7 @@ def top():
         adb('shell','input','swipe','360','450','360','1050','300')
     raise RuntimeError('Host top missing')
 def status(prefix):
+    __import__("ui").camera_controls_top()
     until=time.monotonic()+20
     while time.monotonic()<until:
         if any(t.startswith(prefix) for t in labels()):return
@@ -147,6 +148,21 @@ try:
     tap('Back to camera');status('Camera preview ready.');rotate(1);host_ready();no_camera_client();rotate(0);host_ready()
     opened();workspace();tap('Saved photos');find('Saved photos: 1 / 8');find('Saved photo preview')
     done('Real rotation closes native camera without losing the saved photo')
+    if os.environ.get('CONSTRUCT_CAMERA_UX_LAYOUTS')=='1':
+        original_font=adb('shell','settings','get','system','font_scale').strip()
+        try:
+            tap('Close camera');adb('shell','settings','put','system','font_scale','2.0')
+            opened();workspace();tap('Saved photos');find('Saved photo preview')
+            tap('Save to phone gallery');find('Save a gallery copy?');tap('Keep private');capture('camera-font2-portrait')
+            tap('Close camera');rotate(1);opened();workspace();tap('Saved photos');find('Saved photo preview')
+            tap('Delete photo');find('Delete this photo?');tap('Keep photo');capture('camera-font2-landscape')
+            tap('Close camera')
+        finally:
+            if original_font=='null':adb('shell','settings','delete','system','font_scale')
+            else:adb('shell','settings','put','system','font_scale',original_font)
+            rotate(0)
+        opened();workspace();tap('Saved photos');find('Saved photos: 1 / 8');find('Saved photo preview')
+        done('Native large-text portrait/landscape keeps the photo visible and gallery/delete confirmation reachable without modifying it')
     for count in range(2,9):tap('Back to camera');status('Camera preview ready.');shutter(count)
     tap('Back to camera');status('Camera preview ready.');tap('Take photo');status('[CAMERA_QUOTA]');tap('Saved photos');find('Saved photos: 8 / 8')
     tap('Delete photo');tap('Keep photo');find('Saved photos: 8 / 8');tap('Delete photo');tap('Delete permanently');find('Saved photos: 7 / 8')

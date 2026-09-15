@@ -68,12 +68,12 @@ try:
     by_id={e['id']:e for e in candidates}
     hello=by_id['dev.construct.hello']
     select(hello,'Open'); find('Add one'); menu_clearance('Add one'); tap('Add one'); find('1')
-    tap('Mark working'); close(); restart(); select(hello,'Open'); find('1'); close()
+    tap('Mark working'); find('Marked working. You can now install an update.'); restart(); select(hello,'Open'); find('1'); close()
     done('Hello task control clears the native corner and its count survives restart')
     checklist=by_id['dev.construct.checklist']
     select(checklist,'Open'); find('New item'); replace('UX literal <tag> & quotes')
     tap('Add item'); find('UX literal <tag> & quotes'); adb('shell','input','keyevent','111')
-    menu_clearance('Add item'); capture('ux-checklist-keyboard-entry'); tap('Mark working'); close()
+    menu_clearance('Add item'); capture('ux-checklist-keyboard-entry'); tap('Mark working'); find('Marked working. You can now install an update.')
     adb('shell','svc','wifi','disable'); adb('shell','svc','data','disable')
     try:
         restart(); select(checklist,'Open'); find('UX literal <tag> & quotes'); close()

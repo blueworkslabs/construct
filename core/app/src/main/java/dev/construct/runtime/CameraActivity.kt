@@ -230,7 +230,7 @@ class CameraActivity : ComponentActivity() {
     private fun loadPhoto() {
         analysisGeneration.invalidate(); analysis = null
         val generation = ++imageGeneration; bitmap = null; status = "Loading saved photo…"
-        val file = saved.getOrNull(selected) ?: return
+        val file = saved.getOrNull(selected) ?: run { status = "No saved photos yet."; return }
         io.execute {
             try {
                 if (!live || generation != imageGeneration) return@execute
@@ -343,11 +343,10 @@ class CameraActivity : ComponentActivity() {
             }
         }
         @Composable fun Controls(modifier: Modifier) {
-            Column(modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(modifier.verticalScroll(rememberScrollState()).semantics { contentDescription = "Camera controls" }.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("${installed.manifest.name} · Camera", style = MaterialTheme.typography.titleMedium)
                 WorkshopStatus(WorkshopMessage(status, if (status.startsWith("[")) WorkshopTone.ERROR else WorkshopTone.NEUTRAL))
                 if (gallery) Text("Saved photos: ${saved.size} / ${CameraPhotos.MAX_PHOTOS}", style = MaterialTheme.typography.bodySmall)
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).semantics { contentDescription = "Camera controls" }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = { finish() }) { Text("Close camera") }
                     TextButton(enabled = !busy, onClick = { if (gallery) { imageGeneration++; analysisGeneration.invalidate(); analysis = null; bitmap = null; gallery = false; status = "Opening camera…" } else showGallery() }) { Text(if (gallery) "Back to camera" else "Saved photos") }
@@ -377,7 +376,6 @@ class CameraActivity : ComponentActivity() {
                 TextButton(onClick = { helpExpanded = !helpExpanded }) { Text(if (helpExpanded) "Hide camera help" else "Camera help") }
                 if (helpExpanded) Text("Up to 8 photos / 20 MiB here. Closing, backgrounding or rotating closes the camera. Saved photos remain until you delete them. Gallery copies are independent and may be backed up by photo apps. Analysis does not identify people or infer emotions.", style = MaterialTheme.typography.bodySmall)
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                }
             }
         }
         Surface(Modifier.fillMaxSize()) {

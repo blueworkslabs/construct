@@ -141,3 +141,20 @@ Raw results can contain operator URLs and device metadata. Review/redact evidenc
 before sharing, never upload real contacts/photos or an entire private result tree.
 The checked-in screenshots are synthetic reference-pilot images. Fresh source
 verification is recorded separately in [public-release.md](public-release.md).
+
+## UX-refresh candidate scopes
+
+`--ux-candidates /absolute/path/candidates.json` runs only the Library/Browse and
+refreshed launcher UI checks. Supply an array of eight exact signed catalog
+entries (`id`, `name`, `version`, `sha256`); use a dedicated test catalog that
+contains those immutable packages and the historical versions. This scope checks
+initial local-only inventory, latest-first cards, actual Versions/consent paths,
+package identity, literal keyboard entry, offline reopening, native-menu clearance
+and Android font/rotation layouts. Screenshots still require visual review. It is
+not a replacement for host, gameplay, contacts or native photo regressions.
+
+Use `--focus-version`, `--snake-version`, `--contacts-version` and
+`--measure-version` with matching module hashes when checking new releases.
+`--camera-ux-layouts` extends full camera/gallery acceptance with reachable native
+confirmation controls at 2x Android text in portrait and landscape. It requires
+`--camera-only --camera-gallery-export` and the exact camera version/hash.

@@ -24,7 +24,8 @@ proxy. See its `--help` and `server/nginx-registry.conf.example`. The origin bin
 loopback; it is not an authenticated public marketplace. Keep private signing
 material and source/build trees outside the served directory.
 
-Enter your HTTPS index URL in Construct, or create an ignored operator build profile
+Enter your HTTPS index URL under Construct menu → Settings → Use catalog (see
+[using Construct](using-construct.md)), or create an ignored operator build profile
 with `scripts/configure_host.py`. A private CA is optional and scoped to the exact
 registry hostname. Certificate and hostname verification remain enabled.
 

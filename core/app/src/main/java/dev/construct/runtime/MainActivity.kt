@@ -204,7 +204,7 @@ class MainActivity : ComponentActivity() {
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
                         TextButton(enabled = !busy, onClick = { accessModuleId = null }) { Text("Back") }
                         WorkshopStatus(WorkshopMessage(status, if (status.startsWith("[")) WorkshopTone.ERROR else WorkshopTone.NEUTRAL))
-                                                Text("The module is stopped. Changes apply immediately and survive updates and rollback.")
+                        Text("The module is stopped. Changes apply immediately and survive updates and rollback.")
                         modules.firstOrNull { it.manifest.id == accessModuleId }?.let { module ->
                             Text(module.manifest.name)
                             for (cap in module.manifest.capabilities) {

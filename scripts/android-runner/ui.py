@@ -53,6 +53,7 @@ def enabled(node, parents):
     return True
 
 def find(text, timeout=30):
+    if text.startswith('Saved photos: '): camera_controls_top()
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
         try:
@@ -74,6 +75,17 @@ def tap_node(n):
 CAMERA_CONTROLS = {'Close camera','Back to camera','Saved photos','Find faces','Find objects',
                    'Previous photo','Next photo','Delete photo','Save to phone gallery',
                    'Take photo','Switch camera','Camera help','Hide camera help'}
+
+
+def camera_controls_top():
+    current=nodes()
+    panes=[n for n in current if n.get('content-desc')=='Camera controls' and n.get('package')=='dev.construct.runtime']
+    if not panes: return
+    if len(panes)!=1: raise RuntimeError('Ambiguous native camera control panel')
+    x1,y1,x2,y2=map(int,re.findall(r'\d+',panes[0].get('bounds','')))
+    if x2<=x1 or y2-y1<32: raise RuntimeError('Camera controls have no viewport')
+    for _ in range(5):
+        adb('shell','input','swipe',str((x1+x2)//2),str(y1+(y2-y1)//5),str((x1+x2)//2),str(y2-(y2-y1)//5),'200')
 
 
 def reveal_camera_control(text):

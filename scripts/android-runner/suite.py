@@ -25,6 +25,7 @@ p.add_argument('--snake-only', action='store_true', help='Run only Snake accepta
 p.add_argument('--contacts-sha256', help='Append synthetic contacts and Android permission checks')
 p.add_argument('--contacts-only', action='store_true', help='Only contacts; also require full regression for a host change')
 p.add_argument('--camera-sha256', help='Exact signed native camera launcher acceptance')
+p.add_argument('--camera-ux-layouts', action='store_true', help='Also exercise redesigned native camera controls at Android 2x font in portrait/landscape')
 p.add_argument('--camera-version', default='0.1.0', help='Exact camera launcher version paired with its hash')
 p.add_argument('--camera-gallery-export', action='store_true', help='Also verify native gallery confirmation, exact copy and independent deletion (Android 10+)')
 p.add_argument('--camera-only', action='store_true', help='Only synthetic camera; host changes also need baseline')
@@ -57,6 +58,8 @@ if a.reliability_only and any((a.camera_sha256, a.focus_sha256, a.snake_sha256, 
 if a.camera_vision_only and (not a.camera_only or not a.camera_sha256 or a.camera_gallery_export or a.camera_reopen_only): p.error('Vision scope requires camera-only/hash and cannot mix gallery or reopen scopes')
 if a.camera_gallery_export and (not a.camera_only or not a.camera_sha256 or a.camera_reopen_only): p.error('Gallery export requires full camera-only/hash acceptance, not reopen-only')
 if not __import__('re').fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', a.camera_version): p.error('Camera version must be a numeric release version')
+if a.camera_ux_layouts and (not a.camera_only or not a.camera_gallery_export or a.camera_vision_only): p.error('Camera UX layouts require full camera/gallery scope')
+os.environ['CONSTRUCT_CAMERA_UX_LAYOUTS']='1' if a.camera_ux_layouts else '0'
 os.environ['CONSTRUCT_CAMERA_VERSION'] = a.camera_version
 for module in ('focus','snake','contacts','measure'):
     version = getattr(a, module+'_version')
