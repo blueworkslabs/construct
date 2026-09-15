@@ -5,7 +5,7 @@ import hashlib, io, json, os, re, socket, struct, subprocess, time
 from pathlib import Path
 from PIL import Image
 from ui import adb, nodes, labels, tap, tap_node, find, capture, RESULTS
-from host_ui import restart, diagnostics, select_after, installed_status
+from host_ui import restart, diagnostics, select_after, installed_status, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern
 require_runner()
 camera_avd = CONFIG.profile(True)[0]
 config=(CONFIG.avd/(camera_avd+'.avd')/'config.ini').read_text()
@@ -20,12 +20,32 @@ expected=os.environ['CONSTRUCT_CAMERA_SHA256'];heading='Pocket Camera · '+os.en
 export_checks=os.environ.get('CONSTRUCT_CAMERA_GALLERY_EXPORT')=='1'
 result={'complete':False,'checks':[],'cameraSource':'Android emulator generated scene, no physical camera'}
 def done(name):result['checks'].append(name);print('PASS:',name,flush=True)
+def photo_layout(name):
+    previous=None;until=time.monotonic()+15
+    while time.monotonic()<until:
+        current=nodes()
+        (RESULTS/(name+'-nodes.json')).write_text(json.dumps([dict(n.attrib) for n in current],indent=2)+'\n')
+        rectangles=[]
+        for label in ('Saved photo preview','Camera controls'):
+            matches=[n for n in current if n.get('package')=='dev.construct.runtime' and label in (n.get('text'),n.get('content-desc'))]
+            if len(matches)!=1:break
+            rectangles.append(list(map(int,re.findall(r'-?\d+',matches[0].get('bounds','')))))
+        if len(rectangles)==2 and rectangles==previous:break
+        previous=rectangles;time.sleep(.3)
+    else:raise RuntimeError('Native photo/control layout did not settle after dialog dismissal')
+    photo,panel=rectangles
+    for rect in rectangles:
+        if len(rect)!=4 or rect[0]<0 or rect[1]<0 or rect[2]-rect[0]<64 or rect[3]-rect[1]<64:raise RuntimeError('Native photo/control viewport is clipped')
+    if min(photo[2],panel[2])>max(photo[0],panel[0]) and min(photo[3],panel[3])>max(photo[1],panel[1]):raise RuntimeError('Native photo and control viewports overlap')
+    result.setdefault('nativeLayoutBounds',{})[name]={'photo':photo,'controls':panel}
 def top():
+    if modern(): return library()
     for _ in range(12):
         if 'Use configured registry' in labels():return
         adb('shell','input','swipe','360','450','360','1050','300')
     raise RuntimeError('Host top missing')
 def status(prefix):
+    __import__("ui").camera_controls_top()
     until=time.monotonic()+20
     while time.monotonic()<until:
         if any(t.startswith(prefix) for t in labels()):return
@@ -73,7 +93,7 @@ def reopen():
             except RuntimeError:result['recoveryDiagnostics']['menuReturn']=False
             before=adb('shell','pidof','dev.construct.runtime').strip()
             adb('shell','am','start','-n','dev.construct.runtime/.MainActivity','-f','0x04000000')
-            find('Installed');top();select_after(heading,('Open',));find('Pocket Camera')
+            host_ready();top();select_after(heading,('Open',));find('Pocket Camera')
             after=adb('shell','pidof','dev.construct.runtime').strip()
             result['recoveryDiagnostics']['sameProcess']=before==after
             try:find('Open camera workspace',timeout=8);result['recoveryDiagnostics']['activityRecreate']=True
@@ -113,12 +133,12 @@ def gallery_files():
     return names
 try:
     if export_checks and gallery_files():raise RuntimeError('Gallery baseline is not empty; refusing stale export evidence')
-    restart()
+    restart(); catalog_settings()
     url=CONFIG.test_catalog
     from catalog_input import replace_catalog
     import ui
     replace_catalog(nodes, lambda value: ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value), url)
-    tap('Refresh catalog');find('Catalog refreshed.');select_after(heading,('Review & install',))
+    apply_catalog();find('Catalog refreshed.');select_after(heading,('Review & install',))
     find('Allow camera workspace')
     switches=[n for n in nodes() if n.get('content-desc')=='Allow camera workspace' and n.get('checkable')=='true']
     if len(switches)!=1 or switches[0].get('checked')!='false':raise RuntimeError('Camera must default off')
@@ -143,9 +163,24 @@ try:
     done('Actual Android permission dialog enables streaming native preview and user-shutter capture')
     tap('Close camera');no_camera_client();opened();workspace();tap('Saved photos');find('Saved photos: 1 / 8');find('Saved photo preview')
     done('Private album retains a decoded photo across workspace and host restart; camera releases on close')
-    tap('Back to camera');status('Camera preview ready.');rotate(1);find('Installed');no_camera_client();rotate(0);find('Installed')
+    tap('Back to camera');status('Camera preview ready.');rotate(1);host_ready();no_camera_client();rotate(0);host_ready()
     opened();workspace();tap('Saved photos');find('Saved photos: 1 / 8');find('Saved photo preview')
     done('Real rotation closes native camera without losing the saved photo')
+    if os.environ.get('CONSTRUCT_CAMERA_UX_LAYOUTS')=='1':
+        original_font=adb('shell','settings','get','system','font_scale').strip()
+        try:
+            tap('Close camera');adb('shell','settings','put','system','font_scale','2.0')
+            opened();workspace();tap('Saved photos');find('Saved photo preview')
+            tap('Save to phone gallery');find('Save a gallery copy?');capture('camera-font2-gallery-confirmation');tap('Keep private');photo_layout('camera-font2-portrait');capture('camera-font2-portrait')
+            tap('Close camera');rotate(1);opened();workspace();tap('Saved photos');find('Saved photo preview')
+            tap('Delete photo');find('Delete this photo?');capture('camera-font2-delete-confirmation');tap('Keep photo');photo_layout('camera-font2-landscape');capture('camera-font2-landscape')
+            tap('Close camera')
+        finally:
+            if original_font=='null':adb('shell','settings','delete','system','font_scale')
+            else:adb('shell','settings','put','system','font_scale',original_font)
+            rotate(0)
+        opened();workspace();tap('Saved photos');find('Saved photos: 1 / 8');find('Saved photo preview')
+        done('Native large-text portrait/landscape keeps the photo visible and gallery/delete confirmation reachable without modifying it')
     for count in range(2,9):tap('Back to camera');status('Camera preview ready.');shutter(count)
     tap('Back to camera');status('Camera preview ready.');tap('Take photo');status('[CAMERA_QUOTA]');tap('Saved photos');find('Saved photos: 8 / 8')
     tap('Delete photo');tap('Keep photo');find('Saved photos: 8 / 8');tap('Delete photo');tap('Delete permanently');find('Saved photos: 7 / 8')

@@ -8,14 +8,15 @@ import socket
 import struct
 import time
 from ui import adb, nodes, labels, tap, tap_node, find, capture, RESULTS
-from host_ui import restart, diagnostics, select_after, installed_status
+from host_ui import restart, diagnostics, select_after, installed_status, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern
 require_runner()
 expected=os.environ['CONSTRUCT_SNAKE_SHA256']
-heading='Pocket Snake · 0.1.5'
+heading='Pocket Snake · ' + os.environ.get('CONSTRUCT_SNAKE_VERSION', '0.1.5')
 result={'complete':False,'moduleSha256':expected,'checks':[]}
 
 def done(name): result['checks'].append(name); print('PASS:',name,flush=True)
 def top():
+    if modern(): return library()
     for _ in range(8):
         if 'Use configured registry' in labels(): return
         adb('shell','input','swipe','360','450','360','1050','300')
@@ -40,7 +41,7 @@ def number(prefix):
     if len(values)!=1:raise RuntimeError('Missing unique '+prefix)
     return int(values[0].split()[-1])
 def access(on):
-    if 'Construct menu' in labels() or 'Close module' in labels():tap('Module access')
+    if ('Construct menu' in labels() or 'Close module' in labels()) and 'Library' not in labels():tap('Module access')
     else:card('Module access')
     label='Allow saving data on this phone';find(label)
     matches=[n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true']
@@ -84,7 +85,7 @@ def fresh_game():
     tap('New game');find('New game ready. Best score kept.');find('Play')
 
 try:
-    restart()
+    restart(); catalog_settings()
     import ui
     nodes()
     field=ui._device(className='android.widget.EditText')
@@ -92,7 +93,7 @@ try:
     url=CONFIG.test_catalog
     field.set_text(url)
     if field.get_text()!=url:raise RuntimeError('Catalog URL mismatch')
-    adb('shell','input','keyevent','111');tap('Refresh catalog')
+    adb('shell','input','keyevent','111');apply_catalog()
     select_after(heading,('Review & install',));tap('Allow & install');installed_status()
     top();es=diagnostics();installs=[e for e in es if e.get('moduleId')=='dev.construct.snake' and e.get('code')=='INSTALLED_TRIAL']
     if len(installs)!=1 or installs[0].get('packageDigest')!=expected:raise RuntimeError('Wrong signed Snake candidate')
@@ -148,7 +149,7 @@ try:
     raw=rotate(1);find('Pocket Snake');find('Resume')
     time.sleep(.7)
     capture('snake-landscape')
-    if 'Installed' in labels():raise RuntimeError('Rotation returned to host')
+    if 'Installed' in labels() or ('Library' in labels() and 'Browse' in labels()):raise RuntimeError('Rotation returned to host')
     if stable_board()['label']!=saved:raise RuntimeError('Landscape changed paused game')
     # Board and all controls fit the landscape screen without scrolling and avoid native menu.
     menu=find('Construct menu');bx1,by1,bx2,by2=map(int,re.findall(r'\d+',board()['node'].get('bounds')))

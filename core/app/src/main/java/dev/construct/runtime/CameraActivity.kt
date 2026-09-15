@@ -20,6 +20,9 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,6 +34,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
@@ -96,7 +101,7 @@ class CameraActivity : ComponentActivity() {
         } catch (e: Exception) {
             val code = (e as? ConstructError)?.code ?: "CAMERA_UNAVAILABLE"
             runCatching { store.log("camera", code, message = "Native camera initialization failed; details omitted") }
-            setContent { MaterialTheme(colorScheme = darkColorScheme()) { Surface(Modifier.fillMaxSize()) {
+            setContent { ConstructTheme { Surface(Modifier.fillMaxSize()) {
                 Column(Modifier.safeDrawingPadding().padding(24.dp)) {
                     Text("Camera unavailable", style = MaterialTheme.typography.titleLarge)
                     Text("[$code] Camera could not open. Check Module access, then close and retry.")
@@ -105,7 +110,7 @@ class CameraActivity : ComponentActivity() {
             } } }
             return
         }
-        setContent { MaterialTheme(colorScheme = darkColorScheme()) { Screen() } }
+        setContent { ConstructTheme { Screen() } }
     }
     private fun checkAccess() {
         store.withCapability(installed, "camera.capture") { }
@@ -225,7 +230,7 @@ class CameraActivity : ComponentActivity() {
     private fun loadPhoto() {
         analysisGeneration.invalidate(); analysis = null
         val generation = ++imageGeneration; bitmap = null; status = "Loading saved photo…"
-        val file = saved.getOrNull(selected) ?: return
+        val file = saved.getOrNull(selected) ?: run { status = "No saved photos yet."; return }
         io.execute {
             try {
                 if (!live || generation != imageGeneration) return@execute
@@ -316,58 +321,73 @@ class CameraActivity : ComponentActivity() {
             }
         }
     }
+    @OptIn(ExperimentalLayoutApi::class)
     @Composable private fun Screen() {
         BackHandler { finish() }
-        Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp)) {
-                Text("${installed.manifest.name} · Camera", style = MaterialTheme.typography.titleLarge)
-                Text("Private photos · gallery copies only when you choose", style = MaterialTheme.typography.bodySmall)
-                Text(status, color = MaterialTheme.colorScheme.primary)
-                Row {
+        var helpExpanded by rememberSaveable { mutableStateOf(false) }
+        @Composable fun PhotoPane(modifier: Modifier) {
+            Box(modifier) {
+                if (gallery) { bitmap?.let { photo ->
+                    Image(photo.asImageBitmap(), "Saved photo preview", Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                    Canvas(Modifier.fillMaxSize()) {
+                        val fit = PhotoFit.fit(photo.width, photo.height, size.width, size.height)
+                        analysis?.boxes?.forEach { box ->
+                            drawRect(Color.Cyan, Offset(fit.left + box.left * fit.width, fit.top + box.top * fit.height),
+                                Size((box.right - box.left) * fit.width, (box.bottom - box.top) * fit.height), style = Stroke(2.dp.toPx()))
+                        }
+                    }
+                } ?: Text("No saved photos yet.", Modifier.padding(16.dp))
+                } else key(front) {
+                    AndroidView(factory = { PreviewView(it).apply { implementationMode = PreviewView.ImplementationMode.COMPATIBLE }.also { view -> bind(view) } }, modifier = Modifier.fillMaxSize())
+                }
+            }
+        }
+        @Composable fun Controls(modifier: Modifier) {
+            Column(modifier.verticalScroll(rememberScrollState()).semantics { contentDescription = "Camera controls" }.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("${installed.manifest.name} · Camera", style = MaterialTheme.typography.titleMedium)
+                WorkshopStatus(WorkshopMessage(status, if (status.startsWith("[")) WorkshopTone.ERROR else WorkshopTone.NEUTRAL))
+                if (gallery) Text("Saved photos: ${saved.size} / ${CameraPhotos.MAX_PHOTOS}", style = MaterialTheme.typography.bodySmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = { finish() }) { Text("Close camera") }
                     TextButton(enabled = !busy, onClick = { if (gallery) { imageGeneration++; analysisGeneration.invalidate(); analysis = null; bitmap = null; gallery = false; status = "Opening camera…" } else showGallery() }) { Text(if (gallery) "Back to camera" else "Saved photos") }
                 }
                 if (gallery) {
-                    Text("Saved photos: ${saved.size} / ${CameraPhotos.MAX_PHOTOS}")
-                    bitmap?.let { photo ->
-                        Box(Modifier.weight(1f).fillMaxWidth()) {
-                            Image(photo.asImageBitmap(), "Saved photo preview", Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                            Canvas(Modifier.fillMaxSize()) {
-                                val fit = PhotoFit.fit(photo.width, photo.height, size.width, size.height)
-                                analysis?.boxes?.forEach { box ->
-                                    drawRect(Color.Cyan, Offset(fit.left + box.left * fit.width, fit.top + box.top * fit.height),
-                                        Size((box.right - box.left) * fit.width, (box.bottom - box.top) * fit.height), style = Stroke(2.dp.toPx()))
-                                }
-                            }
-                        }
-                    }
-                        ?: Spacer(Modifier.weight(1f))
-                    if (saved.isEmpty()) Text("No saved photos yet.")
-                    Row {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(enabled = !busy && bitmap != null, onClick = { analyzePhoto(AnalysisKind.FACES) }) { Text("Find faces") }
                         OutlinedButton(enabled = !busy && bitmap != null, onClick = { analyzePhoto(AnalysisKind.OBJECTS) }) { Text("Find objects") }
                     }
                     analysis?.let { result ->
                         Text(result.boxes.joinToString(" · ") { "${it.label} ${(it.score * 100).toInt()}%" }.ifEmpty { "No detections" }, style = MaterialTheme.typography.bodySmall)
-                        Text("Estimates can be wrong. No identity or emotion recognition. Results are not saved or exported.", style = MaterialTheme.typography.bodySmall)
+                        Text("Estimates can be wrong. Results are not saved or exported.", style = MaterialTheme.typography.bodySmall)
                     }
-                    Row {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(enabled = !busy && selected > 0, onClick = { selected--; loadPhoto() }) { Text("Previous photo") }
                         TextButton(enabled = !busy && selected + 1 < saved.size, onClick = { selected++; loadPhoto() }) { Text("Next photo") }
                     }
-                    Button(enabled = !busy && saved.isNotEmpty(), onClick = { deleteConfirm = true }) { Text("Delete photo") }
-                    if (android.os.Build.VERSION.SDK_INT >= 29) {
-                        OutlinedButton(enabled = !busy && bitmap != null && saved.isNotEmpty(), onClick = { exportConfirm = true }) { Text("Save to phone gallery") }
-                    } else Text("Gallery export requires Android 10 or later. Private photos remain available here.", style = MaterialTheme.typography.bodySmall)
-                } else {
-                    key(front) { AndroidView(factory = { PreviewView(it).apply { implementationMode = PreviewView.ImplementationMode.COMPATIBLE }.also { view -> bind(view) } }, modifier = Modifier.weight(1f).fillMaxWidth()) }
-                    Row {
-                        Button(enabled = ready && !busy, onClick = { shoot() }) { Text("Take photo") }
-                        TextButton(enabled = canSwitch && !busy, onClick = { stopPreview(); front = !front; status = "Switching camera…" }) { Text("Switch camera") }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (android.os.Build.VERSION.SDK_INT >= 29) Button(enabled = !busy && bitmap != null && saved.isNotEmpty(), onClick = { exportConfirm = true }) { Text("Save to phone gallery") }
+                        TextButton(enabled = !busy && saved.isNotEmpty(), onClick = { deleteConfirm = true }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Delete photo") }
                     }
+                    if (android.os.Build.VERSION.SDK_INT < 29) Text("Gallery export requires Android 10 or later. Private photos remain available here.", style = MaterialTheme.typography.bodySmall)
+                } else FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(enabled = ready && !busy, onClick = { shoot() }) { Text("Take photo") }
+                    OutlinedButton(enabled = canSwitch && !busy, onClick = { stopPreview(); front = !front; status = "Switching camera…" }) { Text("Switch camera") }
                 }
-                Text("Up to 8 photos / 20 MiB here. Closing, backgrounding or rotating closes the camera. Saved photos remain until you delete them.", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = { helpExpanded = !helpExpanded }) { Text(if (helpExpanded) "Hide camera help" else "Camera help") }
+                if (helpExpanded) Text("Up to 8 photos / 20 MiB here. Closing, backgrounding or rotating closes the camera. Saved photos remain until you delete them. Gallery copies are independent and may be backed up by photo apps. Analysis does not identify people or infer emotions.", style = MaterialTheme.typography.bodySmall)
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+        }
+        Surface(Modifier.fillMaxSize()) {
+            BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
+                // Keep the viewfinder/photo visible even when large text makes controls scroll.
+                if (maxWidth > maxHeight) Row(Modifier.fillMaxSize()) {
+                    PhotoPane(Modifier.weight(0.58f).fillMaxHeight())
+                    Controls(Modifier.weight(0.42f).fillMaxHeight())
+                } else Column(Modifier.fillMaxSize()) {
+                    PhotoPane(Modifier.weight(0.5f).fillMaxWidth())
+                    Controls(Modifier.weight(0.5f).fillMaxWidth())
+                }
             }
             if (exportConfirm) AlertDialog(onDismissRequest = { exportConfirm = false }, title = { Text("Save a gallery copy?") }, text = {
                 Text("Save this photo to Pictures/Construct? Other apps with photo access, including configured photo backup services, may read it. The private original stays here. Deleting it or uninstalling Construct will not remove the gallery copy. Each save creates a new copy.")

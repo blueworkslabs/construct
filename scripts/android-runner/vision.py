@@ -2,8 +2,9 @@
 """Offline native inference on licensed test photos, only inside a disposable emulator."""
 from config import CONFIG, require_runner
 from ui import adb, nodes, labels, tap, tap_node, find, capture, RESULTS
-from host_ui import restart, select_after, installed_status, diagnostics
+from host_ui import restart, select_after, installed_status, diagnostics, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern
 from catalog_input import replace_text
+from adb_identity import restore_shell_identity
 from pathlib import Path
 from PIL import Image
 import ui
@@ -19,12 +20,14 @@ def done(text):
     result['checks'].append(text); print('PASS:', text, flush=True)
 
 def top():
+    if modern(): return library()
     for _ in range(12):
         if 'Use configured registry' in labels(): return
         adb('shell', 'input', 'swipe', '360', '450', '360', '1050', '250')
     raise RuntimeError('Workshop top missing')
 
 def expect(prefix):
+    ui.camera_controls_top()
     deadline = time.monotonic() + 60
     while time.monotonic() < deadline:
         current = labels()
@@ -48,8 +51,8 @@ def root():
 
 def unroot():
     global rooted
-    adb('unroot'); adb('wait-for-device')
-    if adb('shell', 'id', '-u').strip() == '0': raise RuntimeError('Could not restore non-root ADB')
+    reconnects=restore_shell_identity(adb)
+    if reconnects:result['unrootTransportCloses']=result.get('unrootTransportCloses',0)+reconnects
     rooted = False
 
 try:
@@ -64,23 +67,31 @@ try:
         if entry['kind'] != 'fixture': continue
         data = (fixtures/entry['name']).read_bytes()
         if len(data) != entry['bytes'] or hashlib.sha256(data).hexdigest() != entry['sha256']: raise RuntimeError('Test image checksum mismatch')
-    restart()
+    restart(); catalog_settings()
     replace_text(nodes, lambda value: ui._device(className='android.widget.EditText', packageName='dev.construct.runtime').set_text(value), CONFIG.test_catalog)
-    tap('Refresh catalog')
+    apply_catalog()
     try: find('Catalog refreshed.')
     except RuntimeError:
         if not any(t.startswith('[REGISTRY_NETWORK]') for t in labels()): raise
         result['setupNetworkRetry'] = True
         adb('shell', 'svc', 'wifi', 'enable'); adb('shell', 'svc', 'data', 'enable')
         time.sleep(2)
-        tap('Refresh catalog'); find('Catalog refreshed.')
+        apply_catalog(); find('Catalog refreshed.')
     select_after(heading, ('Review & install',))
     tap('Allow & install'); installed_status()
     top(); installed = [e for e in diagnostics() if e.get('code') == 'INSTALLED_TRIAL' and e.get('moduleId') == 'dev.construct.camera']
     if len(installed) != 1 or installed[0].get('packageDigest') != os.environ['CONSTRUCT_CAMERA_SHA256']: raise RuntimeError('Wrong signed launcher')
     top(); select_after(heading, ('Module access',))
-    matches = [n for n in nodes() if n.get('content-desc') == 'Allow camera workspace' and n.get('checkable') == 'true']
-    if len(matches) != 1 or matches[0].get('checked') != 'false': raise RuntimeError('Unexpected initial grant')
+    find('Allow camera workspace')
+    previous=None;until=time.monotonic()+10
+    while time.monotonic()<until:
+        matches = [n for n in nodes() if n.get('content-desc') == 'Allow camera workspace' and n.get('checkable') == 'true']
+        if len(matches)==1:
+            if matches[0].get('bounds')==previous:break
+            previous=matches[0].get('bounds')
+        time.sleep(.3)
+    else:raise RuntimeError('Camera grant switch missing or moving')
+    if matches[0].get('checked') != 'false': raise RuntimeError('Unexpected initial grant')
     tap_node(matches[0]); find('Allow camera workspace: on.')
     tap('Allow Android camera access'); find('While using the app'); tap('While using the app'); find('Android camera access: allowed')
     opened(); tap('Take photo'); find('Saved photos: 1 / 8'); find('Saved photo preview')

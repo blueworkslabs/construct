@@ -42,3 +42,8 @@ header{min-height:34px;margin-bottom:4px}h1{font-size:15px}
 #status{margin:10px 0 0}
 .hint,footer{display:none}
 }
+
+/* Shared shell polish only; board geometry, effects and game controls stay unchanged. */
+body{background:var(--bg)}header h1{color:var(--text)}.chip{background:var(--surface2);border-color:var(--border);color:var(--text)}header{flex-wrap:wrap}button.primary{background:var(--jade);color:var(--jade-ink);border-color:var(--jade)}
+
+.toolbar{flex-wrap:wrap}

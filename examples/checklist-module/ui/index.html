@@ -1,1 +1,10 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pocket Checklist</title><link rel="stylesheet" href="style.css"></head><body><h1>Pocket Checklist</h1><p>Version __VERSION__ · saved on this phone</p><form id="add-form"><label for="text">New item</label><input id="text" type="text" maxlength="120" autocomplete="off" disabled><button id="add" disabled>Add item</button></form><p id="summary"></p><ul id="items"></ul><button id="clear" hidden disabled>Clear completed</button><p id="status" role="status">Loading saved items…</p><script src="bridge.js"></script><script src="app.js"></script></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pocket Checklist</title><link rel="stylesheet" href="/construct-host.css"><link rel="stylesheet" href="construct-ui.css"><link rel="stylesheet" href="style.css"></head><body><main>
+<header class="construct-head"><h1>Pocket Checklist</h1><p class="purpose">Saved on this phone · works offline</p></header>
+<form id="add-form" class="row"><label for="text" class="visually-hidden">New item</label><input id="text" type="text" maxlength="120" autocomplete="off" placeholder="New item" disabled><button id="add" type="submit" disabled>Add item</button></form>
+<p id="summary" class="summary"></p>
+<ul id="items" class="construct-list"></ul>
+<button id="clear" hidden disabled>Clear completed</button>
+<p id="status" role="status">Loading saved items…</p>
+<details class="help"><summary>Help</summary><p>Up to 30 items. Tick an item to complete it, or delete it. Items are saved only on this phone and never leave it. Removing the tool keeps your list; reinstalling brings it back.</p><p>If saving is off, turn on <strong>Allow saving data on this phone</strong> in Module access from the Construct menu.</p></details>
+<footer>On this phone · __VERSION__</footer>
+</main><script src="bridge.js"></script><script src="app.js"></script></body></html>

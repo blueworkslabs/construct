@@ -53,6 +53,7 @@ def enabled(node, parents):
     return True
 
 def find(text, timeout=30):
+    if text.startswith('Saved photos: '): camera_controls_top()
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
         try:
@@ -71,7 +72,54 @@ def tap_node(n):
     if not (x2 > x1 and y2 > y1): raise RuntimeError('Element is not visible')
     adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2))
 
+CAMERA_CONTROLS = {'Close camera','Back to camera','Saved photos','Find faces','Find objects',
+                   'Previous photo','Next photo','Delete photo','Save to phone gallery',
+                   'Take photo','Switch camera','Camera help','Hide camera help'}
+
+
+def camera_controls_top():
+    for attempt in range(6):
+        current=nodes()
+        panes=[n for n in current if n.get('content-desc')=='Camera controls' and n.get('package')=='dev.construct.runtime']
+        if not panes: return
+        if len(panes)!=1: raise RuntimeError('Ambiguous native camera control panel')
+        pane=panes[0]
+        x1,y1,x2,y2=map(int,re.findall(r'\d+',pane.get('bounds','')))
+        if x2<=x1 or y2-y1<32: raise RuntimeError('Camera controls have no viewport')
+        # Do not swipe a panel already at its top. Unnecessary gestures over
+        # non-scrolling action rows can activate an unrelated camera action.
+        for node in pane.iter('node'):
+            if not node.get('text','').endswith(' · Camera'):continue
+            bounds=list(map(int,re.findall(r'\d+',node.get('bounds',''))))
+            if len(bounds)==4 and x1<=bounds[0]<bounds[2]<=x2 and y1<=bounds[1]<bounds[3]<=y2:return
+        if attempt==5:raise RuntimeError('Native camera panel header is not reachable')
+        adb('shell','input','swipe',str((x1+x2)//2),str(y1+(y2-y1)//5),str((x1+x2)//2),str(y2-(y2-y1)//5),'200')
+
+
+def reveal_camera_control(text):
+    """Scroll only the identified native camera panel, never the photo or a WebView."""
+    if text not in CAMERA_CONTROLS: return
+    current = nodes()
+    panes = [n for n in current if n.get('content-desc') == 'Camera controls'
+             and n.get('package') == 'dev.construct.runtime']
+    if not panes: return  # Legacy camera layout; original selection rules apply.
+    if len(panes) != 1: raise RuntimeError('Ambiguous native camera control panel')
+    x1,y1,x2,y2=map(int,re.findall(r'\d+',panes[0].get('bounds','')))
+    if x2<=x1 or y2-y1<32:raise RuntimeError('Camera control panel has no usable viewport')
+    x=(x1+x2)//2; top=y1+(y2-y1)//5; bottom=y2-(y2-y1)//5
+    for direction, attempts in [('up',5),('down',10)]:
+        for _ in range(attempts):
+            current=nodes()
+            parents={child:parent for parent in current for child in parent}
+            if any(text in (n.get('text'),n.get('content-desc')) and enabled(n,parents)
+                   and n.get('bounds') not in ('[0,0][0,0]',None) for n in current): return
+            start,end=(top,bottom) if direction=='up' else (bottom,top)
+            adb('shell','input','swipe',str(x),str(start),str(x),str(end),'250')
+    raise RuntimeError('Native camera action not reachable: '+text)
+
+
 def tap(text):
+    reveal_camera_control(text)
     # Explicit native shell navigation, never an arbitrary retry of a missing module control.
     if text in ('Close module', 'Module access', 'Mark working', 'Diagnostics'):
         current = labels()
@@ -89,10 +137,13 @@ def tap(text):
             break
         if time.monotonic() > deadline: raise RuntimeError('Unstable UI target: '+text)
         previous = current
-    if text == 'Close module':
-        # Do not let the next host-navigation read race the closing menu/tree.
-        # This is the native activity-result completion state, not a delay.
-        find('Module stopped.')
+    if text in ('Close module', 'Mark working'):
+        # Observe the actual activity-result destination, then reveal its status.
+        # Library may retain a scroll position from the selected module card.
+        from host_ui import host_ready, modern, scroll_top
+        host_ready()
+        if modern(): scroll_top()
+        find('Module stopped.' if text == 'Close module' else 'Marked working. You can now install an update.')
     print('Tapped:',text,flush=True)
 
 def capture(name):

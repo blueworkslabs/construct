@@ -3,10 +3,10 @@
   "id": "dev.construct.checklist",
   "name": "Pocket Checklist",
   "description": "A small offline checklist. Version 0.2 adds Clear completed; the saved item format stays compatible.",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "constructApi": {
-    "min": "0.1.0",
-    "target": "0.1.0"
+    "min": "0.6.0",
+    "target": "0.6.0"
   },
   "runtime": {
     "kind": "webview-js"
@@ -22,5 +22,6 @@
       "reason": "Report startup and technical failures without item text."
     }
   ],
-  "author": "Construct Runtime"
+  "author": "Construct Runtime",
+  "themeColor": "#0B1410"
 }

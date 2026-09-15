@@ -78,7 +78,7 @@ class MeasureActivity : ComponentActivity() {
             installed = store.inventory().modules.single { it.manifest.id == intent.getStringExtra("module") && it.digest == intent.getStringExtra("digest") }
             checkAccess()
         } catch (e: Exception) { finish(); return }
-        setContent { MaterialTheme(colorScheme = darkColorScheme()) { Screen() } }
+        setContent { ConstructTheme { Screen() } }
     }
     override fun onStart() { live = true; super.onStart() }
     override fun onStop() {

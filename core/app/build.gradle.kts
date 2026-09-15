@@ -11,8 +11,8 @@ android {
         applicationId = "dev.construct.runtime"
         minSdk = 28
         targetSdk = 35
-        versionCode = 20
-        versionName = "0.1.0-alpha20"
+        versionCode = 21
+        versionName = "0.1.0-alpha21"
         externalNativeBuild { cmake {
             abiFilters += listOf("arm64-v8a", "x86_64")
             arguments += listOf("-DANDROID_STL=c++_static", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")

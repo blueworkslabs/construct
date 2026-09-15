@@ -3,12 +3,14 @@
 from config import CONFIG, SERIAL, require_runner
 import json, os, re, socket, time, struct
 from ui import adb, nodes, labels, tap, tap_node, find, capture, RESULTS
-from host_ui import restart, diagnostics, select_after, installed_status
+from host_ui import restart, diagnostics, select_after, installed_status, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern, scroll_content
+from host_cards import matching_card
 require_runner()
-expected=os.environ['CONSTRUCT_CONTACTS_SHA256'];heading='Pocket Contacts · 0.2.1'
+expected=os.environ['CONSTRUCT_CONTACTS_SHA256'];heading='Pocket Contacts · ' + os.environ.get('CONSTRUCT_CONTACTS_VERSION', '0.2.1')
 result={'complete':False,'checks':[]}
 def done(name):result['checks'].append(name);print('PASS:',name,flush=True)
 def top():
+    if modern(): return library()
     for _ in range(10):
         if 'Use configured registry' in labels():return
         adb('shell','input','swipe','360','450','360','1050','300')
@@ -16,7 +18,18 @@ def top():
 def card(action):
     top();(RESULTS/'contacts-card-before.json').write_text(json.dumps([dict(n.attrib) for n in nodes()],indent=2)+'\n');select_after(heading,(action,))
 def opened():
-    restart();find('Trial — not yet marked working');card('Open');find('Pocket Contacts')
+    restart()
+    if modern():
+        for attempt in range(21):
+            current=matching_card(nodes(),heading)
+            if current is not None:
+                if not any('Trial' in (n.get('text'),n.get('content-desc')) for n in current.iter('node')):
+                    raise RuntimeError('Exact Contacts card is not a trial')
+                break
+            if attempt<20:scroll_content('down')
+        else:raise RuntimeError('Exact Contacts trial card missing')
+    else:find('Trial — not yet marked working')
+    card('Open');find('Pocket Contacts')
 def status(prefix):
     until=time.monotonic()+12
     while time.monotonic()<until:
@@ -111,12 +124,12 @@ def seed():
             insert('content://com.android.contacts/data',['raw_contact_id:l:'+rid,'mimetype:s:vnd.android.cursor.item/email_v2','data1:s:synthetic@example.invalid','data2:i:1'])
     result['syntheticContacts']=26
 try:
-    restart()
+    restart(); catalog_settings()
     for n in nodes():
         if n.get('class')=='android.widget.EditText':
             tap_node(n);adb('shell','input','keycombination','113','29');adb('shell','input','text',CONFIG.test_catalog);break
     else:raise RuntimeError('Catalog field missing')
-    adb('shell','input','keyevent','111');tap('Refresh catalog');find('Catalog refreshed.');select_after(heading,('Review & install',))
+    adb('shell','input','keyevent','111');apply_catalog();find('Catalog refreshed.');select_after(heading,('Review & install',))
     # The opt-in defaults off; install without changing it.
     if grant_switch().get('checked')!='false':raise RuntimeError('Contacts not off by default')
     tap('Allow & install');installed_status()

@@ -1,9 +1,9 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pocket Contacts</title><link rel="stylesheet" href="/construct-host.css"><link rel="stylesheet" href="style.css"></head><body><main>
-<header><h1>Pocket Contacts</h1><span>Read only</span></header>
-<p class="hint">Browse or search contacts on this phone. Nothing is edited, saved by this module, or sent over the network.</p>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pocket Contacts</title><link rel="stylesheet" href="/construct-host.css"><link rel="stylesheet" href="construct-ui.css"><link rel="stylesheet" href="style.css"></head><body><main>
+<header class="construct-head"><h1>Pocket Contacts</h1><p class="purpose">Read-only contacts on this phone.</p></header>
+
 <form id="search"><label for="query">Contact name</label><div class="search"><input id="query" maxlength="80" type="search" autocomplete="off" placeholder="Name or start of a word"><button id="go" type="submit">Search</button><button id="browse" type="button">Browse contacts</button></div></form>
 <p id="status" role="status">Ready to search. Or choose Browse contacts.</p>
 <section id="detail" hidden><button id="back">Back to results</button><h2 id="name"></h2><h3>Phone numbers</h3><ul id="phones"></ul><h3>Email addresses</h3><ul id="emails"></ul><p id="detail-note"></p></section>
 <section id="results" aria-label="Search results"></section><button id="more" hidden>More results</button>
-<p class="hint">If access is denied, open Construct menu → Module access. Both the module switch and Android contacts permission must be allowed. Closing clears the view.</p><footer>On this phone · __VERSION__</footer>
+<details class="help"><summary>Help</summary><p class="hint">Browse or search contacts on this phone. Nothing is edited, saved by this module, or sent over the network.</p><p>If access is denied, open Construct menu → Module access. Both the module switch and Android contacts permission must be allowed. Closing clears the view.</p></details><footer>On this phone · __VERSION__</footer>
 </main><script src="bridge.js"></script><script src="app.js"></script></body></html>

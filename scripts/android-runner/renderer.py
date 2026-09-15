@@ -5,7 +5,7 @@ import json
 import socket
 import time
 from ui import adb, labels, tap, find, capture, RESULTS
-from host_ui import restart, diagnostics
+from host_ui import restart, diagnostics, select_after, modern
 from renderer_identity import selected_provider, renderer_candidates
 
 require_runner()
@@ -29,7 +29,7 @@ try:
     baseline = {json.dumps(e,sort_keys=True) for e in diagnostics()}
     time.sleep(2)
     before = renderers()
-    tap('Open')
+    select_after('Pocket Checklist · 0.1.0', ('Open',))
     find('Pocket Checklist')
     find('Ready. Works offline once installed.')
     deadline=time.monotonic()+15
@@ -51,7 +51,7 @@ try:
     if current.get(target) != new[target]: raise RuntimeError('Renderer identity changed before injection')
     adb('shell','kill','-9',target)
     # The host, not a test restart, must handle renderer death and expose recovery.
-    find('[RENDERER_STOPPED] Module stopped. Retry, remove, or restore previous code from Installed.')
+    find('[RENDERER_STOPPED] Module stopped. Retry, remove, or restore previous code from ' + ('Library.' if modern() else 'Installed.'))
     if adb('shell','pidof','dev.construct.runtime').strip() != host_pid:
         raise RuntimeError('Host process restarted during renderer loss')
     if 'Mark working' in labels(): raise RuntimeError('Failed renderer is still markable')
@@ -60,7 +60,7 @@ try:
     if not any(e.get('source')=='host' and e.get('code')=='RENDERER_STOPPED' and e.get('moduleId')=='dev.construct.checklist' for e in fresh):
         raise RuntimeError('No native renderer-loss event')
     result['events']=fresh
-    tap('Retry'); find('Pocket Checklist')
+    select_after('Pocket Checklist · 0.1.0', ('Retry',)); find('Pocket Checklist')
     try: find('Emulator-item',timeout=4)
     except RuntimeError:
         adb('shell','input','swipe','360','1100','360','800','300')

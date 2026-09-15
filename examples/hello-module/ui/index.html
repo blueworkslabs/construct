@@ -1,9 +1,2 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hello Module</title><link rel="stylesheet" href="style.css"><script src="app.js" defer></script></head>
-<body><main><p class="eyebrow">CONSTRUCT / HELLO</p><h1>A little tool.<br>Your phone.</h1>
-<p>Version __VERSION__ · running locally</p><p id="status" role="status">Connecting to Construct…</p>
-<output id="count">0</output><button id="add" disabled>Add one</button>
-<button id="toast" disabled>Say hello</button><button id="reset" hidden disabled>Reset counter</button>
-<p class="hint">Close and reopen: your count stays here. Updates change this tool, not the host app.</p>
-</main></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hello Module</title><link rel="stylesheet" href="/construct-host.css"><link rel="stylesheet" href="construct-ui.css"><link rel="stylesheet" href="style.css"><script src="app.js" defer></script></head>
+<body><main><header class="construct-head"><h1>Hello Module</h1><p class="purpose">A little counter, saved on your phone.</p></header><p id="status" role="status">Connecting to Construct…</p><output id="count">0</output><div class="row"><button id="add" class="primary" disabled>Add one</button><button id="toast" disabled>Say hello</button><button id="reset" hidden disabled>Reset counter</button></div><details class="help"><summary>Help</summary><p>Close and reopen: your count stays here. Updates change this tool, not the host app. Reset clears the counter; removing the module keeps its saved data.</p></details><footer>On this phone · __VERSION__</footer></main></body></html>

@@ -59,7 +59,7 @@ class ModuleActivity : ComponentActivity() {
         // Never resurrect a stopped runtime after process death. Rotation is handled in-place.
         if (savedInstanceState != null) { finishSession(); return }
         store = ModuleStore.shared(this)
-        setContent { MaterialTheme(colorScheme = darkColorScheme()) { Session() } }
+        setContent { ConstructTheme { Session() } }
         worker.execute {
             try {
                 val module = store.inventory().modules.firstOrNull {

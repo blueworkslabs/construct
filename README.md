@@ -11,10 +11,17 @@ local tests, a disposable Android emulator, artifact verification and a private
 module registry—then onto a real phone. Released modules can also be served from
 the public static catalog, without a local server.
 
-![Pocket Snake running in the module-first Android shell, in landscape](docs/media/snake-landscape.png)
+![Construct's Library with installed tools and quiet per-tool actions](docs/media/ux-refresh/library.png)
 
-*Actual Android emulator screenshot of the alpha11 pilot. The native corner menu
-belongs to Construct; the game is a downloaded module.*
+*Actual Android emulator screenshot of the alpha21 UX pilot, using synthetic
+test state. Installed tools live in Library; Browse presents one latest normal
+release per tool, with version history available separately.*
+
+![Pocket Snake with the native menu reserved above the game controls](docs/media/ux-refresh/snake-landscape.png)
+
+*The native corner menu belongs to Construct; the game is a downloaded module.
+See the [UX verification record](docs/ux-refresh/verification.md) for exact scopes
+and the remaining physical-device check.*
 
 **Experimental, MIT-licensed source release.** Build your own host and publisher
 identity; this is not a production app store or a hardened hostile-code sandbox.
@@ -24,6 +31,7 @@ See [release provenance](docs/public-release.md) and [known limits](docs/evidenc
 [How the workflow works](docs/workflow.md) ·
 [Architecture](docs/architecture.md) ·
 [Reproduction guide](docs/reproduce.md) ·
+[Using Construct](docs/using-construct.md) ·
 [Evidence and limits](docs/evidence.md) ·
 [Module API](docs/module-api.md)
 
@@ -41,6 +49,9 @@ publisher key need their own signed catalog.
 
 ## What it can do today
 
+- Open installed tools from a local-only Library, browse a latest-first catalog,
+  and keep setup and diagnostics behind the native menu. Shared, restrained
+  green-black/jade styling covers the host and the eight example modules.
 - Download, verify, install, update and roll back module code while retaining its
   separate local data. A failed update does not have to replace a working tool.
 - Run Canvas games and ordinary web interfaces in a module-first native shell,

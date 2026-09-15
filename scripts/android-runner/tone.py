@@ -5,7 +5,7 @@ import json
 import socket
 import time
 from ui import adb, labels, tap, tap_node, find, capture, RESULTS
-from host_ui import restart, diagnostics, select_after, installed_status
+from host_ui import restart, diagnostics, select_after, installed_status, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern
 
 require_runner()
 result = {'complete': False, 'scope': 'Grant/revoke lifecycle and native short-tone submission, not physical audibility', 'checks': []}
@@ -16,6 +16,7 @@ def done(name):
     print('PASS:', name, flush=True)
 
 def top():
+    if modern(): return library()
     for _ in range(6):
         if 'Use configured registry' in labels(): return
         adb('shell', 'input', 'swipe', '360', '450', '360', '1050', '250')
@@ -37,7 +38,7 @@ def status(prefix):
     raise RuntimeError('Missing tone status: '+prefix)
 
 def access(allowed):
-    if 'Construct menu' in labels() or 'Close module' in labels(): tap('Module access')
+    if ('Construct menu' in labels() or 'Close module' in labels()) and 'Library' not in labels(): tap('Module access')
     else: card('Module access')
     switch = find('Allow short tones')
     # Text and switch share a label: require the actual checkable switch.
@@ -60,7 +61,7 @@ def snapshot_events():
     return {json.dumps(e, sort_keys=True) for e in diagnostics()}
 
 try:
-    restart(); tap('Use configured registry'); tap('Refresh catalog'); find('Catalog refreshed.')
+    restart(); configured_catalog(); find('Catalog refreshed.')
     select_after('Pocket Tones · 0.1.0', ('Review & install',))
     tap('Allow & install'); installed_status()
     before = snapshot_events()
@@ -141,10 +142,10 @@ try:
     (RESULTS/'tone-before-return.txt').write_text(adb('shell', 'dumpsys', 'activity', 'activities'))
     adb('shell', 'am', 'start', '-n', 'dev.construct.runtime/.MainActivity')
     find('Module stopped.')
-    top(); find('Installed')
+    top(); host_ready()
     events = fresh_since(before)
     if not any(e.get('code') == 'TONE_STOPPED' for e in events): raise RuntimeError('No native stop before/after background')
-    if 'Construct menu' in labels() or 'Close module' in labels(): raise RuntimeError('Background left module running')
+    if ('Construct menu' in labels() or 'Close module' in labels()) and 'Library' not in labels(): raise RuntimeError('Background left module running')
     done('Rollback retains revocation; regrant works and background closes module')
     access(False)
     result['complete'] = True
