@@ -41,7 +41,9 @@ try:
         activity = adb('shell', 'dumpsys', 'activity', 'activities')
         resumed = [line for line in activity.splitlines() if 'mResumedActivity:' in line or 'topResumedActivity=' in line]
         foreground = any(any(name in line for name in ('dev.construct.runtime/.MainActivity', 'dev.construct.runtime/.ModuleActivity')) for line in resumed)
-        if 'Construct menu' in observed or 'Close module' in observed: tap('Close module')
+        # Library now also has a hamburger. Use the recorded native activity,
+        # not a shared label, to distinguish an already-contained module stop.
+        if any('dev.construct.runtime/.ModuleActivity' in line for line in resumed): tap('Close module')
         # Read diagnostics before restarting: restart must not mask a hang.
         events = diagnostics()
         fresh = [e for e in events if json.dumps(e, sort_keys=True) not in previous]
