@@ -190,13 +190,10 @@ class SkyActivity : ComponentActivity() {
         busy=true; note("Updating aircraft…")
         worker.execute {
             try {
-                val results=requestedMode.sources.map { source ->
-                    val result=network.fetch(source,p,requestedRadius)
-                    if(!result.ok) result.copy(aircraft=old.firstOrNull { it.source==source }?.aircraft.orEmpty()) else result
-                }
+                val results=requestedMode.sources.map { source -> network.fetch(source,p,requestedRadius) }
                 runOnUiThread {
                     if(live && token==generation && !isFinishing) try {
-                        access(); feeds=results; now=System.currentTimeMillis()/1000.0
+                        access(); feeds=SkyData.updateFeeds(old,results); now=System.currentTimeMillis()/1000.0
                         when { results.all { it.ok } -> { updatedAt=now; note("") }
                             results.any { it.ok } -> { updatedAt=now; note("Partial coverage · one source is unavailable",WorkshopTone.ATTENTION) }
                             else -> note("Could not refresh · recent cached positions may remain",WorkshopTone.ERROR) }
