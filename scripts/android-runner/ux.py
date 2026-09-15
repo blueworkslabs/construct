@@ -8,7 +8,7 @@ from config import CONFIG, require_runner
 import ui
 from ui import adb, nodes, labels, find, tap, capture, RESULTS
 from host_ui import restart, diagnostics, select_after, installed_status, catalog_settings, apply_catalog, library, scroll_content
-from text_entry import replace_text
+from catalog_input import replace_text
 
 require_runner()
 candidates = json.loads(os.environ['CONSTRUCT_UX_CANDIDATES'])
