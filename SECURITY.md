@@ -31,3 +31,12 @@ keys, real contact records, personal photos or unredacted diagnostics.
 
 Known camera direct-Reopen accessibility and the limits of bounded isolation probes
 are documented openly; neither is represented as a completed security guarantee.
+
+### Sky Watch native workspace
+
+API 0.8.0 adds an explicit `sky.watch` open-only grant. Its native foreground map
+may query fixed aircraft/map services after a human chooses an area. Optional
+coarse/fine phone location is requested only from a native human control. Module
+JavaScript receives no location, aircraft data or map pixels and retains its
+existing network/geolocation denial. There is no background location permission.
+See [the scoped privacy and network contract](docs/sky-watch.md).
