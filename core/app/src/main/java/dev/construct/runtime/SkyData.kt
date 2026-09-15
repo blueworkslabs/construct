@@ -85,6 +85,15 @@ internal object SkyData {
             SkyAircraft(id,text(a.opt(1)),null,null,p,altitude(a.opt(7)),speed(a.opt(9)),track(a.opt(10)),t,SkySource.OPENSKY)
         }
     }
+    /** Refresh only the requested sources; mode changes must not evict other recent observations. */
+    fun updateFeeds(cached: List<SkyFeed>, results: List<SkyFeed>): List<SkyFeed> {
+        val bySource=cached.associateBy { it.source }.toMutableMap()
+        results.forEach { result ->
+            bySource[result.source]=if(result.ok) result else
+                result.copy(aircraft=bySource[result.source]?.aircraft.orEmpty())
+        }
+        return bySource.values.toList()
+    }
     fun merge(feeds: List<SkyFeed>, mode: SkyMode, center: SkyPoint, radiusKm: Int, now: Double): List<SkyAircraft> =
         feeds.filter { it.source in mode.sources }.flatMap { it.aircraft }.filter { it.age(now)<=MAX_AGE && it.positionTime<=now+10 }
             .groupBy { it.key }.values.map { reports ->

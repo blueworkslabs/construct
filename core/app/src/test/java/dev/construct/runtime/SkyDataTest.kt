@@ -67,6 +67,24 @@ class SkyDataTest {
         assertEquals(2,SkyData.merge(feeds,SkyMode.BOTH,center,25,now).size)
         assertTrue(SkyData.merge(feeds,SkyMode.BOTH,center,25,now+122).isEmpty())
     }
+    @Test fun switchingAwayAndBackDuringRequestFloorRetainsCacheUntilExpiry() {
+        val a=SkyData.adsb(adsb(),now).single()
+        val o=SkyData.opensky(opensky(0 to "def456"),now).single()
+        var cached=SkyData.updateFeeds(emptyList(),listOf(feed(a.source,listOf(a))))
+        cached=SkyData.updateFeeds(cached,listOf(feed(o.source,listOf(o))))
+        assertEquals(listOf(o.key),SkyData.merge(cached,SkyMode.OPENSKY,center,25,now).map { it.key })
+        val limited=SkyFeed(a.source,emptyList(),"Wait before refreshing",false,now+5)
+        cached=SkyData.updateFeeds(cached,listOf(limited))
+        assertEquals(listOf(a.key),SkyData.merge(cached,SkyMode.ADSB,center,25,now+5).map { it.key })
+        assertEquals("Wait before refreshing",cached.single { it.source==a.source }.message)
+        assertFalse(cached.single { it.source==a.source }.ok)
+        assertEquals(2,SkyData.merge(cached,SkyMode.BOTH,center,25,now+5).size)
+        assertTrue(SkyData.merge(cached,SkyMode.BOTH,center,25,now+122).isEmpty())
+        // A successful empty snapshot replaces that source, but never the other source.
+        cached=SkyData.updateFeeds(cached,listOf(feed(a.source,emptyList())))
+        assertTrue(SkyData.merge(cached,SkyMode.ADSB,center,25,now+6).isEmpty())
+        assertEquals(listOf(o.key),SkyData.merge(cached,SkyMode.BOTH,center,25,now+6).map { it.key })
+    }
     @Test fun nonIcaoAddressesCannotCollideWithRealAircraft() {
         val a=SkyData.adsb(adsb("hex" to "~abc123"),now).single(); val o=SkyData.opensky(opensky(),now).single()
         assertEquals(2,SkyData.merge(listOf(feed(a.source,listOf(a)),feed(o.source,listOf(o))),SkyMode.BOTH,center,25,now).size)
