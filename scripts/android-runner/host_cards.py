@@ -38,3 +38,17 @@ def card_action(current, heading, choices, is_enabled, any_version=False):
     if len(matches) > 1:
         raise RuntimeError('Ambiguous action inside exact card')
     return matches[0] if matches else None
+
+
+def host_viewport(current):
+    """Accessibility window ordering can put Android's status bar first."""
+    rectangles=[]
+    for node in current:
+        if node.get('package')!='dev.construct.runtime': continue
+        values=list(map(int,re.findall(r'-?\d+',node.get('bounds',''))))
+        if len(values)!=4: continue
+        x1,y1,x2,y2=values
+        if x1>=0 and y1>=0 and x2>x1 and y2>y1:
+            rectangles.append(values)
+    if not rectangles: raise RuntimeError('Construct window is absent; refusing a system-window gesture')
+    return max(rectangles,key=lambda r:(r[2]-r[0])*(r[3]-r[1]))

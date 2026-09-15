@@ -46,3 +46,22 @@ class HostCardTest(unittest.TestCase):
 
 
 if __name__ == '__main__': unittest.main()
+
+
+class HostViewportTest(__import__('unittest').TestCase):
+    def test_status_bar_first_is_not_a_scroll_viewport(self):
+        from host_cards import host_viewport
+        from xml.etree.ElementTree import Element
+        current=[Element('node',{'package':'com.android.systemui','bounds':'[0,0][720,96]'}),
+                 Element('node',{'package':'dev.construct.runtime','bounds':'[0,96][720,1552]'}),
+                 Element('node',{'package':'dev.construct.runtime','bounds':'[24,200][690,400]'})]
+        self.assertEqual(host_viewport(current),[0,96,720,1552])
+    def test_landscape_uses_construct_not_the_larger_system_window(self):
+        from host_cards import host_viewport
+        from xml.etree.ElementTree import Element
+        self.assertEqual(host_viewport([Element('node',{'package':'com.android.systemui','bounds':'[0,0][1600,720]'}),
+          Element('node',{'package':'dev.construct.runtime','bounds':'[0,48][1512,700]'})]),[0,48,1512,700])
+    def test_no_construct_window_fails_instead_of_swiping_system(self):
+        from host_cards import host_viewport
+        from xml.etree.ElementTree import Element
+        with self.assertRaises(RuntimeError):host_viewport([Element('node',{'package':'com.android.systemui','bounds':'[0,0][720,1600]'})])

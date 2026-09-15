@@ -2,7 +2,7 @@
 import json
 import re
 import time
-from host_cards import card_action, card_heading
+from host_cards import card_action, card_heading, host_viewport
 
 _modern = False
 from ui import adb, nodes, labels, tap, tap_node, find, enabled
@@ -108,11 +108,7 @@ def host_ready():
 
 
 def scroll_content(direction):
-    current=nodes()
-    if not current: raise RuntimeError('No native host viewport')
-    rect=list(map(int,re.findall(r'\d+',current[0].get('bounds',''))))
-    if len(rect)!=4 or rect[2]<=rect[0] or rect[3]<=rect[1]: raise RuntimeError('Invalid host viewport')
-    x1,y1,x2,y2=rect
+    x1,y1,x2,y2=host_viewport(nodes())
     x=(x1+x2)//2; top=y1+(y2-y1)*3//10; bottom=y1+(y2-y1)*4//5
     start,end=(top,bottom) if direction=='up' else (bottom,top)
     adb('shell','input','swipe',str(x),str(start),str(x),str(end),'250')
