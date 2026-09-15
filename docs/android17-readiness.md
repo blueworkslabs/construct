@@ -256,8 +256,8 @@ selecting the single synthetic thumbnail, it either observes an immediate return
 It still requires real decoded/calibrated results afterward; selection alone is
 not a pass.
 
-A separate focused test catalog keeps only the exact probe, camera and measurement
-versions under test. It copies the original signed entries and verifies unchanged
+A separate focused test catalog keeps only the exact probe, camera, measurement,
+Focus, Snake and Contacts versions under test. It copies the original signed entries and verifies unchanged
 ZIP hashes; historical catalogs and the user's home catalog remain untouched.
 This avoids repeatedly traversing unrelated historical fixture versions during
 native acceptance. Full-catalog navigation remains represented by earlier host
@@ -323,3 +323,39 @@ confirmation, background/revocation, Android permission re-grant, offline album,
 export cancellation, exact published JPEG bytes and independent-copy survival.
 The emulator stopped. Process exits match test force-stops, permission changes and
 isolated-renderer cleanup; the separate Bluetooth 0x42 crash remains recorded.
+
+All **28 measurement checks** passed on the same optimized candidate in
+`20260915T000135Z-b26cc66f`, including offline ArUco positive/negative controls,
+independent perspective and EXIF fixtures, 95 mm calibration, drag cancellation,
+Undo and stale selection, actual pinch/pan, accessible adjustment, large-font
+layout, rotation retention, background/process cleanup, revocation, unchanged
+originals and diagnostic privacy. Synthetic 240 mm reference tolerances (3 mm
+flat / 4 mm warped) are test-fixture thresholds, not a real-world accuracy promise.
+The accepted receipt is complete/stopped; no Construct ANR or native crash was
+found in its runtime/exit review. The platform Bluetooth crash remains separate.
+
+The complete alpha 20 host baseline also passed in
+`20260915T000931Z-54fb5c96`: Checklist **5/5**, probes **5 BLOCKED / 6 CONTAINED /
+0 FAIL**, injected renderer-loss recovery, tones **7/7** and consent **5/5**.
+The unknown-reason isolated-renderer exit matches the exact injected SIGKILL PID
+and timestamp; the host PID survived and Retry retained the saved item. Remaining
+host exits are expected test force-stops. No new Construct ANR/native crash was
+found; the independent Bluetooth failure remains recorded. The emulator stopped.
+
+
+The first final-module run stopped before installation because the focused catalog
+initially omitted Focus, Snake and Contacts. That setup failure is retained as
+`20260915T002109Z-16f2f40e`, not a module failure or pass. Their exact existing
+signed entries were added to that separate catalog, and all six served ZIP hashes
+verified. Historical/home catalogs, APK bytes and completed scopes were unchanged;
+only the unfinished module scope was rerun.
+
+The subsequent Focus run rendered the expected `25:00` clock, but the new WebView
+exposed visible text instead of the older `Time remaining: 25:00` accessibility
+label. That failed driver receipt (`20260915T002322Z-d774a77d`) is preserved.
+A narrowly scoped reader accepts either real label representation only inside
+Construct's package, rejects ambiguous/conflicting values, and excludes Android's
+status-bar clock. Countdown and saved-remainder comparisons still require exact
+values; no generated timer state substitutes for UI evidence. Three additional
+unit cases cover old/new labels, status-bar exclusion and invalid/ambiguous
+clocks, bringing runner tests to **50**, passing normally and under Python `-O`.
