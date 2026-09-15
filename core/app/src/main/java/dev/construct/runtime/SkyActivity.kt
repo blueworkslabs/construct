@@ -223,7 +223,7 @@ class SkyActivity : ComponentActivity() {
                         val wide=maxWidth>maxHeight*1.3f
                         if(wide) Row(Modifier.fillMaxSize()) {
                             SkyMap(network,p,radius,aircraft,selected,now,{ selected=it },{ choose(it) },!busy,Modifier.weight(1f).fillMaxHeight())
-                            AircraftPanel(aircraft,p,Modifier.widthIn(max=330.dp).fillMaxWidth(0.43f).fillMaxHeight())
+                            AircraftPanel(aircraft,p,Modifier.width((maxWidth*0.43f).coerceAtMost(330.dp)).fillMaxHeight())
                         } else Column(Modifier.fillMaxSize()) {
                             SkyMap(network,p,radius,aircraft,selected,now,{ selected=it },{ choose(it) },!busy,Modifier.weight(0.58f).fillMaxWidth())
                             AircraftPanel(aircraft,p,Modifier.weight(0.42f).fillMaxWidth())
