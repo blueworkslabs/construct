@@ -1,1 +1,7 @@
-body { color:#e8eef5; background:#15202b; font:18px system-ui,sans-serif; margin:20px; } h1 { font-size:26px; } button,input { font:inherit; padding:10px; border-radius:8px; } input[type=text] { width:100%; box-sizing:border-box; } button { margin:6px 4px 6px 0; } li { list-style:none; display:flex; align-items:center; gap:8px; padding:8px 0; } ul { padding:0; } li span { flex:1; overflow-wrap:anywhere; } .done { text-decoration:line-through; opacity:.65; } #status { font-size:14px; min-height:2em; } [hidden] { display:none!important; }
+/* Checklist-specific rules; shared tokens and components come from construct-ui.css. */
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#add-form{margin-top:8px}
+.summary{font-size:13px;color:var(--muted);margin:8px 0 0}
+#items:empty{display:none}
+#items li button{background:none;border-color:transparent;color:var(--error)}
+#clear{margin-top:8px}

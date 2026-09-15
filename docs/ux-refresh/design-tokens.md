@@ -19,6 +19,7 @@ terminal prompts. Monospace only for versions, hashes, timers and measured value
 | `surface` | `#122019` | Cards, sheets, dialogs |
 | `surface2` | `#18291F` | Inputs, chips, nested rows |
 | `border` | `#2E4638` | Hairlines, card edges (decorative, 1px) |
+| `controlBorder` | `#6F8C7C` | Input and secondary-control boundaries that identify an interactive region (4.6:1 on surface, 4.2:1 on surface2) |
 | `text` | `#E6F0EA` | Body and titles |
 | `muted` | `#9DB3A6` | Secondary text, metadata |
 | `jade` | `#5FD3A0` | Primary action fill, links, selected state |
@@ -70,7 +71,7 @@ inside the board and controls.
 
 - **Primary button** (jade fill, jadeInk label): exactly one per screen or card.
   Open, Install, Confirm, Take photo, Search.
-- **Secondary button** (surface2 fill, text label, border): Versions, Undo, Choose
+- **Secondary button** (surface2 fill, text label, controlBorder): Versions, Undo, Choose
   photo, Retry when not primary.
 - **Quiet button** (no fill, jade label): Details, Help, Cancel, Back.
 - **Destructive** (no fill, error label, always confirmed): Remove, Discard,
@@ -135,8 +136,10 @@ these rules. Later the host can serve it like `construct-host.css` if wanted.
 
 `darkColorScheme(background=bg, surface=surface, surfaceVariant=surface2,
 onBackground=text, onSurface=text, onSurfaceVariant=muted, primary=jade,
-onPrimary=jadeInk, secondary=jade, tertiary=amber, error=error, outline=border,
-outlineVariant=border)`. Buttons map: primary → `Button`, secondary →
+onPrimary=jadeInk, secondary=jade, secondaryContainer=surface2,
+onSecondaryContainer=text, tertiary=amber, error=error, outline=controlBorder,
+outlineVariant=border)`. Every container/on-container pair is set explicitly so
+no default Material purple survives. Implemented in `ConstructTheme.kt`. Buttons map: primary → `Button`, secondary →
 `FilledTonalButton`, quiet → `TextButton`, destructive → `TextButton` with
 `error` content colour. Badges → `AssistChip`/`SuggestionChip` with the label
 and no icon. Typography stays Material defaults scaled by the type table.
