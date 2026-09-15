@@ -154,7 +154,10 @@ native and CSS token sets. Existing module storage formats stay unchanged.
 4. Publish immutable new signed module versions and a tested host candidate.
    Retain old artifacts for rollback and explicit Versions access; do not rewrite
    old package bytes or remove the historical/test registry.
-5. Verify native/JVM/host/module checks, actual APK/registry signing continuity,
+5. Adapt the runner to open explicit Versions controls instead of assuming a flat
+   historical catalog. Preserve exact module/version/hash checks; do not retain
+   awkward product copy solely to satisfy an old selector.
+6. Verify native/JVM/host/module checks, actual APK/registry signing continuity,
    portrait/landscape/large-font/keyboard and error states. Pixel checks focus on
    appearance and interaction, not a request to repeat every regression manually.
 

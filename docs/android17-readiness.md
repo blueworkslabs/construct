@@ -35,6 +35,16 @@ changing target SDK, permissions, models, signing identity or module versions.
 
 The history below intentionally retains failed experiments and their limits.
 
+## Operator follow-up — 2026-09-15
+
+The operator reports the requested alpha 20 Pixel checks pass after the Android 17
+upgrade and authorized merging PR #9. This is a reported hardware pass, distinct
+from the automated evidence below. The Snake emulator interruption pause remains
+unresolved; a successful phone check does not fix or certify that runner path.
+Nano Lab still reports UNAVAILABLE after the updates; its experiment is concluded
+for now, without identifying account eligibility as the cause. No additional APK
+is needed merely because the approved branches merged.
+
 ## Platform audit
 
 Reviewed Google's [all-app changes](https://developer.android.com/about/versions/17/behavior-changes-all)

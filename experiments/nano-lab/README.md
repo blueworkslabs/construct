@@ -1,5 +1,17 @@
 # Construct Nano Lab
 
+## Experiment closeout — 2026-09-15
+
+The operator reports `UNAVAILABLE` on a Pixel 8a before and after upgrading from
+Android 16 to Android 17 and applying available updates. No successful Nano
+inference was observed. Device/API eligibility remains a plausible explanation;
+the result does not establish an account restriction or a precise cause.
+Exploration is concluded for now. Keep this standalone probe as a reference;
+there is no Nano integration or cloud fallback in Construct. No further phone
+setup/reset loop is planned. The unavailable path has physical-device evidence;
+model download and successful inference remain unverified.
+
+
 A **separately installed experimental app**, not a Construct host update or module.
 It asks the public ML Kit Prompt API whether AICore can serve this app and, only
 when available, offers independent short text prompts with streamed output.
