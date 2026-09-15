@@ -256,6 +256,21 @@
         }
       ],
       "latest": "0.3.0"
+    },
+    {
+      "id": "dev.construct.sky-watch",
+      "name": "Sky Watch",
+      "versions": [
+        {
+          "id": "dev.construct.sky-watch",
+          "name": "Sky Watch",
+          "version": "0.1.0",
+          "artifact": "dev.construct.sky-watch-0.1.0.zip",
+          "sha256": "96bf0b6ba3745d7ccb4e0b09c1bc1c9eaef56a183a098cc03003ecefcaf61c9e",
+          "signature": "j/rqZz2MboyrbTQ/3v2fXce4Li89nYDPcGSxs7RpHfEBt77m9ys6gPptrypPQ2hYN9cMU8ZvYyf7+4fBf5FfI4RXBZv3S+jRspdrfZhk4OTwM4Yfh/MflbiGiyOW+DUB6QdF4BqCbEUNQShmNhgfbKoEfKAN26+0R4LyVhhjNGV7Hqb1vISrcMIkYARp7nnImrsR4vbYcwpd0GieNN8kMXAX0S6KZho5Vs2gMLAR2Q/PQk0NS4r4Ylz3tsa+tfIW+/C/+TzDX/Du0Sn0Ug31LWoh3cGUuc9g/PdUs7fd/P3A2kXexxgerQdmlLyoO3ETMTebSDxKwRFYuzHQo/w6GA=="
+        }
+      ],
+      "latest": "0.1.0"
     }
   ]
 }
