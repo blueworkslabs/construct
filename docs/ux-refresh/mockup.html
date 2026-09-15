@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Construct UX refresh — design prototype (not a functioning app)</title>
+<style>
+/* ---- Shared tokens: single source with design-tokens.md ---- */
+:root{--bg:#0B1410;--surface:#122019;--surface2:#18291F;--border:#2E4638;--control-border:#6F8C7C;--text:#E6F0EA;--muted:#9DB3A6;--jade:#5FD3A0;--jade-ink:#06110B;--focus:#8CF0C4;--amber:#E9C46A;--error:#F08A7E;--disabled:#5E7268;--r-card:12px;--r-btn:10px;--gap:12px;--gutter:16px;--construct-menu-width:56px;--construct-menu-height:56px;--font:1}
+*{box-sizing:border-box}
+html,body{margin:0;background:#06090a;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+/* ---- Prototype chrome (outside the device) ---- */
+.proto{display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px}
+.proto h1{font-size:16px;font-weight:600;color:#c9d6cf;margin:0}
+.proto .bar{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.proto .bar button{background:#1b2a2a;color:#e6f0ea;border:1px solid #2e4638;border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;cursor:pointer}
+.proto .bar button[aria-pressed=true]{background:#5fd3a0;color:#06110b;border-color:#5fd3a0}
+.note{font-size:12px;color:#8ea69a;max-width:720px;text-align:center}
+/* ---- Device frame ---- */
+.device{position:relative;background:var(--bg);border:3px solid #2a3a3a;border-radius:28px;overflow:hidden;width:412px;height:860px;font-size:calc(15px*var(--font));line-height:1.45}
+.device.narrow{width:360px;height:780px}.device.landscape{width:860px;height:412px}
+.device.large{--font:1.3}.device.xlarge{--font:2}
+.screen{position:absolute;inset:0;display:none;flex-direction:column}
+.screen.active{display:flex}
+/* ---- App bar, status, nav ---- */
+.appbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px var(--gutter);min-height:56px}.appbar>div:first-child{flex:1 1 160px;min-width:0}
+.appbar h2{font-size:calc(22px*var(--font));line-height:1.25;font-weight:600;margin:0;flex:1}
+.appbar .sub{font-size:calc(13px*var(--font));color:var(--muted)}
+.status{padding:0 var(--gutter) 8px;font-size:calc(13px*var(--font));color:var(--muted);min-height:1.5em}
+.status.amber{color:var(--amber)}.status.error{color:var(--error)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em}
+.content{flex:1;overflow:auto;padding:0 var(--gutter) 16px;display:flex;flex-direction:column;gap:var(--gap)}
+.tabs{display:flex;border-top:1px solid var(--border);background:var(--surface)}
+.tabs button{flex:1;background:none;border:0;color:var(--muted);font:inherit;font-size:calc(13px*var(--font));padding:10px 4px;min-height:48px;cursor:pointer}
+.tabs button[aria-selected=true]{color:var(--jade);font-weight:600;box-shadow:inset 0 3px 0 var(--jade)}
+/* ---- Buttons ---- */
+.btn{white-space:normal;text-align:center;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 16px;border-radius:var(--r-btn);font:inherit;font-size:calc(15px*var(--font));font-weight:600;border:1px solid transparent;cursor:pointer;background:var(--surface2);color:var(--text);border-color:var(--control-border)}
+.btn.primary{background:var(--jade);color:var(--jade-ink);border-color:var(--jade)}
+.btn.quiet{background:none;border-color:transparent;color:var(--jade)}
+.btn.danger{background:none;border-color:transparent;color:var(--error)}
+.btn.icon{width:48px;height:48px;padding:0;border-radius:50%;background:none;border-color:transparent;color:var(--text);font-size:22px}
+.btn:disabled{color:var(--disabled);border-color:var(--disabled);background:var(--surface2);opacity:.6;cursor:default}
+.btn:focus-visible,.tabs button:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+/* ---- Cards, badges ---- */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);padding:16px;display:flex;flex-direction:column;gap:8px}
+.card h3{margin:0;font-size:calc(17px*var(--font));line-height:1.3;font-weight:600}
+.card p{margin:0;font-size:calc(14px*var(--font));color:var(--muted)}
+.card .meta{font-size:calc(12px*var(--font));color:var(--muted);overflow-wrap:anywhere}
+.card.damaged{border-color:var(--error)}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:calc(12px*var(--font));background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.badge.amber{color:var(--amber);border-color:var(--amber)}.badge.error{color:var(--error);border-color:var(--error)}.badge.jade{color:var(--jade);border-color:var(--jade)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px}
+.actions .spacer{flex:1}
+.banner{background:var(--surface);border:1px solid var(--error);border-radius:var(--r-card);padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.banner p{margin:0;font-size:calc(14px*var(--font))}
+details{background:var(--surface2);border-radius:10px;padding:8px 12px;font-size:calc(14px*var(--font))}
+summary{cursor:pointer;color:var(--jade);font-weight:600}
+details p{margin:8px 0 0;color:var(--muted)}
+/* ---- Sheets, dialogs, menu ---- */
+.scrim{position:absolute;inset:0;background:#0006;display:none}
+.scrim.open{display:block}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:16px 16px 0 0;padding:8px 16px 16px;max-height:70%;overflow:auto;display:none;flex-direction:column;gap:12px;border-top:1px solid var(--border)}
+.sheet.open{display:flex}
+.handle{width:40px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 4px}
+.sheet h3{margin:0;font-size:calc(17px*var(--font))}
+.vrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border);font-size:calc(14px*var(--font))}.vrow .grow{min-width:0;overflow-wrap:anywhere;flex:1 1 160px}
+.vrow:first-of-type{border-top:0}
+.dialog{position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;display:none;flex-direction:column;gap:12px;max-height:80%;overflow:auto}
+.dialog.open{display:flex}
+.dialog h3{margin:0;font-size:calc(18px*var(--font))}
+.menu{position:absolute;top:56px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;display:none;flex-direction:column;min-width:200px}
+.menu.open{display:flex}
+.menu button{background:none;border:0;color:var(--text);text-align:left;padding:12px 14px;min-height:48px;font:inherit;font-size:calc(15px*var(--font));border-radius:8px;cursor:pointer}
+.menu button:hover{background:var(--surface2)}
+.menu .sep{height:1px;background:var(--border);margin:4px 8px}
+/* ---- Inside modules ---- */
+.module .mhead{display:flex;align-items:flex-start;gap:8px;padding:12px var(--gutter) 4px;padding-right:calc(var(--gutter) + var(--construct-menu-width))}
+.module .mhead h2{margin:0;font-size:calc(20px*var(--font));font-weight:600;line-height:1.3}
+.module .mhead p{margin:2px 0 0;color:var(--muted);font-size:calc(13px*var(--font))}
+.corner{position:absolute;top:4px;right:4px;width:48px;height:48px;border-radius:50%;background:#00000059;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;border:0;cursor:pointer}
+.corner-reserved{position:absolute;top:0;right:0;width:56px;height:56px;border:1px dashed #5fd3a055;pointer-events:none}
+input[type=text],input[type=search]{font:inherit;font-size:calc(15px*var(--font));background:var(--surface2);color:var(--text);border:1px solid var(--control-border);border-radius:var(--r-btn);padding:10px 12px;min-height:44px;flex:1;min-width:140px}
+.list{display:flex;flex-direction:column}
+.item{display:flex;align-items:center;gap:12px;min-height:48px;border-top:1px solid var(--border)}
+.item:first-child{border-top:0}
+.item input[type=checkbox]{width:24px;height:24px;accent-color:var(--jade)}
+.item span{flex:1}.item .done{text-decoration:line-through;color:var(--muted)}
+.item .btn.danger{min-height:40px;padding:4px 8px}
+footer.mfoot{padding:8px var(--gutter) 12px;font-size:calc(11px*var(--font));color:var(--muted);text-align:center}
+.eyebrow{color:var(--jade);font-size:calc(12px*var(--font));letter-spacing:.08em;margin:0}
+/* landscape: two-column module content and library */
+.device.landscape .content.grid2{display:grid;grid-template-columns:1fr 1fr;align-content:start}
+.device.landscape .module .content{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-content:start}
+</style></head>
+<body>
+<div class="proto">
+<h1>Construct UX refresh · design prototype · not a functioning app · synthetic data only</h1>
+<div class="bar" id="screens">
+<button data-screen="library" aria-pressed="true">Library</button><button data-screen="browse">Browse</button><button data-screen="settings">Settings</button><button data-screen="access">Module access</button><button data-screen="error">Error states</button><button data-screen="checklist">Module: Checklist</button><button data-screen="camera">Module: Camera</button>
+</div>
+<div class="bar" id="frames"><button data-frame="phone" aria-pressed="true">Phone 412</button><button data-frame="narrow">Narrow 360</button><button data-frame="landscape">Landscape</button><button id="large" aria-pressed="false">Large font ×1.3</button><button id="xlarge" aria-pressed="false">Huge font ×2</button></div>
+<p class="note">Click cards, ☰, Versions, Install, Help and the checklist controls. Buttons labelled "Demo:" only cycle mocked states. Dashed square marks the 56px corner reserved for the native menu inside modules. Tokens and rules: <span class="mono">design-tokens.md</span>.</p>
+
+<div class="device phone" id="device">
+
+<!-- ================= LIBRARY ================= -->
+<section class="screen active" data-screen="library">
+ <div class="appbar"><div><h2>Construct</h2><div class="sub">Library · 6 tools</div></div><button class="btn icon" aria-label="Menu" onclick="toggle('menu')">☰</button></div>
+ <div class="status">Everything here works offline.</div>
+ <div class="content grid2">
+  <div class="card"><h3>Pocket Snake</h3><p>Swipe-and-button Snake with a saved best score.</p><div class="row"><span class="badge">Working</span><span class="meta mono">0.1.5</span></div>
+   <div class="actions"><button class="btn primary" onclick="show('snakehint')">Open</button><span class="spacer"></span><button class="btn icon" aria-label="More actions for Pocket Snake" onclick="toggle('overflow')">⋯</button></div></div>
+  <div class="card"><h3>Pocket Measure</h3><p>Tabletop lengths from a photo with the printed marker.</p><div class="row"><span class="badge amber">Update 0.1.3</span><span class="meta mono">0.1.2</span></div>
+   <div class="actions"><button class="btn primary">Open</button><button class="btn" onclick="go('browse')">Update</button><span class="spacer"></span><button class="btn icon" aria-label="More actions for Pocket Measure">⋯</button></div></div>
+  <div class="card"><h3>Pocket Checklist</h3><p>Saved to-do list. Works offline.</p><div class="row"><span class="badge amber">Trial</span><span class="meta mono">0.2.0</span></div>
+   <p class="meta">Trial: open it, test it, then use Mark working in the module menu (☰).</p><div class="actions"><button class="btn primary" onclick="go('checklist')">Open</button><span class="spacer"></span><button class="btn icon" aria-label="More actions for Pocket Checklist">⋯</button></div></div>
+  <div class="card"><h3>Pocket Camera</h3><p>Private viewfinder and album.</p><div class="row"><span class="badge">Working</span><span class="badge amber">Needs Android camera access</span><span class="meta mono">0.3.0</span></div>
+   <div class="actions"><button class="btn primary" onclick="go('camera')">Open</button><span class="spacer"></span><button class="btn icon" aria-label="More actions for Pocket Camera">⋯</button></div></div>
+  <div class="card"><h3>Pocket Contacts</h3><p>Read-only contact search.</p><div class="row"><span class="badge">Disabled</span><span class="meta mono">0.2.1</span></div>
+   <div class="actions"><button class="btn">Enable</button><span class="spacer"></span><button class="btn icon" aria-label="More actions for Pocket Contacts">⋯</button></div></div>
+  <div class="card damaged"><h3>Pocket Focus</h3><p>Focus countdown with optional tone.</p><div class="row"><span class="badge error">Failed</span><span class="meta mono">0.1.2 · JAVASCRIPT_ERROR</span></div>
+   <div class="actions"><button class="btn primary">Retry</button><button class="btn">Restore 0.1.1</button><span class="spacer"></span><button class="btn icon" aria-label="More actions for Pocket Focus">⋯</button></div></div>
+ </div>
+ <div class="tabs"><button aria-selected="true">Library</button><button onclick="go('browse')">Browse</button></div>
+ <div class="menu" id="menu"><button onclick="go('settings');toggle('menu')">Settings</button><button onclick="toggle('menu')">Diagnostics</button><div class="sep"></div><button onclick="toggle('menu')">About · alpha 21</button></div>
+ <div class="menu" id="overflow" style="top:auto;bottom:120px"><button onclick="go('access');toggle('overflow')">Module access</button><button onclick="toggle('overflow')">Disable</button><button onclick="toggle('overflow')">Roll back to 0.1.4</button><div class="sep"></div><button style="color:var(--error)" onclick="toggle('overflow')">Remove · keep data</button></div>
+ <div class="scrim" id="snakehint" onclick="hide('snakehint')"></div>
+ <div class="dialog" id="snakehint-d"><h3>Opens the module</h3><p style="margin:0;color:var(--muted)">In the app this launches Pocket Snake full-screen with the native corner menu. The prototype shows Checklist and Camera as module examples instead.</p><div class="actions"><span class="spacer"></span><button class="btn quiet" onclick="hide('snakehint')">OK</button></div></div>
+</section>
+
+<!-- ================= BROWSE ================= -->
+<section class="screen" data-screen="browse">
+ <div class="appbar"><div><h2>Browse</h2><div class="sub">Home registry · refreshed 2 min ago</div></div><button class="btn quiet" onclick="setStatus('browse-status','Refreshing…','')">Refresh</button><button class="btn icon" aria-label="Menu" onclick="toggle('menu2')">☰</button></div>
+ <div class="status" id="browse-status">Showing the latest release of each tool.</div>
+ <div class="content grid2">
+  <div class="card"><h3>Pocket Measure</h3><p>Tabletop lengths from a photo with the printed marker.</p><div class="row"><span class="badge amber">Update available</span><span class="meta">Installed <span class="mono">0.1.2</span> · latest <span class="mono">0.1.3</span></span></div>
+   <div class="actions"><button class="btn primary" onclick="openLayer('consent')">Update</button><button class="btn" onclick="openLayer('versions')">Versions</button></div></div>
+  <div class="card"><h3>Pocket Snake</h3><p>Swipe-and-button Snake with a saved best score.</p><div class="row"><span class="badge jade">Installed</span><span class="meta mono">0.1.5</span></div>
+   <div class="actions"><button class="btn" disabled>Installed</button><button class="btn" onclick="openLayer('versions')">Versions</button></div></div>
+  <div class="card"><h3>Pocket Tones</h3><p>Two short beeps to prove the tone capability.</p><div class="row"><span class="meta mono">0.2.0</span></div>
+   <div class="actions"><button class="btn primary" onclick="openLayer('consent')">Install</button><button class="btn" onclick="openLayer('versions')">Versions</button></div></div>
+  <div class="card"><h3>Hello Module</h3><p>Minimal demo: toast, log and saved counter.</p><div class="row"><span class="meta mono">0.2.1</span></div>
+   <div class="actions"><button class="btn primary" onclick="openLayer('consent')">Install</button><button class="btn" onclick="openLayer('versions')">Versions</button></div></div>
+  <div class="card"><h3>Isolation probes</h3><p>Deliberately misbehaving fixture for testing the sandbox.</p><div class="row"><span class="badge error">Test fixture</span><span class="meta mono">0.1.1</span></div>
+   <div class="actions"><button class="btn">Install for testing</button><button class="btn" onclick="openLayer('versions')">Versions</button></div></div>
+ </div>
+ <div class="tabs"><button onclick="go('library')">Library</button><button aria-selected="true">Browse</button></div>
+ <div class="menu" id="menu2"><button onclick="go('settings');toggle('menu2')">Settings</button><button onclick="toggle('menu2')">Diagnostics</button><div class="sep"></div><button onclick="toggle('menu2')">About · alpha 21</button></div>
+ <div class="scrim" id="versions" onclick="closeLayer('versions')"></div>
+ <div class="sheet" id="versions-s"><div class="handle"></div><h3>Pocket Measure · versions</h3><p style="margin:0;color:var(--muted);font-size:.9em">Every published version stays available. Installing any of them uses the same signature check and access review.</p>
+  <div class="vrow"><span class="mono">0.1.3</span><span class="grow">Latest · loupe and drag placement</span><button class="btn quiet" onclick="closeLayer('versions');openLayer('consent')">Update</button></div>
+  <div class="vrow"><span class="mono">0.1.2</span><span class="grow"><span class="badge jade">Installed</span></span><button class="btn quiet" disabled>Installed</button></div>
+  <div class="vrow"><span class="mono">0.1.4</span><span class="grow"><span class="badge error">Test fixture</span> Broken on purpose</span><button class="btn quiet">Install for testing</button></div>
+  <div class="vrow"><span class="mono">0.1.1</span><span class="grow">Previous</span><button class="btn quiet">Install</button></div>
+  <div class="actions"><span class="spacer"></span><button class="btn" onclick="closeLayer('versions')">Close</button></div></div>
+ <div class="scrim" id="consent" onclick="closeLayer('consent')"></div>
+ <div class="dialog" id="consent-d"><h3>Update Pocket Measure to 0.1.3?</h3><p style="margin:0;color:var(--muted)">Publisher signature verified. This tool may:</p>
+  <div class="vrow"><span class="grow">Open the photo picker and measurement workspace<br><span class="meta mono">photo.measure</span></span><span class="badge">Required</span></div>
+  <div class="vrow"><span class="grow">Play short tones on completion<br><span class="meta mono">device.tone</span></span><label class="row" style="gap:6px"><input type="checkbox" style="width:22px;height:22px;accent-color:var(--jade)">Allow</label></div>
+  <p style="margin:0;font-size:.9em;color:var(--muted)">Your existing access choices are kept. Tone access starts off. New code installs as a trial; your working version stays available for rollback. No network access for module code.</p>
+  <div class="actions"><span class="spacer"></span><button class="btn quiet" onclick="closeLayer('consent')">Cancel</button><button class="btn primary" onclick="closeLayer('consent');setStatus('browse-status','Installed Pocket Measure 0.1.3 as a trial. Open it, then mark it working.','amber')">Allow &amp; install</button></div></div>
+</section>
+
+<!-- ================= SETTINGS ================= -->
+<section class="screen" data-screen="settings">
+ <div class="appbar"><button class="btn icon" aria-label="Back" onclick="go('library')">‹</button><h2>Settings</h2></div>
+ <div class="status">Changes apply immediately.</div>
+ <div class="content">
+  <div class="card"><h3>Catalog source</h3><p>Where Browse looks for tools. Installed tools keep working if this is offline.</p>
+   <div class="vrow"><span class="grow">Home registry<br><span class="meta mono">https://catalog.example.invalid/index.json</span></span><span class="badge jade">In use</span></div>
+   <div class="vrow"><span class="grow">Bundled demo<br><span class="meta">Hello 0.1.0 and 0.2.0, no network</span></span><button class="btn quiet">Use</button></div>
+   <div class="actions"><button class="btn">Edit URL</button><button class="btn">Refresh now</button></div></div>
+  <div class="card"><h3>Diagnostics</h3><p>Local technical log, JSON lines. Module messages may contain module data; review before sharing.</p><div class="actions"><button class="btn">Open</button><button class="btn">Copy</button></div></div>
+  <div class="card"><h3>Storage</h3><p>Saved module data stays when a tool is removed. Photos live in each tool's private album. Index repair appears in Library only if the module index cannot be read.</p></div>
+  <div class="card"><h3>About</h3><p>Construct <span class="mono">0.1.0-alpha21</span> · private build · signed modules only</p></div>
+ </div>
+</section>
+
+<!-- ================= MODULE ACCESS ================= -->
+<section class="screen" data-screen="access">
+ <div class="appbar"><button class="btn icon" aria-label="Back" onclick="go('library')">‹</button><div><h2>Module access</h2><div class="sub">Pocket Camera · <span class="mono">0.3.0</span></div></div></div>
+ <div class="status">The module is stopped while you change access. Choices survive updates and rollback.</div>
+ <div class="content">
+  <div class="card"><h3>What this tool may do</h3>
+   <div class="vrow"><span class="grow">Allow camera workspace<br><span class="meta">Required for this tool · <span class="mono">camera.capture</span></span></span><label class="row" style="gap:6px"><input type="checkbox" checked style="width:22px;height:22px;accent-color:var(--jade)">On</label></div>
+      <div class="vrow"><span class="grow">Allow diagnostics<br><span class="meta mono">log.write</span></span><label class="row" style="gap:6px"><input type="checkbox" checked style="width:22px;height:22px;accent-color:var(--jade)">On</label></div></div>
+  <div class="card"><h3>Android permission</h3><p>App-wide. Only tools you switch on above can use it.</p>
+   <div class="vrow"><span class="grow">Camera</span><span class="badge amber">Not allowed</span><button class="btn primary">Allow</button></div>
+   <div class="actions"><button class="btn quiet">Android app settings</button></div></div>
+  <div class="card"><h3>Saved photos</h3><p>8 photos · 12 MiB in this tool's private album. Gallery copies are made from the camera workspace with a native confirmation; there is no separate permission.</p><div class="actions"><button class="btn danger">Delete all…</button></div></div>
+  <div class="actions"><button class="btn primary" onclick="go('camera')">Reopen module</button></div>
+ </div>
+</section>
+
+<!-- ================= ERROR STATES ================= -->
+<section class="screen" data-screen="error">
+ <div class="appbar"><div><h2>Construct</h2><div class="sub">Library · 3 tools</div></div><button class="btn icon" aria-label="Menu">☰</button></div>
+ <div class="status error"><span class="mono">[REGISTRY_HTTP]</span> Catalog is offline. Installed tools still work. <button class="btn quiet" style="min-height:32px;padding:0 6px" onclick="show('errdetails')">Details</button></div>
+ <div class="content grid2">
+  <div class="banner"><p><strong>Module index can't be read</strong> <span class="mono">[STATE_UNREADABLE]</span></p><p style="color:var(--muted)">Saved module data is untouched. Repair archives the damaged index and removes installed code so tools can be reinstalled.</p><div class="actions"><button class="btn primary">Repair module index…</button><button class="btn quiet">Details</button></div></div>
+  <div class="card damaged"><h3>dev.construct.focus</h3><p>Installed code is damaged.</p><div class="row"><span class="badge error">Needs repair</span><span class="meta mono">CHECKSUM_FAILED</span></div><div class="actions"><button class="btn primary">Restore 0.1.1</button><button class="btn danger">Remove · keep data</button></div></div>
+  <div class="card"><h3>Pocket Checklist</h3><p>Saved to-do list. Works offline.</p><div class="row"><span class="badge amber">Trial</span><span class="meta mono">0.2.0</span></div><p class="meta">Trial: test it, then Mark working from the module menu (☰).</p><div class="actions"><button class="btn primary">Open</button><button class="btn quiet">Discard trial</button></div></div>
+  <div class="card"><h3>Pocket Snake</h3><p>Swipe-and-button Snake with a saved best score.</p><div class="row"><span class="badge">Working</span><span class="meta mono">0.1.5</span></div><div class="actions"><button class="btn primary">Open</button></div></div>
+ </div>
+ <div class="tabs"><button aria-selected="true">Library</button><button>Browse</button></div>
+ <div class="scrim" id="errdetails" onclick="hide('errdetails')"></div>
+ <div class="dialog" id="errdetails-d"><h3>Catalog offline</h3><p class="mono" style="margin:0;font-size:.85em;user-select:text">[REGISTRY_HTTP] Registry did not return a successful response.<br>GET https://catalog.example.invalid/index.json → connect timeout (10 s)<br>Last successful refresh: 14:02</p><div class="actions"><button class="btn">Copy</button><span class="spacer"></span><button class="btn quiet" onclick="hide('errdetails')">Close</button><button class="btn primary" onclick="hide('errdetails')">Retry</button></div></div>
+</section>
+
+<!-- ================= MODULE: CHECKLIST ================= -->
+<section class="screen module" data-screen="checklist">
+ <div class="corner-reserved"></div><button class="corner" aria-label="Construct menu" onclick="toggle('mmenu')">☰</button>
+ <div class="mhead"><div><h2>Pocket Checklist</h2><p>Saved on this phone · works offline</p></div></div>
+ <div class="content">
+  <div>
+   <form class="row" onsubmit="addItem(event)"><input type="text" id="newitem" placeholder="New item" maxlength="120" aria-label="New item"><button class="btn primary" type="submit">Add</button></form>
+   <div class="status" id="cl-status" style="padding:6px 0 0">2 of 4 completed</div>
+  </div>
+  <div class="card" style="padding:4px 12px"><div class="list" id="cl-list">
+   <div class="item"><input type="checkbox" checked aria-label="Complete Print marker card"><span class="done">Print marker card</span><button class="btn danger" aria-label="Delete Print marker card">✕</button></div>
+   <div class="item"><input type="checkbox" checked aria-label="Complete Measure chopstick"><span class="done">Measure chopstick</span><button class="btn danger" aria-label="Delete Measure chopstick">✕</button></div>
+   <div class="item"><input type="checkbox" aria-label="Complete Test landscape Snake"><span>Test landscape Snake</span><button class="btn danger" aria-label="Delete Test landscape Snake">✕</button></div>
+   <div class="item"><input type="checkbox" aria-label="Complete Review alpha 21"><span>Review alpha 21</span><button class="btn danger" aria-label="Delete Review alpha 21">✕</button></div>
+  </div></div>
+  <div class="row"><button class="btn">Clear completed</button><button class="btn quiet" title="Prototype only" onclick="cycle('cl-status',['Saving…','Saved on this phone.','[CAPABILITY_DENIED] Saving is off. Turn on Allow saving data in Module access (☰).'],['','','error'])">Demo: cycle status</button></div>
+  <details><summary>Help</summary><p>Up to 30 items. Items are saved on this phone only and never leave it. Removing the tool keeps your list; reinstalling brings it back.</p></details>
+ </div>
+ <footer class="mfoot">On this phone · <span class="mono">0.2.0</span></footer>
+ <div class="menu" id="mmenu"><button onclick="toggle('mmenu')">Module access</button><button onclick="toggle('mmenu')">Diagnostics</button><button onclick="toggle('mmenu')">Mark working</button><div class="sep"></div><button onclick="go('library');toggle('mmenu')">Close module</button></div>
+</section>
+
+<!-- ================= MODULE: CAMERA LAUNCHER ================= -->
+<section class="screen module" data-screen="camera">
+ <div class="corner-reserved"></div><button class="corner" aria-label="Construct menu" onclick="toggle('mmenu2')">☰</button>
+ <div class="mhead"><div><p class="eyebrow">YOUR PHONE · YOUR PHOTOS</p><h2>Pocket Camera</h2><p>Take a photo into a private album. Nothing leaves this phone unless you export it.</p></div></div>
+ <div class="content">
+  <div><button class="btn primary" style="width:100%;min-height:52px" id="cam-open" onclick="camState(1)">Open camera</button>
+   <div class="status" id="cam-status" style="padding:8px 0 0">Ready. The camera stays off until you open it.</div></div>
+  <div class="row"><button class="btn quiet" onclick="camState(0)">Demo: ready</button><button class="btn quiet" onclick="camState(1)">Demo: loading</button><button class="btn quiet" onclick="camState(2)">Demo: denied</button></div>
+  <details><summary>Help</summary><p>Photos start in this tool's private album, up to 8 photos or 20 MiB. From the native workspace you can export a separate copy to your phone gallery; exported copies can be read and backed up by your photo apps. Module code never receives images or live frames. Closing, backgrounding or rotating closes the camera.</p></details>
+ </div>
+ <footer class="mfoot">On this phone · <span class="mono">0.3.0</span></footer>
+ <div class="menu" id="mmenu2"><button onclick="toggle('mmenu2')">Module access</button><button onclick="toggle('mmenu2')">Diagnostics</button><div class="sep"></div><button onclick="go('library');toggle('mmenu2')">Close module</button></div>
+</section>
+
+</div><!-- device -->
+</div>
+<script>
+'use strict';
+const device=document.getElementById('device');
+function go(name){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.dataset.screen===name));document.querySelectorAll('#screens button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.screen===name));document.querySelectorAll('.menu.open,.scrim.open,.sheet.open,.dialog.open').forEach(e=>e.classList.remove('open'));}
+function toggle(id){document.getElementById(id).classList.toggle('open');}
+function openLayer(id){document.getElementById(id).classList.add('open');const p=document.getElementById(id+'-s')||document.getElementById(id+'-d');if(p)p.classList.add('open');}
+function closeLayer(id){document.getElementById(id).classList.remove('open');const p=document.getElementById(id+'-s')||document.getElementById(id+'-d');if(p)p.classList.remove('open');}
+const show=openLayer,hide=closeLayer;
+function setStatus(id,text,cls){const el=document.getElementById(id);el.textContent=text;el.className='status '+cls;}
+function cycle(id,texts,classes){const el=document.getElementById(id);const i=((+el.dataset.i||0)+1)%texts.length;el.dataset.i=i;el.textContent=texts[i];el.className='status '+classes[i];}
+function addItem(e){e.preventDefault();const input=document.getElementById('newitem');const text=input.value.trim();if(!text)return;
+ const row=document.createElement('div');row.className='item';const check=document.createElement('input');check.type='checkbox';check.setAttribute('aria-label','Complete '+text);
+ const span=document.createElement('span');span.textContent=text;const del=document.createElement('button');del.className='btn danger';del.textContent='✕';del.setAttribute('aria-label','Delete '+text);del.onclick=()=>row.remove();
+ check.onchange=()=>span.classList.toggle('done',check.checked);row.append(check,span,del);document.getElementById('cl-list').append(row);input.value='';setStatus('cl-status','Saved on this phone.','');input.focus();}
+function camState(n){const b=document.getElementById('cam-open');const s=document.getElementById('cam-status');if(n===0){b.disabled=false;b.textContent='Open camera';setStatus('cam-status','Ready. The camera stays off until you open it.','');}
+ if(n===1){b.disabled=true;b.textContent='Opening…';setStatus('cam-status','Opening the camera workspace…','');}
+ if(n===2){b.disabled=false;b.textContent='Open camera';setStatus('cam-status','[ANDROID_PERMISSION_DENIED] Camera is off. Turn on Allow Android camera access in Module access (☰).','error');}}
+document.querySelectorAll('#screens button').forEach(b=>b.onclick=()=>go(b.dataset.screen));
+document.querySelectorAll('#frames button[data-frame]').forEach(b=>b.onclick=()=>{device.classList.remove('phone','narrow','landscape');device.classList.add(b.dataset.frame);document.querySelectorAll('#frames button[data-frame]').forEach(x=>x.setAttribute('aria-pressed',x===b));});
+document.getElementById('large').onclick=e=>{device.classList.remove('xlarge');document.getElementById('xlarge').setAttribute('aria-pressed','false');const on=device.classList.toggle('large');e.target.setAttribute('aria-pressed',on);};
+document.getElementById('xlarge').onclick=e=>{device.classList.remove('large');document.getElementById('large').setAttribute('aria-pressed','false');const on=device.classList.toggle('xlarge');e.target.setAttribute('aria-pressed',on);};
+document.querySelectorAll('.item .btn.danger').forEach(b=>b.onclick=()=>b.closest('.item').remove());
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.menu.open,.scrim.open,.sheet.open,.dialog.open').forEach(x=>x.classList.remove('open'));});
+// Deep links for review screenshots: ?screen=browse&frame=narrow&large=1&open=versions
+(()=>{const q=new URLSearchParams(location.search);if(q.get('screen'))go(q.get('screen'));
+ if(q.get('frame')){device.classList.remove('phone','narrow','landscape');device.classList.add(q.get('frame'));}
+ if(q.get('large')==='1'){device.classList.add('large');document.getElementById('large').setAttribute('aria-pressed','true');}
+ if(q.get('large')==='2'){device.classList.add('xlarge');document.getElementById('xlarge').setAttribute('aria-pressed','true');}
+ if(q.get('open')){const id=q.get('open');const el=document.getElementById(id);if(el)openLayer(id);}
+ if(q.get('cam'))camState(+q.get('cam'));
+ if(q.get('click'))q.getAll('click').forEach(sel=>{const el=document.querySelector(sel);if(el)el.click();});})();
+</script>
+</body></html>
