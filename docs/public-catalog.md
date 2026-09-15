@@ -106,3 +106,13 @@ to preserve its modules and data. The pilot signer is unchanged.
 
 APK downloads through a browser may follow GitHub's download redirects. This is
 separate from Construct's stricter module downloader; module ZIPs stay on Pages.
+
+### Completed production cutover — 2026-09-15
+
+The operator confirmed that alpha22's public catalog works on the phone. The
+former local production catalog and APK download routes are now retired with
+HTTP 410 responses; their files were moved outside the web root into a
+recoverable archive. Android runner production catalog settings now use Pages.
+Local test catalogs remain separate and available, and the shared gateway proxy
+is unchanged. New production catalogs belong in `catalog/`; new APKs belong in
+GitHub Releases, not the retired local web directories.
