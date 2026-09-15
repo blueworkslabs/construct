@@ -175,6 +175,8 @@ class SkyActivity : ComponentActivity() {
         refresh()
     }
     private fun enterArea() {
+        // Keyboard Done must respect the same in-flight gate as Show aircraft.
+        if(busy) return
         val a=latText.trim().replace(',','.').toDoubleOrNull(); val b=lonText.trim().replace(',','.').toDoubleOrNull()
         if(a==null || b==null || !a.isFinite() || !b.isFinite() || a !in -85.0..85.0 || b !in -180.0..180.0) {
             note("Enter latitude −85 to 85 and longitude −180 to 180.",WorkshopTone.ERROR); return
