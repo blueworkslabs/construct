@@ -3,7 +3,8 @@
 from config import CONFIG, SERIAL, require_runner
 import json, os, re, socket, time, struct
 from ui import adb, nodes, labels, tap, tap_node, find, capture, RESULTS
-from host_ui import restart, diagnostics, select_after, installed_status, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern
+from host_ui import restart, diagnostics, select_after, installed_status, catalog_settings, apply_catalog, configured_catalog, library, host_ready, modern, scroll_content
+from host_cards import matching_card
 require_runner()
 expected=os.environ['CONSTRUCT_CONTACTS_SHA256'];heading='Pocket Contacts · ' + os.environ.get('CONSTRUCT_CONTACTS_VERSION', '0.2.1')
 result={'complete':False,'checks':[]}
@@ -17,7 +18,18 @@ def top():
 def card(action):
     top();(RESULTS/'contacts-card-before.json').write_text(json.dumps([dict(n.attrib) for n in nodes()],indent=2)+'\n');select_after(heading,(action,))
 def opened():
-    restart();find('Trial — not yet marked working');card('Open');find('Pocket Contacts')
+    restart()
+    if modern():
+        for attempt in range(21):
+            current=matching_card(nodes(),heading)
+            if current is not None:
+                if not any('Trial' in (n.get('text'),n.get('content-desc')) for n in current.iter('node')):
+                    raise RuntimeError('Exact Contacts card is not a trial')
+                break
+            if attempt<20:scroll_content('down')
+        else:raise RuntimeError('Exact Contacts trial card missing')
+    else:find('Trial — not yet marked working')
+    card('Open');find('Pocket Contacts')
 def status(prefix):
     until=time.monotonic()+12
     while time.monotonic()<until:
