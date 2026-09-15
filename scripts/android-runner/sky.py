@@ -121,14 +121,25 @@ try:
         # Respect the provider floor rather than forcing repeated calls.
         time.sleep(16);mode('OpenSky','Combined');source_status(['ADSB.lol: Updated','OpenSky: Updated'])
         capture('sky-combined-map');done('Combined mode receives both live providers; deterministic merge semantics tested separately')
-        time.sleep(16);tap('25 km');tap('50 km');map_ready();find('50 km');tap('Zoom in');tap('Zoom out');tap('Center')
+        time.sleep(16);tap('25 km');tap('100 km');map_ready();find('100 km');tap('Zoom in');tap('Zoom out');tap('Center')
         capture('sky-radius-map');done('Radius and zoom/center controls remain usable with live data')
+        # Select a real, currently displayed aircraft rather than a hardcoded callsign.
+        seen=labels()
+        details=next((i for i,v in enumerate(seen) if re.match(r'^\d+(?:\.\d+)? km · ',v)),None)
+        if details is None or details==0:raise RuntimeError('No visible live aircraft row available for detail acceptance')
+        aircraft_label=seen[details-1];tap(aircraft_label);find('Dismiss details');capture('sky-aircraft-details');tap('Dismiss details')
+        viewport=find('Aircraft map. North is up. Drag to pan; zoom buttons and aircraft list are available.')
+        x1,y1,x2,y2=map(int,re.findall(r'\d+',viewport.get('bounds','')))
+        adb('shell','input','swipe',str((x1+x2)//2),str((y1+y2)//2),str((x1+x2)//2+(x2-x1)//6),str((y1+y2)//2),'350')
+        find('Search here');time.sleep(16);tap('Search here');map_ready();capture('sky-panned-area')
+        done('Real aircraft detail selection and pan-to-search-area controls work')
+
         # Actual configuration changes, not CSS simulation.
         adb('shell','settings','put','system','accelerometer_rotation','0');adb('shell','settings','put','system','user_rotation','1');time.sleep(2)
-        find('Sky Watch');find('50 km');find('Zoom in');capture('sky-landscape')
+        find('Sky Watch');find('100 km');find('Zoom in');capture('sky-landscape')
         adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
         adb('shell','settings','put','system','font_scale','2.0');time.sleep(2)
-        find('Sky Watch');find('50 km');find('Zoom in');capture('sky-font2')
+        find('Sky Watch');find('100 km');find('Zoom in');capture('sky-font2')
         adb('shell','settings','put','system','font_scale',font);time.sleep(2)
         done('Native map retained through landscape and Android 2x font; screenshots retained for visual review')
     if not location_only:tap('Close')
@@ -149,8 +160,14 @@ try:
     tap('Cancel')
     done('Native foreground location uses an explicit Android grant and public synthetic GPS fix')
     adb('shell','input','keyevent','3');time.sleep(2)
-    activities=adb('shell','dumpsys','activity','activities')
-    if 'SkyActivity' in activities:raise RuntimeError('Sky workspace survived real backgrounding')
+    deadline=time.monotonic()+10
+    while True:
+        activities=adb('shell','dumpsys','activity','activities')
+        (RESULTS/'activities-after-home.txt').write_text(activities)
+        active=any('SkyActivity' in line and ('Hist #' in line or 'ResumedActivity' in line) for line in activities.splitlines())
+        if not active:break
+        if time.monotonic()>deadline:raise RuntimeError('Sky workspace remained in active history after backgrounding')
+        time.sleep(.5)
     open_sky();find('Use my location')
     if any('Phone location' in x for x in labels()):raise RuntimeError('Location restored on fresh workspace')
     done('Real backgrounding closes Sky Watch; reopen does not restore prior coordinates')
