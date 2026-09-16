@@ -86,9 +86,13 @@ def check_aircraft_info():
     capture('sky-info-before-lookup')
     tap('Look up with ADSBdb');find('Look up again',timeout=60)
     # A missing database record is honest; transport/parsing failure is not acceptance.
+    reveal_sky_action('ADSBdb record')
     current=labels()
     if any(any(word in label for word in ('unavailable','unexpected response','did not match','quota reached','cooling down')) for label in current):
         raise RuntimeError('Metadata lookup failed: '+repr(current))
+    # Reach either the aircraft fields or an explicit not-found response, not merely a completed button.
+    if 'No matching database record.' not in current:
+        reveal_sky_action('Registry owner');find('Registry owner')
     capture('sky-info-result')
     for orientation,name in [('1','landscape'),('0','portrait')]:
         adb('shell','settings','put','system','accelerometer_rotation','0')
