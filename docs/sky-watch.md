@@ -16,9 +16,16 @@ with host API **0.8.0** / **alpha23**. Camera/AR is deliberately deferred.
   does not change the aircraft-query center; the circle shows the actual radius.
 - Tap a marker or list row for details. North is up; heading is ground track,
   not the aircraft's nose direction; an unknown track uses a neutral dot. Altitude is barometric feet, not height above
-  the phone/terrain; speed is ground speed in km/h.
+  the phone/terrain; speed is ground speed in km/h. Each row also gives the
+  eight-point compass direction from the chosen area (the way to look), and the
+  details card adds the exact bearing. The selected aircraft is haloed in jade
+  with its label drawn on the map; amber markers are positions over 30 s old.
 - Automatic updates run every 30 seconds while open, with a manual refresh and an
-  off switch. Individual providers have a process-wide/persisted 15-second floor.
+  off switch. The panel shows "Updated … ago" and the countdown to the next
+  automatic refresh; a thin progress bar runs under the controls while fetching.
+  Individual providers have a process-wide/persisted 15-second floor.
+- Each active source has a worded chip (live / problem / waiting); "Sources &
+  status" expands the provider messages, quota notes and unit explanations.
 - Rotation retains the workspace. Leaving closes it, unregisters location updates,
   disconnects current HTTP requests and discards positions/coordinates. Reopening
   starts with area selection. No background tracking or notification service.

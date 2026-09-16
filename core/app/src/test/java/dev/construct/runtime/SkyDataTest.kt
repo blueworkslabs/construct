@@ -102,12 +102,31 @@ class SkyDataTest {
         assertTrue(SkyData.distance(p,SkyPoint(0.0,-179.99))<3)
         assertEquals(1,SkyData.boxes(center,100).size)
     }
+    @Test fun bearingAndCompassPointTheSpotter() {
+        assertEquals(0.0,SkyData.bearing(center,SkyPoint(51.0,8.0)),0.01)
+        assertEquals(90.0,SkyData.bearing(center,SkyPoint(50.0,8.5)),1.0)
+        assertEquals(180.0,SkyData.bearing(center,SkyPoint(49.0,8.0)),0.01)
+        assertEquals(270.0,SkyData.bearing(center,SkyPoint(50.0,7.5)),1.0)
+        assertEquals("N",SkyData.compass(0.0)); assertEquals("N",SkyData.compass(359.0)); assertEquals("N",SkyData.compass(22.4))
+        assertEquals("NE",SkyData.compass(22.5)); assertEquals("E",SkyData.compass(90.0)); assertEquals("SW",SkyData.compass(225.0))
+        assertEquals("NW",SkyData.compass(-45.0)); assertEquals("S",SkyData.compass(540.0))
+        assertEquals("E",SkyData.compass(SkyData.bearing(SkyPoint(0.0,179.9),SkyPoint(0.0,-179.9))))
+    }
     @Test fun projectionRoundTripAndWrap() {
         for(p in listOf(center,SkyPoint(84.0,-179.0),SkyPoint(-84.0,179.0))) {
             val actual=SkyProjection.point(SkyProjection.x(p.lon),SkyProjection.y(p.lat))
             assertEquals(p.lat,actual.lat,1e-6);assertEquals(p.lon,actual.lon,1e-6)
         }
         assertEquals(0.002,SkyProjection.deltaX(0.001,0.999),1e-9)
+    }
+    @Test fun selectedMarkerAndLabelLeaveTheViewportTogether() {
+        assertTrue(SkyProjection.markerVisible(180f,120f,360f,240f))
+        assertTrue(SkyProjection.markerVisible(-30f,120f,360f,240f))
+        assertTrue(SkyProjection.markerVisible(390f,120f,360f,240f))
+        assertFalse(SkyProjection.markerVisible(-31f,120f,360f,240f))
+        assertFalse(SkyProjection.markerVisible(391f,120f,360f,240f))
+        assertFalse(SkyProjection.markerVisible(180f,-31f,360f,240f))
+        assertFalse(SkyProjection.markerVisible(180f,271f,360f,240f))
     }
     @Test fun unknownFieldsRemainUnknownAndUntrustedLabelsAreBounded() {
         val a=SkyData.adsb(adsb("flight" to "\n<script>".repeat(20),"alt_baro" to JSONObject.NULL,"gs" to "fast","track" to -1),now).single()

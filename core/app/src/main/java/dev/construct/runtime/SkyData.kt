@@ -33,6 +33,15 @@ internal object SkyData {
         val h=sin(dlat/2).pow(2)+cos(p1)*cos(p2)*sin(dlon/2).pow(2)
         return 6371.0088*2*asin(sqrt(h.coerceIn(0.0,1.0)))
     }
+    /** Initial great-circle bearing from a to b in degrees, 0 = north, clockwise. */
+    fun bearing(a: SkyPoint,b: SkyPoint): Double {
+        val p1=Math.toRadians(a.lat); val p2=Math.toRadians(b.lat); val dlon=Math.toRadians(b.lon-a.lon)
+        val y=sin(dlon)*cos(p2); val x=cos(p1)*sin(p2)-sin(p1)*cos(p2)*cos(dlon)
+        return (Math.toDegrees(atan2(y,x))+360.0)%360.0
+    }
+    private val COMPASS=listOf("N","NE","E","SE","S","SW","W","NW")
+    /** Eight-point compass word for a bearing; the word a spotter says when pointing. */
+    fun compass(bearing: Double): String = COMPASS[(((bearing%360+360)%360+22.5)/45).toInt()%8]
     fun number(value: Any?): Double? = (value as? Number)?.toDouble()?.takeIf { it.isFinite() }
     private fun text(value: Any?): String? = (value as? String)?.filter { it.code in 32..126 }?.trim()?.take(32)?.takeIf { it.isNotBlank() }
     private fun point(lat: Any?,lon: Any?): SkyPoint? {
@@ -117,6 +126,10 @@ internal object SkyData {
 
 /** Web Mercator in unit-world coordinates, with wrapped longitude. */
 internal object SkyProjection {
+    /** Shared culling for a marker and its attached label, including the glyph's edge allowance. */
+    fun markerVisible(x: Float,y: Float,width: Float,height: Float)=
+        x in -30f..(width+30) && y in -30f..(height+30)
+
     fun x(lon: Double)=(lon+180)/360
     fun y(lat: Double): Double { val s=sin(Math.toRadians(lat.coerceIn(-85.0,85.0))); return 0.5-ln((1+s)/(1-s))/(4*PI) }
     fun point(x: Double,y: Double)=SkyPoint(Math.toDegrees(atan(sinh(PI*(1-2*y.coerceIn(0.001638,0.998362))))).coerceIn(-85.0,85.0),((x%1+1)%1)*360-180)

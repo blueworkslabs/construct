@@ -6,6 +6,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.io.File
@@ -33,6 +34,23 @@ class SkyAccessTest {
         store.withCapability(installed,"sky.watch") { }
         store.setCapability(installed.manifest.id,"sky.watch",false);store=ModuleStore(app)
         denied("CAPABILITY_DENIED") { store.withCapability(store.installed().single(),"sky.watch") { fail() } }
+    }
+    @Test fun keyboardAreaSubmissionCannotInvalidateAnInFlightRefresh() {
+        store.install(fixture())
+        val installed=store.installed().single()
+        store.setCapability(installed.manifest.id,"sky.watch",true)
+        val activity=Robolectric.buildActivity(SkyActivity::class.java).get()
+        fun field(name: String,value: Any) { SkyActivity::class.java.getDeclaredField(name).apply { isAccessible=true }.set(activity,value) }
+        fun call(name: String,type: Class<*>,value: Any) { SkyActivity::class.java.getDeclaredMethod(name,type).apply { isAccessible=true }.invoke(activity,value) }
+        field("store",store); field("installed",installed); field("generation",7)
+        val original=SkyPoint(50.0,8.0)
+        call("setCenter",SkyPoint::class.java,original)
+        call("setBusy",Boolean::class.javaPrimitiveType!!,true)
+        call("setLatText",String::class.java,"51.0"); call("setLonText",String::class.java,"9.0")
+        SkyActivity::class.java.getDeclaredMethod("enterArea").apply { isAccessible=true }.invoke(activity)
+        assertEquals(7,SkyActivity::class.java.getDeclaredField("generation").apply { isAccessible=true }.getInt(activity))
+        assertEquals(original,SkyActivity::class.java.getDeclaredMethod("getCenter").apply { isAccessible=true }.invoke(activity))
+        assertFalse(activity.isFinishing)
     }
     @Test fun callerCannotSupplyCoordinatesUrlsOrTriggerLocation() {
         SkyActivity.validate(JSONObject().put("op","open"))
