@@ -45,9 +45,12 @@ for module, default in [('focus','0.1.2'),('snake','0.1.5'),('contacts','0.2.1')
 p.add_argument('--ux-layouts-only', action='store_true', help='Only native font/landscape continuation with the pinned Checklist fixture; other UX checks excluded')
 p.add_argument('--ux-candidates', type=Path, help='Only Library/Browse and eight refreshed package UI checks; JSON exact candidate metadata')
 p.add_argument('--sky-only', action='store_true', help='Foreground Sky Watch map, provider, location and lifecycle acceptance only')
+p.add_argument('--sky-details', action='store_true', help='Also exercise alpha25 aircraft identity and opt-in metadata dialog')
 p.add_argument('--sky-location-only', action='store_true', help='Only Sky Watch location/lifecycle continuation, excluding map/source/layout acceptance')
 p.add_argument('--sky-sha256', help='Exact signed Sky Watch 0.1.0 launcher')
 a = p.parse_args()
+if a.sky_details and (not a.sky_only or a.sky_location_only): p.error('Sky details requires the full sky-only run')
+os.environ['CONSTRUCT_SKY_DETAILS']='1' if a.sky_details else '0'
 if a.sky_location_only and not a.sky_only: p.error('Sky location continuation requires sky-only')
 os.environ['CONSTRUCT_SKY_LOCATION_ONLY']='1' if a.sky_location_only else '0'
 if a.sky_only != bool(a.sky_sha256): p.error('Sky scope requires both sky-only and sky-sha256')

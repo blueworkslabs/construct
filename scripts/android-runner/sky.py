@@ -13,6 +13,7 @@ from catalog_input import replace_text
 require_runner()
 EXPECTED=os.environ['CONSTRUCT_SKY_SHA256']
 location_only=os.environ.get('CONSTRUCT_SKY_LOCATION_ONLY')=='1'
+aircraft_details=os.environ.get('CONSTRUCT_SKY_DETAILS')=='1'
 result={'complete':False,'checks':[],'scope':'Sky Watch manual/live dual-provider map and synthetic foreground location, not physical GPS or full host regression'}
 if location_only:result['scope']='Location/denial/background/offline/revoke continuation only; map/source/layout checks excluded'
 font=adb('shell','settings','get','system','font_scale').strip()
@@ -63,6 +64,41 @@ def permission_tap(text):
 def scroll_panel():
     # Only the lower portrait native panel; do not drag the map.
     adb('shell','input','swipe','350','1350','350','1050','250')
+
+def reveal_sky_action(text):
+    # The expanded aircraft card is a real scrollable list item, not a fixed-height dialog.
+    # Use the actual native list bounds, never a gesture over the map or a blind tap.
+    for _ in range(7):
+        current=nodes()
+        targets=[n for n in current if text in (n.get('text'),n.get('content-desc')) and n.get('enabled')=='true']
+        if any(len(b:=list(map(int,re.findall(r'\d+',n.get('bounds','')))))==4 and b[2]>b[0] and b[3]-b[1]>=12 for n in targets):return
+        panes=[n for n in current if n.get('scrollable')=='true' and n.get('package')=='dev.construct.runtime']
+        if len(panes)!=1:raise RuntimeError('Expected exactly one native aircraft scroll panel')
+        x1,y1,x2,y2=map(int,re.findall(r'\d+',panes[0].get('bounds','')))
+        if x2<=x1 or y2-y1<64:raise RuntimeError('Aircraft panel has no usable viewport')
+        adb('shell','input','swipe',str((x1+x2)//2),str(y2-(y2-y1)//5),str((x1+x2)//2),str(y1+(y2-y1)//5),'300')
+        time.sleep(.5)
+    raise RuntimeError('Aircraft action is not reachable: '+text)
+
+def check_aircraft_info():
+    reveal_sky_action('More aircraft info');tap('More aircraft info');find('Look up with ADSBdb')
+    if 'ADSBdb record' in labels():raise RuntimeError('Lookup result appeared before explicit request')
+    capture('sky-info-before-lookup')
+    tap('Look up with ADSBdb');find('Look up again',timeout=60)
+    # A missing database record is honest; transport/parsing failure is not acceptance.
+    current=labels()
+    if any(any(word in label for word in ('unavailable','unexpected response','did not match','quota reached','cooling down')) for label in current):
+        raise RuntimeError('Metadata lookup failed: '+repr(current))
+    capture('sky-info-result')
+    for orientation,name in [('1','landscape'),('0','portrait')]:
+        adb('shell','settings','put','system','accelerometer_rotation','0')
+        adb('shell','settings','put','system','user_rotation',orientation);time.sleep(2)
+        find('Close aircraft info');find('Look up again');capture('sky-info-'+name)
+        adb('shell','settings','put','system','font_scale','2.0');time.sleep(2)
+        find('Close aircraft info');find('Look up again');capture('sky-info-font2-'+name)
+        adb('shell','settings','put','system','font_scale',font);time.sleep(2)
+    tap('Close aircraft info')
+    done('Explicit selected-aircraft metadata lookup completes; dialog controls reachable in both orientations and 2x text')
 
 def fields(lat='50.0379',lon='8.5622'):
     ns=[n for n in nodes() if n.get('class')=='android.widget.EditText' and n.get('package')=='dev.construct.runtime']
@@ -127,7 +163,9 @@ try:
         seen=labels()
         details=next((i for i,v in enumerate(seen) if re.match(r'^\d+(?:\.\d+)? km · ',v)),None)
         if details is None or details==0:raise RuntimeError('No visible live aircraft row available for detail acceptance')
-        aircraft_label=seen[details-1];tap(aircraft_label);find('Dismiss details');capture('sky-aircraft-details');tap('Dismiss details')
+        aircraft_label=seen[details-1];tap(aircraft_label);time.sleep(1);capture('sky-aircraft-details')
+        if aircraft_details:check_aircraft_info()
+        reveal_sky_action('Dismiss details');tap('Dismiss details')
         viewport=find('Aircraft map. North is up. Drag to pan; zoom buttons and aircraft list are available.')
         x1,y1,x2,y2=map(int,re.findall(r'\d+',viewport.get('bounds','')))
         adb('shell','input','swipe',str((x1+x2)//2),str((y1+y2)//2),str((x1+x2)//2+(x2-x1)//6),str((y1+y2)//2),'350')
@@ -140,6 +178,9 @@ try:
         adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
         adb('shell','settings','put','system','font_scale','2.0');time.sleep(2)
         find('Sky Watch');find('100 km');find('Zoom in');capture('sky-font2')
+        adb('shell','settings','put','system','user_rotation','1');time.sleep(2)
+        find('Sky Watch');find('Zoom in');capture('sky-font2-landscape')
+        adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
         adb('shell','settings','put','system','font_scale',font);time.sleep(2)
         done('Native map retained through landscape and Android 2x font; screenshots retained for visual review')
     if not location_only:tap('Close')
