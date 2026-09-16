@@ -59,6 +59,37 @@ class SkyDataTest {
         assertEquals(o.altitudeM,merged.altitudeM); assertEquals("NEW",merged.label)
         assertEquals(setOf(SkySource.ADSB,SkySource.OPENSKY),merged.sources)
     }
+    @Test fun combinedFillsIdentityWithoutMixingLiveObservationOrLeakingDisabledSources() {
+        val a=SkyData.adsb(adsb("r" to "TEST-REG","t" to "A20N","category" to "A3"),now).single()
+        val o=SkyData.opensky(opensky(1 to "NEW",7 to 1500),now).single()
+        val feeds=listOf(feed(a.source,listOf(a)),feed(o.source,listOf(o)))
+        val m=SkyData.merge(feeds,SkyMode.BOTH,center,25,now).single()
+        assertEquals(o.point,m.point);assertEquals(o.altitudeM,m.altitudeM);assertEquals(o.positionTime,m.positionTime,0.0)
+        assertEquals("A20N",m.type);assertEquals("TEST-REG",m.registration);assertEquals(SkySource.ADSB,m.typeSource)
+        assertEquals("Large aircraft",m.category);assertFalse(m.identityConflict)
+        val single=SkyData.merge(feeds,SkyMode.OPENSKY,center,25,now).single()
+        assertNull(single.type);assertNull(single.registration);assertNull(single.category)
+        val expired=SkyData.merge(feeds,SkyMode.BOTH,center,25,now+119).single()
+        assertNull(expired.type) // Older identity does not outlive its source observation.
+    }
+    @Test fun conflictingIdentityIsFlaggedAndNewestKnownValueWins() {
+        val old=SkyData.adsb(adsb("t" to "EC35","category" to "A7"),now).single()
+        val newer=old.copy(type="A20N",positionTime=now,source=SkySource.OPENSKY,typeSource=SkySource.OPENSKY)
+        val m=SkyData.merge(listOf(feed(old.source,listOf(old)),feed(newer.source,listOf(newer))),SkyMode.BOTH,center,25,now).single()
+        assertEquals("A20N",m.type);assertTrue(m.identityConflict);assertEquals(SkyKind.UNKNOWN,SkyIdentity.kind(m))
+    }
+    @Test fun reportedCategoriesDoNotDependOnSpeedAndMissingCategoriesStayUnknown() {
+        val rotor=SkyData.adsb(adsb("category" to "A7","gs" to 500),now).single()
+        assertEquals(SkyKind.ROTORCRAFT,SkyIdentity.kind(rotor))
+        assertEquals("Rotorcraft",SkyData.opensky(opensky(17 to 8),now).single().category)
+        for(value in listOf(0,1,8.5,"8",JSONObject.NULL)) assertNull(SkyData.opensky(opensky(17 to value),now).single().category)
+        assertEquals(SkyKind.UNKNOWN,SkyIdentity.kind(SkyData.adsb(adsb("gs" to 10,"alt_baro" to 100),now).single()))
+        assertEquals("Airbus A320neo",SkyIdentity.name("A20N"));assertEquals("Aircraft type XXXX",SkyIdentity.name("XXXX"))
+        assertEquals("Type unknown",SkyIdentity.name(null))
+        assertEquals(SkyKind.UNKNOWN,SkyIdentity.kind(rotor.copy(type="A20N")))
+        assertEquals(SkyKind.JET,SkyIdentity.model("B77L")!!.kind) // Not an assumed cargo flight.
+        assertEquals(SkyKind.BUSINESS,SkyIdentity.model("C25C")!!.kind) // Model, not a private-flight claim.
+    }
     @Test fun sourceSwitchCannotLeakOtherProviderAndFailureKeepsRecentCache() {
         val a=SkyData.adsb(adsb(),now).single(); val o=SkyData.opensky(opensky(0 to "def456"),now).single()
         val feeds=listOf(feed(a.source,listOf(a),false),feed(o.source,listOf(o)))

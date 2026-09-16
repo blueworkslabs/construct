@@ -15,7 +15,10 @@ internal data class SkyPoint(val lat: Double, val lon: Double) {
 }
 internal data class SkyAircraft(val key: String, val callsign: String?, val registration: String?, val type: String?,
     val point: SkyPoint, val altitudeM: Double?, val speedMps: Double?, val track: Double?,
-    val positionTime: Double, val source: SkySource, val sources: Set<SkySource> = setOf(source)) {
+    val positionTime: Double, val source: SkySource, val sources: Set<SkySource> = setOf(source),
+    val category: String? = null, val registrationSource: SkySource? = if(registration!=null) source else null,
+    val typeSource: SkySource? = if(type!=null) source else null,
+    val categorySource: SkySource? = if(category!=null) source else null, val identityConflict: Boolean = false) {
     val label get() = callsign ?: registration ?: key.removePrefix("icao:").uppercase(Locale.ROOT)
     fun age(now: Double) = max(0.0, now-positionTime)
 }
@@ -75,7 +78,7 @@ internal object SkyData {
             val t=time(stamp-seen,now) ?: return@mapNotNull null
             SkyAircraft(id,text(a.opt("flight")),text(a.opt("r")),text(a.opt("t")),p,
                 altitude(number(a.opt("alt_baro"))?.times(0.3048)),speed(number(a.opt("gs"))?.times(0.514444)),
-                track(a.opt("track")),t,SkySource.ADSB)
+                track(a.opt("track")),t,SkySource.ADSB,category=SkyIdentity.adsbCategory(a.opt("category")))
         }
     }
     fun opensky(root: JSONObject, now: Double): List<SkyAircraft> {
@@ -91,7 +94,8 @@ internal object SkyData {
             val p=point(a.opt(6),a.opt(5)) ?: return@mapNotNull null
             // last_contact may be fresh without a new position. Never substitute it for time_position.
             val t=time(number(a.opt(3)),now) ?: return@mapNotNull null
-            SkyAircraft(id,text(a.opt(1)),null,null,p,altitude(a.opt(7)),speed(a.opt(9)),track(a.opt(10)),t,SkySource.OPENSKY)
+            SkyAircraft(id,text(a.opt(1)),null,null,p,altitude(a.opt(7)),speed(a.opt(9)),track(a.opt(10)),t,SkySource.OPENSKY,
+                category=SkyIdentity.openskyCategory(a.opt(17)))
         }
     }
     /** Refresh only the requested sources; mode changes must not evict other recent observations. */
@@ -107,8 +111,16 @@ internal object SkyData {
         feeds.filter { it.source in mode.sources }.flatMap { it.aircraft }.filter { it.age(now)<=MAX_AGE && it.positionTime<=now+10 }
             .groupBy { it.key }.values.map { reports ->
                 // Select the newest coherent observation, not an average of two positions/altitudes.
-                val newest=reports.sortedWith(compareByDescending<SkyAircraft> { it.positionTime }.thenBy { it.source.ordinal }).first()
-                newest.copy(sources=reports.map { it.source }.toSet())
+                val ordered=reports.sortedWith(compareByDescending<SkyAircraft> { it.positionTime }.thenBy { it.source.ordinal })
+                val newest=ordered.first()
+                val reg=ordered.firstOrNull { it.registration!=null }; val type=ordered.firstOrNull { it.type!=null }
+                val category=ordered.firstOrNull { it.category!=null }
+                // Only identity fields may be filled from another active source. Never mix motion/time.
+                newest.copy(sources=reports.map { it.source }.toSet(),registration=reg?.registration,type=type?.type,
+                    registrationSource=reg?.registrationSource,typeSource=type?.typeSource,
+                    category=category?.category,categorySource=category?.categorySource,
+                    identityConflict=reports.mapNotNull { it.registration }.distinct().size>1 ||
+                        reports.mapNotNull { it.type }.distinct().size>1 || reports.mapNotNull { it.category }.distinct().size>1)
             }.filter { distance(center,it.point)<=radiusKm }
             .sortedWith(compareBy<SkyAircraft> { distance(center,it.point) }.thenBy { it.key })
     /** Split antimeridian-crossing bounds rather than issuing an invalid or global request. */
