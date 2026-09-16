@@ -68,16 +68,17 @@ def scroll_panel():
 def reveal_sky_action(text):
     # The expanded aircraft card is a real scrollable list item, not a fixed-height dialog.
     # Use the actual native list bounds, never a gesture over the map or a blind tap.
-    for _ in range(7):
-        current=nodes()
-        targets=[n for n in current if text in (n.get('text'),n.get('content-desc')) and n.get('enabled')=='true']
-        if any(len(b:=list(map(int,re.findall(r'\d+',n.get('bounds','')))))==4 and b[2]>b[0] and b[3]-b[1]>=12 for n in targets):return
-        panes=[n for n in current if n.get('scrollable')=='true' and n.get('package')=='dev.construct.runtime']
-        if len(panes)!=1:raise RuntimeError('Expected exactly one native aircraft scroll panel')
-        x1,y1,x2,y2=map(int,re.findall(r'\d+',panes[0].get('bounds','')))
-        if x2<=x1 or y2-y1<64:raise RuntimeError('Aircraft panel has no usable viewport')
-        adb('shell','input','swipe',str((x1+x2)//2),str(y2-(y2-y1)//5),str((x1+x2)//2),str(y1+(y2-y1)//5),'300')
-        time.sleep(.5)
+    for direction in (1,-1):
+        for _ in range(7):
+            current=nodes()
+            targets=[n for n in current if text in (n.get('text'),n.get('content-desc')) and n.get('enabled')=='true']
+            if any(len(b:=list(map(int,re.findall(r'\d+',n.get('bounds','')))))==4 and b[2]>b[0] and b[3]-b[1]>=12 for n in targets):return
+            panes=[n for n in current if n.get('scrollable')=='true' and n.get('package')=='dev.construct.runtime']
+            if len(panes)!=1:raise RuntimeError('Expected exactly one native aircraft scroll panel')
+            x1,y1,x2,y2=map(int,re.findall(r'\d+',panes[0].get('bounds','')))
+            if x2<=x1 or y2-y1<64:raise RuntimeError('Aircraft panel has no usable viewport')
+            adb('shell','input','swipe',str((x1+x2)//2),str(y2-(y2-y1)//5 if direction==1 else y1+(y2-y1)//5),str((x1+x2)//2),str(y1+(y2-y1)//5 if direction==1 else y2-(y2-y1)//5),'300')
+            time.sleep(.5)
     raise RuntimeError('Aircraft action is not reachable: '+text)
 
 def check_aircraft_info():
@@ -91,15 +92,15 @@ def check_aircraft_info():
     if any(any(word in label for word in ('unavailable','unexpected response','did not match','quota reached','cooling down')) for label in current):
         raise RuntimeError('Metadata lookup failed: '+repr(current))
     # Reach either the aircraft fields or an explicit not-found response, not merely a completed button.
-    if 'No matching database record.' not in current:
-        reveal_sky_action('Registry owner');find('Registry owner')
+    record_label='No matching database record.' if 'No matching database record.' in current else 'Registry owner'
+    reveal_sky_action(record_label);find(record_label)
     capture('sky-info-result')
     for orientation,name in [('1','landscape'),('0','portrait')]:
         adb('shell','settings','put','system','accelerometer_rotation','0')
         adb('shell','settings','put','system','user_rotation',orientation);time.sleep(2)
-        find('Close aircraft info');find('Look up again');capture('sky-info-'+name)
+        find('Close aircraft info');find('Look up again');reveal_sky_action(record_label);capture('sky-info-'+name)
         adb('shell','settings','put','system','font_scale','2.0');time.sleep(2)
-        find('Close aircraft info');find('Look up again');capture('sky-info-font2-'+name)
+        find('Close aircraft info');find('Look up again');reveal_sky_action(record_label);capture('sky-info-font2-'+name)
         adb('shell','settings','put','system','font_scale',font);time.sleep(2)
     tap('Close aircraft info')
     done('Explicit selected-aircraft metadata lookup completes; dialog controls reachable in both orientations and 2x text')

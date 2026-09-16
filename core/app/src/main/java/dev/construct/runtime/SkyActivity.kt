@@ -446,7 +446,7 @@ class SkyActivity : ComponentActivity() {
             Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                 Text(SkyIdentity.name(a.type),style=MaterialTheme.typography.titleMedium)
                 Text("${a.registration ?: "Registration unknown"} · ${a.type ?: "Type code unknown"}",style=MaterialTheme.typography.bodySmall)
-                Text("Model type: ${SkyIdentity.kind(a).label}. This does not establish the purpose of this flight.",style=MaterialTheme.typography.bodySmall)
+                Text("Model type: ${SkyIdentity.kind(a).label}",style=MaterialTheme.typography.bodySmall)
                 if(a.typeSource!=null) Text("Type: ${a.typeSource.label} · registration: ${a.registrationSource?.label ?: "unknown"}",style=MaterialTheme.typography.labelSmall)
                 if(a.category!=null) Text("Reported category: ${a.category} · ${a.categorySource?.label ?: "unknown source"}",style=MaterialTheme.typography.bodySmall)
                 if(a.identityConflict) Text("Live sources disagree on identity/category. Newest known fields are shown.",color=ConstructColors.amber)
@@ -459,29 +459,37 @@ class SkyActivity : ComponentActivity() {
                 } else {
                     Text("ADSBdb record",style=MaterialTheme.typography.titleSmall)
                     result.aircraft.aircraft?.let { info ->
-                        DetailLine("Model",listOfNotNull(info.manufacturer,info.model).joinToString(" ").ifBlank { "Unknown" })
-                        DetailLine("Type code",info.typeCode ?: "Unknown")
-                        DetailLine("Registration",info.registration ?: "Unknown")
-                        DetailLine("Registry owner",info.owner ?: "Unknown")
-                        DetailLine("Registry country",info.country ?: "Unknown")
+                        MetadataLine("Model",listOfNotNull(info.manufacturer,info.model).joinToString(" ").ifBlank { "Unknown" })
+                        MetadataLine("Type code",info.typeCode ?: "Unknown")
+                        MetadataLine("Registration",info.registration ?: "Unknown")
+                        MetadataLine("Registry owner",info.owner ?: "Unknown")
+                        MetadataLine("Registry country",info.country ?: "Unknown")
                         if((a.type!=null && info.typeCode!=null && a.type!=info.typeCode) ||
                             (a.registration!=null && info.registration!=null && a.registration!=info.registration))
                             Text("This record differs from the live feed. It has not replaced the map identity.",color=ConstructColors.amber,style=MaterialTheme.typography.bodySmall)
                     }
                     result.aircraft.message?.let { Text(it,style=MaterialTheme.typography.bodySmall) }
                     result.airline?.let { part ->
-                        DetailLine("Callsign airline",part.airline?.let { "$it (${request?.airline})" } ?: part.message ?: "Unknown")
+                        MetadataLine("Callsign airline",part.airline?.let { "$it (${request?.airline})" } ?: part.message ?: "Unknown")
                     }
-                    Text("Registry owner and callsign airline can differ through leasing or outdated records. Neither confirms who is aboard or whether this flight is private, charter or cargo.",style=MaterialTheme.typography.bodySmall)
+                    Text("Registry owner and callsign airline can differ through leasing or old records. These are not a verified current operator or private/cargo flight classification.",style=MaterialTheme.typography.bodySmall)
                     val at=java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT,java.text.DateFormat.SHORT)
-                    Text("Retrieved ${at.format(java.util.Date(result.aircraft.checkedAt))} · ADSBdb / PlaneBase aircraft data. Retrieval time is not the record’s update date.",style=MaterialTheme.typography.labelSmall)
+                    Text("Aircraft retrieved ${at.format(java.util.Date(result.aircraft.checkedAt))}",style=MaterialTheme.typography.labelSmall)
+                    result.airline?.let { Text("Airline retrieved ${at.format(java.util.Date(it.checkedAt))}",style=MaterialTheme.typography.labelSmall) }
+                    Text("ADSBdb / PlaneBase aircraft data. Retrieval times are not database update dates.",style=MaterialTheme.typography.labelSmall)
                 }
                 if(infoBusy) { CircularProgressIndicator(Modifier.size(22.dp)); Text("Looking up aircraft…",style=MaterialTheme.typography.bodySmall) }
                 infoError?.let { Text(it,color=ConstructColors.amber,style=MaterialTheme.typography.bodySmall) }
             }
         },confirmButton={
             if(request!=null) TextButton(onClick={ lookupInfo(a) },enabled=!infoBusy) { Text(if(infoResult==null) "Look up with ADSBdb" else "Look up again") }
-        },dismissButton={ TextButton(onClick={ closeInfo() }) { Text("Close aircraft info") } })
+        },dismissButton={ TextButton(onClick={ closeInfo() },modifier=Modifier.semantics { contentDescription="Close aircraft info" }) { Text("Close") } })
+    }
+    @Composable private fun MetadataLine(label: String,value: String) {
+        Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
+            Text(label,style=MaterialTheme.typography.labelMedium,color=ConstructColors.muted)
+            Text(value,style=MaterialTheme.typography.bodyMedium,color=ConstructColors.text)
+        }
     }
     @Composable private fun DetailLine(label: String,value: String) {
         Row(verticalAlignment=Alignment.Top) {
