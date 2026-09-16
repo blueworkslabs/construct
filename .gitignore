@@ -47,3 +47,5 @@ core/app/libs/*.aar
 
 # Explicitly published, signed module artifacts only
 !catalog/*.zip
+# Local publisher coordination lock, not a catalog artifact
+catalog/.publish.lock

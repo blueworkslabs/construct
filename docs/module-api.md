@@ -1,7 +1,7 @@
 # Implemented module API
 
 The current host accepts exact `constructApi.min == constructApi.target` versions
-0.1.0 through 0.7.0. Module versions are three numeric components. See the
+0.1.0 through 0.8.0. Module versions are three numeric components. See the
 [manifest schema](../schemas/module-manifest.schema.json) and runnable
 [examples](../examples); the native validator is authoritative.
 
@@ -172,3 +172,14 @@ handoff is an explicit lifecycle exception; other backgrounding or rotation
 closes and clears the workspace. Process recreation does not restore it.
 No URI, pixels, marker size, endpoints or lengths are returned to JavaScript or
 written to diagnostics. User-selected originals are never modified.
+
+## Sky Watch (API 0.8.0)
+
+`sky.watch` accepts only `{op:"open"}` and returns `{opened:true}`. The explicit
+native grant opens a foreground aircraft-map workspace. The human chooses an area,
+source(s), radius and optional foreground Android location permission there.
+No coordinates, URLs, credentials, aircraft records or images pass through the
+module bridge. Closing/backgrounding discards the session and stops location and
+requests; rotation retains it. Selected areas leave the phone for aircraft data
+and map tiles; the consent text names those providers. See [Sky Watch](sky-watch.md)
+for data formats, merge policy, rate limits, caching, privacy and attribution.
