@@ -9,7 +9,7 @@
   function screen(p){const f=fit();return {x:f.x+p.x*f.w,y:f.y+p.y*f.h};}
   function position(event){const r=canvas.getBoundingClientRect();return {x:event.clientX-r.left,y:event.clientY-r.top};}
   function expanded(value){el('controls').hidden=!value;el('panel').classList.toggle('collapsed',!value);el('expand').textContent=value?'Hide controls':'Show controls';el('expand').setAttribute('aria-expanded',String(value));}
-  function fail(error){el('error').textContent=(error.code?'['+error.code+'] ':'')+(error.message||'Could not complete this action.');el('error').hidden=false;expanded(true);}
+  function fail(error){const message=error.code==='CAPABILITY_DENIED'?'Allow selected image pixels and local marker detection in Module access, then reopen.':(error.message||'Could not complete this action.');el('error').textContent=(error.code?'['+error.code+'] ':'')+message;el('error').hidden=false;expanded(true);}
   function clearError(){el('error').hidden=true;el('error').textContent='';}
   function run(action){try{action();clearError();}catch(error){fail(error);}render();}
   function clampView(){const {w,h}=dimensions(),f=fit();offset.x=Math.max(-Math.max(0,(f.w-w)/2),Math.min(Math.max(0,(f.w-w)/2),offset.x));offset.y=Math.max(-Math.max(0,(f.h-h)/2),Math.min(Math.max(0,(f.h-h)/2),offset.y));}
@@ -26,7 +26,8 @@
   function render(){
     const value=editor.value,calibrated=editor.side!==null;
     if(endpoint&&!value?.[endpoint])endpoint=null;
-    el('result').textContent=value?.mm!=null?'Length: '+(value.mm/10).toFixed(1)+' cm':'No length yet';
+    const units=el('units').value;
+    el('result').textContent=value?.mm!=null?'Length: '+(units==='mm'?value.mm:value.mm/10).toFixed(1)+' '+units:'No length yet';
     el('status').textContent=busy?'Reading photo and finding reference marker…':!image?'Choose one saved photo. Nothing is saved or sent online.':!calibrated?corners.length?'Reference found. Enter its measured black-square side.':'Choose a photo containing the reference card.':!value?'Tap the two ends of a length in the photo.':!value.b?'First endpoint set. Tap the other end.':'Drag an endpoint to adjust, or Clear for another length.';
     el('choose').disabled=busy||!visible;el('retry').hidden=!image||corners.length>0;el('retry').disabled=busy||!visible;
     el('setup').hidden=!corners.length||calibrated;el('calibrate').hidden=!calibrated;el('confirm').disabled=busy||!visible;
@@ -49,8 +50,9 @@
     try {
       const next=await call('image.read',{op:'pick'});if(token!==epoch)return;
       selected=next;
-      image=await new Promise((resolve,reject)=>{const picture=new Image();picture.onload=()=>resolve(picture);picture.onerror=()=>reject(new Error('Image is no longer available. Choose it again.'));picture.src=next.url;});
-      if(token!==epoch){image=null;return;}
+      const decoded=await new Promise((resolve,reject)=>{const picture=new Image();picture.onload=()=>resolve(picture);picture.onerror=()=>reject(new Error('Image is no longer available. Choose it again.'));picture.src=next.url;});
+      if(token!==epoch)return;
+      image=decoded;
       await detect(token);
     } catch(error){if(token===epoch)fail(error);}
     finally {if(token===epoch){busy=false;render();}}
@@ -60,6 +62,7 @@
   el('side').oninput=()=>{cancelGesture();editor.reset();endpoint=null;clearError();render();};
   el('calibrate').onclick=()=>run(()=>{cancelGesture();editor.reset();endpoint=null;expanded(true);});
   el('expand').onclick=()=>{cancelGesture();expanded(el('controls').hidden);render();};
+  el('units').onchange=()=>{cancelGesture();render();};
   el('undo').onclick=()=>run(()=>{cancelGesture();editor.undo();});el('clear').onclick=()=>run(()=>{cancelGesture();editor.clear();endpoint=null;});
   for(const end of ['a','b'])el('select-'+end).onclick=()=>run(()=>{cancelGesture();endpoint=end;});
   for(const [name,dx,dy] of [['left',-1,0],['right',1,0],['up',0,-1],['down',0,1]])el(name).onclick=()=>run(()=>{cancelGesture();editor.nudge(endpoint,dx,dy,selected.width,selected.height);});
@@ -86,12 +89,12 @@
     else if(old?.type==='tap'&&editor.plane)run(()=>editor.place(editor.revision,point(p)));
     gesture=null;if(pointers.size)gesture={type:'ignore'};render();
   };
-  canvas.onpointercancel=()=>{cancelGesture();render();};
+  canvas.onpointercancel=()=>{cancelGesture();clearError();render();};
   new ResizeObserver(()=>{cancelGesture();zoom=1;offset={x:0,y:0};draw();}).observe(el('viewport'));
   window.addEventListener('constructvisibilitychange',event=>{
     visible=event.detail.visible;cancelGesture();
     // Picker handoff pauses natively without this menu event. A real menu cancels work.
-    if(!visible){epoch++;busy=false;}
+    if(!visible){epoch++;busy=false;clearError();}
     render();
   });
   render();

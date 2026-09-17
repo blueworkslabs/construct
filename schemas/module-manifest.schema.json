@@ -105,7 +105,7 @@
               "type": "string",
               "maxLength": 260
             },
-            "description": "Exact public HTTPS origins; required only for net.http in API0.9. Native and publisher validators enforce origin syntax and capability/version binding."
+            "description": "Exact public HTTPS origins; required only for net.http in API0.9 or later. Native and publisher validators enforce origin syntax and capability/version binding."
           }
         }
       }

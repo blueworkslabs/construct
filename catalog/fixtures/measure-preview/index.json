@@ -13,6 +13,15 @@
           "sha256": "5724f854847e8201ee3b95b08a8587509cf14618785a05522185aa39459136ec",
           "signature": "chs54PEstNcxNNXT12JVOqM/PAb3JDaEGhG0aAD0sTYd97bY69oJf0CvXy/89DaznZAnO7Zana7lDJpAzBe/94uDsZ5s1gIU7Gi/Jxt6nwH6ruKSY3WRVOFsHyg6ROgCl3ngCd3fNmiDDuU4sVZIdtD2FlYIns3GNbcxcrVTuO8rv0w+eo8VbvSihCEogsxRKqNzaEEBh1Ek6XfVG+bAznQr+QUZSWhbDGJ8olGjtL7dJNByaY2dhv4lLg/dS9XPWw3ur+g9RNwTU99RpD1tDiRIOlT7vQth36I7IDAEOdbgsgoxrQo/+H3+arQmblBaI0GgSORHIeZopyFwTK4bXg==",
           "testFixture": true
+        },
+        {
+          "id": "dev.construct.measure-preview",
+          "name": "Measure Preview",
+          "version": "0.2.0",
+          "artifact": "dev.construct.measure-preview-0.2.0.zip",
+          "sha256": "0579f28aea151c6e75d12e53fcde0fd645bd9b3ac18b15c9430860fd8b0f68eb",
+          "signature": "V+QKn5t+nQzbNyeRwKDZJQ3qBxC1VlVgp6XMyuH6HZVDdh6GXTvwTjUJdNfwTiz5RpYoupAaJSwi/VwiRuD4HHg2dcQouGsnlG+f8Qg2VsbNo6Fphu+GB6Fhcyst5gflu9qnuYbDubLX9FNfWq4osu0DPcZgWVOCrHsCOqZps7j+LpE2O4q6GpVAJGX+p/iup8CdTMd5jt0LZ5SaNAhsklwU9ghJtUqRh0eDlNHn1EKba4j5DFoYa2n5Hjm9Edun59roLGWMq+EtJfV51I94OmJZrOW+x0wJRB9ylBdJUWU83gncGpIwnbv/FWmj0EBIEGyur3jHeERnYudu+iqpmA==",
+          "testFixture": true
         }
       ]
     }

@@ -27,7 +27,8 @@ workflow or domain result belongs in that primitive.
   foreground session before selection, decoding, delivery and resource access.
   Reusing the old `photo.measure` grant cannot authorize these pixels.
 - The system picker is the only deliberate background exception. The module is
-  paused while it is open; unrelated privileged requests are cancelled. A result
+  paused while it is open; unrelated privileged requests are cancelled or their
+  replies invalidated. A result
   can be delivered only after the same activity resumes and authority is checked
   again. A replaced/closed session cannot receive it. Ordinary backgrounding,
   closure and process recreation discard the entire run and image authority.
@@ -47,6 +48,10 @@ No marker-side length, calibration, length/result formatting or endpoint input i
 accepted. Only this fixed dictionary is initially implemented; unknown dictionaries
 and fields fail. Requires both its own grant and live `image.read` authority.
 Detection reads only the current run's opaque handle; no path/image uploads.
+
+Selected-image module windows retain Android’s secure-window protection against
+ordinary screenshots/screen recording. Synthetic emulator display capture, if
+available, is an operator-owned test surface, not an app capability.
 
 ## Data composition and limits
 
