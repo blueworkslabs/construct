@@ -56,6 +56,7 @@ if a.http_consent_candidates:
         p.error('HTTP consent cannot mix scopes')
     consent=json.loads(a.http_consent_candidates.read_text())
     from config import catalog as validate_catalog
+    if consent.get('scenario') not in ('http','location'): p.error('Consent scenario must be http or location; use separate clean runs')
     validate_catalog(consent['catalog'])
     validate_catalog(consent['locationCatalog'])
     if hashlib.sha256(Path(consent['oldApk']).read_bytes()).hexdigest()!=consent['oldSha256']:
@@ -276,9 +277,8 @@ try:
     if a.sky_module_candidates: children=[('sky_module.py','sky-module-result.json')]
     if a.http_consent_candidates: children=[('http_consent.py','http-consent-result.json')]
     for script, result in children:
-        # Consent seeds three old-APK states and exercises many signed updates;
-        # keep a bounded matrix budget without lengthening unrelated scopes.
-        timeout = 3600 if script == 'http_consent.py' else 1800 if script in ('ux.py','sky_module.py') else 900
+        # HTTP and location run separately to bound emulator memory growth.
+        timeout = 1800 if script in ('http_consent.py','ux.py','sky_module.py') else 900
         with (run/(script+'.log')).open('w') as log:
             subprocess.run([str(BASE/'venv/bin/python'), str(BASE/script)], check=True,
                            stdout=log, stderr=subprocess.STDOUT, timeout=timeout)

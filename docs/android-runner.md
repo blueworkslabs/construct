@@ -169,7 +169,8 @@ against a phone or an installation whose data matters.
 Generate separate signed test catalogs with `prepare_http_consent_fixture.py` and
 `prepare_location_consent_fixture.py`, each using `--output DIRECTORY`. Keep them
 out of the product catalog and retain published version bytes unchanged. The JSON
-input contains `oldApk` (runner-local absolute path), `oldSha256`, `catalog`,
+input requires `scenario` (`http` or `location`; run each separately on a clean
+snapshot) and contains `oldApk` (runner-local absolute path), `oldSha256`, `catalog`,
 `versions` (HTTP version/hash pairs), `locationCatalog`, and `locationVersions`
 (location version/hash pairs). Each pair has `version` and `sha256`; the suite
 supplies the new APK path/hash from its normal command arguments.

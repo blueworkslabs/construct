@@ -20,7 +20,7 @@ C=json.loads(os.environ['CONSTRUCT_HTTP_CONSENT_CANDIDATES'])
 versions={v['version']:v['sha256'] for v in C['versions']}
 NAME='Consent Probe'; SWITCH='Allow approved internet sources'
 PROBE='Check HTTP access'; PREFIX='HTTP result: '
-result={'complete':False,'checks':[],'oldSha256':C['oldSha256'],
+result={'complete':False,'checks':[],'oldSha256':C['oldSha256'],'scenario':C['scenario'],
         'scope':'Synthetic HTTP/location consent plus a coarse-only mock network fix; HTTP probes are rejected locally; no real position or outbound request'}
 for path,digest in [(C['oldApk'],C['oldSha256']),(C['newApk'],C['newSha256'])]:
     if hashlib.sha256(Path(path).read_bytes()).hexdigest()!=digest:raise RuntimeError('APK checksum mismatch')
@@ -89,70 +89,72 @@ def upgrade():
     verify_apk(C['newSha256']);restart()
 
 try:
-    old_setup()
-    install('1.2.0',expected=True);probe('1.2.0','HTTP_SOURCE',keep=True)
-    rollback('1.2.0');probe('1.1.0','HTTP_SOURCE')
-    done('Old APK reproduces wider HTTP consent resurrection after untouched-switch narrowing and rollback')
-    install('1.2.0',expected=True);probe('1.2.0','HTTP_SOURCE',keep=True)
-    upgrade();probe('1.2.0','HTTP_SOURCE')
-    rollback('1.2.0');probe('1.1.0','CAPABILITY_DENIED')
-    done('In-place host upgrade preserves counter and allowed narrow scope; rollback cannot revive removed origin')
+    if C['scenario']=='http':
+        old_setup()
+        install('1.2.0',expected=True);probe('1.2.0','HTTP_SOURCE',keep=True)
+        rollback('1.2.0');probe('1.1.0','HTTP_SOURCE')
+        done('Old APK reproduces wider HTTP consent resurrection after untouched-switch narrowing and rollback')
+        install('1.2.0',expected=True);probe('1.2.0','HTTP_SOURCE',keep=True)
+        upgrade();probe('1.2.0','HTTP_SOURCE')
+        rollback('1.2.0');probe('1.1.0','CAPABILITY_DENIED')
+        done('In-place host upgrade preserves counter and allowed narrow scope; rollback cannot revive removed origin')
 
-    old_setup()
-    install('1.3.0');probe('1.3.0','CAPABILITY_DENIED',keep=True)
-    install('1.4.0',expected=False);probe('1.4.0','HTTP_SOURCE')
-    done('Old APK reproduces hidden HTTP grant after capability removal and reintroduction despite off install switch')
-    rollback('1.4.0');probe('1.3.0','CAPABILITY_DENIED')
-    upgrade()
-    install('1.4.0',expected=False);probe('1.4.0','CAPABILITY_DENIED',keep=True)
-    done('In-place host upgrade blocks stale removed-capability consent on reintroduction; counter remains intact')
+        old_setup()
+        install('1.3.0');probe('1.3.0','CAPABILITY_DENIED',keep=True)
+        install('1.4.0',expected=False);probe('1.4.0','HTTP_SOURCE')
+        done('Old APK reproduces hidden HTTP grant after capability removal and reintroduction despite off install switch')
+        rollback('1.4.0');probe('1.3.0','CAPABILITY_DENIED')
+        upgrade()
+        install('1.4.0',expected=False);probe('1.4.0','CAPABILITY_DENIED',keep=True)
+        done('In-place host upgrade blocks stale removed-capability consent on reintroduction; counter remains intact')
 
-    # Fresh transitions on the corrected host, plus an explicit reapproval.
-    install('1.1.0',expected=False,approve=True);probe('1.1.0','HTTP_SOURCE',keep=True)
-    install('1.2.0',expected=True);probe('1.2.0','HTTP_SOURCE')
-    rollback('1.2.0');probe('1.1.0','CAPABILITY_DENIED')
-    done('Corrected host allows explicit HTTP approval but untouched-switch narrowing revokes removed origins on rollback')
-    install('1.2.0',expected=False,approve=True);probe('1.2.0','HTTP_SOURCE',keep=True)
-    install('1.3.0');probe('1.3.0','CAPABILITY_DENIED')
-    rollback('1.3.0');probe('1.2.0','CAPABILITY_DENIED')
-    done('Corrected host clears HTTP consent on capability removal, including rollback, without losing counter data')
-    # Repeat with location; Android permission stays off, so no position is read.
-    C['catalog']=C['locationCatalog']
-    versions={v['version']:v['sha256'] for v in C['locationVersions']}
-    NAME='Location Probe'; SWITCH='Allow reading phone location'
-    PROBE='Check Location access'; PREFIX='Location result: '
-    old_setup()
-    install('1.2.0');probe('1.2.0','CAPABILITY_DENIED',keep=True)
-    install('1.3.0',expected=False);probe('1.3.0','LOCATION_PERMISSION')
-    done('Old APK reproduces hidden location module grant after removal and reintroduction; Android permission stays off')
-    rollback('1.3.0');probe('1.2.0','CAPABILITY_DENIED')
-    upgrade()
-    install('1.3.0',expected=False);probe('1.3.0','CAPABILITY_DENIED',keep=True)
-    done('In-place host upgrade blocks stale location consent on reintroduction and preserves counter data')
-    install('1.1.0',expected=False,approve=True);probe('1.1.0','LOCATION_PERMISSION',keep=True)
-    install('1.2.0');probe('1.2.0','CAPABILITY_DENIED',keep=True)
-    install('1.3.0',expected=False);probe('1.3.0','CAPABILITY_DENIED')
-    done('Corrected host permits explicit location grant but defaults reintroduced location off; no OS permission or position requested')
-    # Separate, explicitly synthetic position test. GPS is enabled, but only the
-    # coarse Android permission is granted; a network fix arrives after registration.
-    install('1.5.0',expected=False,approve=True)
-    mock_added=False
-    try:
-        adb('shell','appops','set','com.android.shell','android:mock_location','allow')
-        adb('shell','cmd','location','providers','add-test-provider','network','--accuracy','2')
-        mock_added=True
-        adb('shell','cmd','location','providers','set-test-provider-enabled','network','true')
-        adb('shell','pm','grant','dev.construct.runtime','android.permission.ACCESS_COARSE_LOCATION')
-        permissions=adb('shell','dumpsys','package','dev.construct.runtime')
-        if 'android.permission.ACCESS_FINE_LOCATION: granted=true' in permissions:raise RuntimeError('Expected coarse-only location permission')
-        restart();select_after(NAME+' · 1.5.0',('Open',));find('Counter: 3');tap(PROBE);time.sleep(1)
-        adb('shell','cmd','location','providers','set-test-provider-location','network','--location','50.0,8.0','--accuracy','5000')
-        find('Location result: APPROXIMATE');capture('coarse-only-network-fix')
-        tap('Construct menu');tap('Close module');library()
-        done('Coarse-only Android permission delivers an approximate synthetic network fix without requiring fine/GPS access')
-    finally:
-        if mock_added:adb('shell','cmd','location','providers','remove-test-provider','network')
-        adb('shell','appops','set','com.android.shell','android:mock_location','default')
+        # Fresh transitions on the corrected host, plus an explicit reapproval.
+        install('1.1.0',expected=False,approve=True);probe('1.1.0','HTTP_SOURCE',keep=True)
+        install('1.2.0',expected=True);probe('1.2.0','HTTP_SOURCE')
+        rollback('1.2.0');probe('1.1.0','CAPABILITY_DENIED')
+        done('Corrected host allows explicit HTTP approval but untouched-switch narrowing revokes removed origins on rollback')
+        install('1.2.0',expected=False,approve=True);probe('1.2.0','HTTP_SOURCE',keep=True)
+        install('1.3.0');probe('1.3.0','CAPABILITY_DENIED')
+        rollback('1.3.0');probe('1.2.0','CAPABILITY_DENIED')
+        done('Corrected host clears HTTP consent on capability removal, including rollback, without losing counter data')
+    else:
+        # Repeat with location; Android permission stays off, so no position is read.
+        C['catalog']=C['locationCatalog']
+        versions={v['version']:v['sha256'] for v in C['locationVersions']}
+        NAME='Location Probe'; SWITCH='Allow reading phone location'
+        PROBE='Check Location access'; PREFIX='Location result: '
+        old_setup()
+        install('1.2.0');probe('1.2.0','CAPABILITY_DENIED',keep=True)
+        install('1.3.0',expected=False);probe('1.3.0','LOCATION_PERMISSION')
+        done('Old APK reproduces hidden location module grant after removal and reintroduction; Android permission stays off')
+        rollback('1.3.0');probe('1.2.0','CAPABILITY_DENIED')
+        upgrade()
+        install('1.3.0',expected=False);probe('1.3.0','CAPABILITY_DENIED',keep=True)
+        done('In-place host upgrade blocks stale location consent on reintroduction and preserves counter data')
+        install('1.1.0',expected=False,approve=True);probe('1.1.0','LOCATION_PERMISSION',keep=True)
+        install('1.2.0');probe('1.2.0','CAPABILITY_DENIED',keep=True)
+        install('1.3.0',expected=False);probe('1.3.0','CAPABILITY_DENIED')
+        done('Corrected host permits explicit location grant but defaults reintroduced location off; no OS permission or position requested')
+        # Separate, explicitly synthetic position test. GPS is enabled, but only the
+        # coarse Android permission is granted; a network fix arrives after registration.
+        install('1.5.0',expected=False,approve=True)
+        mock_added=False
+        try:
+            adb('shell','appops','set','com.android.shell','android:mock_location','allow')
+            adb('shell','cmd','location','providers','add-test-provider','network','--accuracy','2')
+            mock_added=True
+            adb('shell','cmd','location','providers','set-test-provider-enabled','network','true')
+            adb('shell','pm','grant','dev.construct.runtime','android.permission.ACCESS_COARSE_LOCATION')
+            permissions=adb('shell','dumpsys','package','dev.construct.runtime')
+            if 'android.permission.ACCESS_FINE_LOCATION: granted=true' in permissions:raise RuntimeError('Expected coarse-only location permission')
+            restart();select_after(NAME+' · 1.5.0',('Open',));find('Counter: 3');tap(PROBE);time.sleep(1)
+            adb('shell','cmd','location','providers','set-test-provider-location','network','--location','50.0,8.0','--accuracy','5000')
+            find('Location result: APPROXIMATE');capture('coarse-only-network-fix')
+            tap('Construct menu');tap('Close module');library()
+            done('Coarse-only Android permission delivers an approximate synthetic network fix without requiring fine/GPS access')
+        finally:
+            if mock_added:adb('shell','cmd','location','providers','remove-test-provider','network')
+            adb('shell','appops','set','com.android.shell','android:mock_location','default')
     verify_apk(C['newSha256'])
     result['environment']={'apkSha256':C['newSha256']};result['complete']=True
 except Exception as error:
