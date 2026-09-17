@@ -265,6 +265,9 @@ coarse-only permission, not a claim about measured positional quality.
 Both explicit module consent and Android foreground coarse or fine permission are
 required. Android permission is requested only by the human-operated **Module
 access** control, never by JavaScript. Manual-area modules can work without it.
+Coarse-only access uses the enabled network provider; GPS is considered only with
+fine permission. With no enabled provider permitted by the granted accuracy,
+the request returns `LOCATION_UNAVAILABLE` rather than requesting more access.
 
 A result is either a valid cached fix at most 120 seconds old (monotonic age) or
 one foreground provider update, with a 12-second timeout. One pending request and

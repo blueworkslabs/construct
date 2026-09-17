@@ -158,3 +158,31 @@ Use `--focus-version`, `--snake-version`, `--contacts-version` and
 `--camera-ux-layouts` extends full camera/gallery acceptance with reachable native
 confirmation controls at 2x Android text in portrait and landscape. It requires
 `--camera-only --camera-gallery-export` and the exact camera version/hash.
+
+## Consent-update regression scope
+
+`--http-consent-candidates /absolute/path/candidates.json` runs standalone on the
+disposable app-free snapshot. It uninstalls only the disposable Construct app to
+seed old-APK state, then upgrades in place to the exact candidate. Never run it
+against a phone or an installation whose data matters.
+
+Generate separate signed test catalogs with `prepare_http_consent_fixture.py` and
+`prepare_location_consent_fixture.py`, each using `--output DIRECTORY`. Keep them
+out of the product catalog and retain published version bytes unchanged. The JSON
+input contains `oldApk` (runner-local absolute path), `oldSha256`, `catalog`,
+`versions` (HTTP version/hash pairs), `locationCatalog`, and `locationVersions`
+(location version/hash pairs). Each pair has `version` and `sha256`; the suite
+supplies the new APK path/hash from its normal command arguments.
+
+HTTP versions 0.1–0.4 exercise removal, untouched-switch narrowing, rollback,
+explicit reapproval and old-state upgrades. Their undeclared URL is rejected
+locally, so no HTTP probe leaves the host. Location versions 0.1–0.3 exercise
+reintroduced module grants while Android permission remains off. Version 0.5
+separately reads a synthetic network-provider fix with coarse-only permission;
+the driver removes that test provider in `finally`. The synthetic counter must
+survive updates. Native installation diagnostics must match every signed digest.
+
+This scope excludes live Sky providers and the full host baseline; run relevant
+scopes separately on the same frozen candidate. Review screenshots and both child
+and parent completion/stopped receipts. A reproduced failure on the old APK is
+an expected regression precondition, not a pass for the new APK.

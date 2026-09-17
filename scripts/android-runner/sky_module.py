@@ -111,10 +111,17 @@ def switch(label):
     tap_node(matches[0])
 
 def fields(lat='50.0379',lon='8.5622'):
-    current=[n for n in nodes() if n.get('class')=='android.widget.EditText' and visible(n)]
-    if len(current)!=2:raise RuntimeError('Expected the two visible coordinate fields')
-    controls=ui._device(className='android.widget.EditText',packageName='dev.construct.runtime')
-    controls[0].set_text(lat);controls[1].set_text(lon)
+    deadline=time.monotonic()+20
+    previous=None
+    while time.monotonic()<deadline:
+        current=[n for n in nodes() if n.get('class')=='android.widget.EditText' and visible(n)
+                 and n.get('resource-id') in ('latitude','longitude')]
+        state={n.get('resource-id'):n.get('bounds') for n in current}
+        if len(current)==2 and set(state)=={'latitude','longitude'} and state==previous:break
+        previous=state;time.sleep(.3)
+    else:raise RuntimeError('Expected the two stable visible coordinate fields')
+    for identifier,value in [('latitude',lat),('longitude',lon)]:
+        ui._device(className='android.widget.EditText',packageName='dev.construct.runtime',resourceId=identifier).set_text(value)
     # Accessibility set_text does not open the IME. Escape would cancel the HTML dialog.
 
 def area():
