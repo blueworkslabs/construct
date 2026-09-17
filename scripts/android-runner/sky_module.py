@@ -7,7 +7,7 @@ import time
 from config import require_runner
 import ui
 from ui import adb,nodes,labels,find,tap,tap_node,capture,RESULTS
-from host_ui import restart,diagnostics,select_after,installed_status,catalog_settings,apply_catalog,library,reveal_host_control
+from host_ui import restart,diagnostics,select_after,installed_status,catalog_settings,apply_catalog,library,reveal_host_control,scroll_top
 from catalog_input import replace_text
 
 require_runner()
@@ -73,6 +73,12 @@ def close_module():tap('Construct menu');tap('Close module');library()
 
 def access():tap('Construct menu');tap('Module access')
 
+def native_status(text):
+    scroll_top();return contains(text)
+
+def leave_access():
+    scroll_top();tap('Back')
+
 def switch(label):
     reveal_host_control(label)
     matches=[n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true' and visible(n)]
@@ -136,10 +142,10 @@ try:
     path=adb('shell','pm','path','dev.construct.runtime').strip().removeprefix('package:')
     apk=adb('shell','sha256sum',path).split()[0];result['environment']={'apkSha256':apk}
     open_module();area();contains('Enable the requested capability');capture('modular-default-denied')
-    access();switch('Allow approved internet sources');contains('Allow approved internet sources: on.')
+    access();switch('Allow approved internet sources');native_status('Allow approved internet sources: on.')
     for origin in ['api.adsb.lol','opensky-network.org','tile.openstreetmap.org','api.adsbdb.com']:
         reveal_host_control('https://'+origin)
-    tap('Back');open_module();time.sleep(16);done('Exact signed module; net.http denied by default and explicitly granted in native access')
+    leave_access();open_module();time.sleep(16);done('Exact signed module; net.http denied by default and explicitly granted in native access')
     click('Choose area');fields('91','8.5622');tap('Show aircraft');contains('Enter latitude −85 to 85')
     fields();tap('Show aircraft');ready('ADSB.lol')
     if app_permission('android.permission.ACCESS_FINE_LOCATION') or app_permission('android.permission.ACCESS_COARSE_LOCATION'):raise RuntimeError('Manual area unexpectedly granted location')
@@ -160,12 +166,12 @@ try:
     click('Dismiss details');click('Center map');screenshot_layouts('modular-map','100 km');done('Map, radius and controls survive both orientations and Android 2x text')
     tap('Construct menu');tap('Return to module');contains('Refresh paused while');capture('modular-menu-resume');done('Native menu pauses privileged work and returns to module state')
     click('Area');tap('Use my location');contains('Enable the requested capability');tap('Cancel')
-    access();switch('Allow reading phone location');contains('Allow reading phone location: on.')
+    access();switch('Allow reading phone location');native_status('Allow reading phone location: on.')
     reveal_host_control('Allow Android location access');tap('Allow Android location access');choose_permission(["Don’t allow","Don't allow"])
-    contains('Android location access denied');tap('Back');open_module();click('Choose area');tap('Use my location');contains('Enable Allow reading phone location');tap('Cancel')
+    native_status('Android location access denied');leave_access();open_module();click('Choose area');tap('Use my location');contains('Enable Allow reading phone location');tap('Cancel')
     done('Location module grant and Android denial remain separate; module cannot launch OS prompt')
     access();reveal_host_control('Allow Android location access');tap('Allow Android location access');choose_permission(['While using the app','Only this time'])
-    contains('Android location access allowed');tap('Back');open_module()
+    native_status('Android location access allowed');leave_access();open_module()
     adb('shell','cmd','location','set-location-enabled','true')
     for _ in range(3):adb('emu','geo','fix','8.5622','50.0379');time.sleep(1)
     click('Choose area');tap('Use my location');contains('Location ready',25)
@@ -178,7 +184,7 @@ try:
     adb('shell','svc','wifi','enable');adb('shell','svc','data','enable');done('Offline transport failure is visible without crashing module')
     access();switch('Allow approved internet sources')
     if 'Turn off' in labels():tap('Turn off')
-    contains('Allow approved internet sources: off.');tap('Back');open_module();area();contains('Enable the requested capability');close_module()
+    native_status('Allow approved internet sources: off.');leave_access();open_module();area();contains('Enable the requested capability');close_module()
     done('Revoked internet grant remains denied after reopen')
     # Separate fixtures: same actual Sky parser/UI with synthetic feed and only glossary/version differences.
     use_catalog(C['updateCatalog']);v1,v2=C['updates']
