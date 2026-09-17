@@ -200,7 +200,11 @@ def control(text):
     for direction in (1,-1):
         for _ in range(9):
             matches=[n for n in nodes() if text in (n.get('text'),n.get('content-desc')) and n.get('enabled')!='false' and len(rect(n))==4 and rect(n)[3]>rect(n)[1]]
-            if len(matches)==1:return matches[0]
+            if len(matches)==1:
+                prior=matches[0].get('bounds');time.sleep(.6)
+                settled=[n for n in nodes() if text in (n.get('text'),n.get('content-desc')) and n.get('enabled')!='false' and n.get('bounds')==prior]
+                if len(settled)==1:return settled[0]
+                continue
             current_nodes=nodes()
             web=next(n for n in current_nodes if n.get('class')=='android.webkit.WebView')
             x1,y1,x2,y2=rect(web)
@@ -228,6 +232,8 @@ def size(value):
     if any(x.startswith('Length:') or (x.startswith('Marker ') and x.endswith('mm ✓')) for x in labels()):action('Change reference size')
     control('Measured black-square side (mm)')
     ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value)
+    # Dismiss only the IME, before querying coordinates of the submit control.
+    adb('shell','input','keyevent','111');time.sleep(.6)
     action('Use this size');expect('Tap the two ends');collapse()
 def screen_point(entry,point):
     x1,y1,x2,y2=rect(find(WORKSPACE))
@@ -412,7 +418,7 @@ try:
     receipt['complete']=True
 except Exception as e:
     receipt['error'] = str(e)
-    try: capture('failure')
+    try: capture_display('failure')
     except Exception: pass
     raise
 finally:
