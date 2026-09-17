@@ -39,7 +39,13 @@
     el('placeholder').hidden=!!image;el('reset').hidden=!image;
     draw();
   }
-  function cancelGesture(){editor.cancel();gesture=null;pointers.clear();draw();}
+  function cancelGesture(){
+    const captured=[...pointers.keys()];editor.cancel();gesture=null;pointers.clear();
+    // A touch-only cancellation may also omit the browser's capture cleanup.
+    // Clear our transaction first so lostcapture cannot re-enter an active edit.
+    for(const id of captured){try{canvas.releasePointerCapture(id);}catch{}}
+    draw();
+  }
   async function detect(token){
     const result=await call('image.markers',{op:'detect',handle:selected.handle,dictionary:'DICT_4X4_50'});
     if(token!==epoch||!visible)return;

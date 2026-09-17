@@ -23,10 +23,10 @@ test('module scripts compile and capabilities exclude native launcher/network/st
 // WebView trace delivered touchcancel without a corresponding pointercancel.
 function measureUi() {
   class Element {
-    constructor(){this.value='';this.hidden=false;this.listeners={};this.clientWidth=600;this.clientHeight=450;this.classList={toggle(){}};}
+    constructor(){this.captures=new Set();this.value='';this.hidden=false;this.listeners={};this.clientWidth=600;this.clientHeight=450;this.classList={toggle(){}};}
     addEventListener(type,fn){(this.listeners[type]??=[]).push(fn);}
     dispatch(type,extra={}){const event={type,preventDefault(){},...extra};this['on'+type]?.(event);for(const fn of this.listeners[type]||[])fn(event);}
-    setAttribute(){} blur(){} setPointerCapture(){}
+    setAttribute(){} blur(){} setPointerCapture(id){this.captures.add(id);} releasePointerCapture(id){this.captures.delete(id);}
     getBoundingClientRect(){return {left:0,top:0};}
     getContext(){return new Proxy({},{get:()=>()=>{}});}
   }
@@ -45,4 +45,12 @@ for(const cancellation of ['pointercancel','touchcancel','lostpointercapture'])t
   e.photo.dispatch(cancellation);assert.equal(e.result.textContent,'Length: 25.0 cm');
   pointer('pointerup',420,270);assert.equal(e.result.textContent,'Length: 25.0 cm');
   e.undo.onclick();assert.equal(e.result.textContent,'No length yet','cancel must not add a committed undo step');
+});
+
+test('touch-only cancellation releases capture before subsequent controls can receive input',async()=>{
+  const {elements:e,pointer,tap}=measureUi();await e.choose.onclick();e.side.value='100';e.setup.dispatch('submit');tap(180,270);tap(480,270);
+  pointer('pointerdown',480,270);pointer('pointermove',420,270);assert.ok(e.photo.captures.has(1));
+  e.photo.dispatch('touchcancel');assert.equal(e.photo.captures.size,0);assert.equal(e.result.textContent,'Length: 25.0 cm');
+  e['select-b'].onclick();e.left.onclick();assert.equal(e.result.textContent,'Length: 25.0 cm');
+  e.units.value='mm';e.units.onchange();assert.equal(e.result.textContent,'Length: 249.6 mm');
 });

@@ -20,7 +20,7 @@ p.add_argument('--sha', required=True)
 p.add_argument('--catalog', required=True)
 p.add_argument('--module-sha', required=True)
 p.add_argument('--module-name', default='Pocket Measure')
-p.add_argument('--module-version', default='0.2.1')
+p.add_argument('--module-version', default='0.2.2')
 a = p.parse_args()
 from config import catalog
 catalog(a.catalog)
@@ -202,7 +202,7 @@ def panel_rect(ns):
     return x1,rect(photo)[3],x2,y2
 def in_panel(n,box):
     r=rect(n)
-    return len(r)==4 and box[0]<=r[0]<r[2]<=box[2] and box[1]<=r[1]<r[3]<=box[3]
+    return len(r)==4 and box[0]<=r[0]<r[2]<=box[2] and box[1]<=r[1]<r[3]<=box[3] and (n.get('class')!='android.widget.Button' or r[3]-r[1]>=52)
 def scroll_panel(box,direction):
     x1,y1,x2,y2=box;top=y1+(y2-y1)//5;bottom=y2-(y2-y1)//5
     adb('shell','input','swipe',str((x1+x2)//2),str(bottom if direction==1 else top),str((x1+x2)//2),str(top if direction==1 else bottom),'350')
@@ -221,9 +221,18 @@ def control(text):
                 settled=[n for n in ns if text in (n.get('text'),n.get('content-desc')) and n.get('enabled')!='false' and n.get('bounds')==prior and in_panel(n,box)]
                 if len(settled)==1:return settled[0]
                 continue
-            scroll_panel(box,direction)
+            raw=[n for n in ns if text in (n.get('text'),n.get('content-desc')) and len(rect(n))==4]
+            effective=direction
+            if len(raw)==1:
+                rr=rect(raw[0])
+                if rr[1]<=box[1]+2:effective=-1
+                elif rr[3]>=box[3]-2:effective=1
+            scroll_panel(box,effective)
     raise RuntimeError('Visible control missing: '+text)
-def action(text):tap_node(control(text));time.sleep(.4)
+def action(text):
+    node=control(text)
+    with (run/'action-trace.jsonl').open('a') as trace:trace.write(json.dumps({'control':text,'node':dict(node.attrib),'panel':panel_rect(nodes())})+'\n')
+    tap_node(node);time.sleep(.4)
 def collapse():
     # WebView exposes overflow-clipped controls in its accessibility tree.
     # A positive node bound is not proof that its centre is actually touchable.
@@ -365,7 +374,11 @@ try:
     done('Accessible photo-pixel nudges are individually undoable')
     action('Clear');collapse();no_measurement()
     fit_pixels=photo_pixels('module-gesture-fit')
-    ui._device(description=WORKSPACE).pinch_out(percent=40,steps=25);time.sleep(.5);no_measurement()
+    x1,y1,x2,y2=rect(find(WORKSPACE));cx,cy=(x1+x2)//2,(y1+y2)//2
+    # Start with separated fingers: the convenience pinch starts near-zero
+    # separation, reaches the 8x cap, and loses all features in this white fixture.
+    ui._device(description=WORKSPACE).gesture((cx-100,cy),(cx+100,cy),(cx-160,cy),(cx+160,cy),steps=25)
+    time.sleep(.5);no_measurement()
     zoom_pixels=photo_pixels('module-gesture-zoom')
     if zoom_pixels==fit_pixels:raise RuntimeError('Pinch did not visibly zoom the photograph')
     x1,y1,x2,y2=rect(find(WORKSPACE));ui._device.swipe((x1+x2)//2,(y1+y2)//2,(x1+x2)//2-60,(y1+y2)//2-40,duration=.4)
@@ -435,7 +448,9 @@ try:
     receipt['complete']=True
 except Exception as e:
     receipt['error'] = str(e)
-    try: capture_display('failure')
+    try:
+        (run/'failure-nodes.json').write_text(json.dumps([dict(n.attrib) for n in nodes()],indent=2))
+        capture_display('failure')
     except Exception: pass
     raise
 finally:

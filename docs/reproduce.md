@@ -100,14 +100,14 @@ none builds or substitutes candidate bytes.
   --module-sha MODULE_SHA`: real picker, default/fresh/revoked grants, offline
   detection, calibration/editor/gestures, perspective/EXIF/negative fixtures,
   portrait/landscape/large text, lifecycle and original-image/diagnostic checks.
-  Default module is Pocket Measure 0.2.1; explicit `--module-name` and
+  Default module is Pocket Measure 0.2.2; explicit `--module-name` and
   `--module-version` permit an identified later candidate.
 - `measure_retirement.py --old ALPHA28_APK --old-sha OLD_SHA --new ALPHA29_APK
   --new-sha NEW_SHA --catalog HTTPS_INDEX_URL --candidates CANDIDATES_JSON`:
   install the real signed Pocket Measure 0.1.3 on alpha28, upgrade in place,
   preserve unrelated saved data/catalog choice, check update-required recovery,
   fresh image consent and retired install/rollback rejection. Metadata contains
-  `{"measure":{"version":"0.2.1","sha256":"EXPECTED_MODULE_SHA"}}`.
+  `{"measure":{"version":"0.2.2","sha256":"EXPECTED_MODULE_SHA"}}`.
 - `measure_update.py --apk APK --sha APK_SHA --catalog HTTPS_FIXTURE_INDEX_URL
   --module-sha BEFORE_SHA --after-sha AFTER_SHA`: separate signed Measure Preview
   0.1.0/0.2.0 fixtures add a working cm/mm selector, then roll back on identical

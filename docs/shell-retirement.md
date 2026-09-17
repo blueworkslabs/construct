@@ -96,7 +96,7 @@ ID selection, calibration, endpoints, units and interpretation do not.
 handling described above. New installs and rollback into the retired workspace
 are blocked. The native workspace itself never saved measurements or photos.
 
-Pocket Measure 0.2.1 requires API 0.10 and two new explicit image grants; old native
+Pocket Measure 0.2.2 requires API 0.10 and two new explicit image grants; old native
 measurement consent must not be inherited. Alpha28 is the final native Measure
 host. Full optimized-candidate acceptance is pending; the completed debug prototype
 is not release acceptance. See [the image contract](module-images.md) and
