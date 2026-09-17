@@ -181,38 +181,52 @@ def pick():
 
 
 def rect(n):return list(map(int,__import__('re').findall(r'-?\d+',n.get('bounds',''))))
+def panel_rect(ns):
+    web=next(n for n in ns if n.get('class')=='android.webkit.WebView')
+    photo=next(n for n in ns if WORKSPACE in (n.get('text'),n.get('content-desc')))
+    x1,y1,x2,y2=rect(web)
+    return x1,rect(photo)[3],x2,y2
+def in_panel(n,box):
+    r=rect(n)
+    return len(r)==4 and box[0]<=r[0]<r[2]<=box[2] and box[1]<=r[1]<r[3]<=box[3]
+def scroll_panel(box,direction):
+    x1,y1,x2,y2=box;top=y1+(y2-y1)//5;bottom=y2-(y2-y1)//5
+    adb('shell','input','swipe',str((x1+x2)//2),str(bottom if direction==1 else top),str((x1+x2)//2),str(top if direction==1 else bottom),'350')
+    time.sleep(.3)
 def control(text):
-    if 'Show controls' in labels():tap('Show controls')
+    ns=nodes();box=panel_rect(ns)
+    show=[n for n in ns if n.get('text')=='Show controls' and in_panel(n,box)]
+    if len(show)==1:tap_node(show[0]);time.sleep(.5)
     for direction in (1,-1):
-        for _ in range(9):
-            matches=[n for n in nodes() if text in (n.get('text'),n.get('content-desc')) and n.get('enabled')!='false' and len(rect(n))==4 and rect(n)[3]>rect(n)[1]]
+        for _ in range(12):
+            ns=nodes();box=panel_rect(ns)
+            matches=[n for n in ns if text in (n.get('text'),n.get('content-desc')) and n.get('enabled')!='false' and in_panel(n,box)]
             if len(matches)==1:
-                prior=matches[0].get('bounds');time.sleep(.6)
-                settled=[n for n in nodes() if text in (n.get('text'),n.get('content-desc')) and n.get('enabled')!='false' and n.get('bounds')==prior]
+                prior=matches[0].get('bounds');time.sleep(.5)
+                ns=nodes();box=panel_rect(ns)
+                settled=[n for n in ns if text in (n.get('text'),n.get('content-desc')) and n.get('enabled')!='false' and n.get('bounds')==prior and in_panel(n,box)]
                 if len(settled)==1:return settled[0]
                 continue
-            current_nodes=nodes()
-            web=next(n for n in current_nodes if n.get('class')=='android.webkit.WebView')
-            x1,y1,x2,y2=rect(web)
-            y1=rect(find(WORKSPACE))[3]
-            top=y1+(y2-y1)//5;bottom=y2-(y2-y1)//5
-            adb('shell','input','swipe',str((x1+x2)//2),str(bottom if direction==1 else top),str((x1+x2)//2),str(top if direction==1 else bottom),'350')
-    raise RuntimeError('Control missing: '+text)
+            scroll_panel(box,direction)
+    raise RuntimeError('Visible control missing: '+text)
 def action(text):tap_node(control(text));time.sleep(.4)
 def collapse():
-    # The selector's native popup closes asynchronously, and the summary can be
-    # above the scrolled control panel. Settle at its actual top before acting.
-    for _ in range(12):
-        ns=nodes();visible=[n for n in ns if len(rect(n))==4 and rect(n)[3]>rect(n)[1]]
+    # WebView exposes overflow-clipped controls in its accessibility tree.
+    # A positive node bound is not proof that its centre is actually touchable.
+    for _ in range(16):
+        ns=nodes();box=panel_rect(ns)
+        visible=[n for n in ns if in_panel(n,box)]
         if any(n.get('text')=='Show controls' for n in visible):return
         hide=[n for n in visible if n.get('text')=='Hide controls']
         if len(hide)==1:
-            tap_node(hide[0]);find('Show controls');time.sleep(.5);return
-        web=next(n for n in ns if n.get('class')=='android.webkit.WebView')
-        x1,y1,x2,y2=rect(web);y1=rect(find(WORKSPACE))[3]
-        adb('shell','input','swipe',str((x1+x2)//2),str(y1+(y2-y1)//5),str((x1+x2)//2),str(y2-(y2-y1)//5),'350')
-        time.sleep(.3)
-    raise RuntimeError('Could not collapse actual control panel')
+            prior=hide[0].get('bounds');time.sleep(.5)
+            ns=nodes();box=panel_rect(ns)
+            stable=[n for n in ns if n.get('text')=='Hide controls' and n.get('bounds')==prior and in_panel(n,box)]
+            if len(stable)==1:
+                tap_node(stable[0]);find('Show controls');time.sleep(.5);return
+            continue
+        scroll_panel(box,-1)
+    raise RuntimeError('Could not collapse actual visible control panel')
 def size(value):
     if 'Show controls' in labels():tap('Show controls');time.sleep(.4)
     if any(x.startswith('Length:') or (x.startswith('Marker ') and x.endswith('mm ✓')) for x in labels()):action('Change reference size')

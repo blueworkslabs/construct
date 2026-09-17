@@ -39,7 +39,9 @@ may be dropped. Check declaration, saved grant and relevant Android permission o
 every request. Sensitive asynchronous results are re-authorized at delivery.
 
 Legacy storage/log/toast access is approved at installation unless previously
-revoked. Tone, contacts, camera, photo measurement, HTTP and location start off and require explicit native opt-in.
+revoked. Tone, contacts, camera, selected-image pixels, marker detection, HTTP and
+location start off and require explicit native opt-in. Retired native-workspace
+capabilities cannot be enabled.
 When installing a version that reintroduces a capability absent from the current
 manifest, opt-in access starts off again unless explicitly approved in that install.
 Historical grant entries cannot override the displayed off switch. Unchanged
