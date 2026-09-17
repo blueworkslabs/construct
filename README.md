@@ -11,6 +11,12 @@ local tests, a disposable Android emulator, artifact verification and a private
 module registry—then onto a real phone. Released modules can also be served from
 the public static catalog, without a local server.
 
+**Design principle: the host supplies defined capabilities; the modules contain
+the applications.** Domain logic and feature UI should be independently updateable
+in signed module packages. Some current native-workspace pilots do not yet meet
+that boundary; they are migration debt, not the template for new tools. See the
+[modular design contract](docs/modular-design.md) and [agent guidance](AGENTS.md).
+
 ![Construct's Library with installed tools and quiet per-tool actions](docs/media/ux-refresh/library.png)
 
 *Actual Android emulator screenshot of the alpha21 UX pilot, using synthetic
@@ -96,7 +102,10 @@ flowchart LR
     F --> R
 ```
 
-**A module update usually needs no new APK. A new native capability does.**
+**The design goal is module updates without a new APK once the required host API
+exists. New native capabilities need host updates.** Current launcher-only tools,
+including Sky Watch and Pocket Measure, still put their feature behavior in the
+APK; their independent module delivery requires the documented migration.
 The phone runs the module locally; Discord is the workshop, not the execution
 environment or package transport. OpenClaw coordinates the work, but the underlying
 build, publisher and runner are ordinary scripts rather than an agent-only format.
