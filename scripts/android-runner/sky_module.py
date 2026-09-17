@@ -84,7 +84,7 @@ def fields(lat='50.0379',lon='8.5622'):
     if len(current)!=2:raise RuntimeError('Expected the two visible coordinate fields')
     controls=ui._device(className='android.widget.EditText',packageName='dev.construct.runtime')
     controls[0].set_text(lat);controls[1].set_text(lon)
-    adb('shell','input','keyevent','111')
+    # Accessibility set_text does not open the IME. Escape would cancel the HTML dialog.
 
 def area():
     time.sleep(16) # Respect module-persisted provider floor across reopen/update.
