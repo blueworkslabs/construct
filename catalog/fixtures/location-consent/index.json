@@ -31,6 +31,15 @@
           "sha256": "b9de6711c3ef0d6231b3e001e8697e6c2a1993a2fa570ac6204a5fc82c2d8b9d",
           "signature": "e/SZO+EjiNA0NRjnQXK7LuXEdX11r/fq8HVWxdXsIfncoIaM+IvxJY8WarLug3souMCUWk9sjOugZen7yyVWNxG/hVOrMbC62PnVPVs7RT7IltgdkrFTkAvaEO9ZN1d3DuJPl0glrDKx3c05VjoA4cM0eir/NdW0ot3sRWmPMaogOcHz6qSyxKaESI9p8McKHdENoRIvLEWIPxi377DpsEFnBjmfTxeOVsP4kwGfVrDAHMoCZ0UL8MUbJMDGHWoxv/XCNkVNGukBcdtyohBihkobgCBTHYQgSCUHTdrOTCas6qSc5VCcnAQptUaKjA+CDpZWRQ2cSqfZkKFz1Eadtw==",
           "testFixture": true
+        },
+        {
+          "id": "dev.construct.location-fixture",
+          "name": "Location Probe",
+          "version": "0.4.0",
+          "artifact": "dev.construct.location-fixture-0.4.0.zip",
+          "sha256": "fb5ef0233b28474b979489bfbfd416fe5b143c6be6faed9f099e012832a7c8df",
+          "signature": "g42LsyjG9IQyV5sc/xZtb7TAq7GDGTOwc8rWmC8ueC+myCEUezmV0KN+D7PcjYd7oeB4SfdhNAoERUzUrHYb4MW7WeZC2/HyUtOckHQdvsLzUrDcXuKqwRs4CZ5K1JRxAyiqD3qcWFES4mdanm5fNxiV0re8X6nxNBE0VgP5s2K6n8cLdpMcoMhiz/E2DWj0uP+OHzref7l1LkaJdi4tHzA2dy3FD/ffxh70XazyCr43YuqVpgvisxB7CWkWrIf/17krRmrvb49jst/fltqeuwv91usjz78NIPsVwUDIGAnSJYQYyh1Mo1QFVytJCJpWF4clZf3pVvgAAAR8BgEbcQ==",
+          "testFixture": true
         }
       ]
     }
