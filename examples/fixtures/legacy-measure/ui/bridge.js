@@ -4,7 +4,7 @@ let sequence = 0;
 function call(method, params = {}) {
   return new Promise((resolve, reject) => {
     const id = String(++sequence);
-    const timeout = setTimeout(() => { pending.delete(id); reject(Object.assign(new Error('Host did not respond'), {code:'TIMEOUT'})); }, method === 'image.read' && params.op === 'pick' ? 300000 : 20000);
+    const timeout = setTimeout(() => { pending.delete(id); reject(Object.assign(new Error('Host did not respond'), {code:'TIMEOUT'})); }, 5000);
     pending.set(id, { resolve, reject, timeout });
     construct.postMessage(JSON.stringify({ id, method, params }));
   });

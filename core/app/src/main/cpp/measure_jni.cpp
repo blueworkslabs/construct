@@ -3,14 +3,15 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/objdetect/aruco_detector.hpp>
 #include <vector>
+#include <stdexcept>
 
 extern "C" JNIEXPORT jdoubleArray JNICALL
-Java_dev_construct_runtime_MeasureNative_detect(JNIEnv* env, jobject, jintArray pixels,
+Java_dev_construct_runtime_ImageMarkerNative_detect(JNIEnv* env, jobject, jintArray pixels,
                                                jint width, jint height) {
     // Independent native bounds: this entry point cannot process an arbitrary allocation.
     if (!pixels || width < 1 || height < 1 || width > 1600 || height > 1600 ||
         env->GetArrayLength(pixels) != width * height) {
-        env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), "Invalid measurement image");
+        env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), "Invalid image");
         return nullptr;
     }
     try {
@@ -38,8 +39,9 @@ Java_dev_construct_runtime_MeasureNative_detect(JNIEnv* env, jobject, jintArray 
         std::vector<int> ids;
         detector.detectMarkers(gray, corners, ids);
         std::vector<jdouble> result;
+        if (ids.size() > 64) throw std::runtime_error("Too many markers");
         for (size_t i = 0; i < ids.size(); ++i) {
-            if (ids[i] != 0) continue;
+            result.push_back(ids[i]);
             for (const auto& point : corners[i]) {
                 result.push_back(point.x / static_cast<double>(width));
                 result.push_back(point.y / static_cast<double>(height));

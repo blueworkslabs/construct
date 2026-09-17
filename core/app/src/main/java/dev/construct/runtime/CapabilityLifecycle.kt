@@ -12,7 +12,7 @@ internal object CapabilityLifecycle {
         checkRule(capability !in retired, "CAPABILITY_RETIRED", "This capability has been retired. Update the module from your catalog.")
     }
     fun validateHistoricalApi(capabilities: List<Capability>, api: String) {
-        checkRule(capabilities.none { it.id in retired } || api in setOf("0.8.0", "0.9.0"),
+        checkRule(capabilities.none { it.id in retired } || api in setOf("0.8.0", "0.9.0", "0.10.0"),
             "API_INCOMPATIBLE", "Historical capability requires Construct API 0.8.0 or later")
     }
 }

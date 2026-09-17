@@ -6,6 +6,10 @@ import android.content.res.Configuration
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.net.Uri
+import android.view.WindowManager
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
@@ -53,6 +57,34 @@ class ModuleActivity : ComponentActivity() {
     private var diagnosticText by mutableStateOf<String?>(null)
     private var webView: ModuleSessionView? = null
     private var ending = false
+    private var pickingImage = false
+    private var pickerReturned = false
+    private var pickedUri: Uri? = null
+    private var imageCompletion: ((Uri?) -> Unit)? = null
+    private val imagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        pickedUri = uri; pickerReturned = true
+    }
+    private fun pickImage(done: (Uri?) -> Unit) {
+        checkRule(!ending && !pickingImage && !menu && !diagnosticsOpen, "IMAGE_BUSY", "Image picker is unavailable")
+        pickingImage = true; imageCompletion = done
+        webView?.pauseForPicker()
+        try { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+        catch (e: Exception) {
+            pickingImage = false; imageCompletion = null
+            webView?.setMenuPaused(false)
+            throw ConstructError("IMAGE_UNAVAILABLE", "Could not open image picker")
+        }
+    }
+    override fun onPostResume() {
+        super.onPostResume()
+        if (pickerReturned && !ending) {
+            pickerReturned = false; pickingImage = false
+            val uri = pickedUri; pickedUri = null
+            val done = imageCompletion; imageCompletion = null
+            webView?.setMenuPaused(false)
+            done?.invoke(uri)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,6 +106,8 @@ class ModuleActivity : ComponentActivity() {
                     val style = if (dark) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
                         else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
                     enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                    if (module.manifest.capabilities.any { it.id == "image.read" })
+                        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
                     selected = module
                 } }
             } catch (error: Exception) {
@@ -85,6 +119,7 @@ class ModuleActivity : ComponentActivity() {
     private fun finishSession(action: String = "close", error: String? = null) {
         if (ending) return
         ending = true
+        imageCompletion = null; pickedUri = null
         webView?.destroy(); webView = null
         setResult(RESULT_OK, Intent().putExtra("action", action)
             .putExtra("module", intent.getStringExtra("module"))
@@ -94,11 +129,11 @@ class ModuleActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        if (selected?.manifest?.api == "0.9.0")
+        if (selected?.manifest?.api in setOf("0.9.0", "0.10.0"))
             webView?.settings?.textZoom = (newConfig.fontScale * 100).toInt().coerceIn(50, 300)
     }
 
-    override fun onStop() { finishSession(); super.onStop() }
+    override fun onStop() { if (!pickingImage) finishSession(); super.onStop() }
     override fun onDestroy() {
         webView?.destroy(); webView = null
         worker.shutdown()
@@ -133,7 +168,7 @@ class ModuleActivity : ComponentActivity() {
                     right = if (legacy && landscape) ModuleLayout.MENU_RECT.dp else 0.dp),
                     factory = { context ->
                         try {
-                            moduleWebView(context, store, active) { failedView, code ->
+                            moduleWebView(context, store, active, pickImage = ::pickImage) { failedView, code ->
                                 if (webView === failedView) finishSession(error = code)
                             }.also { webView = it }
                         } catch (error: Exception) {

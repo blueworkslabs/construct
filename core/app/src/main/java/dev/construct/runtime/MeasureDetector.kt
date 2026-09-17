@@ -3,8 +3,9 @@ package dev.construct.runtime
 import android.graphics.Bitmap
 
 internal object MeasureNative {
-    init { System.loadLibrary("construct_measure") }
-    external fun detect(pixels: IntArray, width: Int, height: Int): DoubleArray
+    fun detect(pixels: IntArray, width: Int, height: Int): DoubleArray =
+        ImageMarkerNative.detect(pixels, width, height).toList().chunked(9)
+            .filter { it[0] == 0.0 }.flatMap { it.drop(1) }.toDoubleArray()
 }
 
 object MeasureDetector {

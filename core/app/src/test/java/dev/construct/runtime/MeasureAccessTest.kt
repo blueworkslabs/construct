@@ -17,7 +17,7 @@ class MeasureAccessTest {
     private lateinit var store: ModuleStore
     @Before fun setup() { app.filesDir.listFiles()?.forEach { it.deleteRecursively() }; store=ModuleStore(app) }
     private fun fixture(): VerifiedPackage {
-        val dir=File(System.getProperty("construct.fixtureRoot"),"home-registry")
+        val dir=File(System.getProperty("construct.fixtureRoot"),"measure-legacy-registry")
         val entry=Packages.catalog(File(dir,"index.json").readBytes()).filter { it.id=="dev.construct.measure" }.maxBy { it.version }
         return Packages.verify(File(dir,entry.artifact).readBytes(),entry,store.publicKey)
     }
