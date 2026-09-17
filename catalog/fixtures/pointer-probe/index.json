@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.pointer-probe",
+      "name": "Pointer Probe",
+      "versions": [
+        {
+          "id": "dev.construct.pointer-probe",
+          "name": "Pointer Probe",
+          "version": "0.1.0",
+          "artifact": "dev.construct.pointer-probe-0.1.0.zip",
+          "sha256": "acc725d1714c3f8b87bcfe3a9a40cb9819b0cae4112c8e1364168076b5ecc707",
+          "signature": "Kccg4AiRuwNpCJ7rFKB/xDobPyJpveBKoIWKt92vtoZ88TpKALo2leE07HjwoV6jIB+i2U2/wGGAv+vOiiseMbBV6C5ww3s7nmPzjiZ/nwDWmGAL9+FbtfOaynNnTdT3s+CqPrCmRtRmItlpouhSE7zO5e9Wj4L+loJyznKz/KMKFtBJPZgxEpCXw24LTtirED6NDsWfejixLX8wIUx2xBLHHctKTrT2AfJHsCdtd55ILJn1OR8uljBoyvhEL+4c1I8Ba5UToVuTmjLIvN7xkNJXsCuynFvo5n1Iot1CGUK/p46dtUuO5DXBe4otQPqmXPiZ9n0ABUBlNFGkhWyQtg==",
+          "testFixture": true
+        }
+      ]
+    }
+  ]
+}
