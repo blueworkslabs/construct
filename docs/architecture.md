@@ -30,7 +30,7 @@ flowchart TB
         AndroidGate --> Camera[Native camera UI + private album]
         Grants --> HTTP[Bounded origin-scoped HTTP transport]
         AndroidGate --> Location[One foreground location result]
-        Grants --> Legacy[Legacy Sky Watch and Measure native workspaces]
+        Grants --> Legacy[Legacy Measure native workspace]
     end
 ```
 
