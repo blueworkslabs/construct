@@ -30,7 +30,8 @@ flowchart TB
         AndroidGate --> Camera[Native camera UI + private album]
         Grants --> HTTP[Bounded origin-scoped HTTP transport]
         AndroidGate --> Location[One foreground location result]
-        Grants --> Legacy[Legacy Measure native workspace]
+        Grants --> Image[System image picker + bounded run-private raster]
+        Image --> Markers[Generic local marker detections]
     end
 ```
 
@@ -66,7 +67,7 @@ module code; API 0.10 supplies image selection/decoding and generic marker corne
 `ModuleImageSession` owns only run-private image authority and bounded processing;
 no marker size, endpoint, measurement or unit policy reaches the native API.
 
-These are working prototypes but **not the desired module ownership boundary**.
+The remaining native Camera workflow is a working prototype but **not the desired module ownership boundary**.
 Preserve existing callers during migration; do not treat full native workspaces
 behind an `open` call as the pattern for new tools. Future reusable capabilities
 and their consent/data contracts must be implemented before moving dependent
