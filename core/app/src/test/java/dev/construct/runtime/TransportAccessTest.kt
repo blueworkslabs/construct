@@ -116,6 +116,56 @@ class TransportAccessTest {
         denied("CAPABILITY_DENIED") { allowed("net.http") }
         assertEquals(7,store.storage(id,JSONObject().put("op","get").put("key","counter")))
     }
+    private fun storedOrigins(): Set<String> {
+        val origins = JSONObject(File(app.filesDir, "module-state.json").readText()).getJSONObject(id).getJSONArray("httpOrigins")
+        return (0 until origins.length()).map { origins.getString(it) }.toSet()
+    }
+    private fun restoreStaleWideScope() {
+        // Older hosts retained both origins while the active manifest declared only A.
+        val file = File(app.filesDir, "module-state.json")
+        val state = JSONObject(file.readText())
+        state.getJSONObject(id).put("httpOrigins", org.json.JSONArray(listOf("https://example.org", "https://www.example.org")))
+        file.writeText(state.toString()); store = ModuleStore(app)
+    }
+    @Test fun unchangedEnabledSwitchStillNarrowsConsentBeforeRollback() {
+        store.install(fixture("0.2.0"), mapOf("net.http" to true, "location.read" to true)); store.confirm(id)
+        store.storage(id, JSONObject().put("op", "set").put("key", "counter").put("value", 7))
+        // The install dialog's switch stays on: no explicit consentChanges entry.
+        store.install(fixture("0.1.0")); store = ModuleStore(app)
+        assertTrue(allowed("net.http"))
+        assertEquals(setOf("https://example.org"), storedOrigins())
+        store.rollback(id); store = ModuleStore(app)
+        denied("CAPABILITY_DENIED") { allowed("net.http") }
+        assertFalse("net.http" in store.installed().single().granted)
+        assertTrue(allowed("location.read"))
+        assertEquals(7, store.storage(id, JSONObject().put("op", "get").put("key", "counter")))
+        store.setCapability(id, "net.http", true)
+        assertTrue(allowed("net.http"))
+    }
+    @Test fun rollbackToNarrowerVersionAlsoForgetsRemovedOrigins() {
+        store.install(fixture("0.1.0"), mapOf("net.http" to true)); store.confirm(id)
+        store.install(fixture("0.2.0"), mapOf("net.http" to true))
+        store.rollback(id); store = ModuleStore(app)
+        assertTrue(allowed("net.http"))
+        assertEquals(setOf("https://example.org"), storedOrigins())
+        store.install(fixture("0.2.0"))
+        denied("CAPABILITY_DENIED") { allowed("net.http") }
+    }
+    @Test fun staleWiderScopeCannotBeReusedWhenUpdating() {
+        store.install(fixture("0.1.0"), mapOf("net.http" to true)); store.confirm(id)
+        restoreStaleWideScope()
+        store.install(fixture("0.2.0"))
+        denied("CAPABILITY_DENIED") { allowed("net.http") }
+        assertEquals(setOf("https://example.org"), storedOrigins())
+    }
+    @Test fun staleWiderScopeCannotBeReusedWhenRollingBack() {
+        store.install(fixture("0.2.0"), mapOf("net.http" to true)); store.confirm(id)
+        store.install(fixture("0.1.0"))
+        restoreStaleWideScope()
+        store.rollback(id)
+        denied("CAPABILITY_DENIED") { allowed("net.http") }
+        assertEquals(setOf("https://example.org"), storedOrigins())
+    }
     @Test fun explicitDenialSurvivesRollbackAndLegacyLauncherCannotGrantNewApis() {
         store.install(fixture("0.1.0"),mapOf("net.http" to true));store.confirm(id)
         store.install(fixture("0.2.0"),mapOf("net.http" to false));store.rollback(id)

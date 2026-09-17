@@ -209,8 +209,11 @@ must remain on one of the declared origins; paths and queries are module-owned.
 Consent lists the actual signed origins. The capability starts off. A module
 update expanding its approved origin set disables the grant unless the human
 explicitly approves the new scope. Rollback cannot recover a wider scope after
-narrower consent. Installing or rolling back to a version without `net.http`
-clears its grant and approved origins; bringing HTTP back, including by rollback,
+narrowing: installing or rolling back to fewer origins forgets removed origins,
+even when the already-enabled consent switch is left unchanged. Without a fresh
+opt-in, retained consent is limited to origins shared by the old approval and both
+the current and destination manifests. Installing or rolling back to a version
+without `net.http` clears its grant and approved origins; bringing HTTP back, including by rollback,
 requires a new explicit opt-in. Unrelated grants and module data are retained.
 The installed package digest is rechecked on each operation.
 

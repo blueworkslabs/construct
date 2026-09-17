@@ -136,15 +136,19 @@ class ModuleStore(private val context: Context) {
         return m
     }
 
+    private fun retainedHttpOrigins(record: JSONObject?, manifest: ModuleManifest?): Set<String> {
+        val declared = manifest?.capabilities?.firstOrNull { it.id == "net.http" }?.origins.orEmpty().toSet()
+        val raw = record?.optJSONArray("httpOrigins") ?: return emptySet()
+        return (0 until raw.length()).mapNotNull { raw.opt(it) as? String }.filter { it in declared }.toSet()
+    }
+
     private fun grants(record: JSONObject, manifest: ModuleManifest): JSONObject {
         val result = if (record.has("grants")) record.getJSONObject("grants") else JSONObject().apply {
             manifest.capabilities.forEach { put(it.id, !it.explicitOptIn) }
         }
         for (key in result.keys()) checkRule(key in Packages.supported && result.get(key) is Boolean,
             "STATE_INVALID", "Invalid capability grants")
-        val rawOrigins = record.optJSONArray("httpOrigins")
-        val approvedOrigins = if (rawOrigins == null) emptySet() else (0 until rawOrigins.length()).mapNotNull { rawOrigins.opt(it) as? String }.toSet()
-        if (!HttpPolicy.approved(manifest, approvedOrigins)) result.put("net.http", false)
+        if (!HttpPolicy.approved(manifest, retainedHttpOrigins(record, manifest))) result.put("net.http", false)
         return result
     }
 
@@ -223,16 +227,15 @@ class ModuleStore(private val context: Context) {
         val oldManifest = old?.let { verifiedInstalled(id, it.getString("active")) }
         val approved = if (old == null) JSONObject() else grants(old, oldManifest!!)
         candidate.manifest.capabilities.forEach { if (!approved.has(it.id)) approved.put(it.id, !it.explicitOptIn) }
-        // Do not resurrect consent retained by older hosts while HTTP was absent.
-        val rawOrigins = old?.optJSONArray("httpOrigins")?.takeIf { oldManifest?.capabilities?.any { it.id == "net.http" } == true }
-        val previousOrigins = if (rawOrigins == null) emptySet() else (0 until rawOrigins.length()).mapNotNull { rawOrigins.opt(it) as? String }.toSet()
+        // Older hosts could retain origins absent from the active manifest.
+        val previousOrigins = retainedHttpOrigins(old, oldManifest)
         if (!HttpPolicy.approved(candidate.manifest, previousOrigins)) approved.put("net.http", false)
         consentChanges.forEach { (capability, allowed) -> approved.put(capability, allowed) }
         val http = candidate.manifest.capabilities.firstOrNull { it.id == "net.http" }
         val httpOrigins = when {
             http == null -> emptyList()
             consentChanges["net.http"] == true -> http.origins
-            else -> previousOrigins.toList()
+            else -> http.origins.filter { it in previousOrigins }
         }
         state.put(id, JSONObject().put("httpOrigins", org.json.JSONArray(httpOrigins)).put("grants", approved).put("active", candidate.digest)
             .put("previous", old?.getString("active") ?: JSONObject.NULL)
@@ -260,10 +263,11 @@ class ModuleStore(private val context: Context) {
         val previous = record.getString("previous")
         val m = verifiedInstalled(id, previous)
         val current = runCatching { verifiedInstalled(id, record.getString("active")) }.getOrNull()
-        // A missing/unverifiable active HTTP declaration cannot carry consent into
-        // restored code. Repair remains possible, but HTTP needs fresh approval.
-        if (current?.capabilities?.any { it.id == "net.http" } != true || m.capabilities.none { it.id == "net.http" })
-            record.put("httpOrigins", org.json.JSONArray())
+        // Rollback may retain or narrow consent, never resurrect removed origins.
+        // An unverifiable active declaration fails closed without blocking repair.
+        val previousOrigins = retainedHttpOrigins(record, current)
+        val restoredOrigins = m.capabilities.firstOrNull { it.id == "net.http" }?.origins.orEmpty()
+        record.put("httpOrigins", org.json.JSONArray(restoredOrigins.filter { it in previousOrigins }))
         record.put("grants", grants(record, m))
         record.put("active", previous).put("previous", JSONObject.NULL).put("confirmed", true).put("enabled", true)
         record.remove("failureCode")
