@@ -53,7 +53,13 @@ def reveal(text):
 def reveal_fragment(text):
     for direction in ('up','down'):
         for _ in range(12):
-            matches=[n for n in nodes() if text in (n.get('text','')+' '+n.get('content-desc','')) and visible(n)]
+            current=nodes()
+            close=next((n for n in current if 'Close aircraft info' in (n.get('text'),n.get('content-desc')) and visible(n)),None)
+            # WebView accessibility can report content hidden behind a sticky dialog
+            # footer. Require the field (and room for its value) above that footer.
+            bottom=bounds(close)[1]-90 if close is not None else None
+            matches=[n for n in current if text in (n.get('text','')+' '+n.get('content-desc','')) and visible(n)
+                     and (bottom is None or bounds(n)[3]<=bottom)]
             if matches:return matches[0]
             scroll(direction)
     raise RuntimeError('Module content is not reachable: '+text)
