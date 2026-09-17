@@ -1,0 +1,95 @@
+{
+  "date": "2026-09-17",
+  "appSourceRevision": "90fee23cf092eb6e749245da553c73f48c45ff39",
+  "module": {
+    "id": "dev.construct.sky-watch",
+    "version": "0.2.2",
+    "sha256": "9871b7e5116ce2271e71c40196581def781e446f4d08cdb0e52cb185aa886d39"
+  },
+  "apks": [
+    {
+      "abi": "arm64-v8a",
+      "name": "construct-0.1.0-alpha26-arm64-v8a-90fee23.apk",
+      "bytes": 24068522,
+      "sha256": "2aebacb75865bf57e49d9d4667c87f6505eb840e97e7efffb4ee968a5cf3b491"
+    },
+    {
+      "abi": "x86_64",
+      "name": "construct-0.1.0-alpha26-x86_64-90fee23.apk",
+      "bytes": 26952107,
+      "sha256": "b4318f5690e4e4d7707cd91c5054f7c75f6416d024512ae4656c239ab8a47625"
+    }
+  ],
+  "localChecks": {
+    "jvmTests": 191,
+    "lintErrors": 0,
+    "moduleDataTests": 24,
+    "moduleMapLifecycleTests": 3
+  },
+  "android": {
+    "apiLevel": 37,
+    "complete": true,
+    "checks": [
+      "Exact signed module; net.http denied by default and explicitly granted in native access",
+      "Module-owned parser/map loads live ADSB.lol after manual coordinate validation without location permission",
+      "Module-owned OpenSky adapter loads live data",
+      "Combined receives both live feeds; deterministic identity/merge rules tested separately",
+      "Selected-aircraft metadata requires explicit lookup and returns attributed results; layout screenshots retained",
+      "Map, radius and controls survive both orientations and Android 2x text",
+      "Native menu pauses privileged work and returns to module state",
+      "Location module grant and Android denial remain separate; module cannot launch OS prompt",
+      "Granted location.read returns synthetic foreground coordinates to module code",
+      "Real background exit discards module area and requires a new selection",
+      "Offline transport failure is visible without crashing module",
+      "Revoked internet grant remains denied after reopen",
+      "Two signed synthetic module versions change real glossary behavior and rollback on the same checksummed APK"
+    ],
+    "apkSha256": "b4318f5690e4e4d7707cd91c5054f7c75f6416d024512ae4656c239ab8a47625",
+    "moduleOnlyUpdate": {
+      "before": {
+        "id": "dev.construct.sky-fixture",
+        "version": "0.1.0",
+        "sha256": "da5378bbfa945411d52c3deaf583816a32b225bcac1deab5a0d97980234d0706"
+      },
+      "after": {
+        "id": "dev.construct.sky-fixture",
+        "version": "0.2.0",
+        "sha256": "bd3fcb37d75c0fcf1c7653f559583c696cc233f443f01e7b3518881ad4a61805"
+      },
+      "apkSha256Before": "b4318f5690e4e4d7707cd91c5054f7c75f6416d024512ae4656c239ab8a47625",
+      "apkSha256After": "b4318f5690e4e4d7707cd91c5054f7c75f6416d024512ae4656c239ab8a47625"
+    },
+    "screenshotsReviewed": [
+      "live map portrait and landscape",
+      "map and metadata at Android 2x text",
+      "scrolled registry fields clear of sticky actions",
+      "synthetic glossary before, after and rollback"
+    ],
+    "constructCrashOrAnrMarkers": false,
+    "emulatorStopped": true
+  },
+  "upgrade": {
+    "complete": true,
+    "stopped": true,
+    "oldSha256": "c3e50ab4d98a39a5757986ccf3475572ab1d9e7da9e6027470803c011dd1f678",
+    "newSha256": "b4318f5690e4e4d7707cd91c5054f7c75f6416d024512ae4656c239ab8a47625",
+    "checks": [
+      "In-place alpha25\u2192alpha26 upgrade preserves explicit demo catalog selection",
+      "In-place APK upgrade preserves installed module, storage grant and counter data",
+      "Configured shortcut selects public URL without typing; public module update retains prior data",
+      "Existing signed Sky0.1 launcher and sky.watch grant still open the native workspace after APK upgrade",
+      "Sky module upgrade requires new HTTP consent; rollback restores the working legacy launcher/grant"
+    ]
+  },
+  "failedDevelopmentRuns": [
+    "Earlier host candidate crashed during main-thread TLS socket cleanup; replacement moves cancellation and resource teardown off-thread with synchronous delivery revocation and regression tests. That failed APK was not released.",
+    "Test-driver iterations fixed window-transition timing, WebView accessibility selection, expired live selection and dialog scrolling. Incomplete runs remain separate from the completed exact-artifact result.",
+    "An upgrade preflight inspected consent before its window settled; the completed repeat waits for stable native controls. No APK or module changes were needed for this driver correction."
+  ],
+  "limits": [
+    "Android 17 x86_64 emulator, not physical ARM64 execution or real-phone GPS accuracy.",
+    "Synthetic update fixtures demonstrate module-owned glossary behavior; they are not live aircraft observations and are not in the product catalog.",
+    "This is scoped Sky migration plus upgrade acceptance, not a rerun of every camera/measurement/contacts workflow or a complete sandbox/egress proof.",
+    "Legacy Sky0.1 native workspace remains for compatibility; Measure and Camera migration is future work."
+  ]
+}

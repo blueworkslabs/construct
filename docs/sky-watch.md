@@ -1,7 +1,44 @@
-# Sky Watch — map-first pilot
+# Sky Watch — module-owned map
 
-Sky Watch is a signed launcher for a foreground native aircraft map, introduced
-with host API **0.8.0** / **alpha23**. Camera/AR is deliberately deferred.
+Sky Watch **0.2.2** runs its aircraft logic and UI in the signed HTML/CSS/JavaScript
+module, using host **API 0.9 / alpha26**. The new package does not call `sky.watch`.
+Camera/AR remains deferred.
+
+## Module 0.2.x: installation and ownership
+
+Install the compatible host first, then update Sky Watch through Browse. The old
+`sky.watch` grant does **not** grant the new APIs. Allow **approved internet sources**
+in native consent/Module access. For optional phone location, separately allow
+**reading phone location** and **Android location access** there, then reopen.
+Manual coordinates need no location permission. The approved sources are
+`api.adsb.lol`, `opensky-network.org`, `tile.openstreetmap.org` and `api.adsbdb.com`.
+They use HTTPS only. Source expansion requires fresh consent.
+
+The module owns provider URLs/parsing, freshness, deduplication, identity/glossary,
+ADSBdb interpretation, polling/backoff, Canvas map rendering and controls. The host
+owns only bounded `net.http`, `location.read`, storage and the trusted shell/grants.
+See [the generic API contract](module-api.md). A model name or provider parser
+change now ships by signing a new module version; no APK change is required.
+
+The map retains source/radius controls, aircraft selection/details, manual area or
+one GPS fix, pan/zoom/recenter/Search here, stale markers and optional metadata
+lookup. Auto refresh is opt-in, every 30 seconds. Module provider requests have a
+persisted 15-second floor and quota backoff; the host independently enforces its
+hard transport budget. Selected labels disappear off-screen; details remain until
+the aircraft expires or selection changes. Rotation retains state; real background
+exit discards coordinates, observations and the in-memory metadata cache.
+
+Unlike 0.1.0, approved data now reaches module code. This module sends only the
+chosen area to aircraft feeds, viewed tile coordinates to OpenStreetMap, and the
+selected aircraft/callsign identifiers to ADSBdb after the explicit lookup button.
+Only provider cooldowns are persisted in module storage. The host may cache raster
+responses; it does not cache JSON. Data composition is explained in trusted consent.
+
+Legacy 0.1.0 remains supported by the native workspace for existing installations
+and rollback. The following sections describe that baseline and shared aviation
+semantics; legacy native worker/request limits are **not** the new HTTP API limits.
+
+## Legacy 0.1.0 launcher baseline (API 0.8 / alpha23–25)
 
 ## Interaction
 

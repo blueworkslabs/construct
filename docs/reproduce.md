@@ -48,3 +48,18 @@ Install the candidate host on a test phone and download its modules. Reserve pho
 checks for physical input feel, actual sound/camera behavior and vendor differences.
 Do not treat a working emulator as evidence of all Android devices or all possible
 malicious modules. See [evidence](evidence.md) and [release provenance](public-release.md).
+
+## Module-owned Sky Watch
+
+Run `node scripts/test_sky_map.cjs` for tile cancellation/retry behavior and
+`node scripts/test_sky.cjs` for the actual shipped module's parsers, identity
+merge, glossary and metadata contracts. `python scripts/prepare_fixtures.py` creates
+a separate signed legacy launcher for native compatibility tests and signed
+transport-scope versions for new-grant/update/rollback checks. Do not replace or
+re-sign published module versions in a production catalog.
+
+API 0.9 host checks include `HttpPolicyTest`, `ModuleHttpTest`, `ModuleLocationTest`
+and `TransportAccessTest`; existing Sky tests still cover the legacy native path.
+The migration also requires live exact-artifact Android checks and a separate
+synthetic, signed module-only update demonstration on the same APK. JVM/Node tests
+alone are not a completed migration or physical-phone acceptance.

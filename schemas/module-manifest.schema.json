@@ -95,6 +95,17 @@
           "optional": {
             "type": "boolean",
             "default": false
+          },
+          "origins": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "maxLength": 260
+            },
+            "description": "Exact public HTTPS origins; required only for net.http in API0.9. Native and publisher validators enforce origin syntax and capability/version binding."
           }
         }
       }

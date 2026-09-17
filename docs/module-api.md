@@ -4,18 +4,19 @@ This reference describes implemented contracts, not the target architecture.
 Read the [modular design contract](modular-design.md) when proposing capabilities.
 The broad native-workspace launch operations below are compatibility exceptions;
 new modules should own their feature logic and UI through reusable capabilities.
-Proposed general transport, location-result or rendering contracts are not
-available merely because the design document discusses them.
+API 0.9 adds the bounded transport and one-shot location contracts below.
+Unrestricted WebView networking/geolocation and general native rendering remain unavailable.
 
 The current host accepts exact `constructApi.min == constructApi.target` versions
-0.1.0 through 0.8.0. Module versions are three numeric components. See the
+0.1.0 through 0.9.0. Module versions are three numeric components. See the
 [manifest schema](../schemas/module-manifest.schema.json) and runnable
 [examples](../examples); the native validator is authoritative.
 
 ## Manifest and transport
 
 A signed ZIP contains `manifest.json`, an HTML entry and local assets. Runtime is
-`webview-js`. Capabilities declare `id`, `reason` and `optional`; there are no
+`webview-js`. Capabilities declare `id`, `reason` and `optional`; `net.http` additionally requires
+a signed `origins` list. There are no
 implemented capability tiers or arbitrary native-code modules. Identity is bound
 to the installed package, never supplied by a bridge caller.
 
@@ -37,7 +38,13 @@ may be dropped. Check declaration, saved grant and relevant Android permission o
 every request. Sensitive asynchronous results are re-authorized at delivery.
 
 Legacy storage/log/toast access is approved at installation unless previously
-revoked. Tone, contacts, camera and photo measurement start off and require explicit native opt-in.
+revoked. Tone, contacts, camera, photo measurement, Sky Watch, HTTP and location start off and require explicit native opt-in.
+When installing a version that reintroduces a capability absent from the current
+manifest, opt-in access starts off again unless explicitly approved in that install.
+Historical grant entries cannot override the displayed off switch. Unchanged
+declarations retain their grants. Direct legacy code rollback preserves existing
+non-HTTP grants but never reverses an explicit revocation; HTTP additionally forgets
+removed origins as described below.
 Updates/rollback preserve revoked access. Required access has confirmation before
 revocation. Native consent explains contacts plus storage when both are declared:
 a granted module can retain data it has read; revocation is not retroactive erasure.
@@ -180,7 +187,7 @@ closes and clears the workspace. Process recreation does not restore it.
 No URI, pixels, marker size, endpoints or lengths are returned to JavaScript or
 written to diagnostics. User-selected originals are never modified.
 
-## Sky Watch (API 0.8.0)
+## Legacy Sky Watch launcher (API 0.8.0)
 
 `sky.watch` accepts only `{op:"open"}` and returns `{opened:true}`. The explicit
 native grant opens a foreground aircraft-map workspace. The human chooses an area,
@@ -190,3 +197,99 @@ module bridge. Closing/backgrounding discards the session and stops location and
 requests; rotation retains it. Selected areas leave the phone for aircraft data
 and map tiles; the consent text names those providers. See [Sky Watch](sky-watch.md)
 for data formats, merge policy, rate limits, caching, privacy and attribution.
+
+
+## Approved HTTP transport (`net.http`, API 0.9)
+
+This is a reusable GET transport, not a provider adapter. Declare **1–8 unique,
+exact HTTPS origins** in the signed capability, for example:
+
+```json
+{"id":"net.http","reason":"Read public map and aircraft data",
+ "origins":["https://api.adsb.lol","https://tile.openstreetmap.org"]}
+```
+
+Origins must be lowercase DNS names with no credentials, wildcard, explicit port,
+path, query or fragment. Local names and IP literals are rejected. Every request
+must remain on one of the declared origins; paths and queries are module-owned.
+Consent lists the actual signed origins. The capability starts off. A module
+update expanding its approved origin set disables the grant unless the human
+explicitly approves the new scope. Rollback cannot recover a wider scope after
+narrowing: installing or rolling back to fewer origins forgets removed origins,
+even when the already-enabled consent switch is left unchanged. Without a fresh
+opt-in, retained consent is limited to origins shared by the old approval and both
+the current and destination manifests. Installing or rolling back to a version
+without `net.http` clears its grant and approved origins; bringing HTTP back, including by rollback,
+requires a new explicit opt-in. Unrelated grants and module data are retained.
+The installed package digest is rechecked on each operation.
+
+Request: exactly `{op:'get', url, format:'json'}` or `format:'image'`.
+URL length is at most 2,048 characters. Result is `{status, headers, text}` for
+HTTP 200 JSON, or `{status, headers, dataUrl}` for an HTTP 200 raster image.
+Other statuses have no response-body data. Modules parse JSON and interpret
+statuses, retry policy and domain records. No route/provider logic lives here.
+
+- HTTPS only; normal certificate/hostname verification. The actual HTTP client's
+  DNS lookup rejects non-public addresses, including private/local and common
+  transition ranges. No redirects, proxy routing, cookies, auth, caller headers,
+  request bodies or arbitrary methods. Fixed application User-Agent and Accept.
+- At most four concurrent requests per session and 180 submissions/minute per
+  module, with the latter persisted across reopen. Eight-second connect/read and
+  15-second total timeouts. Cancellation occurs on menu pause or close.
+- At most 2 MiB JSON or 256 KiB raster bytes after decompression. JSON MIME must be
+  `application/json`. Images must be PNG/JPEG/WebP with matching signature,
+  dimensions 1–4,096 each and at most 4,194,304 pixels. SVG/HTML are not image results.
+- Only cache-control, expires, age, retry-after and the two documented rate-limit
+  headers are returned, each capped at 512 characters. Cookies/redirect locations
+  and arbitrary response headers are not exposed.
+- JSON is requested with `Cache-Control: no-store`. Raster HTTP cache respects
+  response freshness/revalidation, at most 12 MiB per module; older other-module
+  caches are evicted to at most 50 MiB when opening a session. Caches are disposable.
+  No tile prefetch is performed by the host. The module decides what to request.
+- Authorization is checked again after reading and on main-thread delivery;
+  menu-generation changes invalidate replies. Revocation cannot retract data
+  already delivered to module code or an external service.
+
+Errors include `HTTP_PARAMS`, `HTTP_URL`, `HTTP_SOURCE`, `HTTP_BUSY`, `HTTP_RATE`,
+`HTTP_DATA`, `HTTP_SIZE`/`SIZE_LIMIT` and `HTTP_UNAVAILABLE`, plus common grant/session
+errors. Allow a bridge timeout longer than 15 seconds. Direct `fetch`, XHR,
+WebSocket, remote scripts/navigation and WebView geolocation remain blocked.
+
+## Foreground location (`location.read`, API 0.9)
+
+Request exactly `{op:'get'}`. Result:
+`{latitude, longitude, accuracyM, timestamp, approximate}`. Coordinates are degrees;
+accuracy is metres; timestamp is Unix milliseconds. `approximate` reflects Android
+coarse-only permission, not a claim about measured positional quality.
+
+Both explicit module consent and Android foreground coarse or fine permission are
+required. Android permission is requested only by the human-operated **Module
+access** control, never by JavaScript. Manual-area modules can work without it.
+Coarse-only access uses the enabled network provider; GPS is considered only with
+fine permission. With no enabled provider permitted by the granted accuracy,
+the request returns `LOCATION_UNAVAILABLE` rather than requesting more access.
+
+A result is either a valid cached fix at most 120 seconds old (monotonic age) or
+one foreground provider update, with a 12-second timeout. One pending request and
+15-second request spacing per session; no continuous subscription, background
+tracking or background permission. Native listeners and timeout are removed on
+completion, cancellation or close. Data is re-authorized before delivery.
+Errors include `LOCATION_PERMISSION`, `LOCATION_PARAMS`, `LOCATION_BUSY`,
+`LOCATION_RATE`, `LOCATION_TIMEOUT`, `LOCATION_DATA`, `LOCATION_UNAVAILABLE` and
+`LOCATION_CANCELLED`, plus common grant/session errors.
+
+**Composition matters:** unlike the legacy Sky launcher, these capabilities return
+data to module JavaScript. If internet access is also granted, the module may send
+location or other granted data to its approved origins. If storage is granted, it
+may retain copies. Native consent states this; revocation is not retroactive erasure.
+
+API 0.9 module text follows Android font scale through WebView text zoom (50–300%).
+Font-scale configuration changes retain the live module session, like rotation.
+Module layouts must allow wrapping/scrolling; a module-owned Canvas supplies its
+own accessible text/list alternative. Older API modules retain legacy text sizing.
+
+API 0.9 also serves bounded base64 PNG/JPEG/WebP `data:` subresources through the
+local resource filter. These are local bytes, not a network permission; the same
+256 KiB and pixel bounds apply. Main-frame data navigation, SVG/HTML data URLs and
+other external resource schemes remain blocked. A module may render its own local
+raster data without an HTTP grant; previously delivered data is not revocable.

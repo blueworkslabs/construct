@@ -86,18 +86,19 @@ For a new or extended capability, describe:
 6. **Compatibility:** API negotiation, unavailable-capability behavior, module
    data migration and treatment of existing installed versions.
 
-These are design requirements, **not newly implemented APIs**. In particular,
-the current WebView has no general network or geolocation API. A future bounded
-transport or location-result capability must be designed, implemented and verified
-before a module can depend on it. Do not bypass the current restrictions simply
-to move code out of the APK.
+These requirements now have an initial consumer: Sky Watch 0.2.x uses the bounded
+API 0.9 `net.http` and `location.read` contracts. The WebView still has no direct
+network or geolocation access. Future capabilities must likewise be designed,
+implemented and verified before a module depends on them.
 
 ## Current implementation debt
 
-- **Sky Watch:** `sky.watch` accepts `{op:"open"}`. Its module is a launcher;
+- **Legacy Sky Watch 0.1.0:** `sky.watch` accepts `{op:"open"}`. Its module is a launcher;
   `SkyActivity`, `SkyNetwork`, `SkyData`, `SkyIdentity`, `SkyMetadata` and `SkyMap`
   put aviation logic and presentation in the host. Even a glossary fix currently
-  needs a host build to reach the phone. This is not the target architecture.
+  needs a host build to reach that legacy workspace. Sky Watch 0.2.x instead owns
+  its aviation logic and Canvas/UI in its module package, using API 0.9 transport
+  and location. The old host implementation remains only for published callers.
 - **Pocket Measure:** `photo.measure` opens the native measurement workspace;
   no pixels, endpoints or measurement results return to the module. Separate
   reusable image access/compute from the feature workflow in a future migration.

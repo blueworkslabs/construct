@@ -1,5 +1,167 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/construct-host.css"><link rel="stylesheet" href="construct-ui.css"><link rel="stylesheet" href="style.css"><title>Sky Watch</title></head>
-<body><main><header class="construct-head"><h1>Sky Watch</h1><p class="purpose">What’s flying nearby?</p></header>
-<button id="open" class="primary">Open aircraft map</button><p id="status" role="status">Ready. Choose your location or an area on the map.</p>
-<details class="help"><summary>Help and data sources</summary><p>Choose a 10, 25, 50 or 100 km radius. Switch between ADSB.lol, OpenSky and Combined. Combined merges matching aircraft using the freshest reported position.</p><p>Your chosen area goes to the selected aircraft providers; visible map areas go to OpenStreetMap. Phone location is optional and requested only when you tap Use my location. Map tiles are cached privately on this phone.</p><p>Public feeds have gaps, delays and quotas. No ordinary drone detection, route guarantee or navigation use. Camera/AR is not included.</p><p class="hint">Enable Allow Sky Watch map and data in Module access. Requires Construct alpha23 or later. Rotation keeps the map; leaving closes the workspace. Module code receives no location or aircraft data.</p><p>Map: © OpenStreetMap contributors (openstreetmap.org/copyright). ADSB.lol data: ODbL 1.0. OpenSky: The OpenSky Network, opensky-network.org; Schäfer et al., “Bringing Up OpenSky”, IPSN 2014.</p></details><footer>On this phone · __VERSION__</footer></main><script src="bridge.js"></script><script src="app.js"></script></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="/construct-host.css" />
+    <link rel="stylesheet" href="style.css" />
+    <title>Sky Watch</title>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Sky Watch</h1>
+        <p id="area-label">What’s flying nearby?</p>
+      </div>
+      <button id="area">Area</button>
+    </header>
+    <main>
+      <section id="welcome">
+        <h2>Choose your viewing area</h2>
+        <p>
+          Use a phone location fix or enter coordinates. Your chosen area goes
+          to the selected aircraft providers; map tiles come from OpenStreetMap.
+        </p>
+        <p>
+          Enable <strong>Allow approved internet sources</strong> in Construct’s
+          Module access. Phone location is optional and needs both the module
+          grant and Android location access there.
+        </p>
+        <button id="start" class="primary">Choose area</button>
+      </section>
+      <section id="workspace" hidden>
+        <div class="toolbar">
+          <label
+            >Source<select id="source">
+              <option value="adsb">ADSB.lol</option>
+              <option value="opensky">OpenSky</option>
+              <option value="combined">Combined</option>
+            </select></label
+          ><label
+            >Radius<select id="radius">
+              <option value="10">10 km</option>
+              <option value="25">25 km</option>
+              <option value="50" selected>50 km</option>
+              <option value="100">100 km</option>
+            </select></label
+          ><button id="refresh" aria-label="Refresh aircraft">↻</button>
+        </div>
+        <progress
+          id="progress"
+          aria-label="Refreshing aircraft"
+          hidden
+        ></progress>
+        <div class="work-grid">
+          <div id="map-wrap">
+            <canvas
+              id="map"
+              aria-label="Aircraft map. Select aircraft in the nearby list for accessible details."
+              role="img"
+            ></canvas
+            ><span class="north">N ↑</span>
+            <div class="map-controls">
+              <button id="zoom-in" aria-label="Zoom in">+</button
+              ><button id="zoom-out" aria-label="Zoom out">−</button
+              ><button id="center" aria-label="Center map">⌖</button>
+            </div>
+            <button id="search-here" hidden>Search here</button
+            ><span class="attribution"
+              >© OpenStreetMap contributors · openstreetmap.org/copyright</span
+            >
+          </div>
+          <aside>
+            <div class="list-head">
+              <h2 id="count">Nearby aircraft</h2>
+              <label class="auto"
+                >Auto <input id="auto" type="checkbox" role="switch"
+              /></label>
+            </div>
+            <p id="updated">Not refreshed yet</p>
+            <div id="source-status"></div>
+            <p id="status" role="status"></p>
+            <p id="map-status" role="status"></p>
+            <section id="selected" hidden></section>
+            <div id="aircraft-list"></div>
+          </aside>
+        </div>
+      </section>
+      <details class="help">
+        <summary>Help and data sources</summary>
+        <p>
+          Radius: 10–100 km. Combined merges matching aircraft using the newest
+          complete position report and retains known identity from active feeds.
+          Amber means stale data. The map is north-up; symbols follow ground
+          track, not necessarily the aircraft’s nose direction.
+        </p>
+        <p>
+          Altitude is barometric, not height above you or terrain. Public feeds
+          have gaps, delays and quotas. No ordinary drone detection, route
+          guarantee or navigation use. Camera/AR is not included.
+        </p>
+        <p>
+          This module receives permitted aircraft data and optional phone
+          coordinates. It sends only the chosen area to aircraft providers and
+          viewed tile coordinates to OpenStreetMap. Extra aircraft lookups
+          happen only when requested. JSON and position history stay in the
+          current session; raster tiles may be cached by Construct. Leaving
+          closes the session.
+        </p>
+        <p>
+          Map: © OpenStreetMap contributors. ADSB.lol data: ODbL 1.0. OpenSky:
+          The OpenSky Network; Schäfer et al., “Bringing Up OpenSky”, IPSN 2014.
+          Optional aircraft/airline records: ADSBdb / PlaneBase. No photos or
+          route data.
+        </p>
+      </details>
+      <footer>Sky Watch · __VERSION__</footer>
+    </main>
+    <dialog id="area-dialog">
+      <form id="area-form">
+        <h2>Choose area</h2>
+        <p>
+          Coordinates stay in this session. To use phone location, enable both
+          location permissions in Construct’s Module access, then reopen this
+          module.
+        </p>
+        <button type="button" id="use-location">Use my location</button
+        ><label
+          >Latitude<input
+            id="latitude"
+            type="text"
+            inputmode="decimal"
+            enterkeyhint="next"
+            autocomplete="off"
+            placeholder="−85 to 85" /></label
+        ><label
+          >Longitude<input
+            id="longitude"
+            type="text"
+            inputmode="decimal"
+            enterkeyhint="done"
+            autocomplete="off"
+            placeholder="−180 to 180"
+        /></label>
+        <p id="area-status" role="status"></p>
+        <div class="actions">
+          <button type="button" id="cancel-area">Cancel</button
+          ><button type="submit" class="primary" id="show-aircraft">
+            Show aircraft
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="info-dialog">
+      <h2 id="info-title">Aircraft info</h2>
+      <div id="info-body" class="dialog-body"></div>
+      <div class="actions">
+        <button id="close-info" aria-label="Close aircraft info">Close</button
+        ><button id="lookup" class="primary">Look up with ADSBdb</button>
+      </div>
+    </dialog>
+    <script src="bridge.js"></script>
+    <script src="models.js"></script>
+    <script src="sky-data.js"></script>
+    <script src="sky-map.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

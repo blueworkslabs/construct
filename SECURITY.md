@@ -32,7 +32,7 @@ keys, real contact records, personal photos or unredacted diagnostics.
 Known camera direct-Reopen accessibility and the limits of bounded isolation probes
 are documented openly; neither is represented as a completed security guarantee.
 
-### Sky Watch native workspace
+### Legacy Sky Watch native workspace
 
 API 0.8.0 adds an explicit `sky.watch` open-only grant. Its native foreground map
 may query fixed aircraft/map services after a human chooses an area. Optional
@@ -40,3 +40,20 @@ coarse/fine phone location is requested only from a native human control. Module
 JavaScript receives no location, aircraft data or map pixels and retains its
 existing network/geolocation denial. There is no background location permission.
 See [the scoped privacy and network contract](docs/sky-watch.md).
+
+
+### Module HTTP and location (API 0.9)
+
+`net.http` is a separately granted, signed-origin-scoped HTTPS GET capability;
+`location.read` returns one foreground fix after independent module and Android
+permission checks. The host checks actual DNS connection addresses, TLS, formats,
+byte/pixel bounds, quotas and asynchronous authority. Redirects, cookies and caller
+headers are unavailable. Direct WebView network/geolocation remains disabled.
+See [the precise contract and limits](docs/module-api.md).
+
+Module code can combine legitimately granted data: network plus location/contacts
+can send that data to approved origins; storage can retain it. Source expansion
+requires fresh consent. Host enforcement limits authority, not application intent;
+signed modules still require review. Revocation blocks future authorized access,
+not copies already delivered. The new Sky module documents its narrower intended
+usage; those product promises must not be mistaken for universal host guarantees.

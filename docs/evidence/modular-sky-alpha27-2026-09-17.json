@@ -1,0 +1,195 @@
+{
+  "date": "2026-09-17",
+  "appSourceRevision": "b2b249b629eae93afd1c1b1ce786853b33187887",
+  "release": "0.1.0-alpha27",
+  "module": {
+    "id": "dev.construct.sky-watch",
+    "version": "0.2.2",
+    "sha256": "9871b7e5116ce2271e71c40196581def781e446f4d08cdb0e52cb185aa886d39"
+  },
+  "reviewFixes": [
+    "HTTP capability removal discards consent, including stale-state upgrades and rollback.",
+    "Narrowing HTTP origins intersects retained consent with both current and target declarations; untouched switches cannot preserve removed destinations.",
+    "Reintroduced opt-in capabilities default off unless explicitly approved; unchanged grants, explicit revocations and saved data are preserved.",
+    "Coarse-only location excludes fine-only GPS registration and can receive an approximate network fix."
+  ],
+  "limits": [
+    "Exact-APK device scopes use Android 17 x86_64, not physical ARM64 or Android 9 execution. API-28 provider selection has focused Robolectric coverage.",
+    "Human Pixel acceptance applies to earlier alpha26/Sky0.2.2; alpha27 physical-phone acceptance is not claimed.",
+    "Consent fixtures and network-location fix are synthetic, not live provider or physical GPS accuracy evidence.",
+    "Scoped migration, consent and upgrade acceptance; unrelated camera/measurement/contact workflows and full sandbox/egress behavior are not rerun.",
+    "Direct legacy code rollback preserves non-HTTP grants unless explicitly revoked; reinstallation of reintroduced sensitive capabilities requires fresh opt-in. HTTP additionally discards removed origins.",
+    "Published Sky0.2.2 package and alpha26 artifacts are unchanged; legacy native launcher compatibility remains."
+  ],
+  "apks": [
+    {
+      "abi": "arm64-v8a",
+      "name": "construct-0.1.0-alpha27-arm64-v8a-b2b249b.apk",
+      "bytes": 24068522,
+      "sha256": "dd86191e1f75ae0e8a352791547e437fccaf02e2b59665f9c6fb572de9257a10"
+    },
+    {
+      "abi": "x86_64",
+      "name": "construct-0.1.0-alpha27-x86_64-b2b249b.apk",
+      "bytes": 26952107,
+      "sha256": "c82f49941650416afb632ec0c93ebc430ddda5331ac912c89bd8e62746816c7e"
+    }
+  ],
+  "localChecks": {
+    "jvmTests": 208,
+    "lintErrors": 0,
+    "runnerTests": 67,
+    "publisherScriptTests": 26
+  },
+  "android": {
+    "apiLevel": 37,
+    "complete": true,
+    "checks": [
+      "Exact signed module; net.http denied by default and explicitly granted in native access",
+      "Module-owned parser/map loads live ADSB.lol after manual coordinate validation without location permission",
+      "Module-owned OpenSky adapter loads live data",
+      "Combined receives both live feeds; deterministic identity/merge rules tested separately",
+      "Selected-aircraft metadata requires explicit lookup and returns attributed results; layout screenshots retained",
+      "Map, radius and controls survive both orientations and Android 2x text",
+      "Native menu pauses privileged work and returns to module state",
+      "Location module grant and Android denial remain separate; module cannot launch OS prompt",
+      "Granted location.read returns synthetic foreground coordinates to module code",
+      "Real background exit discards module area and requires a new selection",
+      "Offline transport failure is visible without crashing module",
+      "Revoked internet grant remains denied after reopen",
+      "Two signed synthetic module versions change real glossary behavior and rollback on the same checksummed APK"
+    ],
+    "apkSha256": "c82f49941650416afb632ec0c93ebc430ddda5331ac912c89bd8e62746816c7e",
+    "moduleOnlyUpdate": {
+      "before": {
+        "id": "dev.construct.sky-fixture",
+        "version": "0.1.0",
+        "sha256": "da5378bbfa945411d52c3deaf583816a32b225bcac1deab5a0d97980234d0706"
+      },
+      "after": {
+        "id": "dev.construct.sky-fixture",
+        "version": "0.2.0",
+        "sha256": "bd3fcb37d75c0fcf1c7653f559583c696cc233f443f01e7b3518881ad4a61805"
+      },
+      "apkSha256Before": "c82f49941650416afb632ec0c93ebc430ddda5331ac912c89bd8e62746816c7e",
+      "apkSha256After": "c82f49941650416afb632ec0c93ebc430ddda5331ac912c89bd8e62746816c7e"
+    },
+    "screenshotsReviewed": [
+      "map portrait/landscape and Android 2x text",
+      "metadata registry fields portrait/landscape and Android 2x text",
+      "synthetic glossary before and rollback"
+    ],
+    "constructCrashOrAnrMarkers": false,
+    "emulatorStopped": true
+  },
+  "failedDevelopmentRuns": [
+    "First alpha27 Android run stopped when the driver queried area fields before the dialog settled. Saved screenshot/node evidence showed the expected controls and no Construct crash. A bounded stable-field wait fixed the driver; APK and module bytes were unchanged for the completed rerun.",
+    "The initial synthetic consent fixture used inline CSS rejected by the existing module CSP. It failed before any consent assertion. New immutable 1.x fixture versions move styling into a packaged stylesheet; no host or production module change was made.",
+    "The first corrected-fixture consent run completed four old/new HTTP assertions, then hit the inherited 900-second child limit. It remained incomplete and was archived. The standalone consent matrix now has a bounded 3600-second budget; unrelated scopes retain their existing limits.",
+    "The longer combined consent run completed eight assertions before the emulator service was OOM-killed at its 4.5 GiB limit. That parent remains incomplete. HTTP and location were split into independently completed clean-snapshot scopes with a 1800-second cap each, without raising emulator memory limits.",
+    "The first isolated location scope completed the three consent assertions, then attempted a new sample installation while the previous version was still a trial. Native trial protection blocked the runner. The coarse sample now runs first on the clean candidate, before the old-state transitions."
+  ],
+  "upgrade": {
+    "complete": true,
+    "stopped": true,
+    "oldSha256": "c3e50ab4d98a39a5757986ccf3475572ab1d9e7da9e6027470803c011dd1f678",
+    "newSha256": "c82f49941650416afb632ec0c93ebc430ddda5331ac912c89bd8e62746816c7e",
+    "checks": [
+      "In-place alpha25\u2192alpha27 upgrade preserves explicit demo catalog selection",
+      "In-place APK upgrade preserves installed module, storage grant and counter data",
+      "Configured shortcut selects public URL without typing; public module update retains prior data",
+      "Existing signed Sky0.1 launcher and sky.watch grant still open the native workspace after APK upgrade",
+      "Sky module upgrade requires new HTTP consent; rollback restores the working legacy launcher/grant"
+    ]
+  },
+  "locationConsent": {
+    "complete": true,
+    "stopped": true,
+    "oldSha256": "b4318f5690e4e4d7707cd91c5054f7c75f6416d024512ae4656c239ab8a47625",
+    "apkSha256": "c82f49941650416afb632ec0c93ebc430ddda5331ac912c89bd8e62746816c7e",
+    "checks": [
+      "Coarse-only Android permission delivers an approximate synthetic network fix without requiring fine/GPS access",
+      "Old APK reproduces hidden location module grant after removal and reintroduction; Android permission stays off",
+      "In-place host upgrade blocks stale location consent on reintroduction and preserves counter data",
+      "Corrected host permits explicit location grant but defaults reintroduced location off; no OS permission or position requested"
+    ],
+    "screenshotsReviewed": [
+      "reintroduced location switch off",
+      "runtime CAPABILITY_DENIED with preserved counter"
+    ],
+    "constructCrashOrAnrMarkers": false
+  },
+  "httpConsent": {
+    "complete": true,
+    "stopped": true,
+    "oldSha256": "b4318f5690e4e4d7707cd91c5054f7c75f6416d024512ae4656c239ab8a47625",
+    "apkSha256": "c82f49941650416afb632ec0c93ebc430ddda5331ac912c89bd8e62746816c7e",
+    "checks": [
+      "Old APK reproduces wider HTTP consent resurrection after untouched-switch narrowing and rollback",
+      "In-place host upgrade preserves counter and allowed narrow scope; rollback cannot revive removed origin",
+      "Old APK reproduces hidden HTTP grant after capability removal and reintroduction despite off install switch",
+      "In-place host upgrade blocks stale removed-capability consent on reintroduction; counter remains intact",
+      "Corrected host allows explicit HTTP approval but untouched-switch narrowing revokes removed origins on rollback",
+      "Corrected host clears HTTP consent on capability removal, including rollback, without losing counter data"
+    ],
+    "screenshotsReviewed": [
+      "HTTP reintroduction switch off",
+      "runtime CAPABILITY_DENIED with preserved counter"
+    ],
+    "constructCrashOrAnrMarkers": false
+  },
+  "acceptanceComposition": "Four independently completed and stopped exact-APK scopes (Sky, legacy/data upgrade, HTTP consent, location consent), not one uninterrupted parent run. Incomplete development runs are excluded.",
+  "runnerSourceRevision": "e2c435697e601010dc7ae5010d0d5a87ca9a0d65",
+  "captureLimits": [
+    "Some immediate result screenshots captured a prior or incomplete frame (including updated glossary and coarse fix). Those images are excluded from visual evidence; live accessibility assertions and saved result text establish the expected values. Published screenshots were individually reviewed."
+  ],
+  "syntheticConsentFixtures": {
+    "http": [
+      {
+        "version": "1.1.0",
+        "sha256": "e857258b198c611ca8a72bebb635786b3c3f0006a6aa8c9e34b44062de9c4f08"
+      },
+      {
+        "version": "1.2.0",
+        "sha256": "99e05a9bb298288b284f656e76d8c73d8959b04f3c604bb3fcb27f8ccc813bdb"
+      },
+      {
+        "version": "1.3.0",
+        "sha256": "8faf4a02c2c59211914d5adf720b18acef1414b4d2c6d41711434cf6b00314a7"
+      },
+      {
+        "version": "1.4.0",
+        "sha256": "2cbce93caf51740b276ad71d8f7adae37bdadd99c4d40867efc7161a33cdfe22"
+      }
+    ],
+    "location": [
+      {
+        "version": "1.1.0",
+        "sha256": "c3772675313ea5e62a84e488ca664afe641a6b93477d4d64870ebcc8987f372d"
+      },
+      {
+        "version": "1.2.0",
+        "sha256": "d13136fb6cdced6e03aabfc4a07954196fa077417f2c01cfd558b1f65b3bab2a"
+      },
+      {
+        "version": "1.3.0",
+        "sha256": "c55c4c6f7dc4ab859c10cbb472149d85c89acb3699d7395b28593b1ef8569fec"
+      },
+      {
+        "version": "1.4.0",
+        "sha256": "29fd9c3049898ba225b7f73d35f1fe85732f1760d69e46207365574c2f20adc9"
+      },
+      {
+        "version": "1.5.0",
+        "sha256": "3718edcc8412188140a8d3770bfd19f2beb66459843b5e723cbfb4ff01bc06c4"
+      }
+    ]
+  },
+  "artifactChecks": {
+    "signerContinuity": true,
+    "androidPermissionsUnchangedFromAlpha25": true,
+    "protectedAssetsUnchanged": 17,
+    "nativeLibrariesByteIdenticalToAlpha25": true,
+    "bothAbiSizeAnd16KiBAlignmentChecks": true
+  }
+}

@@ -69,6 +69,11 @@ class MainActivity : ComponentActivity() {
             androidCamera = allowed
             status = if (allowed) "Android camera access allowed. Module grants are separate." else "Android camera access denied. Retry or use Android app settings."
         }
+        var androidLocation by remember { mutableStateOf(ModuleLocation.hasPermission(this)) }
+        val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            androidLocation = ModuleLocation.hasPermission(this)
+            status = if (androidLocation) "Android location access allowed. Module grants are separate." else "Android location access denied. Manual areas remain available."
+        }
         var androidContacts by remember { mutableStateOf(ContactsReader.hasPermission(this)) }
         val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
             androidContacts = allowed
@@ -130,6 +135,7 @@ class MainActivity : ComponentActivity() {
                 if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                     androidContacts = ContactsReader.hasPermission(this@MainActivity)
                     androidCamera = CameraActivity.hasPermission(this@MainActivity)
+                    androidLocation = ModuleLocation.hasPermission(this@MainActivity)
                 }
             }
             lifecycle.addObserver(observer)
@@ -224,7 +230,15 @@ class MainActivity : ComponentActivity() {
                                 Text(if (cap.optional) "Optional" else "Required for this module", style = MaterialTheme.typography.labelMedium)
                                 Text(cap.id, style = MaterialTheme.typography.bodySmall)
                                 Text(cap.reason, style = MaterialTheme.typography.bodySmall)
+                                cap.origins.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
                             }
+                            if (module.manifest.capabilities.any { it.id == "location.read" }) {
+                                Text("Android location access: " + if (androidLocation) "allowed" else "not allowed")
+                                Text("This permits an allowed module to receive foreground coordinates and accuracy. Approximate location works. With internet access the module can send that data to its approved sources; stored copies are not erased by revocation.")
+                                Button(enabled = !busy && !androidLocation, onClick = { locationPermission.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION)) }) { Text("Allow Android location access") }
+                                TextButton(onClick = { startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName"))) }) { Text("Android app settings") }
+                            }
+                            if (module.manifest.capabilities.any { it.id == "net.http" }) Text("Internet requests go only to the signed sources listed above. Those services receive requested data and your IP address. Raster responses may be cached on this phone; JSON responses are not cached by the host. Revocation blocks new requests, not copies already received by a module or service.")
                             if (module.manifest.capabilities.any { it.id == "contacts.read" }) {
                                 Text("Android contacts access: " + if (androidContacts) "allowed" else "not allowed")
                                 Text("Android permission is app-wide. Only modules you separately allow can use the host contacts API. Reading exposes names, phone numbers and email addresses; no editing.")
@@ -243,7 +257,7 @@ class MainActivity : ComponentActivity() {
                                 store.beginRun(module);
                                 { accessModuleId = null; moduleLauncher.launch(ModuleActivity.intent(this@MainActivity, module)); status = "Testing ${module.manifest.name} ${module.manifest.version}." }
                             } }) { Text("Reopen module") }
-                            if (module.manifest.capabilities.any { it.id == "device.tone" }) Text("Tones are short, use media volume and stop when you leave the module. No microphone or network access.")
+                            if (module.manifest.capabilities.any { it.id == "device.tone" }) Text("Tones are short, use media volume and stop when you leave the module. The tone capability does not access the microphone or internet.")
                         }
                     }
                 } else if (showLogs) {
@@ -396,7 +410,9 @@ class MainActivity : ComponentActivity() {
                     Text("Publisher signature verified. Review module access:")
                     for (cap in verified.manifest.capabilities) {
                         if (cap.explicitOptIn) {
-                            val prior = modules.firstOrNull { it.manifest.id == verified.manifest.id }?.granted?.contains(cap.id) == true
+                            val existing = modules.firstOrNull { it.manifest.id == verified.manifest.id }
+                            val oldOrigins = existing?.manifest?.capabilities?.firstOrNull { it.id == "net.http" }?.origins.orEmpty()
+                            val prior = existing?.granted?.contains(cap.id) == true && (cap.id != "net.http" || oldOrigins.containsAll(cap.origins))
                             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                 Text(cap.label, Modifier.weight(1f))
                                 Switch(checked = consentChanges[cap.id] ?: prior,
@@ -407,6 +423,7 @@ class MainActivity : ComponentActivity() {
                         Text(if (cap.optional) "Optional" else "Required for this module", style = MaterialTheme.typography.labelMedium)
                         Text(cap.id, style = MaterialTheme.typography.bodySmall)
                         Text(cap.reason)
+                        cap.origins.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
                     }
                     Text("Existing access choices are kept unless you change them. New sensitive capabilities start off. You can change access later in Module access.")
                     if (verified.manifest.capabilities.any { it.id == "sky.watch" }) Text("Sky Watch shares your chosen area with the selected aircraft providers and OpenStreetMap. Phone location is optional and requested only when you tap Use my location. No location or aircraft data is shared with module code. Foreground only.")
@@ -414,7 +431,10 @@ class MainActivity : ComponentActivity() {
                     if (verified.manifest.capabilities.any { it.id == "camera.capture" }) Text("Camera also needs Android permission through Module access. Photos are saved privately by the native workspace, not shared with JavaScript. No microphone or general file access.")
                     if (verified.manifest.capabilities.any { it.id == "contacts.read" }) Text("Contacts also need Android permission. After installing, open Module access to allow Android contacts access. This does not grant any module automatically.")
                     if (verified.manifest.capabilities.any { it.id == "contacts.read" } && verified.manifest.capabilities.any { it.id == "storage.kv" }) Text("This module can save contact data on this phone when both contacts and saved-data access are allowed. Revoking contacts access does not erase data it already saved.")
-                    Text("No module network access. Installed code starts as a trial; your previous working version is kept.")
+                    if (verified.manifest.capabilities.any { it.id == "net.http" }) Text("Approved internet access lets this module send data to the exact sources above, which see your IP address. New sources need new consent. Other granted data, including location or contacts, can be sent to those sources. Raster responses may be cached; revocation does not erase previously received data.")
+                    else Text("No module network access.")
+                    if (verified.manifest.capabilities.any { it.id == "location.read" }) Text("The module can receive a foreground location fix only after both its location grant and Android permission are enabled. Allow Android location in Module access after installation. Approximate location works; no background tracking.")
+                    Text("Installed code starts as a trial; your previous working version is kept.")
                 } },
                 confirmButton = { TextButton(onClick = { val choices = consentChanges; candidate = null; work { store.install(verified, choices); { status = "Installed. Open and test it, then mark it working." } } }) { Text("Allow & install") } },
                 dismissButton = { TextButton(onClick = { candidate = null }) { Text("Cancel") } })

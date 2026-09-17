@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "dev.construct.sky-watch",
+  "name": "Sky Watch",
+  "version": "0.1.0",
+  "description": "Aircraft around your chosen area, with ADSB.lol, OpenSky or both on a live map. Requires Construct alpha23 or later.",
+  "constructApi": {
+    "min": "0.8.0",
+    "target": "0.8.0"
+  },
+  "runtime": {
+    "kind": "webview-js"
+  },
+  "entry": "ui/index.html",
+  "capabilities": [
+    {
+      "id": "sky.watch",
+      "reason": "Open a native aircraft map. Your chosen area goes to ADSB.lol/OpenSky and map views to OpenStreetMap. Phone location is optional. No location or aircraft data reaches module code."
+    }
+  ],
+  "themeColor": "#0B1410"
+}

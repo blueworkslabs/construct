@@ -91,6 +91,12 @@ class ModuleActivity : ComponentActivity() {
         finish()
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (selected?.manifest?.api == "0.9.0")
+            webView?.settings?.textZoom = (newConfig.fontScale * 100).toInt().coerceIn(50, 300)
+    }
+
     override fun onStop() { finishSession(); super.onStop() }
     override fun onDestroy() {
         webView?.destroy(); webView = null

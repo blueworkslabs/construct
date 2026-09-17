@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Bootstrap signed local fixtures and example catalogs from this checkout, not private history."""
 import argparse
+import json
+import tempfile
 from pathlib import Path
 import build_demo
 import prepare_vision
@@ -25,10 +27,41 @@ def prepare(output):
     # these are not redistributions of historical private release packages.
     add('contacts-module',['0.1.0','0.2.0'],'contacts-registry')
     add('camera-module',['0.1.0'],'camera-registry')
+    add('fixtures/legacy-sky-watch',[None],'sky-legacy-registry')
     add('isolation-probe',[None],'probe-registry','test-registry',fixture=True)
     for source in ('focus-module','snake-module','contacts-module','camera-module','measure-module','sky-watch-module'):
         add(source,[None],'home-registry','test-registry')
+    prepare_transport(output, key)
+    prepare_sensitive(output, key)
     print('Prepared complete JVM fixtures plus home/test catalogs under the selected output.')
+
+def prepare_sensitive(output, key):
+    with tempfile.TemporaryDirectory() as tmp:
+        probe=Path(tmp); (probe/'index.html').write_text('<p>Signed sensitive grant fixture</p>')
+        for version in ('0.1.0','0.2.0','0.3.0','0.4.0'):
+            caps=[] if version=='0.4.0' else [dict(id='storage.kv',reason='Keep synthetic counter data')]
+            if version not in ('0.2.0','0.4.0'):
+                caps += [dict(id=cap,reason='Verify explicit native consent') for cap in
+                         ('device.tone','contacts.read','camera.capture','photo.measure','sky.watch','location.read')]
+                caps.append(dict(id='net.http',reason='Verify explicit source consent',origins=['https://example.org']))
+            manifest=dict(schemaVersion=1,id='dev.construct.sensitive-probe',name='Sensitive probe',version=version,
+                constructApi=dict(min='0.9.0',target='0.9.0'),runtime=dict(kind='webview-js'),entry='index.html',capabilities=caps)
+            (probe/'manifest.json').write_text(json.dumps(manifest))
+            publish(output/'sensitive-registry',*build(probe,key),fixture=True)
+
+def prepare_transport(output, key):
+    # Signed scopes exercise expansion, removal/reintroduction and rollback.
+    with tempfile.TemporaryDirectory() as tmp:
+        probe=Path(tmp); (probe/'index.html').write_text('<p>Signed HTTP scope fixture</p>')
+        for version,origins in [('0.1.0',['https://example.org']), ('0.2.0',['https://example.org','https://www.example.org']),
+                                ('0.3.0',None), ('0.4.0',['https://example.org'])]:
+            manifest=dict(schemaVersion=1,id='dev.construct.transport-probe',name='Transport probe',version=version,
+                constructApi=dict(min='0.9.0',target='0.9.0'),runtime=dict(kind='webview-js'),entry='index.html',
+                capabilities=[dict(id='net.http',reason='Verify signed source consent',origins=origins),dict(id='location.read',reason='Verify foreground location consent'),dict(id='storage.kv',reason='Verify retained module data')])
+            if origins is None:
+                manifest['capabilities'] = [cap for cap in manifest['capabilities'] if cap['id'] != 'net.http']
+            (probe/'manifest.json').write_text(json.dumps(manifest))
+            publish(output/'transport-registry',*build(probe,key),fixture=True)
 
 if __name__ == '__main__':
     p=argparse.ArgumentParser(description=__doc__)

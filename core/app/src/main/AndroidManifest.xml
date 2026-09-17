@@ -12,7 +12,7 @@
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="false" android:supportsRtl="true">
         <activity android:name=".ModuleActivity" android:exported="false"
-            android:configChanges="orientation|screenSize|smallestScreenSize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|fontScale"
             android:windowSoftInputMode="adjustResize" />
         <activity android:name=".SkyActivity" android:exported="false"
             android:configChanges="orientation|screenSize|smallestScreenSize|fontScale" />

@@ -1,5 +1,21 @@
 # Evidence ledger and known limits
 
+## Modular Sky alpha27 — September 17, 2026
+
+The [alpha27 exact-artifact summary](evidence/modular-sky-alpha27-2026-09-17.json)
+covers frozen host source `b2b249b` and unchanged Sky Watch 0.2.2: 208 JVM tests,
+zero lint errors, 13 modular Sky checks, 5 data/legacy upgrade checks, 6 HTTP
+consent checks and 4 location checks. These are separately completed Android 17
+scopes on the same x86_64 APK, including old-state upgrades and a coarse-only
+synthetic network fix. Native consent/denial and map/large-text images were
+reviewed; incomplete development runs and lagging frames remain excluded.
+
+The [earlier alpha26 evidence](evidence/modular-sky-2026-09-17.json) is historical
+and does not contain the subsequent consent/provider fixes. Reported Pixel
+acceptance applies to alpha26, not physical-device verification of alpha27.
+
+## Historical baseline
+
 Reference: alpha11 native source `19c984c`, review checkpoint `93be7fd`, September
 2026 private pilot. These counts describe that tested baseline, **not** a fresh
 third-party build of this public-preparation branch.

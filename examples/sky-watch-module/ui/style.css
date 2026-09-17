@@ -1,1 +1,368 @@
-#open{width:100%;min-height:52px;font-size:17px;margin-top:8px}#status{min-height:2.8em}
+:root {
+  color-scheme: dark;
+  font:
+    16px/1.45 system-ui,
+    sans-serif;
+  color: #e0ece4;
+  background: #0b1410;
+  --jade: #70d5ac;
+  --muted: #a0b6a8;
+  --edge: #496556;
+  --panel: #172b21;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button,
+select {
+  min-height: 44px;
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  color: inherit;
+  background: #1b3327;
+  padding: 8px 14px;
+}
+button:disabled {
+  opacity: 0.45;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid var(--jade);
+  outline-offset: 2px;
+}
+button {
+  cursor: pointer;
+}
+.primary {
+  background: var(--jade);
+  color: #10271b;
+  font-weight: 650;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 10px 12px;
+  padding-right: calc(var(--construct-menu-width, 56px) + 12px);
+  min-height: 64px;
+}
+h1 {
+  font-size: 1.6rem;
+  margin: 0;
+}
+header p {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0;
+}
+h2 {
+  font-size: 1.1rem;
+  margin: 6px 0;
+}
+p {
+  margin: 8px 0;
+}
+main {
+  padding: 0 10px 12px;
+}
+#welcome {
+  max-width: 620px;
+  margin: 20px auto;
+  padding: 18px;
+  border: 1px solid var(--edge);
+  border-radius: 20px;
+}
+label {
+  display: block;
+}
+input[type="text"] {
+  display: block;
+  max-width: 100%;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  color: inherit;
+  background: #0b1d13;
+  margin: 4px 0 10px;
+}
+.toolbar {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.toolbar label:first-child {
+  flex: 1;
+}
+.toolbar label {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+select {
+  display: block;
+  width: 100%;
+  font-size: 1rem;
+  color: #e0ece4;
+}
+.toolbar #refresh {
+  font-size: 1.6rem;
+  min-width: 48px;
+  padding: 0 12px;
+}
+progress {
+  width: 100%;
+  height: 3px;
+  accent-color: var(--jade);
+  display: block;
+}
+.work-grid {
+  display: grid;
+  gap: 10px;
+}
+#map-wrap {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--edge);
+  height: clamp(260px, 48vh, 650px);
+  min-width: 0;
+  background: #14281e;
+}
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+.map-controls {
+  position: absolute;
+  right: 9px;
+  top: 9px;
+  display: grid;
+  gap: 8px;
+}
+.map-controls button {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 1.5rem;
+  background: #183326ed;
+}
+.north {
+  position: absolute;
+  left: 9px;
+  top: 9px;
+  border-radius: 12px;
+  background: #183326df;
+  padding: 3px 8px;
+  font-size: 0.8rem;
+}
+.attribution {
+  position: absolute;
+  bottom: 4px;
+  left: 5px;
+  right: 5px;
+  width: fit-content;
+  max-width: calc(100% - 10px);
+  border-radius: 8px;
+  background: #13281ee6;
+  color: #bdd2c4;
+  padding: 2px 6px;
+  font-size: 0.68rem;
+  pointer-events: none;
+}
+#search-here {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--jade);
+  color: #10271b;
+  white-space: nowrap;
+}
+.list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.auto {
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.auto input {
+  accent-color: var(--jade);
+  width: 26px;
+  height: 26px;
+}
+.chip {
+  display: inline-block;
+  border: 1px solid var(--edge);
+  border-radius: 30px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  margin: 2px 5px 2px 0;
+  color: var(--muted);
+}
+#updated {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+#status,
+#map-status {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.error {
+  color: #ffb8a8 !important;
+}
+.attention {
+  color: #e7bc70 !important;
+}
+#aircraft-list {
+  display: grid;
+  gap: 6px;
+}
+.aircraft {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-radius: 14px;
+  background: transparent;
+  padding: 10px;
+}
+.aircraft strong {
+  display: block;
+  font-size: 1.02rem;
+}
+.aircraft span {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.aircraft[aria-pressed="true"] {
+  border-color: var(--jade);
+  background: #213d2d;
+}
+#selected {
+  border: 1px solid var(--jade);
+  border-radius: 16px;
+  padding: 12px;
+  margin: 10px 0;
+}
+.detail-line {
+  margin: 7px 0;
+}
+.detail-line dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.detail-line dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.selected-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.help {
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding: 10px 2px;
+}
+summary {
+  min-height: 44px;
+  display: list-item;
+  align-content: center;
+  cursor: pointer;
+}
+footer {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: center;
+  padding: 10px;
+}
+dialog {
+  background: var(--panel);
+  color: inherit;
+  border: 1px solid var(--edge);
+  border-radius: 22px;
+  padding: 18px;
+  width: min(94vw, 620px);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+dialog::backdrop {
+  background: #0009;
+}
+dialog h2 {
+  margin: 0 0 12px;
+  font-size: 1.2rem;
+  overflow-wrap: anywhere;
+}
+.dialog-body {
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  position: sticky;
+  bottom: -18px;
+  background: var(--panel);
+  padding: 12px 0 6px;
+}
+#area-form p {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+#use-location {
+  margin-bottom: 14px;
+}
+.metadata-section {
+  border-top: 1px solid var(--edge);
+  margin-top: 15px;
+  padding-top: 10px;
+}
+.note {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+[hidden] {
+  display: none !important;
+}
+@media (min-width: 680px) and (orientation: landscape) {
+  .work-grid {
+    grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr);
+    align-items: start;
+  }
+  #map-wrap {
+    position: sticky;
+    top: 8px;
+    height: calc(100vh - 155px);
+    min-height: 240px;
+  }
+  header {
+    min-height: 58px;
+  }
+  aside {
+    min-width: 0;
+  }
+}
