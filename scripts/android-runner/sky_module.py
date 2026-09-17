@@ -92,7 +92,11 @@ def open_module(name='Sky Watch',version=None):
 
 def close_module():tap('Construct menu');tap('Close module');library()
 
-def access():tap('Construct menu');tap('Module access')
+def access():
+    tap('Construct menu');tap('Module access')
+    # This returns from ModuleActivity to the native host. Do not scroll a
+    # transient window hierarchy before the destination page has appeared.
+    find('The module is stopped. Changes apply immediately and survive updates and rollback.')
 
 def native_status(text):
     scroll_top();return contains(text)
