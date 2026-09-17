@@ -174,10 +174,10 @@ input contains `oldApk` (runner-local absolute path), `oldSha256`, `catalog`,
 (location version/hash pairs). Each pair has `version` and `sha256`; the suite
 supplies the new APK path/hash from its normal command arguments.
 
-HTTP versions 0.1–0.4 exercise removal, untouched-switch narrowing, rollback,
+HTTP versions 1.1–1.4 exercise removal, untouched-switch narrowing, rollback,
 explicit reapproval and old-state upgrades. Their undeclared URL is rejected
-locally, so no HTTP probe leaves the host. Location versions 0.1–0.3 exercise
-reintroduced module grants while Android permission remains off. Version 0.5
+locally, so no HTTP probe leaves the host. Location versions 1.1–1.3 exercise
+reintroduced module grants while Android permission remains off. Version 1.5
 separately reads a synthetic network-provider fix with coarse-only permission;
 the driver removes that test provider in `finally`. The synthetic counter must
 survive updates. Native installation diagnostics must match every signed digest.

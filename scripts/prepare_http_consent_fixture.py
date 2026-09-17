@@ -9,11 +9,12 @@ from publish_module import build, publish
 
 ROOT = Path(__file__).resolve().parents[1]
 HTML = '''<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{font:20px sans-serif;padding:24px;background:#fafafa;color:#161616}button{font:inherit;padding:16px;margin:12px 0;display:block}</style></head>
+<link rel="stylesheet" href="style.css"></head>
 <body><h1>Consent Probe</h1><p>Synthetic consent test. No request leaves the host.</p>
 <button id="probe">Check HTTP access</button><p id="result">HTTP result: not checked</p>
 <button id="add">Add one</button><p id="count">Counter: loading</p>
 <script src="bridge.js"></script><script src="app.js"></script></body></html>'''
+CSS = 'body{font:20px sans-serif;padding:24px;background:#fafafa;color:#161616}h1{padding-right:64px}button{font:inherit;padding:16px;margin:12px 0;display:block}'
 JS = ''''use strict';
 let count = 0;
 const countView = document.getElementById('count');
@@ -41,11 +42,12 @@ def prepare(output):
     with tempfile.TemporaryDirectory() as tmp:
         source = Path(tmp)
         (source/'index.html').write_text(HTML)
+        (source/'style.css').write_text(CSS)
         (source/'app.js').write_text(JS)
         (source/'bridge.js').write_bytes((ROOT/'examples/sky-watch-module/ui/bridge.js').read_bytes())
-        for version, origins in [('0.1.0',['https://example.org','https://www.example.org']),
-                                 ('0.2.0',['https://example.org']), ('0.3.0',[]),
-                                 ('0.4.0',['https://example.org'])]:
+        for version, origins in [('1.1.0',['https://example.org','https://www.example.org']),
+                                 ('1.2.0',['https://example.org']), ('1.3.0',[]),
+                                 ('1.4.0',['https://example.org'])]:
             caps = [dict(id='storage.kv',reason='Keep a synthetic counter across updates')]
             if origins:
                 caps.insert(0,dict(id='net.http',reason='Verify consent enforcement without making a network request',origins=origins))
