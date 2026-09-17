@@ -166,20 +166,11 @@ class TransportAccessTest {
         denied("CAPABILITY_DENIED") { allowed("net.http") }
         assertEquals(setOf("https://example.org"), storedOrigins())
     }
-    @Test fun explicitDenialSurvivesRollbackAndLegacyLauncherCannotGrantNewApis() {
+    @Test fun explicitDenialSurvivesRollback() {
         store.install(fixture("0.1.0"),mapOf("net.http" to true));store.confirm(id)
         store.install(fixture("0.2.0"),mapOf("net.http" to false));store.rollback(id)
         denied("CAPABILITY_DENIED") { allowed("net.http") }
-        val dir=File(System.getProperty("construct.fixtureRoot"),"sky-legacy-registry")
-        val entry=Packages.catalog(File(dir,"index.json").readBytes()).single()
-        store.install(Packages.verify(File(dir,entry.artifact).readBytes(),entry,store.publicKey),mapOf("sky.watch" to true))
-        val sky=store.installed().single { it.manifest.id==entry.id };store.confirm(entry.id)
-        val nextDir=File(System.getProperty("construct.fixtureRoot"),"home-registry")
-        val next=Packages.catalog(File(nextDir,"index.json").readBytes()).single { it.id==entry.id }
-        store.install(Packages.verify(File(nextDir,next.artifact).readBytes(),next,store.publicKey))
-        val updated=store.installed().single { it.manifest.id==entry.id }
-        assertFalse("net.http" in updated.granted);assertFalse("location.read" in updated.granted)
-        denied("RUN_STALE") { store.withCapability(sky,"sky.watch") { fail() } }
+
     }
     @Test fun httpChecksAuthorizationBeforeAnyNetworkAndAfterClose() {
         val m=fixture("0.1.0").manifest;var checks=0

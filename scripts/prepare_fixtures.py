@@ -38,11 +38,11 @@ def prepare(output):
 def prepare_sensitive(output, key):
     with tempfile.TemporaryDirectory() as tmp:
         probe=Path(tmp); (probe/'index.html').write_text('<p>Signed sensitive grant fixture</p>')
-        for version in ('0.1.0','0.2.0','0.3.0','0.4.0'):
-            caps=[] if version=='0.4.0' else [dict(id='storage.kv',reason='Keep synthetic counter data')]
-            if version not in ('0.2.0','0.4.0'):
+        for version in ('1.1.0','1.2.0','1.3.0','1.4.0'):
+            caps=[] if version=='1.4.0' else [dict(id='storage.kv',reason='Keep synthetic counter data')]
+            if version not in ('1.2.0','1.4.0'):
                 caps += [dict(id=cap,reason='Verify explicit native consent') for cap in
-                         ('device.tone','contacts.read','camera.capture','photo.measure','sky.watch','location.read')]
+                         ('device.tone','contacts.read','camera.capture','photo.measure','location.read')]
                 caps.append(dict(id='net.http',reason='Verify explicit source consent',origins=['https://example.org']))
             manifest=dict(schemaVersion=1,id='dev.construct.sensitive-probe',name='Sensitive probe',version=version,
                 constructApi=dict(min='0.9.0',target='0.9.0'),runtime=dict(kind='webview-js'),entry='index.html',capabilities=caps)

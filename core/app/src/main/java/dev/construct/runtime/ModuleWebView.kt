@@ -40,6 +40,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
         throw ConstructError("WEBVIEW_UNSUPPORTED", "Update Android System WebView or Chrome before opening modules")
     }
     val module = installed.manifest
+    CapabilityLifecycle.requireRunnable(module)
     val root = store.directory(installed.digest)
     val origin = "https://${module.id}.construct.invalid"
     val entry = "$origin/${module.entry}"
@@ -224,7 +225,6 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                 }
                 "storage.kv" -> store.storage(module.id, params)
                 "device.tone" -> tone.play(params)
-                "sky.watch" -> { SkyActivity.open(context, store, installed, params); JSONObject().put("opened", true) }
                 "photo.measure" -> { MeasureActivity.open(context, store, installed, params); JSONObject().put("opened", true) }
                 "camera.capture" -> { CameraActivity.open(context, store, installed, params); JSONObject().put("opened", true) }
                 else -> throw ConstructError("CAPABILITY_DENIED", "Unsupported capability")

@@ -59,7 +59,9 @@ transport-scope versions for new-grant/update/rollback checks. Do not replace or
 re-sign published module versions in a production catalog.
 
 API 0.9 host checks include `HttpPolicyTest`, `ModuleHttpTest`, `ModuleLocationTest`
-and `TransportAccessTest`; existing Sky tests still cover the legacy native path.
+and `TransportAccessTest`; `CapabilityRetirementTest` covers management of retired
+callers. Run `python scripts/check_architecture.py` to check the shell ownership
+ratchet. Aviation behavior tests now live with the module, not native Sky code.
 The migration also requires live exact-artifact Android checks and a separate
 synthetic, signed module-only update demonstration on the same APK. JVM/Node tests
 alone are not a completed migration or physical-phone acceptance.

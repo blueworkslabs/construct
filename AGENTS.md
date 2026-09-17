@@ -42,10 +42,11 @@ a broad framework or changing the runtime when a small reusable contract suffice
 
 ## Existing exceptions are not templates
 
-`sky.watch` and `photo.measure` currently open host-owned workspaces; the camera
-workspace also includes feature-specific behavior. These are documented migration
-debt, not precedents for new module architecture. Preserve their published
-contracts while migrating deliberately; do not remove working functionality or
+`photo.measure` and the camera workspace still include host-owned feature workflows.
+These are documented migration debt, not precedents for new module architecture.
+`sky.watch` is retired: retain only its historical identifier, never reintroduce
+its implementation. Follow [retirement handling](docs/shell-retirement.md) and run
+`scripts/check_architecture.py`. Preserve supported contracts while migrating deliberately; do not remove working functionality or
 rewrite unrelated modules opportunistically. Prototype success is useful behavior
 evidence, not proof of correct code ownership.
 

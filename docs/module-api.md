@@ -187,17 +187,16 @@ closes and clears the workspace. Process recreation does not restore it.
 No URI, pixels, marker size, endpoints or lengths are returned to JavaScript or
 written to diagnostics. User-selected originals are never modified.
 
-## Legacy Sky Watch launcher (API 0.8.0)
+## Retired Sky Watch launcher
 
-`sky.watch` accepts only `{op:"open"}` and returns `{opened:true}`. The explicit
-native grant opens a foreground aircraft-map workspace. The human chooses an area,
-source(s), radius and optional foreground Android location permission there.
-No coordinates, URLs, credentials, aircraft records or images pass through the
-module bridge. Closing/backgrounding discards the session and stops location and
-requests; rotation retains it. Selected areas leave the phone for aircraft data
-and map tiles; the consent text names those providers. See [Sky Watch](sky-watch.md)
-for data formats, merge policy, rate limits, caching, privacy and attribution.
-
+`sky.watch` was implemented in alpha23–alpha27. In alpha28 it is a recognized
+historical identifier, **not a supported executable capability**. Required callers
+receive `MODULE_UPDATE_REQUIRED`; optional calls receive `CAPABILITY_RETIRED`.
+Existing packages remain manageable and saved data is retained. Install/run/confirm
+and rollback to required callers are blocked. Update Sky Watch to 0.2.2 or later;
+new HTTP/location grants still require explicit consent. See the
+[retirement contract](shell-retirement.md). API 0.9 module-owned Sky uses the generic
+capabilities below instead.
 
 ## Approved HTTP transport (`net.http`, API 0.9)
 

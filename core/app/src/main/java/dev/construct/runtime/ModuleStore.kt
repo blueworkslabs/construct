@@ -146,13 +146,15 @@ class ModuleStore(private val context: Context) {
         val result = if (record.has("grants")) record.getJSONObject("grants") else JSONObject().apply {
             manifest.capabilities.forEach { put(it.id, !it.explicitOptIn) }
         }
-        for (key in result.keys()) checkRule(key in Packages.supported && result.get(key) is Boolean,
+        for (key in result.keys()) checkRule(key in Packages.recognized && result.get(key) is Boolean,
             "STATE_INVALID", "Invalid capability grants")
+        CapabilityLifecycle.retired.forEach { result.put(it, false) }
         if (!HttpPolicy.approved(manifest, retainedHttpOrigins(record, manifest))) result.put("net.http", false)
         return result
     }
 
     @Synchronized fun setCapability(id: String, capability: String, allowed: Boolean) {
+        if (allowed) CapabilityLifecycle.requireAvailable(capability)
         val state = readState()
         val record = state.getJSONObject(id)
         val manifest = verifiedInstalled(id, record.getString("active"))
@@ -168,6 +170,7 @@ class ModuleStore(private val context: Context) {
         checkRule(record != null && record.optString("active") == module.digest && record.optBoolean("enabled") &&
             record.optString("failureCode").isEmpty() && (module.manifest.id to module.digest) !in failedRuns,
             "RUN_STALE", "Module is no longer running; reopen it")
+        CapabilityLifecycle.requireAvailable(capability)
         checkRule(module.manifest.capabilities.any { it.id == capability } && grants(record!!, module.manifest).optBoolean(capability),
             "CAPABILITY_DENIED", "Access is off. Enable it in Module access.")
         return action()
@@ -198,13 +201,16 @@ class ModuleStore(private val context: Context) {
     @Synchronized fun installed(): List<Installed> = inventory().modules
 
     @Synchronized fun install(candidate: VerifiedPackage, consentChanges: Map<String, Boolean> = emptyMap()) {
+        CapabilityLifecycle.requireRunnable(candidate.manifest)
+        consentChanges.filterValues { it }.keys.forEach { CapabilityLifecycle.requireAvailable(it) }
         checkRule(consentChanges.keys.all { id -> candidate.manifest.capabilities.any { it.id == id } },
             "CAPABILITY_DENIED", "Consent may only change declared capabilities")
         val state = readState()
         val id = candidate.manifest.id
         val old = state.optJSONObject(id)
         checkRule(!state.has(id) || inventory().damaged.none { it.id == id }, "NEEDS_REPAIR", "Restore or remove this damaged module before reinstalling")
-        checkRule(old == null || old.getBoolean("confirmed"), "TRIAL_PENDING", "Keep or roll back the current trial before another update")
+        val oldManifest = old?.let { verifiedInstalled(id, it.getString("active")) }
+        checkRule(old == null || old.getBoolean("confirmed") || CapabilityLifecycle.needsUpdate(oldManifest!!), "TRIAL_PENDING", "Keep or roll back the current trial before another update")
         checkRule(old?.getString("active") != candidate.digest, "ALREADY_INSTALLED", "This exact package is already installed")
         val destination = directory(candidate.digest)
         if (!destination.exists()) {
@@ -224,7 +230,6 @@ class ModuleStore(private val context: Context) {
             } finally { if (staging.exists()) staging.deleteRecursively() }
         }
         verifiedInstalled(id, candidate.digest)
-        val oldManifest = old?.let { verifiedInstalled(id, it.getString("active")) }
         val approved = if (old == null) JSONObject() else grants(old, oldManifest!!)
         val previouslyDeclared = oldManifest?.capabilities.orEmpty().map { it.id }.toSet()
         // Match the trusted install switch: an absent capability is a new request,
@@ -256,7 +261,7 @@ class ModuleStore(private val context: Context) {
         val record = state.getJSONObject(id)
         checkRule((id to record.getString("active")) !in failedRuns, "RUNTIME_FAILED", "This run failed; retry before marking it working")
         checkRule(record.optString("failureCode").isEmpty(), "RUNTIME_FAILED", "This run failed; retry successfully or restore the previous version")
-        verifiedInstalled(id, record.getString("active"))
+        CapabilityLifecycle.requireRunnable(verifiedInstalled(id, record.getString("active")))
         state.getJSONObject(id).put("confirmed", true)
         writeAtomic(stateFile, state.toString())
         log("confirm", "VERSION_KEPT", installed().first { it.manifest.id == id }.manifest)
@@ -268,6 +273,7 @@ class ModuleStore(private val context: Context) {
         checkRule(!record.isNull("previous"), "NO_ROLLBACK", "There is no previous working version yet")
         val previous = record.getString("previous")
         val m = verifiedInstalled(id, previous)
+        CapabilityLifecycle.requireRunnable(m)
         val current = runCatching { verifiedInstalled(id, record.getString("active")) }.getOrNull()
         // Rollback may retain or narrow consent, never resurrect removed origins.
         // An unverifiable active declaration fails closed without blocking repair.
@@ -292,7 +298,7 @@ class ModuleStore(private val context: Context) {
         val state = readState()
         val record = state.getJSONObject(module.manifest.id)
         checkRule(record.getString("active") == module.digest && record.getBoolean("enabled"), "RUN_STALE", "Module changed or is disabled; reopen it from Installed")
-        verifiedInstalled(module.manifest.id, module.digest)
+        CapabilityLifecycle.requireRunnable(verifiedInstalled(module.manifest.id, module.digest))
         record.remove("failureCode")
         writeAtomic(stateFile, state.toString())
         failedRuns.remove(module.manifest.id to module.digest)

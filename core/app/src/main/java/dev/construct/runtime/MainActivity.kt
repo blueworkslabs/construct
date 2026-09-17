@@ -157,7 +157,7 @@ class MainActivity : ComponentActivity() {
         fun choice(version: CatalogVersion, explicit: Boolean = false): CatalogInstallChoice {
             val current = modules.firstOrNull { it.manifest.id == version.id }
             return CatalogInstallPresentation.choice(version,
-                current?.let { CatalogInstalledState(it.manifest.version, it.digest, it.confirmed) },
+                current?.let { CatalogInstalledState(it.manifest.version, it.digest, it.confirmed, CapabilityLifecycle.needsUpdate(it.manifest)) },
                 busy, indexError != null, damaged.any { it.id == version.id }, explicit)
         }
         fun review(version: CatalogVersion, explicit: Boolean = false) {
@@ -165,6 +165,7 @@ class MainActivity : ComponentActivity() {
             val selectedSource = catalogSource
             versionsId = null
             work { val verified = store.prepare(selectedSource, version);
+                CapabilityLifecycle.requireRunnable(verified.manifest);
                 { candidate = verified; status = "Signature verified. Review access before installing." }
             }
         }
@@ -217,7 +218,7 @@ class MainActivity : ComponentActivity() {
                                 val label = cap.label
                                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                     Text(label, Modifier.weight(1f))
-                                    Switch(checked = cap.id in module.granted, enabled = !busy,
+                                    Switch(checked = cap.id in module.granted, enabled = !busy && cap.id !in CapabilityLifecycle.retired,
                                         modifier = Modifier.semantics { contentDescription = label },
                                         onCheckedChange = { allowed ->
                                             if (!allowed && !cap.optional) revokeTarget = module.manifest.id to cap
@@ -227,7 +228,7 @@ class MainActivity : ComponentActivity() {
                                             }
                                         })
                                 }
-                                Text(if (cap.optional) "Optional" else "Required for this module", style = MaterialTheme.typography.labelMedium)
+                                Text(if (cap.id in CapabilityLifecycle.retired) "Retired · update this module" else if (cap.optional) "Optional" else "Required for this module", style = MaterialTheme.typography.labelMedium)
                                 Text(cap.id, style = MaterialTheme.typography.bodySmall)
                                 Text(cap.reason, style = MaterialTheme.typography.bodySmall)
                                 cap.origins.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
@@ -253,7 +254,7 @@ class MainActivity : ComponentActivity() {
                                 TextButton(enabled = !busy, onClick = { deletePhotosId = module.manifest.id }) { Text("Delete all saved photos") }
                                 Text("Deleting saved photos works even with camera access off. Remove keeps photos; reinstall to manage retained photos.")
                             }
-                            Button(enabled = !busy && module.enabled, onClick = { work {
+                            Button(enabled = !busy && module.enabled && !CapabilityLifecycle.needsUpdate(module.manifest), onClick = { work {
                                 store.beginRun(module);
                                 { accessModuleId = null; moduleLauncher.launch(ModuleActivity.intent(this@MainActivity, module)); status = "Testing ${module.manifest.name} ${module.manifest.version}." }
                             } }) { Text("Reopen module") }
@@ -325,9 +326,11 @@ class MainActivity : ComponentActivity() {
                                 }
                                 modules.sortedWith(compareBy<Installed> { it.manifest.name.lowercase(java.util.Locale.ROOT) }.thenBy { it.manifest.id }).forEach { module ->
                                     val latest = cards.firstOrNull { it.latest.id == module.manifest.id }?.latest
-                                    val hasUpdate = latest != null && !latest.testFixture && module.confirmed &&
+                                    val needsUpdate = CapabilityLifecycle.needsUpdate(module.manifest)
+                                    val hasUpdate = latest != null && !latest.testFixture && (module.confirmed || needsUpdate) &&
                                         CatalogPresentation.compareVersions(latest.version, module.manifest.version) > 0 && latest.sha256 != module.digest
                                     val badge = when {
+                                        needsUpdate -> WorkshopBadge("Update required", WorkshopTone.ATTENTION)
                                         module.failureCode != null -> WorkshopBadge("Failed", WorkshopTone.ERROR)
                                         !module.enabled -> WorkshopBadge("Disabled")
                                         !module.confirmed -> WorkshopBadge("Trial", WorkshopTone.ATTENTION)
@@ -344,14 +347,16 @@ class MainActivity : ComponentActivity() {
                                     WorkshopCard(WorkshopCardModel(module.manifest.id, module.manifest.name,
                                         version = module.manifest.version,
                                         badges = listOf(badge) + if (hasUpdate) listOf(WorkshopBadge("Update available", WorkshopTone.ATTENTION)) else emptyList(),
-                                        primary = WorkshopAction(if (module.enabled) WorkshopActionId.OPEN else WorkshopActionId.ENABLE,
+                                        primary = if (needsUpdate) WorkshopAction(WorkshopActionId.BROWSE_UPDATES, "Find update", !busy) else WorkshopAction(if (module.enabled) WorkshopActionId.OPEN else WorkshopActionId.ENABLE,
                                             if (!module.enabled) "Enable" else if (module.failureCode != null) "Retry" else "Open", !busy),
                                         secondary = secondary,
                                         message = when {
+                                            needsUpdate -> WorkshopMessage(CapabilityLifecycle.updateMessage, WorkshopTone.ATTENTION)
                                             module.failureCode != null -> WorkshopMessage("[${module.failureCode}] Retry, or use More actions to restore/remove this code.", WorkshopTone.ERROR)
                                             !module.confirmed -> WorkshopMessage("Open and test, then mark working in the module menu.", WorkshopTone.ATTENTION)
                                             else -> null
                                         }), onAction = { action -> when (action) {
+                                            WorkshopActionId.BROWSE_UPDATES -> refreshCatalog(store.registry)
                                             WorkshopActionId.OPEN -> work { store.beginRun(module); { moduleLauncher.launch(ModuleActivity.intent(this@MainActivity, module)); status = "Opened ${module.manifest.name}." } }
                                             WorkshopActionId.ENABLE, WorkshopActionId.DISABLE -> work { store.enable(module.manifest.id, !module.enabled); { status = if (module.enabled) "Module disabled." else "Module enabled." } }
                                             WorkshopActionId.MODULE_ACCESS -> accessModuleId = module.manifest.id
@@ -415,7 +420,7 @@ class MainActivity : ComponentActivity() {
                             val prior = existing?.granted?.contains(cap.id) == true && (cap.id != "net.http" || oldOrigins.containsAll(cap.origins))
                             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                 Text(cap.label, Modifier.weight(1f))
-                                Switch(checked = consentChanges[cap.id] ?: prior,
+                                Switch(checked = consentChanges[cap.id] ?: prior, enabled = cap.id !in CapabilityLifecycle.retired,
                                     modifier = Modifier.semantics { contentDescription = cap.label },
                                     onCheckedChange = { consentChanges = consentChanges + (cap.id to it) })
                             }
@@ -426,7 +431,6 @@ class MainActivity : ComponentActivity() {
                         cap.origins.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
                     }
                     Text("Existing access choices are kept unless you change them. New sensitive capabilities start off. You can change access later in Module access.")
-                    if (verified.manifest.capabilities.any { it.id == "sky.watch" }) Text("Sky Watch shares your chosen area with the selected aircraft providers and OpenStreetMap. Phone location is optional and requested only when you tap Use my location. No location or aircraft data is shared with module code. Foreground only.")
                     if (verified.manifest.capabilities.any { it.id == "photo.measure" }) Text("You choose one image through Android’s photo picker. Measurement is local and approximate; photos and results are not shared with JavaScript or saved by this workspace.")
                     if (verified.manifest.capabilities.any { it.id == "camera.capture" }) Text("Camera also needs Android permission through Module access. Photos are saved privately by the native workspace, not shared with JavaScript. No microphone or general file access.")
                     if (verified.manifest.capabilities.any { it.id == "contacts.read" }) Text("Contacts also need Android permission. After installing, open Module access to allow Android contacts access. This does not grant any module automatically.")
@@ -434,14 +438,14 @@ class MainActivity : ComponentActivity() {
                     if (verified.manifest.capabilities.any { it.id == "net.http" }) Text("Approved internet access lets this module send data to the exact sources above, which see your IP address. New sources need new consent. Other granted data, including location or contacts, can be sent to those sources. Raster responses may be cached; revocation does not erase previously received data.")
                     else Text("No module network access.")
                     if (verified.manifest.capabilities.any { it.id == "location.read" }) Text("The module can receive a foreground location fix only after both its location grant and Android permission are enabled. Allow Android location in Module access after installation. Approximate location works; no background tracking.")
-                    Text("Installed code starts as a trial; your previous working version is kept.")
+                    Text("Installed code starts as a trial. Previous code is kept where available, but versions requiring retired capabilities cannot be restored.")
                 } },
                 confirmButton = { TextButton(onClick = { val choices = consentChanges; candidate = null; work { store.install(verified, choices); { status = "Installed. Open and test it, then mark it working." } } }) { Text("Allow & install") } },
                 dismissButton = { TextButton(onClick = { candidate = null }) { Text("Cancel") } })
         }
         rollbackTarget?.let { id ->
             AlertDialog(onDismissRequest = { rollbackTarget = null }, title = { Text("Restore previous working version?") },
-                text = { Text("This restores module code, not its stored data. The current version will be removed; you can download it again.") },
+                text = { Text("This restores module code, not its stored data. A version requiring retired capabilities cannot be restored; in that case nothing changes. Otherwise the current code is removed and can be downloaded again.") },
                 confirmButton = { TextButton(onClick = { rollbackTarget = null; work { store.rollback(id); { status = "Previous working code restored. Module data kept." } } }) { Text("Restore") } },
                 dismissButton = { TextButton(onClick = { rollbackTarget = null }) { Text("Cancel") } })
         }

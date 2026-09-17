@@ -93,12 +93,11 @@ implemented and verified before a module depends on them.
 
 ## Current implementation debt
 
-- **Legacy Sky Watch 0.1.0:** `sky.watch` accepts `{op:"open"}`. Its module is a launcher;
-  `SkyActivity`, `SkyNetwork`, `SkyData`, `SkyIdentity`, `SkyMetadata` and `SkyMap`
-  put aviation logic and presentation in the host. Even a glossary fix currently
-  needs a host build to reach that legacy workspace. Sky Watch 0.2.x instead owns
-  its aviation logic and Canvas/UI in its module package, using API 0.9 transport
-  and location. The old host implementation remains only for published callers.
+- **Sky Watch:** 0.2.x owns aviation logic and Canvas/UI in its signed module,
+  using API 0.9 transport/location/storage. The alpha28 candidate removes the old
+  native implementation; old required `sky.watch` callers are manageable but need
+  a module update. See the [retirement boundary](shell-retirement.md), including
+  data preservation and unsupported rollback handling.
 - **Pocket Measure:** `photo.measure` opens the native measurement workspace;
   no pixels, endpoints or measurement results return to the module. Separate
   reusable image access/compute from the feature workflow in a future migration.

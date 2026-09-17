@@ -3,7 +3,7 @@ package dev.construct.runtime
 /** Display-only contract. The activity owns all decisions, effects and confirmations. */
 internal enum class WorkshopTone { NEUTRAL, ATTENTION, ERROR }
 internal enum class WorkshopActionId {
-    OPEN, ENABLE, DISABLE, ROLLBACK, MODULE_ACCESS, REMOVE, DISCARD_TRIAL,
+    BROWSE_UPDATES, OPEN, ENABLE, DISABLE, ROLLBACK, MODULE_ACCESS, REMOVE, DISCARD_TRIAL,
     REVIEW_INSTALL, VERSIONS, REPAIR_INDEX
 }
 internal data class WorkshopAction(
