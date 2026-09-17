@@ -34,11 +34,18 @@ selected aircraft/callsign identifiers to ADSBdb after the explicit lookup butto
 Only provider cooldowns are persisted in module storage. The host may cache raster
 responses; it does not cache JSON. Data composition is explained in trusted consent.
 
-Legacy 0.1.0 remains supported by the native workspace for existing installations
-and rollback. The following sections describe that baseline and shared aviation
-semantics; legacy native worker/request limits are **not** the new HTTP API limits.
+Legacy 0.1.0 was supported by the native workspace through alpha27. In alpha28,
+`sky.watch` is a historical identifier only: installed callers require a module
+update, and execution, new installation and rollback to required callers are
+blocked. Saved module data is retained. The following sections describe that
+historical baseline and shared aviation semantics; legacy native worker/request
+limits are **not** the new HTTP API limits.
 
-## Legacy 0.1.0 launcher baseline (API 0.8 / alpha23–25)
+## Historical 0.1.0 launcher baseline (API 0.8 / alpha23–27)
+
+The following sections describe the retired native workspace, **not alpha28
+runtime behavior**. Alpha28 removes that implementation; old required callers
+need a module update. See [retirement and rollback handling](shell-retirement.md).
 
 ## Interaction
 

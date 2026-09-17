@@ -67,6 +67,7 @@ class ModuleActivity : ComponentActivity() {
                         it.digest == intent.getStringExtra("digest") && it.enabled
                 }
                 checkRule(module != null, "RUN_STALE", "Module changed or is disabled; reopen it from Installed")
+                CapabilityLifecycle.requireRunnable(module!!.manifest)
                 runOnUiThread { if (!ending && !isDestroyed) {
                     val colour = android.graphics.Color.parseColor(module!!.manifest.themeColor ?: "#141218")
                     val dark = androidx.core.graphics.ColorUtils.calculateLuminance(colour) < .5

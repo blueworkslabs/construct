@@ -38,13 +38,14 @@ may be dropped. Check declaration, saved grant and relevant Android permission o
 every request. Sensitive asynchronous results are re-authorized at delivery.
 
 Legacy storage/log/toast access is approved at installation unless previously
-revoked. Tone, contacts, camera, photo measurement, Sky Watch, HTTP and location start off and require explicit native opt-in.
+revoked. Tone, contacts, camera, photo measurement, HTTP and location start off and require explicit native opt-in.
 When installing a version that reintroduces a capability absent from the current
 manifest, opt-in access starts off again unless explicitly approved in that install.
 Historical grant entries cannot override the displayed off switch. Unchanged
-declarations retain their grants. Direct legacy code rollback preserves existing
+declarations retain their grants. Rollback between supported versions preserves existing
 non-HTTP grants but never reverses an explicit revocation; HTTP additionally forgets
-removed origins as described below.
+removed origins as described below. Retired capabilities cannot be granted or
+executed; required retired callers cannot be restored (see below).
 Updates/rollback preserve revoked access. Required access has confirmation before
 revocation. Native consent explains contacts plus storage when both are declared:
 a granted module can retain data it has read; revocation is not retroactive erasure.
@@ -187,17 +188,16 @@ closes and clears the workspace. Process recreation does not restore it.
 No URI, pixels, marker size, endpoints or lengths are returned to JavaScript or
 written to diagnostics. User-selected originals are never modified.
 
-## Legacy Sky Watch launcher (API 0.8.0)
+## Retired Sky Watch launcher
 
-`sky.watch` accepts only `{op:"open"}` and returns `{opened:true}`. The explicit
-native grant opens a foreground aircraft-map workspace. The human chooses an area,
-source(s), radius and optional foreground Android location permission there.
-No coordinates, URLs, credentials, aircraft records or images pass through the
-module bridge. Closing/backgrounding discards the session and stops location and
-requests; rotation retains it. Selected areas leave the phone for aircraft data
-and map tiles; the consent text names those providers. See [Sky Watch](sky-watch.md)
-for data formats, merge policy, rate limits, caching, privacy and attribution.
-
+`sky.watch` was implemented in alpha23–alpha27. In alpha28 it is a recognized
+historical identifier, **not a supported executable capability**. Required callers
+receive `MODULE_UPDATE_REQUIRED`; optional calls receive `CAPABILITY_RETIRED`.
+Existing packages remain manageable and saved data is retained. Install/run/confirm
+and rollback to required callers are blocked. Update Sky Watch to 0.2.2 or later;
+new HTTP/location grants still require explicit consent. See the
+[retirement contract](shell-retirement.md). API 0.9 module-owned Sky uses the generic
+capabilities below instead.
 
 ## Approved HTTP transport (`net.http`, API 0.9)
 

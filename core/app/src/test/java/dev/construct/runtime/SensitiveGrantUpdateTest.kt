@@ -16,7 +16,7 @@ class SensitiveGrantUpdateTest {
     private val app get() = RuntimeEnvironment.getApplication()
     private lateinit var store: ModuleStore
     private val id = "dev.construct.sensitive-probe"
-    private val sensitive = setOf("device.tone", "contacts.read", "camera.capture", "photo.measure", "sky.watch", "location.read", "net.http")
+    private val sensitive = setOf("device.tone", "contacts.read", "camera.capture", "photo.measure", "location.read", "net.http")
     @Before fun setup() { app.filesDir.listFiles()?.forEach { it.deleteRecursively() }; store = ModuleStore(app) }
     private fun fixture(version: String): VerifiedPackage {
         val dir = File(System.getProperty("construct.fixtureRoot"), "sensitive-registry")
@@ -33,34 +33,34 @@ class SensitiveGrantUpdateTest {
         assertTrue("storage.kv" in module.granted)
     }
     @Test fun removedSensitiveCapabilitiesDefaultOffWhenReintroduced() {
-        store.install(fixture("0.1.0"), sensitive.associateWith { true }); store.confirm(id)
+        store.install(fixture("1.1.0"), sensitive.associateWith { true }); store.confirm(id)
         store.storage(id, JSONObject().put("op", "set").put("key", "counter").put("value", 7))
-        store.install(fixture("0.2.0")); store.confirm(id); store = ModuleStore(app)
-        store.install(fixture("0.3.0")); store = ModuleStore(app)
+        store.install(fixture("1.2.0")); store.confirm(id); store = ModuleStore(app)
+        store.install(fixture("1.3.0")); store = ModuleStore(app)
         assertDenied()
         assertEquals(7, store.storage(id, JSONObject().put("op", "get").put("key", "counter")))
     }
     @Test fun unchangedDeclarationsAndExplicitReapprovalRetainAuthority() {
-        store.install(fixture("0.1.0"), sensitive.associateWith { true }); store.confirm(id)
-        store.install(fixture("0.3.0")); store.confirm(id)
+        store.install(fixture("1.1.0"), sensitive.associateWith { true }); store.confirm(id)
+        store.install(fixture("1.3.0")); store.confirm(id)
         assertTrue(store.installed().single().granted.containsAll(sensitive))
-        store.install(fixture("0.2.0")); store.confirm(id)
-        store.install(fixture("0.1.0"), sensitive.associateWith { true }); store = ModuleStore(app)
+        store.install(fixture("1.2.0")); store.confirm(id)
+        store.install(fixture("1.1.0"), sensitive.associateWith { true }); store = ModuleStore(app)
         assertTrue(store.installed().single().granted.containsAll(sensitive))
     }
     @Test fun staleSensitiveGrantEntriesCannotOverrideDefaultOffInstallChoices() {
-        store.install(fixture("0.2.0")); store.confirm(id)
+        store.install(fixture("1.2.0")); store.confirm(id)
         val file = File(app.filesDir, "module-state.json")
         val state = JSONObject(file.readText())
         sensitive.forEach { state.getJSONObject(id).getJSONObject("grants").put(it, true) }
         file.writeText(state.toString()); store = ModuleStore(app)
-        store.install(fixture("0.3.0"))
+        store.install(fixture("1.3.0"))
         assertDenied()
     }
     @Test fun reintroducedLegacyStorageDoesNotUndoExplicitRevocation() {
-        store.install(fixture("0.1.0")); store.setCapability(id, "storage.kv", false); store.confirm(id)
-        store.install(fixture("0.4.0")); store.confirm(id)
-        store.install(fixture("0.3.0")); store = ModuleStore(app)
+        store.install(fixture("1.1.0")); store.setCapability(id, "storage.kv", false); store.confirm(id)
+        store.install(fixture("1.4.0")); store.confirm(id)
+        store.install(fixture("1.3.0")); store = ModuleStore(app)
         val module = store.installed().single()
         assertFalse("storage.kv" in module.granted)
         try { store.withCapability(module, "storage.kv") { fail("Revoked storage was restored") } }

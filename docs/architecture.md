@@ -30,7 +30,7 @@ flowchart TB
         AndroidGate --> Camera[Native camera UI + private album]
         Grants --> HTTP[Bounded origin-scoped HTTP transport]
         AndroidGate --> Location[One foreground location result]
-        Grants --> Legacy[Legacy Sky Watch and Measure native workspaces]
+        Grants --> Legacy[Legacy Measure native workspace]
     end
 ```
 
@@ -60,10 +60,7 @@ Android permission UI and session authorization remain outside module control.
 
 ### Current native-workspace exceptions
 
-The legacy Sky Watch 0.1.0 launcher's aviation logic, network adapters and map UI live
-in `SkyActivity`, `SkyNetwork`, `SkyData`, `SkyIdentity`, `SkyMetadata` and `SkyMap`.
-Its signed module calls `sky.watch` with `{op:"open"}` and gets `{opened:true}`;
-it does not receive aircraft/location data. Pocket Measure similarly launches
+Pocket Measure launches
 `MeasureActivity` via `photo.measure`. The camera workspace also contains
 application-specific album/analysis flows alongside native acquisition.
 
@@ -102,3 +99,10 @@ module-publisher identity pinned by the APK. A valid signature establishes publi
 provenance, not harmlessness. HTTPS validates registry transport; it does not replace
 package signatures. Generated keys and private test/deployment material do not
 belong in the public source distribution.
+
+## Native Sky retirement
+
+The alpha28 candidate removes native Sky implementation code. Old `sky.watch`
+packages remain readable for management but require a module update; they cannot
+execute or be restored through rollback. See the [compatibility boundary](shell-retirement.md).
+Camera and Measure remain explicitly inventoried host-workflow debt.

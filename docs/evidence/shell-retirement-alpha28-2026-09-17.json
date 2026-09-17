@@ -1,0 +1,143 @@
+{
+  "date": "2026-09-17",
+  "release": "0.1.0-alpha28",
+  "appSourceRevision": "1dd5fc21a89356f8df779286ba150fc4e022ca49",
+  "runnerSourceRevision": "d994775cd750d6a19009d42d391402ba2494a812",
+  "module": {
+    "id": "dev.construct.sky-watch",
+    "version": "0.2.2",
+    "sha256": "9871b7e5116ce2271e71c40196581def781e446f4d08cdb0e52cb185aa886d39"
+  },
+  "apks": [
+    {
+      "abi": "arm64-v8a",
+      "name": "construct-0.1.0-alpha28-arm64-v8a-1dd5fc2.apk",
+      "bytes": 23888270,
+      "sha256": "d32f4a59d4553e6236574762a79e12ea8534d4a337b8fbe922ce8c4fdf5ec4fd"
+    },
+    {
+      "abi": "x86_64",
+      "name": "construct-0.1.0-alpha28-x86_64-1dd5fc2.apk",
+      "bytes": 26771855,
+      "sha256": "541516088043082ff0d7f8b00cc9f2156d5a08094557fb25d4ee5dd56bc60e2f"
+    }
+  ],
+  "architecture": {
+    "nativeSkyClassesAbsent": true,
+    "aviationProviderStringsAbsentFromDex": true,
+    "remainingNativeWorkflows": [
+      "photo.measure",
+      "camera.capture"
+    ],
+    "historicalIdentifierOnly": "sky.watch"
+  },
+  "artifactChecks": {
+    "signerContinuity": true,
+    "permissionsUnchangedFromAlpha27": true,
+    "protectedAssetsUnchanged": 17,
+    "nativeLibrariesByteIdenticalToAlpha27": true,
+    "bothAbiSizeAnd16KiBAlignmentChecks": true
+  },
+  "localChecks": {
+    "jvmTests": 184,
+    "lintErrors": 0,
+    "scriptTests": 28,
+    "runnerTests": 67,
+    "skyModuleTests": 24,
+    "skyMapTests": 3
+  },
+  "androidApiLevel": 37,
+  "retirement": {
+    "complete": true,
+    "stopped": true,
+    "oldSha256": "c82f49941650416afb632ec0c93ebc430ddda5331ac912c89bd8e62746816c7e",
+    "newSha256": "541516088043082ff0d7f8b00cc9f2156d5a08094557fb25d4ee5dd56bc60e2f",
+    "checks": [
+      "In-place host upgrade preserves selected catalog, unrelated installed module and saved counter",
+      "Retired installed trial remains manageable with visible Find update and disabled old authority",
+      "Unconfirmed retired module updates to exact modern signed module without reusing network consent",
+      "Rollback to retired native code is blocked and current modern module stays runnable",
+      "Retired reinstallation rejected before consent; saved unrelated module data remains intact"
+    ]
+  },
+  "independentChecklist": {
+    "complete": true,
+    "stopped": true,
+    "checks": [
+      "Two exact signed Checklist versions expose different module-owned workflow with saved item intact",
+      "Supported rollback restores original module controls/data on identical checksummed host APK"
+    ],
+    "moduleOnlyUpdate": {
+      "versions": [
+        {
+          "version": "0.1.0",
+          "sha256": "751a0c351ebfbe5841b907607b7c810bc03a0552ba85afe85074a1a36ab30ad9"
+        },
+        {
+          "version": "0.2.0",
+          "sha256": "c778504c9f8fae4c5d1a5cdcf1f6c40b091143d4568551bf5289327c96a0a678"
+        }
+      ],
+      "apkSha256Before": "541516088043082ff0d7f8b00cc9f2156d5a08094557fb25d4ee5dd56bc60e2f",
+      "apkSha256After": "541516088043082ff0d7f8b00cc9f2156d5a08094557fb25d4ee5dd56bc60e2f"
+    }
+  },
+  "modernSky": {
+    "complete": true,
+    "stopped": true,
+    "checks": [
+      "Exact signed module; net.http denied by default and explicitly granted in native access",
+      "Module-owned parser/map loads live ADSB.lol after manual coordinate validation without location permission",
+      "Module-owned OpenSky adapter loads live data",
+      "Combined receives both live feeds; deterministic identity/merge rules tested separately",
+      "Selected-aircraft metadata requires explicit lookup and returns attributed results; layout screenshots retained",
+      "Map, radius and controls survive both orientations and Android 2x text",
+      "Native menu pauses privileged work and returns to module state",
+      "Location module grant and Android denial remain separate; module cannot launch OS prompt",
+      "Granted location.read returns synthetic foreground coordinates to module code",
+      "Real background exit discards module area and requires a new selection",
+      "Offline transport failure is visible without crashing module",
+      "Revoked internet grant remains denied after reopen",
+      "Two signed synthetic module versions change real glossary behavior and rollback on the same checksummed APK"
+    ],
+    "apkSha256": "541516088043082ff0d7f8b00cc9f2156d5a08094557fb25d4ee5dd56bc60e2f",
+    "moduleOnlyUpdate": {
+      "before": {
+        "id": "dev.construct.sky-fixture",
+        "version": "0.1.0",
+        "sha256": "da5378bbfa945411d52c3deaf583816a32b225bcac1deab5a0d97980234d0706"
+      },
+      "after": {
+        "id": "dev.construct.sky-fixture",
+        "version": "0.2.0",
+        "sha256": "bd3fcb37d75c0fcf1c7653f559583c696cc233f443f01e7b3518881ad4a61805"
+      },
+      "apkSha256Before": "541516088043082ff0d7f8b00cc9f2156d5a08094557fb25d4ee5dd56bc60e2f",
+      "apkSha256After": "541516088043082ff0d7f8b00cc9f2156d5a08094557fb25d4ee5dd56bc60e2f"
+    }
+  },
+  "screenshotsReviewed": [
+    "Retirement Update required guidance and Find update action in portrait, landscape, 2x portrait and 2x landscape",
+    "Retired access off/disabled and retired install error",
+    "Checklist 0.1/0.2/rollback control availability, and retained single item after rollback",
+    "Modern Sky combined map and map layouts in both orientations and 2x text",
+    "Actual aircraft registry fields in both orientations and 2x text, above the metadata dialog footer",
+    "Synthetic Sky glossary before and rollback show generic Beechcraft King Air; update screenshot inspected but does not include changed-value viewport"
+  ],
+  "captureLimits": [
+    "Immediate Checklist before/after PNGs contain stale row/checkbox pixels; they are not deletion-state proof. Live accessibility assertions and a fresh rollback reopen with the preserved single item establish the stored workflow result.",
+    "The final retirement rollback PNG does not include the error viewport; the live exact error assertion and successful reopen of the unchanged current module establish rejection. It is not published as a screenshot of the error.",
+    "Synthetic Sky update PNG misses the changed glossary row; live accessibility assertions and saved view hierarchy establish King Air 300 after the update. Only the before/rollback PNGs visibly establish the generic label."
+  ],
+  "failedDevelopmentRuns": [
+    "First retirement scope passed four checks then the driver attempted a gesture during a closing version sheet. It remained incomplete/stopped. A bounded stable-host wait corrected the driver; the same APK completed all five checks on a clean rerun."
+  ],
+  "limits": [
+    "Three independently completed clean-snapshot Android 17 x86_64 scopes; not one uninterrupted run or physical ARM64 execution.",
+    "Legacy-to-modern upgrade uses a real unconfirmed installed Sky 0.1.0; additional confirmed/optional-retirement branches have JVM coverage.",
+    "Checklist uses actual published signed packages and synthetic saved items; Sky glossary fixtures and the location fix are synthetic.",
+    "Camera and Measure native workflows are unchanged and remain migration debt; their full device suites are not rerun.",
+    "Source architecture ratchet catches named dependency/dispatch regressions; it is not a semantic proof of all possible coupling."
+  ],
+  "constructCrashOrAnrMarkers": false
+}

@@ -32,14 +32,21 @@ keys, real contact records, personal photos or unredacted diagnostics.
 Known camera direct-Reopen accessibility and the limits of bounded isolation probes
 are documented openly; neither is represented as a completed security guarantee.
 
-### Legacy Sky Watch native workspace
+### Historical Sky Watch native workspace (alpha23–alpha27)
 
-API 0.8.0 adds an explicit `sky.watch` open-only grant. Its native foreground map
-may query fixed aircraft/map services after a human chooses an area. Optional
-coarse/fine phone location is requested only from a native human control. Module
-JavaScript receives no location, aircraft data or map pixels and retains its
-existing network/geolocation denial. There is no background location permission.
-See [the scoped privacy and network contract](docs/sky-watch.md).
+API 0.8.0 introduced an explicit `sky.watch` open-only grant. Through alpha27, its
+native foreground map could query fixed aircraft/map services after a human chose
+an area. Optional coarse/fine phone location was requested only from a native
+human control. Module JavaScript received no location, aircraft data or map pixels
+and retained its existing network/geolocation denial. No background location
+permission was added. See [the historical privacy contract](docs/sky-watch.md).
+
+Alpha28 removes that native implementation and retains `sky.watch` only as a
+historical identifier for recognizing old manifests. Existing required callers
+need a module update; execution, new installation and rollback to required callers
+are blocked while saved module data is retained. The old grant does not authorize
+the modern module's HTTP or location access. See
+[retirement and rollback handling](docs/shell-retirement.md).
 
 
 ### Module HTTP and location (API 0.9)

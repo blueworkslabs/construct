@@ -16,11 +16,10 @@ fun checkRule(ok: Boolean, code: String, message: String) {
 }
 
 data class Capability(val id: String, val reason: String, val optional: Boolean = false, val origins: List<String> = emptyList()) {
-    val explicitOptIn: Boolean get() = id in setOf("device.tone", "contacts.read", "camera.capture", "photo.measure", "sky.watch", "net.http", "location.read")
+    val explicitOptIn: Boolean get() = id in CapabilityLifecycle.retired || id in setOf("device.tone", "contacts.read", "camera.capture", "photo.measure", "net.http", "location.read")
     val label: String get() = when (id) {
         "net.http" -> "Allow approved internet sources"
         "location.read" -> "Allow reading phone location"
-        "sky.watch" -> "Allow Sky Watch map and data"
         "photo.measure" -> "Allow photo measurement"
         "camera.capture" -> "Allow camera workspace"
         "contacts.read" -> "Allow reading contacts"
@@ -39,7 +38,8 @@ object Packages {
     const val MAX_ZIP = 4 * 1024 * 1024
     const val MAX_EXPANDED = 12 * 1024 * 1024
     const val MAX_FILE = 2 * 1024 * 1024
-    val supported = setOf("device.toast", "log.write", "storage.kv", "device.tone", "contacts.read", "camera.capture", "photo.measure", "sky.watch", "net.http", "location.read")
+    val supported = setOf("device.toast", "log.write", "storage.kv", "device.tone", "contacts.read", "camera.capture", "photo.measure", "net.http", "location.read")
+    val recognized = supported + CapabilityLifecycle.retired
     private val idPattern = Regex("[a-z][a-z0-9]*(\\.[a-z][a-z0-9-]*)+")
     private val versionPattern = Regex("(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)")
     private val filePattern = Regex("[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*(?:/[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)*")
@@ -73,13 +73,13 @@ object Packages {
         val entry = string(m, "entry", 180)
         checkRule(safePath(entry) && entry.endsWith(".html"), "ENTRY_INVALID", "Module entry must be a local HTML file")
         val rawCaps = m.getJSONArray("capabilities")
-        checkRule(rawCaps.length() <= supported.size, "CAPABILITY_DENIED", "Too many requested capabilities")
+        checkRule(rawCaps.length() <= recognized.size, "CAPABILITY_DENIED", "Too many requested capabilities")
         val caps = (0 until rawCaps.length()).map { index ->
             val cap = rawCaps.getJSONObject(index)
             keys(cap, setOf("id", "reason", "optional", "origins"), setOf("id", "reason"))
             if (cap.has("optional")) checkRule(cap.get("optional") is Boolean, "MANIFEST_SCHEMA", "Invalid optional flag")
             val capId = string(cap, "id", 80)
-            checkRule(capId in supported, "CAPABILITY_DENIED", "Unsupported capability: $capId")
+            checkRule(capId in recognized, "CAPABILITY_DENIED", "Unsupported capability: $capId")
             val origins = if (capId == "net.http") {
                 checkRule(api.get("min") == "0.9.0", "API_INCOMPATIBLE", "HTTP requires Construct API 0.9.0")
                 val list = cap.optJSONArray("origins") ?: throw ConstructError("MANIFEST_SCHEMA", "HTTP sources are required")
@@ -98,7 +98,7 @@ object Packages {
         checkRule(caps.none { it.id == "contacts.read" } || api.get("min") in setOf("0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0"), "API_INCOMPATIBLE", "Contacts require Construct API 0.3.0")
         checkRule(caps.none { it.id == "camera.capture" } || api.get("min") in setOf("0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0"), "API_INCOMPATIBLE", "Camera requires Construct API 0.4.0")
         checkRule(caps.none { it.id == "photo.measure" } || api.get("min") in setOf("0.7.0", "0.8.0", "0.9.0"), "API_INCOMPATIBLE", "Photo measurement requires Construct API 0.7.0")
-        checkRule(caps.none { it.id == "sky.watch" } || api.get("min") in setOf("0.8.0", "0.9.0"), "API_INCOMPATIBLE", "Sky Watch requires Construct API 0.8.0")
+        CapabilityLifecycle.validateHistoricalApi(caps, api.getString("min"))
         checkRule(caps.map { it.id }.distinct().size == caps.size, "MANIFEST_SCHEMA", "Duplicate capabilities")
         for ((field, max) in listOf("description" to 500, "author" to 120, "homepage" to 500)) {
             if (m.has(field)) checkRule(m.get(field) is String && m.getString(field).length <= max, "MANIFEST_SCHEMA", "Invalid $field")
