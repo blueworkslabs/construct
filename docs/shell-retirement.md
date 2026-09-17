@@ -67,12 +67,12 @@ landscape and large text. Do not attach alpha27 evidence to alpha28.
 
 ## Next extractions (not implemented by this change)
 
-1. **Measure:** module owns calibration/reference selection, units, endpoint edits,
+1. **[Measure (#26)](https://github.com/blueworkslabs/construct/issues/26):** module owns calibration/reference selection, units, endpoint edits,
    interpretation and screen flow. Specify bounded image acquisition and reusable
    detection/geometry results, opaque per-run image handles, cancellation and
    explicit pixel/data exposure before replacing `photo.measure`. Preserve current
    native image privacy until the new data-flow contract is implemented.
-2. **Camera:** module owns album and analysis presentation/workflow. Separate native
+2. **[Camera (#27)](https://github.com/blueworkslabs/construct/issues/27):** module owns album and analysis presentation/workflow. Separate native
    shutter/permission controls, bounded capture/storage/export and reusable analysis
    from the application. Preserve existing private photos and deletion/export paths.
 3. **Second independent consumer:** use an unrelated module to exercise existing

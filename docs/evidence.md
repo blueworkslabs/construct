@@ -1,5 +1,25 @@
 # Evidence ledger and known limits
 
+## Native Sky retirement alpha28 — September 17, 2026
+
+The [alpha28 exact-artifact summary](evidence/shell-retirement-alpha28-2026-09-17.json)
+covers frozen app source `1dd5fc2`: all six native Sky classes, Activity and
+bridge dispatch removed; only its historical capability identifier is retained.
+184 JVM tests and lint (zero errors) passed. Three separate clean-snapshot
+Android 17 x86_64 scopes completed on the same APK: 5 retirement/upgrade checks,
+2 unrelated Checklist update/rollback checks and 13 modern Sky checks.
+Checklist's published signed versions add and execute Clear completed, then roll
+back while retaining the remaining saved item, without changing the host APK.
+Sky Watch 0.2.2 is unchanged. Signer, permissions, 17 protected assets and native
+libraries match alpha27; both ABI artifact budgets/alignment checks passed.
+
+Retirement guidance was reviewed in both orientations and at 2x text. The receipt
+records excluded stale/missing screenshot viewports and the incomplete first
+retirement driver run, followed by a complete rerun on identical APK bytes.
+This is not physical ARM64 acceptance or a new full Camera/Measure device run.
+Those native workflows remain [tracked extraction debt](shell-retirement.md).
+
+
 ## Modular Sky alpha27 — September 17, 2026
 
 The [alpha27 exact-artifact summary](evidence/modular-sky-alpha27-2026-09-17.json)
