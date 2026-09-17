@@ -43,12 +43,20 @@ def scroll(direction='down'):
     time.sleep(.3)
 
 def reveal(text):
-    for direction in ('down','up'):
+    for direction in ('up','down'):
         for _ in range(9):
             candidates=[n for n in nodes() if text in (n.get('text'),n.get('content-desc')) and visible(n)]
             if candidates:return candidates[0]
             scroll(direction)
     raise RuntimeError('Module control is not reachable: '+text)
+
+def reveal_fragment(text):
+    for direction in ('up','down'):
+        for _ in range(12):
+            matches=[n for n in nodes() if text in (n.get('text','')+' '+n.get('content-desc','')) and visible(n)]
+            if matches:return matches[0]
+            scroll(direction)
+    raise RuntimeError('Module content is not reachable: '+text)
 
 def click(text):tap_node(reveal(text))
 
@@ -126,14 +134,15 @@ def choose_permission(options):
     raise RuntimeError('Android permission choices missing')
 
 def screenshot_layouts(prefix,expected):
+    field_target=None
     for scale,rotation,suffix in [('1.0','0','portrait'),('1.0','1','landscape'),('2.0','0','font2'),('2.0','1','font2-landscape')]:
         adb('shell','settings','put','system','accelerometer_rotation','0')
         adb('shell','settings','put','system','font_scale',scale)
         adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2)
-        contains(expected);capture(prefix+'-'+suffix)
+        reveal_fragment(expected);capture(prefix+'-'+suffix)
         if prefix=='modular-metadata':
-            target=next((x for x in ('Registry owner','Callsign airline') if x in labels()),None)
-            if target:reveal(target);capture(prefix+'-'+suffix+'-fields')
+            field_target=field_target or next((x for x in ('Registry owner','Callsign airline') if x in labels()),None)
+            reveal_fragment(field_target or 'Aircraft retrieved:');capture(prefix+'-'+suffix+'-fields')
     adb('shell','settings','put','system','user_rotation','0')
     adb('shell','settings','put','system','font_scale',font);time.sleep(2)
 
@@ -155,16 +164,16 @@ try:
     time.sleep(16);click('50 km');tap('100 km');ready('ADSB.lol');click('Zoom in');click('Zoom out');click('Center map')
     # Reveal an actual live list row; do not select a hard-coded aircraft.
     for _ in range(8):
-        candidates=[n for n in nodes() if n.get('class')=='android.widget.Button' and re.search(r'\d+(?:\.\d+)? km · ',n.get('text','')+' '+n.get('content-desc','')) and visible(n)]
+        candidates=[n for n in nodes() if re.search(r'\d+(?:\.\d+)? km · ',n.get('text','')+' '+n.get('content-desc','')) and visible(n)]
         if candidates:tap_node(candidates[0]);break
         scroll()
     else:raise RuntimeError('No selectable live aircraft row')
     contains('Dismiss details');click('More aircraft info');find('Look up with ADSBdb');capture('modular-metadata-optin')
-    tap('Look up with ADSBdb');contains('Aircraft retrieved:',60)
+    tap('Look up with ADSBdb');contains('Look up again',60);reveal_fragment('Aircraft retrieved:')
     if any('HTTP ' in x or 'Unexpected ' in x or 'Request unavailable' in x for x in labels()):raise RuntimeError('Metadata lookup failed')
     screenshot_layouts('modular-metadata','ADSBdb record');tap('Close aircraft info');done('Selected-aircraft metadata requires explicit lookup and returns attributed results; layout screenshots retained')
-    click('Dismiss details');click('Center map');screenshot_layouts('modular-map','100 km');done('Map, radius and controls survive both orientations and Android 2x text')
-    tap('Construct menu');tap('Return to module');contains('Refresh paused while');capture('modular-menu-resume');done('Native menu pauses privileged work and returns to module state')
+    click('Area');fields();tap('Show aircraft');ready('ADSB.lol');click('Center map');screenshot_layouts('modular-map','100 km');done('Map, radius and controls survive both orientations and Android 2x text')
+    tap('Construct menu');tap('Return to module');reveal_fragment('Refresh paused while');capture('modular-menu-resume');done('Native menu pauses privileged work and returns to module state')
     click('Area');tap('Use my location');contains('Enable the requested capability');tap('Cancel')
     access();switch('Allow reading phone location');native_status('Allow reading phone location: on.')
     reveal_host_control('Allow Android location access');tap('Allow Android location access');choose_permission(["Don’t allow","Don't allow"])
@@ -204,7 +213,9 @@ try:
     result['complete']=True
 except Exception as e:
     result['error']=str(e)
-    try:capture('modular-failure')
+    try:
+        capture('modular-failure')
+        (RESULTS/'modular-failure-nodes.json').write_text(json.dumps([n.attrib for n in nodes()],indent=2))
     except Exception:pass
     raise
 finally:

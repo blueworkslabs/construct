@@ -7,8 +7,48 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.*
 import org.junit.Test
+import okhttp3.Call
+import okhttp3.OkHttpClient
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
+import java.util.concurrent.TimeUnit
 
 class ModuleHttpTest {
+    @Test fun socketCancellationAndPoolCleanupRunOffTheCallerThread() {
+        val caller = Thread.currentThread()
+        val client = OkHttpClient()
+        val cancelled = CountDownLatch(1)
+        var sameThread = true
+        val call = object : Call by client.newCall(Request.Builder().url("https://example.org/").build()) {
+            override fun cancel() { sameThread = Thread.currentThread() === caller; cancelled.countDown() }
+        }
+        ModuleHttp.releaseResources(listOf(call), client)
+        assertTrue(cancelled.await(5, TimeUnit.SECONDS))
+        assertFalse("TLS socket cancellation must not run on the UI caller", sameThread)
+        val drained = CountDownLatch(1)
+        val barrier = object : Call by call { override fun cancel() { drained.countDown() } }
+        ModuleHttp.releaseResources(listOf(barrier))
+        assertTrue(drained.await(5, TimeUnit.SECONDS))
+        assertTrue(client.dispatcher.executorService.isShutdown)
+    }
+    @Test fun pausedCleanupDoesNotCancelResumedCallsOrCloseTheirDispatcher() {
+        val client = OkHttpClient()
+        var oldCancelled = false
+        var newCancelled = false
+        val delegate = client.newCall(Request.Builder().url("https://example.org/").build())
+        val old = object : Call by delegate { override fun cancel() { oldCancelled = true } }
+        val resumed = object : Call by delegate { override fun cancel() { newCancelled = true } }
+        val calls = mutableListOf<Call>(old)
+        val queued = mutableListOf<Runnable>()
+        ModuleHttp.releaseResources(calls.toList(), executor = Executor { queued.add(it) })
+        calls.add(resumed)
+        assertFalse(oldCancelled)
+        queued.single().run()
+        assertTrue(oldCancelled)
+        assertFalse(newCancelled)
+        assertFalse(client.dispatcher.executorService.isShutdown)
+        client.dispatcher.executorService.shutdown()
+    }
     private fun response(body: String, mime: String="application/json", status: Int=200)=Response.Builder()
         .request(Request.Builder().url("https://example.org/data").build()).protocol(Protocol.HTTP_1_1)
         .code(status).message("Test").header("Set-Cookie","private=value").header("Retry-After","60")

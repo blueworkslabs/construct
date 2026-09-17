@@ -16,6 +16,8 @@ import java.net.Proxy
 import java.net.UnknownHostException
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -36,8 +38,12 @@ internal class ModuleHttp(context: Context, private val module: ModuleManifest, 
         .connectTimeout(8, TimeUnit.SECONDS).readTimeout(8, TimeUnit.SECONDS).callTimeout(15, TimeUnit.SECONDS)
         .cache(Cache(cacheDirectory(context, module.id), 12L * 1024 * 1024)).build()
     private fun check() { checkRule(!closed.get(), "RUN_STALE", "Module request session closed"); authorize() }
-    fun cancel() { calls.forEach { it.cancel() } }
-    fun close() { closed.set(true); cancel(); client.connectionPool.evictAll(); client.dispatcher.executorService.shutdown(); runCatching { client.cache?.close() } }
+    fun cancel() { releaseResources(calls.toList()) }
+    fun close() {
+        // Revoke delivery synchronously; TLS socket/cache teardown can perform I/O.
+        // In particular Conscrypt close() may write close_notify to an idle socket.
+        if (closed.compareAndSet(false, true)) releaseResources(calls.toList(), client)
+    }
     fun get(params: JSONObject, done: (JSONObject?, ConstructError?) -> Unit) {
         check()
         checkRule(params.keys().asSequence().toSet() == setOf("op", "url", "format") && params.opt("op") == "get",
@@ -75,6 +81,20 @@ internal class ModuleHttp(context: Context, private val module: ModuleManifest, 
     }
     companion object {
         private val budgetLock = Any()
+        private val cleanupWorker = Executors.newSingleThreadExecutor { task ->
+            Thread(task, "construct-http-cleanup").apply { isDaemon = true }
+        }
+        internal fun releaseResources(calls: List<Call>, client: OkHttpClient? = null, executor: Executor = cleanupWorker) {
+            // Capture only this pause's calls: a quick resume must not cancel new work.
+            executor.execute {
+                calls.forEach { call -> runCatching { call.cancel() } }
+                if (client != null) {
+                    runCatching { client.connectionPool.evictAll() }
+                    client.dispatcher.executorService.shutdown()
+                    runCatching { client.cache?.close() }
+                }
+            }
+        }
         private fun cacheDirectory(context: Context, id: String): File {
             val root = File(context.cacheDir, "module-http").apply { mkdirs() }
             val current = File(root, id)
