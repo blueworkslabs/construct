@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.measure-preview",
+      "name": "Measure Preview",
+      "versions": [
+        {
+          "id": "dev.construct.measure-preview",
+          "name": "Measure Preview",
+          "version": "0.1.0",
+          "artifact": "dev.construct.measure-preview-0.1.0.zip",
+          "sha256": "5724f854847e8201ee3b95b08a8587509cf14618785a05522185aa39459136ec",
+          "signature": "chs54PEstNcxNNXT12JVOqM/PAb3JDaEGhG0aAD0sTYd97bY69oJf0CvXy/89DaznZAnO7Zana7lDJpAzBe/94uDsZ5s1gIU7Gi/Jxt6nwH6ruKSY3WRVOFsHyg6ROgCl3ngCd3fNmiDDuU4sVZIdtD2FlYIns3GNbcxcrVTuO8rv0w+eo8VbvSihCEogsxRKqNzaEEBh1Ek6XfVG+bAznQr+QUZSWhbDGJ8olGjtL7dJNByaY2dhv4lLg/dS9XPWw3ur+g9RNwTU99RpD1tDiRIOlT7vQth36I7IDAEOdbgsgoxrQo/+H3+arQmblBaI0GgSORHIeZopyFwTK4bXg==",
+          "testFixture": true
+        }
+      ]
+    }
+  ]
+}
