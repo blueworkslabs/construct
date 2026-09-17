@@ -57,4 +57,13 @@ class SensitiveGrantUpdateTest {
         store.install(fixture("0.3.0"))
         assertDenied()
     }
+    @Test fun reintroducedLegacyStorageDoesNotUndoExplicitRevocation() {
+        store.install(fixture("0.1.0")); store.setCapability(id, "storage.kv", false); store.confirm(id)
+        store.install(fixture("0.4.0")); store.confirm(id)
+        store.install(fixture("0.3.0")); store = ModuleStore(app)
+        val module = store.installed().single()
+        assertFalse("storage.kv" in module.granted)
+        try { store.withCapability(module, "storage.kv") { fail("Revoked storage was restored") } }
+        catch (error: ConstructError) { assertEquals("CAPABILITY_DENIED", error.code) }
+    }
 }

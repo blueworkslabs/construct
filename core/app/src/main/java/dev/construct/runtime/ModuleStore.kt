@@ -230,7 +230,8 @@ class ModuleStore(private val context: Context) {
         // Match the trusted install switch: an absent capability is a new request,
         // even if a historical grant remains available for legacy code rollback.
         candidate.manifest.capabilities.forEach {
-            if (it.id !in previouslyDeclared || !approved.has(it.id)) approved.put(it.id, !it.explicitOptIn)
+            if (!approved.has(it.id) || (it.explicitOptIn && it.id !in previouslyDeclared))
+                approved.put(it.id, !it.explicitOptIn)
         }
         // Older hosts could retain origins absent from the active manifest.
         val previousOrigins = retainedHttpOrigins(old, oldManifest)

@@ -38,9 +38,9 @@ def prepare(output):
 def prepare_sensitive(output, key):
     with tempfile.TemporaryDirectory() as tmp:
         probe=Path(tmp); (probe/'index.html').write_text('<p>Signed sensitive grant fixture</p>')
-        for version in ('0.1.0','0.2.0','0.3.0'):
-            caps=[dict(id='storage.kv',reason='Keep synthetic counter data')]
-            if version != '0.2.0':
+        for version in ('0.1.0','0.2.0','0.3.0','0.4.0'):
+            caps=[] if version=='0.4.0' else [dict(id='storage.kv',reason='Keep synthetic counter data')]
+            if version not in ('0.2.0','0.4.0'):
                 caps += [dict(id=cap,reason='Verify explicit native consent') for cap in
                          ('device.tone','contacts.read','camera.capture','photo.measure','sky.watch','location.read')]
                 caps.append(dict(id='net.http',reason='Verify explicit source consent',origins=['https://example.org']))
