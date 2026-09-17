@@ -164,7 +164,7 @@ try:
     if grant.get('checked')!='false': raise RuntimeError('Expected default-off old grant')
     tap_node(grant); tap('Allow & install'); installed_status()
     select_after('Pocket Measure · 0.1.3', ('Open',)); tap('Open measurement workspace'); find('Choose photo')
-    capture('old-native-workspace'); tap('Close measure'); tap('Construct menu'); tap('Close module'); library()
+    capture('old-native-workspace'); tap('Close measure'); library()
     # Leave the old version unconfirmed: it must remain replaceable after retirement.
     catalog_settings(); tap('Use demo catalog'); apply_catalog(); find('Catalog refreshed.')
     adb('shell','am','force-stop','dev.construct.runtime')
