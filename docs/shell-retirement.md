@@ -52,7 +52,7 @@ The store enforces install, run, grant, confirmation and rollback boundaries, an
 the Activity/WebView check the runtime boundary again. Library provides a recovery
 path even when an old trial cannot run.
 
-Run `python scripts/check_architecture.py`. CI rejects the known native Sky domain
+Run `python scripts/check_architecture.py`. CI rejects known native Sky and Measure domain
 classes/provider dependencies, new native workspace dispatches, unreviewed Activity
 registrations and DEX loader introduction. This small source ratchet is a backstop,
 not a semantic proof or a reason to evade ownership review by renaming code.
@@ -81,3 +81,21 @@ landscape and large text. Do not attach alpha27 evidence to alpha28.
 
 These require their own implementations and exact-artifact evidence. Removing Sky
 is not a claim that Camera/Measure are modular or that the complete shell is clean.
+
+
+## Measure retirement (alpha29 candidate)
+
+After the module-owned picker/measurement prototype passed, the alpha29 candidate
+removes the seven native Measure workflow/geometry/UI classes, Activity and bridge
+dispatch. Generic bounded image selection/decoding and marker detection remain;
+ID selection, calibration, endpoints, units and interpretation do not.
+`photo.measure` is retained only as a historical API 0.7+ identifier. Installed
+0.1.x packages receive the same data-preserving Update required / Find update
+handling described above. New installs and rollback into the retired workspace
+are blocked. The native workspace itself never saved measurements or photos.
+
+Pocket Measure 0.2.0 requires API 0.10 and two new explicit image grants; old native
+measurement consent must not be inherited. Alpha28 is the final native Measure
+host. Full optimized-candidate acceptance is pending; the completed debug prototype
+is not release acceptance. See [the image contract](module-images.md) and
+[the modern user flow](pocket-measure.md). Camera is the remaining native exception.

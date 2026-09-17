@@ -432,7 +432,6 @@ class MainActivity : ComponentActivity() {
                         cap.origins.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
                     }
                     Text("Existing access choices are kept unless you change them. New sensitive capabilities start off. You can change access later in Module access.")
-                    if (verified.manifest.capabilities.any { it.id == "photo.measure" }) Text("You choose one image through Android’s photo picker. Measurement is local and approximate; photos and results are not shared with JavaScript or saved by this workspace.")
                     if (verified.manifest.capabilities.any { it.id == "camera.capture" }) Text("Camera also needs Android permission through Module access. Photos are saved privately by the native workspace, not shared with JavaScript. No microphone or general file access.")
                     if (verified.manifest.capabilities.any { it.id == "contacts.read" }) Text("Contacts also need Android permission. After installing, open Module access to allow Android contacts access. This does not grant any module automatically.")
                     if (verified.manifest.capabilities.any { it.id == "contacts.read" } && verified.manifest.capabilities.any { it.id == "storage.kv" }) Text("This module can save contact data on this phone when both contacts and saved-data access are allowed. Revoking contacts access does not erase data it already saved.")

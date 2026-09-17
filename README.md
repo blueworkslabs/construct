@@ -103,8 +103,9 @@ flowchart LR
 ```
 
 **The design goal is module updates without a new APK once the required host API
-exists. New native capabilities need host updates.** Pocket Measure and Camera
-still contain host-owned application workflows.
+exists. New native capabilities need host updates.** Camera remains a host-owned
+application workflow. Pocket Measure 0.2.x moves geometry, editor and UI into its
+module using [API 0.10 image primitives](docs/module-images.md) and fresh consent.
 The alpha28 candidate removes native Sky Watch and provides an explicit
 [old-module update path](docs/shell-retirement.md). Sky Watch 0.2.x keeps aircraft
 logic, glossary, map and controls in the signed module; API 0.9 supplies only

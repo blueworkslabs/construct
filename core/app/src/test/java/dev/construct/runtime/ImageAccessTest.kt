@@ -39,11 +39,4 @@ class ImageAccessTest {
         store = ModuleStore(app)
         denied("CAPABILITY_DENIED") { store.withCapability(store.installed().single(),"image.read") {} }
     }
-    @Test fun nativeMeasureConsentCannotBecomePixelConsentOnUpdate() {
-        store.install(fixture("measure-legacy-registry"), mapOf("photo.measure" to true))
-        val old = store.installed().single(); store.beginRun(old); store.confirm(old.manifest.id)
-        store.install(fixture("home-registry"))
-        val current = store.installed().single()
-        for (cap in listOf("image.read", "image.markers")) denied("CAPABILITY_DENIED") { store.withCapability(current,cap) {} }
-    }
 }

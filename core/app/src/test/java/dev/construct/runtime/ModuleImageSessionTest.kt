@@ -39,6 +39,8 @@ class ModuleImageSessionTest {
         session.cancel()
         result!!(Uri.parse("content://never-read/late"))
         assertEquals(listOf("IMAGE_CANCELLED"), errors)
+        denied("IMAGE_RATE") { session.request("image.read", JSONObject("{op:pick}")) { _, _ -> fail() } }
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofSeconds(2))
         session.request("image.read", JSONObject("{op:pick}")) { _, e -> errors.add(e?.code) }
         result!!(null)
         assertEquals(listOf("IMAGE_CANCELLED", "IMAGE_CANCELLED"), errors)

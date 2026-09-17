@@ -187,9 +187,7 @@ def control(text):
             current_nodes=nodes()
             web=next(n for n in current_nodes if n.get('class')=='android.webkit.WebView')
             x1,y1,x2,y2=rect(web)
-            summary=next((n for n in current_nodes if n.get('text','').startswith(('No length yet','Length:'))),None)
-            if summary is None:raise RuntimeError('Measurement summary not exposed')
-            y1=rect(summary)[1]
+            y1=rect(find(WORKSPACE))[3]
             top=y1+(y2-y1)//5;bottom=y2-(y2-y1)//5
             adb('shell','input','swipe',str((x1+x2)//2),str(bottom if direction==1 else top),str((x1+x2)//2),str(top if direction==1 else bottom),'350')
     raise RuntimeError('Control missing: '+text)
@@ -198,7 +196,8 @@ def collapse():
     if 'Hide controls' in labels():action('Hide controls')
     time.sleep(.4)
 def size(value):
-    if 'Change reference size' in labels():action('Change reference size')
+    if 'Show controls' in labels():tap('Show controls');time.sleep(.4)
+    if any(x.startswith('Length:') or (x.startswith('Marker ') and x.endswith('mm ✓')) for x in labels()):action('Change reference size')
     control('Measured black-square side (mm)')
     ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value)
     action('Use this size');expect('Tap the two ends');collapse()

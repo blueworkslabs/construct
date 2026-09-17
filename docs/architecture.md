@@ -60,9 +60,11 @@ Android permission UI and session authorization remain outside module control.
 
 ### Current native-workspace exceptions
 
-Pocket Measure launches
-`MeasureActivity` via `photo.measure`. The camera workspace also contains
-application-specific album/analysis flows alongside native acquisition.
+Only the camera workspace still contains application-specific album/analysis
+flows alongside native acquisition. Pocket Measure 0.2.x owns its workflow in
+module code; API 0.10 supplies image selection/decoding and generic marker corners.
+`ModuleImageSession` owns only run-private image authority and bounded processing;
+no marker size, endpoint, measurement or unit policy reaches the native API.
 
 These are working prototypes but **not the desired module ownership boundary**.
 Preserve existing callers during migration; do not treat full native workspaces
@@ -105,4 +107,5 @@ belong in the public source distribution.
 The alpha28 candidate removes native Sky implementation code. Old `sky.watch`
 packages remain readable for management but require a module update; they cannot
 execute or be restored through rollback. See the [compatibility boundary](shell-retirement.md).
-Camera and Measure remain explicitly inventoried host-workflow debt.
+Alpha29 also retires `photo.measure`; see [the image/migration contract](module-images.md).
+Camera remains the single inventoried native-workflow exception.

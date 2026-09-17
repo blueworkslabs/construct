@@ -20,6 +20,7 @@ workflow or domain result belongs in that primitive.
   `IMAGE_CANCELLED`; no image is selected automatically.
 - `{op:"release",handle}` discards that run's image. Unknown/expired/foreign
   handles fail `IMAGE_STALE`. One current image and one pending operation per run.
+  Chooser launches have a two-second floor; detection calls a one-second floor.
 - Original encoded input <=20 MiB, source dimensions <=12000 each; software-decoded,
   EXIF-oriented working image <=1600 each with longest side <=1600. Rendered PNG
   <=12 MiB; original EXIF, filename, URI and provider metadata never reach JS.

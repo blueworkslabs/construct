@@ -16,13 +16,12 @@ fun checkRule(ok: Boolean, code: String, message: String) {
 }
 
 data class Capability(val id: String, val reason: String, val optional: Boolean = false, val origins: List<String> = emptyList()) {
-    val explicitOptIn: Boolean get() = id in CapabilityLifecycle.retired || id in setOf("device.tone", "contacts.read", "camera.capture", "photo.measure", "net.http", "location.read", "image.read", "image.markers")
+    val explicitOptIn: Boolean get() = id in CapabilityLifecycle.retired || id in setOf("device.tone", "contacts.read", "camera.capture", "net.http", "location.read", "image.read", "image.markers")
     val label: String get() = when (id) {
         "net.http" -> "Allow approved internet sources"
         "image.read" -> "Allow selected image pixels"
         "image.markers" -> "Allow local marker detection"
         "location.read" -> "Allow reading phone location"
-        "photo.measure" -> "Allow photo measurement"
         "camera.capture" -> "Allow camera workspace"
         "contacts.read" -> "Allow reading contacts"
         "device.tone" -> "Allow short tones"
@@ -40,7 +39,7 @@ object Packages {
     const val MAX_ZIP = 4 * 1024 * 1024
     const val MAX_EXPANDED = 12 * 1024 * 1024
     const val MAX_FILE = 2 * 1024 * 1024
-    val supported = setOf("device.toast", "log.write", "storage.kv", "device.tone", "contacts.read", "camera.capture", "photo.measure", "net.http", "location.read", "image.read", "image.markers")
+    val supported = setOf("device.toast", "log.write", "storage.kv", "device.tone", "contacts.read", "camera.capture", "net.http", "location.read", "image.read", "image.markers")
     val recognized = supported + CapabilityLifecycle.retired
     private val idPattern = Regex("[a-z][a-z0-9]*(\\.[a-z][a-z0-9-]*)+")
     private val versionPattern = Regex("(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)")
@@ -100,7 +99,6 @@ object Packages {
         checkRule(caps.none { it.id == "device.tone" } || api.get("min") in setOf("0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"), "API_INCOMPATIBLE", "Tone requires Construct API 0.2.0")
         checkRule(caps.none { it.id == "contacts.read" } || api.get("min") in setOf("0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"), "API_INCOMPATIBLE", "Contacts require Construct API 0.3.0")
         checkRule(caps.none { it.id == "camera.capture" } || api.get("min") in setOf("0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"), "API_INCOMPATIBLE", "Camera requires Construct API 0.4.0")
-        checkRule(caps.none { it.id == "photo.measure" } || api.get("min") in setOf("0.7.0", "0.8.0", "0.9.0", "0.10.0"), "API_INCOMPATIBLE", "Photo measurement requires Construct API 0.7.0")
         CapabilityLifecycle.validateHistoricalApi(caps, api.getString("min"))
         checkRule(caps.map { it.id }.distinct().size == caps.size, "MANIFEST_SCHEMA", "Duplicate capabilities")
         for ((field, max) in listOf("description" to 500, "author" to 120, "homepage" to 500)) {

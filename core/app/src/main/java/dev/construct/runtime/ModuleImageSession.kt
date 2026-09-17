@@ -35,6 +35,7 @@ internal class ModuleImageSession(
     private var pending: ((JSONObject?, ConstructError?) -> Unit)? = null
     private var deadline: Runnable? = null
     private var lastWork = -1000L
+    private var lastPick = -2000L
 
     private fun check(method: String = "image.read") {
         checkRule(!closed, "RUN_STALE", "Image session closed")
@@ -119,6 +120,11 @@ internal class ModuleImageSession(
             image(args.getString("handle"))
         }
         checkRule(pending == null, "IMAGE_BUSY", "An image request is already running")
+        if (method == "image.read") {
+            val now = android.os.SystemClock.elapsedRealtime()
+            checkRule(now - lastPick >= 2000, "IMAGE_RATE", "Wait two seconds before choosing another image")
+            lastPick = now
+        }
         val token = generation.incrementAndGet(); pending = done
         if (method == "image.read") {
             current = null

@@ -58,7 +58,7 @@
     finally {if(token===epoch){busy=false;render();}}
   };
   el('retry').onclick=async()=>{const token=++epoch;busy=true;clearError();render();try{await detect(token);}catch(error){if(token===epoch)fail(error);}finally{if(token===epoch){busy=false;render();}}};
-  el('setup').onsubmit=event=>{event.preventDefault();run(()=>{cancelGesture();editor.calibrate(corners,Measure.sideMm(el('side').value));endpoint=null;expanded(false);});};
+  el('setup').onsubmit=event=>{event.preventDefault();run(()=>{cancelGesture();editor.calibrate(corners,Measure.sideMm(el('side').value));el('side').blur();endpoint=null;expanded(false);});};
   el('side').oninput=()=>{cancelGesture();editor.reset();endpoint=null;clearError();render();};
   el('calibrate').onclick=()=>run(()=>{cancelGesture();editor.reset();endpoint=null;expanded(true);});
   el('expand').onclick=()=>{cancelGesture();expanded(el('controls').hidden);render();};
@@ -90,7 +90,7 @@
     gesture=null;if(pointers.size)gesture={type:'ignore'};render();
   };
   canvas.onpointercancel=()=>{cancelGesture();clearError();render();};
-  new ResizeObserver(()=>{cancelGesture();zoom=1;offset={x:0,y:0};draw();}).observe(el('viewport'));
+  new ResizeObserver(()=>{cancelGesture();zoom=1;offset={x:0,y:0};render();}).observe(el('viewport'));
   window.addEventListener('constructvisibilitychange',event=>{
     visible=event.detail.visible;cancelGesture();
     // Picker handoff pauses natively without this menu event. A real menu cancels work.

@@ -64,3 +64,18 @@ requires fresh consent. Host enforcement limits authority, not application inten
 signed modules still require review. Revocation blocks future authorized access,
 not copies already delivered. The new Sky module documents its narrower intended
 usage; those product promises must not be mistaken for universal host guarantees.
+
+### Selected images and marker detection (API 0.10 / alpha29)
+
+`image.read` gives module code a bounded, orientation-correct raster of one image
+chosen in Android's picker. `image.markers` returns bounded generic detections and
+also requires current image-read authority. Handles are per-run, not file paths;
+original metadata is stripped. Grants are explicit and off by default. Old
+`photo.measure` consent never authorizes these pixels; that native workflow ends
+at alpha28 and is retired in alpha29.
+
+Network, storage or diagnostic grants may let a module send or retain data it has
+received. Revocation cannot erase copies already delivered. Pocket Measure's lack
+of those capabilities is a module choice, not a universal host promise. Native
+picker handoff is the only background exception; all other background exits end
+the run. See [bounds, lifecycle and compatibility](docs/module-images.md).

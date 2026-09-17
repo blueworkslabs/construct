@@ -269,7 +269,6 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                 }
                 "storage.kv" -> store.storage(module.id, params)
                 "device.tone" -> tone.play(params)
-                "photo.measure" -> { MeasureActivity.open(context, store, installed, params); JSONObject().put("opened", true) }
                 "camera.capture" -> { CameraActivity.open(context, store, installed, params); JSONObject().put("opened", true) }
                 else -> throw ConstructError("CAPABILITY_DENIED", "Unsupported capability")
             }
