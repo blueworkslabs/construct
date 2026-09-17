@@ -85,6 +85,15 @@ def consent_switch(label):
         time.sleep(.3)
     raise RuntimeError('Trusted consent switch did not appear: '+label)
 
+def access_switch(label):
+    find('Reopen module')
+    end=time.monotonic()+20;previous=None
+    while time.monotonic()<end:
+        matches=[n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true']
+        if len(matches)==1 and matches[0].get('bounds')==previous:return matches[0]
+        previous=matches[0].get('bounds') if len(matches)==1 else None;time.sleep(.3)
+    raise RuntimeError('Access switch did not settle: '+label)
+
 def settled_host_surface():
     # A version review closes a ModalBottomSheet asynchronously. Never swipe
     # its disappearing accessibility window or retry the preceding action.
@@ -116,6 +125,12 @@ def capture_display(name):
     outcome=adb('emu','screenrecord','screenshot',str(target))
     images=list(target.glob('*.png'))
     if len(images)!=1 or not images[0].read_bytes().startswith(b'\x89PNG\r\n\x1a\n'):raise RuntimeError('Emulator display capture unavailable: '+outcome)
+    return images[0]
+def photo_pixels(name):
+    from PIL import Image
+    path=capture_display(name)
+    with Image.open(path) as frame:
+        return hashlib.sha256(frame.crop(tuple(rect(find(WORKSPACE)))).tobytes()).hexdigest()
 def expect(text, timeout=40):
     end=time.monotonic()+timeout
     while time.monotonic()<end:
@@ -312,9 +327,15 @@ try:
     if length()!=receipt['flatMm']:raise RuntimeError('Nudge undo failed')
     done('Accessible photo-pixel nudges are individually undoable')
     action('Clear');collapse();no_measurement()
+    fit_pixels=photo_pixels('module-gesture-fit')
     ui._device(description=WORKSPACE).pinch_out(percent=40,steps=25);time.sleep(.5);no_measurement()
+    zoom_pixels=photo_pixels('module-gesture-zoom')
+    if zoom_pixels==fit_pixels:raise RuntimeError('Pinch did not visibly zoom the photograph')
     x1,y1,x2,y2=rect(find(WORKSPACE));ui._device.swipe((x1+x2)//2,(y1+y2)//2,(x1+x2)//2-60,(y1+y2)//2-40,duration=.4)
-    no_measurement();tap('Reset photo view');time.sleep(.5)
+    no_measurement()
+    if photo_pixels('module-gesture-pan')==zoom_pixels:raise RuntimeError('Zoomed pan did not move the photograph')
+    tap('Reset photo view');time.sleep(.5)
+    if photo_pixels('module-gesture-reset')!=fit_pixels:raise RuntimeError('Fit reset did not restore the original rendered photograph')
     if abs(endpoints(entry)-240)>3:raise RuntimeError('Fit reset changed photo coordinates')
     done('Real pinch and pan do not place endpoints; reset restores calibrated fit coordinates')
     size('95');value=endpoints(entry)
@@ -356,9 +377,15 @@ try:
     measured();adb('shell','am','force-stop','dev.construct.runtime');opened();no_measurement()
     done('Process restart retains no selected photo or measurement')
     measured();tap('Construct menu');tap('Module access');find('Reopen module')
-    switch=find('Allow selected image pixels')
+    switch=access_switch('Allow local marker detection')
+    if switch.get('checked')!='true':raise RuntimeError('Expected existing detector grant')
+    tap_node(switch);tap('Turn off');find('Allow local marker detection: off.');tap('Reopen module');find('Choose photo')
+    stage('measure-flat.png');pick();expect('[CAPABILITY_DENIED]');no_measurement()
+    done('Marker detection has its own revocable grant even when image selection is still allowed')
+    tap('Construct menu');tap('Module access');find('Reopen module')
+    switch=access_switch('Allow selected image pixels')
     if switch.get('checked')!='true':raise RuntimeError('Expected existing pixel grant')
-    tap_node(switch);find('Allow selected image pixels: off.');tap('Reopen module');find('Choose photo');no_measurement()
+    tap_node(switch);tap('Turn off');find('Allow selected image pixels: off.');tap('Reopen module');find('Choose photo');no_measurement()
     action('Choose photo');expect('[CAPABILITY_DENIED]')
     if 'Photos' in labels():raise RuntimeError('Revoked access still launched picker')
     done('Revoking pixel access closes the old image session and denies a fresh picker request')
