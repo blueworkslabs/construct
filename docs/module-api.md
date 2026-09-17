@@ -39,6 +39,12 @@ every request. Sensitive asynchronous results are re-authorized at delivery.
 
 Legacy storage/log/toast access is approved at installation unless previously
 revoked. Tone, contacts, camera, photo measurement, Sky Watch, HTTP and location start off and require explicit native opt-in.
+When installing a version that reintroduces a capability absent from the current
+manifest, opt-in access starts off again unless explicitly approved in that install.
+Historical grant entries cannot override the displayed off switch. Unchanged
+declarations retain their grants. Direct legacy code rollback preserves existing
+non-HTTP grants but never reverses an explicit revocation; HTTP additionally forgets
+removed origins as described below.
 Updates/rollback preserve revoked access. Required access has confirmation before
 revocation. Native consent explains contacts plus storage when both are declared:
 a granted module can retain data it has read; revocation is not retroactive erasure.

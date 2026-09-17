@@ -49,7 +49,7 @@ p.add_argument('--sky-details', action='store_true', help='Also exercise alpha25
 p.add_argument('--sky-location-only', action='store_true', help='Only Sky Watch location/lifecycle continuation, excluding map/source/layout acceptance')
 p.add_argument('--sky-sha256', help='Exact signed Sky Watch 0.1.0 launcher')
 p.add_argument('--sky-module-candidates', type=Path, help='Exact module-owned Sky and synthetic update artifact metadata; separate scope')
-p.add_argument('--http-consent-candidates', type=Path, help='Only signed HTTP consent regressions and old-to-new APK upgrade; disposable app data')
+p.add_argument('--http-consent-candidates', type=Path, help='Only signed HTTP/location consent regressions and old-to-new APK upgrade; disposable app data')
 a = p.parse_args()
 if a.http_consent_candidates:
     if any((a.sky_module_candidates,a.sky_only,a.ux_candidates,a.measure_only,a.reliability_only,a.modules_only,a.tone_consent_only,a.focus_sha256,a.snake_sha256,a.contacts_sha256,a.camera_sha256,a.camera_only,a.focus_only,a.snake_only,a.contacts_only)):
@@ -57,9 +57,10 @@ if a.http_consent_candidates:
     consent=json.loads(a.http_consent_candidates.read_text())
     from config import catalog as validate_catalog
     validate_catalog(consent['catalog'])
+    validate_catalog(consent['locationCatalog'])
     if hashlib.sha256(Path(consent['oldApk']).read_bytes()).hexdigest()!=consent['oldSha256']:
         p.error('Old consent APK checksum mismatch')
-    for item in consent['versions']:
+    for item in [*consent['versions'],*consent['locationVersions']]:
         if not __import__('re').fullmatch(r'[0-9a-f]{64}',item['sha256']): p.error('Invalid consent artifact hash')
         if not __import__('re').fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+',item['version']): p.error('Invalid consent artifact version')
     consent.update(newApk=str(a.apk.resolve()),newSha256=a.sha256.lower())
@@ -138,7 +139,7 @@ receipt = {'started': datetime.datetime.now(datetime.timezone.utc).isoformat(), 
            'complete': False, 'scope': 'Checklist regression, classified bounded probes, injected renderer loss, and tone grant lifecycle; not complete sandbox/egress proof'}
 
 if a.sky_module_candidates: receipt['scope']='Module-owned Sky live providers, native HTTP/location grants, lifecycle, layouts and separate synthetic module-only update/rollback; not physical GPS or full host baseline'
-if a.http_consent_candidates: receipt['scope']='Signed synthetic HTTP consent removal/narrowing, rollback and old-to-new APK upgrade; no live provider or full host baseline checks'
+if a.http_consent_candidates: receipt['scope']='Signed synthetic HTTP/location consent removal/narrowing, rollback and old-to-new APK upgrade; no live provider or full host baseline checks'
 
 if a.sky_only: receipt['scope']='Sky Watch native foreground map, source switching, live provider responses, optional synthetic location and lifecycle; not physical GPS accuracy or host baseline'
 

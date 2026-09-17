@@ -32,7 +32,22 @@ def prepare(output):
     for source in ('focus-module','snake-module','contacts-module','camera-module','measure-module','sky-watch-module'):
         add(source,[None],'home-registry','test-registry')
     prepare_transport(output, key)
+    prepare_sensitive(output, key)
     print('Prepared complete JVM fixtures plus home/test catalogs under the selected output.')
+
+def prepare_sensitive(output, key):
+    with tempfile.TemporaryDirectory() as tmp:
+        probe=Path(tmp); (probe/'index.html').write_text('<p>Signed sensitive grant fixture</p>')
+        for version in ('0.1.0','0.2.0','0.3.0'):
+            caps=[dict(id='storage.kv',reason='Keep synthetic counter data')]
+            if version != '0.2.0':
+                caps += [dict(id=cap,reason='Verify explicit native consent') for cap in
+                         ('device.tone','contacts.read','camera.capture','photo.measure','sky.watch','location.read')]
+                caps.append(dict(id='net.http',reason='Verify explicit source consent',origins=['https://example.org']))
+            manifest=dict(schemaVersion=1,id='dev.construct.sensitive-probe',name='Sensitive probe',version=version,
+                constructApi=dict(min='0.9.0',target='0.9.0'),runtime=dict(kind='webview-js'),entry='index.html',capabilities=caps)
+            (probe/'manifest.json').write_text(json.dumps(manifest))
+            publish(output/'sensitive-registry',*build(probe,key),fixture=True)
 
 def prepare_transport(output, key):
     # Signed scopes exercise expansion, removal/reintroduction and rollback.
