@@ -276,9 +276,12 @@ try:
     if a.sky_module_candidates: children=[('sky_module.py','sky-module-result.json')]
     if a.http_consent_candidates: children=[('http_consent.py','http-consent-result.json')]
     for script, result in children:
+        # Consent seeds three old-APK states and exercises many signed updates;
+        # keep a bounded matrix budget without lengthening unrelated scopes.
+        timeout = 3600 if script == 'http_consent.py' else 1800 if script in ('ux.py','sky_module.py') else 900
         with (run/(script+'.log')).open('w') as log:
             subprocess.run([str(BASE/'venv/bin/python'), str(BASE/script)], check=True,
-                           stdout=log, stderr=subprocess.STDOUT, timeout=1800 if script in ('ux.py','sky_module.py') else 900)
+                           stdout=log, stderr=subprocess.STDOUT, timeout=timeout)
         if not json.loads((run/result).read_text()).get('complete'):
             raise RuntimeError('Incomplete child receipt: '+result)
     if not (a.http_consent_candidates or a.sky_module_candidates or a.sky_only or a.ux_candidates or a.measure_only or a.reliability_only or a.modules_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_only):
