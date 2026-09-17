@@ -35,7 +35,8 @@ internal object SkyIdentity {
             "CL60" to "Bombardier Challenger 600 series","FA7X" to "Dassault Falcon 7X","FA8X" to "Dassault Falcon 8X")
         add(SkyKind.TURBOPROP,"AT43" to "ATR 42-300","AT45" to "ATR 42-500","AT46" to "ATR 42-600",
             "AT72" to "ATR 72-200","AT75" to "ATR 72-500","AT76" to "ATR 72-600","DH8D" to "De Havilland Dash 8-400",
-            "PC12" to "Pilatus PC-12","TBM9" to "Daher TBM 900 series","BE20" to "Beechcraft King Air 200","BE30" to "Beechcraft King Air 350")
+            "PC12" to "Pilatus PC-12","TBM9" to "Daher TBM 900 series","BE20" to "Beechcraft King Air 200",
+            "BE30" to "Beechcraft King Air 300","B350" to "Beechcraft King Air 350")
         add(SkyKind.PISTON,"C152" to "Cessna 152","C172" to "Cessna 172","C182" to "Cessna 182",
             "P28A" to "Piper PA-28 Cherokee / Archer","SR20" to "Cirrus SR20","SR22" to "Cirrus SR22","DA40" to "Diamond DA40","DA42" to "Diamond DA42")
         add(SkyKind.ROTORCRAFT,"EC35" to "Airbus H135 / Eurocopter EC135","EC45" to "Airbus H145 / Eurocopter EC145",
