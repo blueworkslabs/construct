@@ -309,4 +309,10 @@ test("actual module has no native Sky launcher or direct network/geolocation", (
   assert.match(app, /call\(['"]location\.read['"]/);
   assert.match(app, /call\(['"]net\.http['"]/);
 });
+test("malformed categories and identity fields remain unknown", () => {
+  for (const value of ["constructor", "__proto__", ["A7"], {}, 7, null]) assert.equal(D.category(value), null);
+  const now = Date.now() / 1000;
+  const a = D.adsb({now: now * 1000, ac:[{hex:"abc123",lat:50,lon:8,seen_pos:0,r:42,t:{},category:"constructor"}]}, now)[0];
+  assert.equal(a.category, null); assert.equal(a.registrationSource, null); assert.equal(a.typeSource, null);
+});
 console.log(`${count} module Sky tests passed.`);

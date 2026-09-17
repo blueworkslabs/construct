@@ -22,7 +22,7 @@ const SkyData = (() => {
       ? { lat, lon }
       : null;
   const category = (x) =>
-    ({
+    typeof x === "string" && /^[AB][0-7]$/.test(x) ? ({
       A1: "Light aircraft",
       A2: "Small aircraft",
       A3: "Large aircraft",
@@ -36,7 +36,7 @@ const SkyData = (() => {
       B4: "Ultralight / hang-glider / paraglider",
       B6: "Unmanned aerial vehicle",
       B7: "Space / trans-atmospheric vehicle",
-    })[x] || null;
+    })[x] || null : null;
   const osCategory = (x) =>
     Number.isInteger(x)
       ? category(
@@ -114,8 +114,8 @@ const SkyData = (() => {
       source,
       sources: [source],
       category: cat,
-      registrationSource: registration ? source : null,
-      typeSource: type ? source : null,
+      registrationSource: text(registration) ? source : null,
+      typeSource: text(type) ? source : null,
       categorySource: cat ? source : null,
       identityConflict: false,
     };
