@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.location-fixture",
+      "name": "Location Probe",
+      "versions": [
+        {
+          "id": "dev.construct.location-fixture",
+          "name": "Location Probe",
+          "version": "0.1.0",
+          "artifact": "dev.construct.location-fixture-0.1.0.zip",
+          "sha256": "509c6632183decd23b5f9a611e192917bcd35bf4a0455421680ae95b3301ee18",
+          "signature": "ajCGf+pX6zwGA9H117l4RSc5GDgUGzqzhvjj/Nid4m6zlB8ZqJbEhuWfa1D0Swu2aIwBtDObdRAz3c2Ol5qyBt8pgR9W/94f4235P905F3lbxntg36N9o3eI9J5iVMlo4JGfTQ+R7KyOfzPYQX9loCJNSOhP9jcSbFr3EOvdsgai988rqJWKrFjaX7n29h4JC9iQ6906DYKoYWPaTHWor5LxV2uV5dQ5hUgMdIx/V5N9sX4kqzOuC6I1TmmVoGef7vIRKuWR4E0nxVC/GsW3dqxllK5mq4W38rgyUo+lj+7NFVAA4W7OkOnQkT0PZ5FW9Wyb8h6R00sQskx2jh6XCQ==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.location-fixture",
+          "name": "Location Probe",
+          "version": "0.2.0",
+          "artifact": "dev.construct.location-fixture-0.2.0.zip",
+          "sha256": "078c19d96a6bcd21852afc7aa32d93483e1c4f28e7b1521876ce444881092c66",
+          "signature": "Zua1FTPOEM8ARERYXlE1akncV4UXx3IpG78tRrToAKGcssEjr3sbwLWuyTU7BRf6wJEtk9ZdO8TswpWLsHr1LhLy9e+kz4Jpeb9QGKZnC1/PKOHxttS6nffe3/NLJdPhLeaNJ2aNJAfZYQRPYBhi2K+HXnYmjERoRfXq1Wr98KLj+kdZ601W6ow2I6NI7c8QQHS96chyaNhjvlNHU+supsigtctn6D9/7RXpt2FYsgjM/CWTvk/LRhGhn7BBhyGMBsmn4NkYJ5DGIlnFp31g0DYgYUKI1L5f19ZGbncdmZke/WPE6E8ey8kWX9apM8zms+hWSObbZcWLHBJRwE+p1g==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.location-fixture",
+          "name": "Location Probe",
+          "version": "0.3.0",
+          "artifact": "dev.construct.location-fixture-0.3.0.zip",
+          "sha256": "b9de6711c3ef0d6231b3e001e8697e6c2a1993a2fa570ac6204a5fc82c2d8b9d",
+          "signature": "e/SZO+EjiNA0NRjnQXK7LuXEdX11r/fq8HVWxdXsIfncoIaM+IvxJY8WarLug3souMCUWk9sjOugZen7yyVWNxG/hVOrMbC62PnVPVs7RT7IltgdkrFTkAvaEO9ZN1d3DuJPl0glrDKx3c05VjoA4cM0eir/NdW0ot3sRWmPMaogOcHz6qSyxKaESI9p8McKHdENoRIvLEWIPxi377DpsEFnBjmfTxeOVsP4kwGfVrDAHMoCZ0UL8MUbJMDGHWoxv/XCNkVNGukBcdtyohBihkobgCBTHYQgSCUHTdrOTCas6qSc5VCcnAQptUaKjA+CDpZWRQ2cSqfZkKFz1Eadtw==",
+          "testFixture": true
+        }
+      ]
+    }
+  ]
+}
