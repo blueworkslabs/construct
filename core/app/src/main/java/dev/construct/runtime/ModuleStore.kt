@@ -142,6 +142,9 @@ class ModuleStore(private val context: Context) {
         }
         for (key in result.keys()) checkRule(key in Packages.supported && result.get(key) is Boolean,
             "STATE_INVALID", "Invalid capability grants")
+        val rawOrigins = record.optJSONArray("httpOrigins")
+        val approvedOrigins = if (rawOrigins == null) emptySet() else (0 until rawOrigins.length()).mapNotNull { rawOrigins.opt(it) as? String }.toSet()
+        if (!HttpPolicy.approved(manifest, approvedOrigins)) result.put("net.http", false)
         return result
     }
 
@@ -151,6 +154,7 @@ class ModuleStore(private val context: Context) {
         val manifest = verifiedInstalled(id, record.getString("active"))
         checkRule(manifest.capabilities.any { it.id == capability }, "CAPABILITY_DENIED", "Capability is not declared")
         record.put("grants", grants(record, manifest).put(capability, allowed))
+        if (capability == "net.http" && allowed) record.put("httpOrigins", org.json.JSONArray(manifest.capabilities.first { it.id == capability }.origins))
         writeAtomic(stateFile, state.toString())
         log("access", if (allowed) "CAPABILITY_GRANTED" else "CAPABILITY_REVOKED", manifest, capability)
     }
@@ -218,8 +222,12 @@ class ModuleStore(private val context: Context) {
         verifiedInstalled(id, candidate.digest)
         val approved = if (old == null) JSONObject() else grants(old, verifiedInstalled(id, old.getString("active")))
         candidate.manifest.capabilities.forEach { if (!approved.has(it.id)) approved.put(it.id, !it.explicitOptIn) }
+        val rawOrigins = old?.optJSONArray("httpOrigins")
+        val previousOrigins = if (rawOrigins == null) emptySet() else (0 until rawOrigins.length()).mapNotNull { rawOrigins.opt(it) as? String }.toSet()
+        if (!HttpPolicy.approved(candidate.manifest, previousOrigins)) approved.put("net.http", false)
         consentChanges.forEach { (capability, allowed) -> approved.put(capability, allowed) }
-        state.put(id, JSONObject().put("grants", approved).put("active", candidate.digest)
+        val httpOrigins = if (consentChanges["net.http"] == true) candidate.manifest.capabilities.first { it.id == "net.http" }.origins else previousOrigins.toList()
+        state.put(id, JSONObject().put("httpOrigins", org.json.JSONArray(httpOrigins)).put("grants", approved).put("active", candidate.digest)
             .put("previous", old?.getString("active") ?: JSONObject.NULL)
             .put("confirmed", false).put("enabled", true))
         writeAtomic(stateFile, state.toString())

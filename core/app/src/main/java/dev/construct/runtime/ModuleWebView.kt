@@ -46,14 +46,22 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
     val active = java.util.concurrent.atomic.AtomicBoolean(true)
     val tone = TonePlayer(context) { code -> store.log("audio", code, module, "Fixed short tone; submission is not proof of audibility") }
     lateinit var contacts: ContactsReader
+    var http: ModuleHttp? = null
+    var location: ModuleLocation? = null
     val view = object : ModuleSessionView(context) {
-        override fun releaseSession() { active.set(false); contacts.close(); tone.close() }
+        override fun releaseSession() { active.set(false); contacts.close(); tone.close(); http?.close(); location?.close() }
     }
     contacts = ContactsReader(context) {
         view.gate.authorize("contacts.read")
         store.withCapability(installed, "contacts.read") { }
     }
-    view.stopEffects = { tone.pause() }
+    fun authorizeCapability(capability: String) {
+        checkRule(active.get(), "RUN_STALE", "Module session closed")
+        view.gate.authorize(capability); store.withCapability(installed, capability) { }
+    }
+    if (module.capabilities.any { it.id == "net.http" }) http = ModuleHttp(context, module) { authorizeCapability("net.http") }
+    if (module.capabilities.any { it.id == "location.read" }) location = ModuleLocation(context) { authorizeCapability("location.read") }
+    view.stopEffects = { tone.pause(); http?.cancel(); location?.cancel() }
     val reportedBlocks = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     var calls = 0
     var window = android.os.SystemClock.elapsedRealtime()
@@ -65,13 +73,14 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
         // Persist failure before posting the UI transition, so a queued Mark working
         // action cannot confirm a failed run even if the view has not closed yet.
         runCatching { store.runtimeFailed(installed, code) }
-        view.post { contacts.close(); tone.close(); onFailure(view, code) }
+        view.post { contacts.close(); tone.close(); http?.close(); location?.close(); onFailure(view, code) }
     }
     fun auditBlock(code: String, category: String = "policy") {
         if (active.get() && reportedBlocks.add("$code:$category"))
             store.log("runtime", code, module, "Blocked category=$category; URL/payload omitted")
     }
     with(view.settings) {
+        if (module.api == "0.9.0") textZoom = (context.resources.configuration.fontScale * 100).toInt().coerceIn(50, 300)
         javaScriptEnabled = true
         domStorageEnabled = false
         allowFileAccess = false
@@ -103,7 +112,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             if (request.method != "GET") return reject("method")
             val path = request.url.path?.removePrefix("/") ?: return reject("path")
             if (!Packages.safePath(path)) return reject("path")
-            if (module.api in setOf("0.6.0", "0.7.0", "0.8.0") && path == "construct-host.css") {
+            if (module.api in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0") && path == "construct-host.css") {
                 return WebResourceResponse("text/css", "UTF-8", 200, "OK",
                     mapOf("X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-store"),
                     ByteArrayInputStream(ModuleLayout.css.toByteArray()))
@@ -158,6 +167,23 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             val method = request.getString("method")
             val params = request.getJSONObject("params")
             view.gate.authorize(method)
+            if (method == "net.http" || method == "location.read") {
+                authorizeCapability(method)
+                val id = requestId; val generation = view.gate.generation.get()
+                val complete: (JSONObject?, ConstructError?) -> Unit = { value, error ->
+                    view.post {
+                        if (active.get()) {
+                            val response = JSONObject().put("id", id)
+                            val denied = try { view.gate.authorizeReply(generation); authorizeCapability(method); error } catch (e: ConstructError) { e }
+                            if (denied == null) response.put("result", value)
+                            else response.put("error", JSONObject().put("code", denied.code).put("message", denied.message))
+                            reply.postMessage(response.toString())
+                        }
+                    }
+                }
+                if (method == "net.http") http!!.get(params, complete) else location!!.get(params, complete)
+                return@addWebMessageListener
+            }
             if (method == "contacts.read") {
                 val id = requestId
                 val generation = view.gate.generation.get()

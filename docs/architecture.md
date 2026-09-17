@@ -28,6 +28,8 @@ flowchart TB
         Grants --> AndroidGate[Android permission gate]
         AndroidGate --> Contacts[Bounded read-only contacts]
         AndroidGate --> Camera[Native camera UI + private album]
+        Grants --> HTTP[Bounded origin-scoped HTTP transport]
+        AndroidGate --> Location[One foreground location result]
         Grants --> Legacy[Legacy Sky Watch and Measure native workspaces]
     end
 ```
@@ -47,9 +49,18 @@ flowchart TB
 - Native contacts/camera components: fixed operations and bounds instead of
   caller-selected provider URIs, raw SQL, arbitrary paths or camera frame streams.
 
+### Module-owned Sky Watch (API 0.9)
+
+Sky Watch 0.2.0 contains provider adapters, coherent-report merging, identity tables,
+metadata interpretation, refresh/backoff policy, Canvas map/tiles and HTML controls
+in `examples/sky-watch-module`. It does not call `sky.watch` or receive aviation
+objects from the host. `ModuleHttp`/`HttpPolicy` supply bounded approved-origin GETs;
+`ModuleLocation` supplies one explicitly granted foreground fix. Native consent,
+Android permission UI and session authorization remain outside module control.
+
 ### Current native-workspace exceptions
 
-Sky Watch's aviation logic, network adapters and complete map UI currently live
+The legacy Sky Watch 0.1.0 launcher's aviation logic, network adapters and map UI live
 in `SkyActivity`, `SkyNetwork`, `SkyData`, `SkyIdentity`, `SkyMetadata` and `SkyMap`.
 Its signed module calls `sky.watch` with `{op:"open"}` and gets `{opened:true}`;
 it does not receive aircraft/location data. Pocket Measure similarly launches

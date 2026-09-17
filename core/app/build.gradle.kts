@@ -11,8 +11,8 @@ android {
         applicationId = "dev.construct.runtime"
         minSdk = 28
         targetSdk = 35
-        versionCode = 25
-        versionName = "0.1.0-alpha25"
+        versionCode = 26
+        versionName = "0.1.0-alpha26"
         externalNativeBuild { cmake {
             abiFilters += listOf("arm64-v8a", "x86_64")
             arguments += listOf("-DANDROID_STL=c++_static", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
@@ -59,6 +59,7 @@ android {
     }
 }
 dependencies {
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation(platform("androidx.compose:compose-bom:2025.04.01"))
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.compose.material3:material3")

@@ -29,6 +29,22 @@ class PublisherTest(unittest.TestCase):
         (self.source/'manifest.json').write_text(json.dumps(self.manifest))
         build(self.source,self.key)
 
+    def test_http_sources_are_signed_exact_origins_and_require_api09(self):
+        self.manifest['capabilities']=[dict(id='net.http',reason='Public data',origins=['https://example.org'])]
+        def attempt():
+            (self.source/'manifest.json').write_text(json.dumps(self.manifest))
+            return build(self.source,self.key)
+        with self.assertRaises(ValueError): attempt()
+        self.manifest['constructApi']=dict(min='0.9.0',target='0.9.0')
+        attempt()
+        for bad in [[], ['https://example.org']*2, ['http://example.org'], ['https://example.org/'], ['https://*.example.org'], ['https://127.0.0.1'], ['https://a.local'], ['https://EXAMPLE.org'], ['https://example.org:443'], ['https://user@example.org']]:
+            self.manifest['capabilities'][0]['origins']=bad
+            with self.assertRaises(ValueError): attempt()
+        self.manifest['capabilities']=[dict(id='location.read',reason='Foreground fix')]
+        attempt()
+        self.manifest['capabilities'][0]['origins']=['https://example.org']
+        with self.assertRaises(ValueError): attempt()
+
     def test_theme_colour_requires_versioned_contract_and_strict_hex(self):
         self.manifest['themeColor'] = '#12AbEF'
         (self.source/'manifest.json').write_text(json.dumps(self.manifest))

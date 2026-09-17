@@ -22,7 +22,7 @@ ID = re.compile(r'[a-z][a-z0-9]*(\.[a-z][a-z0-9-]*)+')
 VERSION = re.compile(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)')
 PATH = re.compile(r'[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*(?:/[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)*')
 EXTENSIONS = {'html', 'js', 'css', 'json', 'png', 'jpg', 'jpeg', 'webp', 'txt', 'woff2'}
-CAPS = {'storage.kv', 'log.write', 'device.toast', 'device.tone', 'contacts.read', 'camera.capture', 'photo.measure', 'sky.watch'}
+CAPS = {'storage.kv', 'log.write', 'device.toast', 'device.tone', 'contacts.read', 'camera.capture', 'photo.measure', 'sky.watch', 'net.http', 'location.read'}
 
 
 def require(ok, message):
@@ -37,22 +37,35 @@ def validate_manifest(m):
     for field, maxlen in [('id', 120), ('version', 50), ('name', 80), ('entry', 180)]:
         require(isinstance(m[field], str) and m[field].strip() and len(m[field]) <= maxlen, field)
     require(ID.fullmatch(m['id']) and VERSION.fullmatch(m['version']), 'Identity/version')
-    require(m['constructApi'] in ({'min': '0.1.0', 'target': '0.1.0'}, {'min': '0.2.0', 'target': '0.2.0'}, {'min': '0.3.0', 'target': '0.3.0'}, {'min': '0.4.0', 'target': '0.4.0'}, {'min': '0.5.0', 'target': '0.5.0'}, {'min': '0.6.0', 'target': '0.6.0'}, {'min': '0.7.0', 'target': '0.7.0'}, {'min': '0.8.0', 'target': '0.8.0'}), 'API compatibility')
+    require(m['constructApi'] in ({'min': '0.1.0', 'target': '0.1.0'}, {'min': '0.2.0', 'target': '0.2.0'}, {'min': '0.3.0', 'target': '0.3.0'}, {'min': '0.4.0', 'target': '0.4.0'}, {'min': '0.5.0', 'target': '0.5.0'}, {'min': '0.6.0', 'target': '0.6.0'}, {'min': '0.7.0', 'target': '0.7.0'}, {'min': '0.8.0', 'target': '0.8.0'}, {'min': '0.9.0', 'target': '0.9.0'}), 'API compatibility')
     if 'themeColor' in m:
         require(isinstance(m['themeColor'], str) and re.fullmatch(r'#[0-9a-fA-F]{6}', m['themeColor']), 'Theme colour must be #RRGGBB')
-        require(m['constructApi']['min'] in ('0.6.0', '0.7.0', '0.8.0'), 'Theme colour requires API 0.6.0')
+        require(m['constructApi']['min'] in ('0.6.0', '0.7.0', '0.8.0', '0.9.0'), 'Theme colour requires API 0.6.0')
     require(m['runtime'] == {'kind': 'webview-js'}, 'Runtime')
     require(PATH.fullmatch(m['entry']) and m['entry'].endswith('.html'), 'Entry path')
     caps = m['capabilities']
     require(isinstance(caps, list) and len(caps) <= len(CAPS), 'Capabilities')
     for cap in caps:
-        require({'id', 'reason'} <= cap.keys() <= {'id', 'reason', 'optional'}, 'Capability fields')
+        require({'id', 'reason'} <= cap.keys() <= {'id', 'reason', 'optional', 'origins'}, 'Capability fields')
         require(cap['id'] in CAPS, 'Unknown capability')
-        require(cap['id'] != 'device.tone' or m['constructApi']['min'] in ('0.2.0', '0.3.0', '0.4.0', '0.5.0', '0.6.0', '0.7.0', '0.8.0'), 'Tone requires API 0.2.0')
-        require(cap['id'] != 'contacts.read' or m['constructApi']['min'] in ('0.3.0', '0.4.0', '0.5.0', '0.6.0', '0.7.0', '0.8.0'), 'Contacts require API 0.3.0')
-        require(cap['id'] != 'sky.watch' or m['constructApi']['min'] == '0.8.0', 'Sky Watch requires API 0.8.0')
-        require(cap['id'] != 'photo.measure' or m['constructApi']['min'] in ('0.7.0', '0.8.0'), 'Photo measurement requires API 0.7.0')
-        require(cap['id'] != 'camera.capture' or m['constructApi']['min'] in ('0.4.0', '0.5.0', '0.6.0', '0.7.0', '0.8.0'), 'Camera requires API 0.4.0')
+        if cap['id'] == 'net.http':
+            require(m['constructApi']['min'] == '0.9.0', 'HTTP requires API 0.9.0')
+            origins = cap.get('origins')
+            require(isinstance(origins, list) and 1 <= len(origins) <= 8, 'Declare 1–8 HTTP sources')
+            for origin in origins:
+                require(isinstance(origin, str) and len(origin) <= 260 and origin.startswith('https://'), 'HTTP source')
+                host = origin[8:]
+                require(len(host) <= 253 and re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+', host) and any(c in 'abcdefghijklmnopqrstuvwxyz' for c in host.rsplit('.',1)[-1]), 'Public HTTPS origin required')
+                require(not any(host == suffix or host.endswith('.'+suffix) for suffix in ('localhost','local','internal','invalid','test','onion')), 'Public origin required')
+            require(len(set(origins)) == len(origins), 'Duplicate HTTP source')
+        else:
+            require('origins' not in cap, 'Sources apply only to HTTP')
+        require(cap['id'] != 'location.read' or m['constructApi']['min'] == '0.9.0', 'Location requires API 0.9.0')
+        require(cap['id'] != 'device.tone' or m['constructApi']['min'] in ('0.2.0', '0.3.0', '0.4.0', '0.5.0', '0.6.0', '0.7.0', '0.8.0', '0.9.0'), 'Tone requires API 0.2.0')
+        require(cap['id'] != 'contacts.read' or m['constructApi']['min'] in ('0.3.0', '0.4.0', '0.5.0', '0.6.0', '0.7.0', '0.8.0', '0.9.0'), 'Contacts require API 0.3.0')
+        require(cap['id'] != 'sky.watch' or m['constructApi']['min'] in ('0.8.0', '0.9.0'), 'Sky Watch requires API 0.8.0')
+        require(cap['id'] != 'photo.measure' or m['constructApi']['min'] in ('0.7.0', '0.8.0', '0.9.0'), 'Photo measurement requires API 0.7.0')
+        require(cap['id'] != 'camera.capture' or m['constructApi']['min'] in ('0.4.0', '0.5.0', '0.6.0', '0.7.0', '0.8.0', '0.9.0'), 'Camera requires API 0.4.0')
         require(isinstance(cap['reason'], str) and 0 < len(cap['reason'].strip()) <= 240, 'Capability reason')
         require('optional' not in cap or type(cap['optional']) is bool, 'Optional flag')
     require(len({c['id'] for c in caps}) == len(caps), 'Duplicate capability')
