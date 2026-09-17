@@ -1,5 +1,10 @@
 # Runtime architecture
 
+The [modular design contract](modular-design.md) defines the intended ownership
+boundary: Construct owns the runtime, authority and reusable capabilities; module
+packages own applications. This page describes the **current implementation**,
+including native-workspace exceptions that have not yet been migrated.
+
 Construct has two distinct trust domains: the development/deployment machinery
 and the Android host that actually runs installed modules.
 
@@ -23,6 +28,7 @@ flowchart TB
         Grants --> AndroidGate[Android permission gate]
         AndroidGate --> Contacts[Bounded read-only contacts]
         AndroidGate --> Camera[Native camera UI + private album]
+        Grants --> Legacy[Legacy Sky Watch and Measure native workspaces]
     end
 ```
 
@@ -40,6 +46,21 @@ flowchart TB
   origin-scoped bridge and native request/lifecycle enforcement.
 - Native contacts/camera components: fixed operations and bounds instead of
   caller-selected provider URIs, raw SQL, arbitrary paths or camera frame streams.
+
+### Current native-workspace exceptions
+
+Sky Watch's aviation logic, network adapters and complete map UI currently live
+in `SkyActivity`, `SkyNetwork`, `SkyData`, `SkyIdentity`, `SkyMetadata` and `SkyMap`.
+Its signed module calls `sky.watch` with `{op:"open"}` and gets `{opened:true}`;
+it does not receive aircraft/location data. Pocket Measure similarly launches
+`MeasureActivity` via `photo.measure`. The camera workspace also contains
+application-specific album/analysis flows alongside native acquisition.
+
+These are working prototypes but **not the desired module ownership boundary**.
+Preserve existing callers during migration; do not treat full native workspaces
+behind an `open` call as the pattern for new tools. Future reusable capabilities
+and their consent/data contracts must be implemented before moving dependent
+features into modules. See the design contract's migration and acceptance criteria.
 
 ## Module contract
 

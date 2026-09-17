@@ -1,5 +1,12 @@
 # Implemented module API
 
+This reference describes implemented contracts, not the target architecture.
+Read the [modular design contract](modular-design.md) when proposing capabilities.
+The broad native-workspace launch operations below are compatibility exceptions;
+new modules should own their feature logic and UI through reusable capabilities.
+Proposed general transport, location-result or rendering contracts are not
+available merely because the design document discusses them.
+
 The current host accepts exact `constructApi.min == constructApi.target` versions
 0.1.0 through 0.8.0. Module versions are three numeric components. See the
 [manifest schema](../schemas/module-manifest.schema.json) and runnable
