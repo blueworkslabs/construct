@@ -19,6 +19,7 @@ p.add_argument('--apk', type=Path, required=True)
 p.add_argument('--sha', required=True)
 p.add_argument('--catalog', required=True)
 p.add_argument('--module-sha', required=True)
+p.add_argument('--after-sha', required=True)
 p.add_argument('--module-name', default='Pocket Measure')
 p.add_argument('--module-version', default='0.2.0')
 a = p.parse_args()
@@ -44,7 +45,7 @@ import ui
 from ui import adb, nodes, labels, tap, tap_node, find, capture
 from host_ui import host_ready, catalog_settings, apply_catalog, library, select_after, installed_status, scroll_top, _stable_card, diagnostics
 
-receipt = {'scope':'Module-owned Measure exact-APK functional and lifecycle acceptance','moduleSha256':a.module_sha,'apkSha256':a.sha,'checks':[],'complete':False,'stopped':False}
+receipt = {'scope':'Signed Measure module-only behavior update and rollback on identical host APK','moduleSha256':a.module_sha,'apkSha256':a.sha,'checks':[],'complete':False,'stopped':False}
 started = False
 
 def save():
@@ -268,106 +269,38 @@ try:
     catalog_settings()
     replace_text(nodes,lambda value:ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value),a.catalog)
     apply_catalog();find('Catalog refreshed.')
-    select_after(heading,('Review & install',));tap('Allow & install');installed_status()
-    events=diagnostics()
-    if not any(e.get('code')=='INSTALLED_TRIAL' and e.get('packageDigest')==a.module_sha for e in events):raise RuntimeError('Wrong signed module')
-    library();select_after(heading,('Open',));find('Choose photo');action('Choose photo');expect('[CAPABILITY_DENIED]')
-    done('Pixel access denied by default before Android picker opens')
-    tap('Construct menu');tap('Module access');find('Reopen module')
-    for label in ('Allow selected image pixels','Allow local marker detection'):
-        deadline=time.monotonic()+20;previous=None;switch=None
-        while time.monotonic()<deadline:
-            matches=[n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true']
-            if len(matches)==1 and matches[0].get('bounds')==previous:
-                switch=matches[0];break
-            previous=matches[0].get('bounds') if len(matches)==1 else None;time.sleep(.3)
-        if switch is None:raise RuntimeError('Native grant did not settle: '+label)
-        if switch.get('checked')!='false':raise RuntimeError('Fresh grant was not off')
-        tap_node(switch);find(label+': on.')
-    tap('Reopen module');find('Choose photo');action('Choose photo');find('Photos');adb('shell','input','keyevent','4');expect('No photo selected')
-    done('Fresh independent grants and native picker cancellation return to same module')
-    entry=stage('measure-flat.png')
-    adb('shell','cmd','connectivity','airplane-mode','enable');adb('shell','svc','wifi','disable');adb('shell','svc','data','disable')
-    pick();expect('Reference found.');size('100');value=endpoints(entry)
-    if abs(value-240)>3:raise RuntimeError('Flat reference failed: '+str(value))
-    receipt['flatMm']=value;capture_display('module-measure-flat')
-    done('Real system picker, private image resource and local detector feed module-owned 240 mm measurement offline')
-    units('Millimetres');expect('Length: 240.0 mm');units('Centimetres');expect('Length: 24.0 cm')
-    done('Module-owned unit selector changes 24.0 cm to 240.0 mm without changing endpoints')
-    # A real drag commits one undo step; pointer cancellation restores its start.
-    bx,by=screen_point(entry,entry['endpoints'][1]);ax,ay=screen_point(entry,entry['endpoints'][0])
-    ui._device.swipe(bx,by,bx-60,by,duration=.5);time.sleep(.5)
-    if not 180<length()<240:raise RuntimeError('Endpoint drag did not adjust length')
-    action('Undo');collapse()
-    if length()!=receipt['flatMm']:raise RuntimeError('Drag Undo failed')
-    ui._device.touch.down(bx,by).move(bx-60,by);time.sleep(.4)
-    adb('shell','input','touchscreen','motionevent','CANCEL',str(bx-60),str(by));time.sleep(.5)
-    if length()!=receipt['flatMm']:raise RuntimeError('Pointer cancellation retained drag preview')
-    done('Real endpoint drag commits once; Undo and Android pointer cancellation restore the prior length')
-    action('Endpoint B')
-    for _ in range(4):action('Move endpoint left')
-    if not receipt['flatMm']-3<=length()<receipt['flatMm']:raise RuntimeError('Pixel nudge did not reduce length')
-    for _ in range(4):action('Undo')
-    collapse()
-    if length()!=receipt['flatMm']:raise RuntimeError('Nudge undo failed')
-    done('Accessible photo-pixel nudges are individually undoable')
-    action('Clear');collapse();no_measurement()
-    ui._device(description=WORKSPACE).pinch_out(percent=40,steps=25);time.sleep(.5);no_measurement()
-    x1,y1,x2,y2=rect(find(WORKSPACE));ui._device.swipe((x1+x2)//2,(y1+y2)//2,(x1+x2)//2-60,(y1+y2)//2-40,duration=.4)
-    no_measurement();tap('Reset photo view');time.sleep(.5)
-    if abs(endpoints(entry)-240)>3:raise RuntimeError('Fit reset changed photo coordinates')
-    done('Real pinch and pan do not place endpoints; reset restores calibrated fit coordinates')
-    size('95');value=endpoints(entry)
-    if abs(value-228)>3:raise RuntimeError('Actual marker-size scaling failed: '+str(value))
-    done('Module-owned recalibration produces 228 mm from the same endpoints')
-    tap('Construct menu');tap('Return to module');expect('Length: 22.8 cm')
-    adb('shell','settings','put','system','accelerometer_rotation','0');adb('shell','settings','put','system','user_rotation','1');time.sleep(2)
-    expect('Length: 22.8 cm');capture_display('module-measure-landscape')
-    adb('shell','settings','put','system','user_rotation','0');time.sleep(2);expect('Length: 22.8 cm')
-    done('Menu and rotation preserve the current module measurement')
-    for rotation in ('0','1'):
-        adb('shell','settings','put','system','font_scale','2.0')
-        adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2)
-        expect('Length: 22.8 cm');action('Choose photo')
-        find('Photos');adb('shell','input','keyevent','4');expect('No photo selected')
-        # Cancellation intentionally clears the previous selection; load again to
-        # inspect both the large-text controls and a completed measurement.
-        entry=measured();capture_display('module-measure-large-'+rotation)
-        size('95');endpoints(entry)
-    adb('shell','settings','put','system','font_scale','1.0');adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
-    done('Two-times text remains operable in portrait and landscape with real picker and measurement')
-    for name,key,tolerance in [('measure-angled.png','angledMm',4),('measure-oriented.jpg','orientedMm',3)]:
-        entry=measured(name);value=length()
-        if abs(value-240)>tolerance:raise RuntimeError(name+' outside tolerance')
-        receipt[key]=value;capture_display('module-'+key)
-    done('Perspective and EXIF-oriented photos recover the expected 240 mm length')
-    for name,message in [('measure-blank.png','No reference marker found.'),('measure-multiple.png','Use only one reference card')]:
-        stage(name);pick();expect(message);no_measurement()
-        if 'Use this size' in labels():raise RuntimeError('Invalid reference exposed calibration')
-    done('Blank and duplicate reference cards reject calibration and clear earlier results')
-    entry=stage('measure-flat.png');pick();expect('Reference found.')
-    control('Measured black-square side (mm)');ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text('9')
-    action('Use this size');expect('Enter the measured black-square side: 10–300 mm.');no_measurement()
-    size('100');endpoints(entry)
-    done('Out-of-range calibration is rejected before a length can be produced')
-    adb('shell','input','keyevent','3');time.sleep(1);opened();no_measurement()
-    if 'Change reference size' in labels():raise RuntimeError('Background retained calibration')
-    done('Ordinary background discards selected image, calibration and endpoints')
-    measured();adb('shell','am','force-stop','dev.construct.runtime');opened();no_measurement()
-    done('Process restart retains no selected photo or measurement')
-    measured();tap('Construct menu');tap('Module access');find('Reopen module')
-    switch=find('Allow selected image pixels')
-    if switch.get('checked')!='true':raise RuntimeError('Expected existing pixel grant')
-    tap_node(switch);find('Allow selected image pixels: off.');tap('Reopen module');find('Choose photo');no_measurement()
-    action('Choose photo');expect('[CAPABILITY_DENIED]')
-    if 'Photos' in labels():raise RuntimeError('Revoked access still launched picker')
-    done('Revoking pixel access closes the old image session and denies a fresh picker request')
-    tap('Construct menu');tap('Close module');library()
-    if hashlib.sha256(adb('exec-out','cat',current,binary=True)).hexdigest()!=current_entry['sha256']:raise RuntimeError('Source photo modified')
-    events=diagnostics();encoded=json.dumps(events)
-    if any(value in encoded for value in ['construct-measure-synthetic','content://media','construct-images/','240.0','22.8']):raise RuntimeError('Image or measurement data leaked into diagnostics')
+    before_sha=a.sha
+    for version,digest in [('0.1.0',a.module_sha),('0.2.0',a.after_sha)]:
+        heading='Measure Preview · '+version
+        select_after(heading,('Review & install',));find('Allow & install')
+        if version=='0.1.0':
+            for label in ('Allow selected image pixels','Allow local marker detection'):
+                switch=consent_switch(label)
+                if switch.get('checked')!='false':raise RuntimeError('Fresh preview grant was not off')
+                tap_node(switch)
+        tap('Allow & install');installed_status()
+        events=diagnostics()
+        if not any(e.get('code')=='INSTALLED_TRIAL' and e.get('packageDigest')==digest for e in events):raise RuntimeError('Incorrect signed preview bytes')
+        library();select_after(heading,('Open',));find('Choose photo')
+        entry=measured();expect('Length: 24.0 cm')
+        if version=='0.1.0':
+            if 'Show controls' in labels():tap('Show controls')
+            if 'Length units' in labels():raise RuntimeError('Old preview already has the new units workflow')
+            capture_display('measure-preview-before');tap('Construct menu');tap('Mark working')
+        else:
+            units('Millimetres');expect('Length: 240.0 mm')
+            capture_display('measure-preview-after');tap('Construct menu');tap('Close module')
+        verify_installed(a.sha)
+    done('Signed module update adds a working cm/mm conversion selector on identical installed APK bytes')
+    select_after('Measure Preview · 0.2.0',('Roll back',));tap('Restore')
+    heading='Measure Preview · 0.1.0';select_after(heading,('Open',));find('Choose photo');no_measurement()
+    entry=measured();expect('Length: 24.0 cm')
+    if 'Show controls' in labels():tap('Show controls')
+    if 'Length units' in labels():raise RuntimeError('Rollback kept update-only units selector')
+    capture_display('measure-preview-rollback');tap('Construct menu');tap('Close module')
     verify_installed(a.sha)
-    done('Synthetic source bytes remain unchanged and diagnostics contain no photo URI or measurement data')
+    receipt['moduleOnlyUpdate']={'beforeModuleSha256':a.module_sha,'afterModuleSha256':a.after_sha,'apkSha256Before':before_sha,'apkSha256After':a.sha,'transientPhotoAndCalibration':'intentionally cleared between runs'}
+    done('Supported rollback removes update-only controls and original measurement behavior works on the same APK')
     receipt['complete']=True
 except Exception as e:
     receipt['error'] = str(e)
