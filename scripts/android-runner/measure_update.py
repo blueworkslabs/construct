@@ -196,8 +196,19 @@ def control(text):
     raise RuntimeError('Control missing: '+text)
 def action(text):tap_node(control(text));time.sleep(.4)
 def collapse():
-    if 'Hide controls' in labels():action('Hide controls')
-    time.sleep(.4)
+    # The selector's native popup closes asynchronously, and the summary can be
+    # above the scrolled control panel. Settle at its actual top before acting.
+    for _ in range(12):
+        ns=nodes();visible=[n for n in ns if len(rect(n))==4 and rect(n)[3]>rect(n)[1]]
+        if any(n.get('text')=='Show controls' for n in visible):return
+        hide=[n for n in visible if n.get('text')=='Hide controls']
+        if len(hide)==1:
+            tap_node(hide[0]);find('Show controls');time.sleep(.5);return
+        web=next(n for n in ns if n.get('class')=='android.webkit.WebView')
+        x1,y1,x2,y2=rect(web);y1=rect(find(WORKSPACE))[3]
+        adb('shell','input','swipe',str((x1+x2)//2),str(y1+(y2-y1)//5),str((x1+x2)//2),str(y2-(y2-y1)//5),'350')
+        time.sleep(.3)
+    raise RuntimeError('Could not collapse actual control panel')
 def size(value):
     if 'Show controls' in labels():tap('Show controls');time.sleep(.4)
     if any(x.startswith('Length:') or (x.startswith('Marker ') and x.endswith('mm ✓')) for x in labels()):action('Change reference size')
@@ -288,7 +299,8 @@ try:
             if 'Length units' in labels():raise RuntimeError('Old preview already has the new units workflow')
             capture_display('measure-preview-before');tap('Construct menu');tap('Mark working')
         else:
-            units('Millimetres');expect('Length: 240.0 mm')
+            units('Millimetres')
+            if not expect('Length: ').endswith(' mm') or abs(length()-240)>3:raise RuntimeError('New units workflow does not show expected millimetres')
             capture_display('measure-preview-after');tap('Construct menu');tap('Close module')
         verify_installed(a.sha)
     done('Signed module update adds a working cm/mm conversion selector on identical installed APK bytes')

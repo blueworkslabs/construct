@@ -210,8 +210,19 @@ def control(text):
     raise RuntimeError('Control missing: '+text)
 def action(text):tap_node(control(text));time.sleep(.4)
 def collapse():
-    if 'Hide controls' in labels():action('Hide controls')
-    time.sleep(.4)
+    # The selector's native popup closes asynchronously, and the summary can be
+    # above the scrolled control panel. Settle at its actual top before acting.
+    for _ in range(12):
+        ns=nodes();visible=[n for n in ns if len(rect(n))==4 and rect(n)[3]>rect(n)[1]]
+        if any(n.get('text')=='Show controls' for n in visible):return
+        hide=[n for n in visible if n.get('text')=='Hide controls']
+        if len(hide)==1:
+            tap_node(hide[0]);find('Show controls');time.sleep(.5);return
+        web=next(n for n in ns if n.get('class')=='android.webkit.WebView')
+        x1,y1,x2,y2=rect(web);y1=rect(find(WORKSPACE))[3]
+        adb('shell','input','swipe',str((x1+x2)//2),str(y1+(y2-y1)//5),str((x1+x2)//2),str(y2-(y2-y1)//5),'350')
+        time.sleep(.3)
+    raise RuntimeError('Could not collapse actual control panel')
 def size(value):
     if 'Show controls' in labels():tap('Show controls');time.sleep(.4)
     if any(x.startswith('Length:') or (x.startswith('Marker ') and x.endswith('mm ✓')) for x in labels()):action('Change reference size')
@@ -307,8 +318,11 @@ try:
     if abs(value-240)>3:raise RuntimeError('Flat reference failed: '+str(value))
     receipt['flatMm']=value;capture_display('module-measure-flat')
     done('Real system picker, private image resource and local detector feed module-owned 240 mm measurement offline')
-    units('Millimetres');expect('Length: 240.0 mm');units('Centimetres');expect('Length: 24.0 cm')
-    done('Module-owned unit selector changes 24.0 cm to 240.0 mm without changing endpoints')
+    units('Millimetres')
+    millimetres=expect('Length: ')
+    if not millimetres.endswith(' mm') or abs(length()-receipt['flatMm'])>.51:raise RuntimeError('Units conversion exceeds cm display rounding')
+    receipt['unitsMm']=length();units('Centimetres');expect('Length: 24.0 cm')
+    done('Module-owned unit selector converts centimetres to millimetres within displayed rounding')
     # A real drag commits one undo step; pointer cancellation restores its start.
     bx,by=screen_point(entry,entry['endpoints'][1]);ax,ay=screen_point(entry,entry['endpoints'][0])
     ui._device.swipe(bx,by,bx-60,by,duration=.5);time.sleep(.5)
