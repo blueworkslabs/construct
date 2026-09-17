@@ -220,13 +220,20 @@ class ModuleStore(private val context: Context) {
             } finally { if (staging.exists()) staging.deleteRecursively() }
         }
         verifiedInstalled(id, candidate.digest)
-        val approved = if (old == null) JSONObject() else grants(old, verifiedInstalled(id, old.getString("active")))
+        val oldManifest = old?.let { verifiedInstalled(id, it.getString("active")) }
+        val approved = if (old == null) JSONObject() else grants(old, oldManifest!!)
         candidate.manifest.capabilities.forEach { if (!approved.has(it.id)) approved.put(it.id, !it.explicitOptIn) }
-        val rawOrigins = old?.optJSONArray("httpOrigins")
+        // Do not resurrect consent retained by older hosts while HTTP was absent.
+        val rawOrigins = old?.optJSONArray("httpOrigins")?.takeIf { oldManifest?.capabilities?.any { it.id == "net.http" } == true }
         val previousOrigins = if (rawOrigins == null) emptySet() else (0 until rawOrigins.length()).mapNotNull { rawOrigins.opt(it) as? String }.toSet()
         if (!HttpPolicy.approved(candidate.manifest, previousOrigins)) approved.put("net.http", false)
         consentChanges.forEach { (capability, allowed) -> approved.put(capability, allowed) }
-        val httpOrigins = if (consentChanges["net.http"] == true) candidate.manifest.capabilities.first { it.id == "net.http" }.origins else previousOrigins.toList()
+        val http = candidate.manifest.capabilities.firstOrNull { it.id == "net.http" }
+        val httpOrigins = when {
+            http == null -> emptyList()
+            consentChanges["net.http"] == true -> http.origins
+            else -> previousOrigins.toList()
+        }
         state.put(id, JSONObject().put("httpOrigins", org.json.JSONArray(httpOrigins)).put("grants", approved).put("active", candidate.digest)
             .put("previous", old?.getString("active") ?: JSONObject.NULL)
             .put("confirmed", false).put("enabled", true))
@@ -252,6 +259,11 @@ class ModuleStore(private val context: Context) {
         checkRule(!record.isNull("previous"), "NO_ROLLBACK", "There is no previous working version yet")
         val previous = record.getString("previous")
         val m = verifiedInstalled(id, previous)
+        val current = runCatching { verifiedInstalled(id, record.getString("active")) }.getOrNull()
+        // A missing/unverifiable active HTTP declaration cannot carry consent into
+        // restored code. Repair remains possible, but HTTP needs fresh approval.
+        if (current?.capabilities?.any { it.id == "net.http" } != true || m.capabilities.none { it.id == "net.http" })
+            record.put("httpOrigins", org.json.JSONArray())
         record.put("grants", grants(record, m))
         record.put("active", previous).put("previous", JSONObject.NULL).put("confirmed", true).put("enabled", true)
         record.remove("failureCode")

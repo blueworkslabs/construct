@@ -31,16 +31,22 @@ def prepare(output):
     add('isolation-probe',[None],'probe-registry','test-registry',fixture=True)
     for source in ('focus-module','snake-module','contacts-module','camera-module','measure-module','sky-watch-module'):
         add(source,[None],'home-registry','test-registry')
-    # Deliberately different signed scopes exercise consent expansion and rollback.
+    prepare_transport(output, key)
+    print('Prepared complete JVM fixtures plus home/test catalogs under the selected output.')
+
+def prepare_transport(output, key):
+    # Signed scopes exercise expansion, removal/reintroduction and rollback.
     with tempfile.TemporaryDirectory() as tmp:
         probe=Path(tmp); (probe/'index.html').write_text('<p>Signed HTTP scope fixture</p>')
-        for version,origins in [('0.1.0',['https://example.org']), ('0.2.0',['https://example.org','https://www.example.org'])]:
+        for version,origins in [('0.1.0',['https://example.org']), ('0.2.0',['https://example.org','https://www.example.org']),
+                                ('0.3.0',None), ('0.4.0',['https://example.org'])]:
             manifest=dict(schemaVersion=1,id='dev.construct.transport-probe',name='Transport probe',version=version,
                 constructApi=dict(min='0.9.0',target='0.9.0'),runtime=dict(kind='webview-js'),entry='index.html',
                 capabilities=[dict(id='net.http',reason='Verify signed source consent',origins=origins),dict(id='location.read',reason='Verify foreground location consent'),dict(id='storage.kv',reason='Verify retained module data')])
+            if origins is None:
+                manifest['capabilities'] = [cap for cap in manifest['capabilities'] if cap['id'] != 'net.http']
             (probe/'manifest.json').write_text(json.dumps(manifest))
             publish(output/'transport-registry',*build(probe,key),fixture=True)
-    print('Prepared complete JVM fixtures plus home/test catalogs under the selected output.')
 
 if __name__ == '__main__':
     p=argparse.ArgumentParser(description=__doc__)

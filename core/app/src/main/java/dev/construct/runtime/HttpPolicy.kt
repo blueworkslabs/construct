@@ -52,5 +52,5 @@ internal object HttpPolicy {
         }
     }
     fun approved(manifest: ModuleManifest, values: Set<String>): Boolean =
-        manifest.capabilities.firstOrNull { it.id == "net.http" }?.origins?.all { it in values } ?: true
+        manifest.capabilities.firstOrNull { it.id == "net.http" }?.origins?.all { it in values } ?: false
 }

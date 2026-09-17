@@ -26,6 +26,70 @@ class TransportAccessTest {
         try { action(); fail("Expected $code") } catch(e: ConstructError) { assertEquals(code,e.code) }
     }
     private fun allowed(cap: String) = store.withCapability(store.installed().single(), cap) { true }
+    private fun httpConsentCleared() {
+        val record = JSONObject(File(app.filesDir, "module-state.json").readText()).getJSONObject(id)
+        assertFalse(record.getJSONObject("grants").optBoolean("net.http"))
+        assertEquals(0, record.getJSONArray("httpOrigins").length())
+        assertFalse("net.http" in store.installed().single().granted)
+        denied("CAPABILITY_DENIED") { allowed("net.http") }
+    }
+    @Test fun removedHttpCannotReturnWithoutFreshConsentAfterRestart() {
+        store.install(fixture("0.1.0"), mapOf("net.http" to true, "location.read" to true)); store.confirm(id)
+        store.storage(id, JSONObject().put("op", "set").put("key", "counter").put("value", 7))
+        store.install(fixture("0.3.0")); store.confirm(id); store = ModuleStore(app)
+        httpConsentCleared()
+        assertTrue(allowed("location.read"))
+        store.install(fixture("0.4.0")); store = ModuleStore(app)
+        httpConsentCleared()
+        assertTrue(allowed("location.read"))
+        assertEquals(7, store.storage(id, JSONObject().put("op", "get").put("key", "counter")))
+        store.setCapability(id, "net.http", true)
+        assertTrue(allowed("net.http"))
+    }
+    @Test fun rollingBackRemovalDoesNotRestoreHttpConsent() {
+        store.install(fixture("0.1.0"), mapOf("net.http" to true)); store.confirm(id)
+        store.install(fixture("0.3.0")); store.rollback(id); store = ModuleStore(app)
+        httpConsentCleared()
+    }
+    @Test fun rollbackToVersionWithoutHttpClearsConsentBeforeReinstall() {
+        store.install(fixture("0.3.0")); store.confirm(id)
+        store.install(fixture("0.4.0"), mapOf("net.http" to true))
+        assertTrue(allowed("net.http"))
+        store.rollback(id); store = ModuleStore(app)
+        httpConsentCleared()
+        store.install(fixture("0.4.0"))
+        httpConsentCleared()
+    }
+    @Test fun staleConsentFromOlderHostCannotReactivateHttp() {
+        store.install(fixture("0.3.0")); store.confirm(id)
+        // Alpha26 could retain this state after installing a version without HTTP.
+        val file = File(app.filesDir, "module-state.json")
+        val state = JSONObject(file.readText())
+        state.getJSONObject(id).getJSONObject("grants").put("net.http", true)
+        state.getJSONObject(id).put("httpOrigins", org.json.JSONArray().put("https://example.org"))
+        file.writeText(state.toString()); store = ModuleStore(app)
+        store.install(fixture("0.4.0"))
+        assertFalse("net.http" in store.installed().single().granted)
+        denied("CAPABILITY_DENIED") { allowed("net.http") }
+    }
+    @Test fun staleConsentFromOlderHostCannotReactivateHttpThroughRollback() {
+        store.install(fixture("0.1.0"), mapOf("net.http" to true)); store.confirm(id)
+        store.install(fixture("0.3.0"))
+        val file = File(app.filesDir, "module-state.json")
+        val state = JSONObject(file.readText())
+        state.getJSONObject(id).getJSONObject("grants").put("net.http", true)
+        state.getJSONObject(id).put("httpOrigins", org.json.JSONArray().put("https://example.org"))
+        file.writeText(state.toString()); store = ModuleStore(app)
+        store.rollback(id)
+        httpConsentCleared()
+    }
+    @Test fun explicitConsentOnReintroductionWorksAndUnchangedScopeStaysGranted() {
+        store.install(fixture("0.1.0"), mapOf("net.http" to true)); store.confirm(id)
+        store.install(fixture("0.4.0")); assertTrue(allowed("net.http")); store.confirm(id)
+        store.install(fixture("0.3.0")); store.confirm(id)
+        store.install(fixture("0.4.0"), mapOf("net.http" to true)); store = ModuleStore(app)
+        assertTrue(allowed("net.http"))
+    }
     @Test fun newAuthorityDefaultsOffAndLocationIsIndependent() {
         store.install(fixture("0.1.0"))
         denied("CAPABILITY_DENIED") { allowed("net.http") }; denied("CAPABILITY_DENIED") { allowed("location.read") }
