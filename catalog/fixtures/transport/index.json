@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.transport-probe",
+      "name": "Transport probe",
+      "versions": [
+        {
+          "id": "dev.construct.transport-probe",
+          "name": "Transport probe",
+          "version": "0.1.0",
+          "artifact": "dev.construct.transport-probe-0.1.0.zip",
+          "sha256": "fbe830ef34a01f66a7884c529808e605f419d76fbe7da5f506a5c602fd6b1add",
+          "signature": "hYux7gZmAUbpP64SslU1F+HGJfKGFt+O4JSGO0auRmaej4H3gUkCMAtpFPgd7VHHaIFb3aPpZ/bOWrN16XUUxaiuZ1NtvnUOezaf+KHmfpmeuRjm+Jk8eVIcmJ29MLCll2iNszBuzuDnScP6wECJMWV8TVmFselq2k1KcpqngbueNySWXiLnIDXNrkOSHbGOcGc6kedeQTzZJgtxH34coHERS+IIuK2ylymDsU/fElI+8qn3sH20GgGBdHzU6z9DWspQB7VmNw5WZ4diP5DHeFF0fKUwIYnvL3EPZJJfebR6Z/KNA2UyZ7bHT3WX8FvmpSAhJvNjJ7ycZNlBzXnxjw==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.transport-probe",
+          "name": "Transport probe",
+          "version": "0.2.0",
+          "artifact": "dev.construct.transport-probe-0.2.0.zip",
+          "sha256": "b1b6858b0e46008215e54deea04bb86293da4f0bbb37454bad7bb831e759d21e",
+          "signature": "M5NRbsYLA5ehcZwtHByLmVdVy2TVX0meyV4R6437jsnQYyYnfXoQT5+bkXJKHH6oIK1E629sn/mhuxpjPLTSNSBW6/8ySRavFYfyDf5jC/qjLvuplGQ/fp0ytQdpj0N/TGmIEz6fp+6/3PkMlH+xidgzsJovCOF6mUlaXttyEzTYYIGv66DbgXWAfhDmGmhPpV6wo10GAGJxRy6/BjPOnHG6yQuZo9/6QWyym4ZSSY+mDrhdqpb7zSsIzibEk2qQMzFKQgqSuW8TQSBA80OOx7O3ARmSwTeGhUZOeoP4DzQQPBGEmfSRoqGIzcRuqS1uEPX+WDpZ1rhzM4TTc8LMYg==",
+          "testFixture": true
+        }
+      ]
+    }
+  ]
+}
