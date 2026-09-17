@@ -105,7 +105,7 @@ flowchart LR
 **The design goal is module updates without a new APK once the required host API
 exists. New native capabilities need host updates.** Current launcher-only tools,
 including Sky Watch 0.1.0 and Pocket Measure, still put their feature behavior in
-the APK for compatibility. Sky Watch 0.2.0 is the first migration: its aircraft
+the APK for compatibility. Sky Watch 0.2.x is the first migration: its aircraft
 logic, glossary, map and controls live in the signed module; API 0.9 supplies only
 bounded approved-origin HTTP and optional foreground location.
 The phone runs the module locally; Discord is the workshop, not the execution

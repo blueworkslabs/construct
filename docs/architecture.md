@@ -51,7 +51,7 @@ flowchart TB
 
 ### Module-owned Sky Watch (API 0.9)
 
-Sky Watch 0.2.0 contains provider adapters, coherent-report merging, identity tables,
+Sky Watch 0.2.x contains provider adapters, coherent-report merging, identity tables,
 metadata interpretation, refresh/backoff policy, Canvas map/tiles and HTML controls
 in `examples/sky-watch-module`. It does not call `sky.watch` or receive aviation
 objects from the host. `ModuleHttp`/`HttpPolicy` supply bounded approved-origin GETs;

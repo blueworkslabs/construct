@@ -51,7 +51,8 @@ malicious modules. See [evidence](evidence.md) and [release provenance](public-r
 
 ## Module-owned Sky Watch
 
-Run `node scripts/test_sky.cjs` for the actual shipped module's parsers, identity
+Run `node scripts/test_sky_map.cjs` for tile cancellation/retry behavior and
+`node scripts/test_sky.cjs` for the actual shipped module's parsers, identity
 merge, glossary and metadata contracts. `python scripts/prepare_fixtures.py` creates
 a separate signed legacy launcher for native compatibility tests and signed
 transport-scope versions for new-grant/update/rollback checks. Do not replace or

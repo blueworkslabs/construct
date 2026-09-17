@@ -86,7 +86,7 @@ For a new or extended capability, describe:
 6. **Compatibility:** API negotiation, unavailable-capability behavior, module
    data migration and treatment of existing installed versions.
 
-These requirements now have an initial consumer: Sky Watch 0.2.0 uses the bounded
+These requirements now have an initial consumer: Sky Watch 0.2.x uses the bounded
 API 0.9 `net.http` and `location.read` contracts. The WebView still has no direct
 network or geolocation access. Future capabilities must likewise be designed,
 implemented and verified before a module depends on them.
@@ -96,7 +96,7 @@ implemented and verified before a module depends on them.
 - **Legacy Sky Watch 0.1.0:** `sky.watch` accepts `{op:"open"}`. Its module is a launcher;
   `SkyActivity`, `SkyNetwork`, `SkyData`, `SkyIdentity`, `SkyMetadata` and `SkyMap`
   put aviation logic and presentation in the host. Even a glossary fix currently
-  needs a host build to reach that legacy workspace. Sky Watch 0.2.0 instead owns
+  needs a host build to reach that legacy workspace. Sky Watch 0.2.x instead owns
   its aviation logic and Canvas/UI in its module package, using API 0.9 transport
   and location. The old host implementation remains only for published callers.
 - **Pocket Measure:** `photo.measure` opens the native measurement workspace;

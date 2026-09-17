@@ -302,6 +302,8 @@ class SkyMap {
           this.onError(null);
         })
         .catch((e) => {
+          // Menu cancellation is not a failed tile and must not impose a cooldown.
+          if (!this.visible || e.code === "RUN_PAUSED" || e.code === "RUN_STALE") return;
           this.failures.set(key, Date.now() + 60000);
           while (this.failures.size > 128)
             this.failures.delete(this.failures.keys().next().value);

@@ -70,14 +70,14 @@
     while (active && inFlight < 3 && queue.length) {
       const job = queue.shift();
       if (job.epoch !== epoch) {
-        job.reject(new Error("Request interrupted."));
+        job.reject(Object.assign(new Error("Request interrupted."), {code: "RUN_PAUSED"}));
         continue;
       }
       inFlight++;
       call("net.http", { op: "get", url: job.url, format: job.format })
         .then((value) => {
           if (!active || job.epoch !== epoch)
-            throw new Error("Request interrupted.");
+            throw Object.assign(new Error("Request interrupted."), {code: "RUN_PAUSED"});
           job.resolve(value);
         })
         .catch(job.reject)
@@ -180,7 +180,7 @@
         );
       budgets[source] = { last: now, until: 0 };
       await saveBudgets();
-      if (e !== epoch || !active) throw new Error("Request interrupted.");
+      if (e !== epoch || !active) throw Object.assign(new Error("Request interrupted."), {code: "RUN_PAUSED"});
       const aircraft = [];
       for (const url of D.urls(source, c, r)) {
         const response = await transport(url);
