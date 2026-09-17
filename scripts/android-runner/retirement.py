@@ -149,15 +149,21 @@ try:
                 from catalog_input import replace_text
                 replace_text(nodes, lambda value: ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value), 'SYNTHETIC-retained-item')
                 tap('Add item'); find('SYNTHETIC-retained-item')
+                replace_text(nodes, lambda value: ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value), 'SYNTHETIC-completed-item')
+                tap('Add item'); find('SYNTHETIC-completed-item')
+                tap('Complete SYNTHETIC-completed-item'); find('1 / 2 completed')
                 adb('shell','input','keyevent','111')
                 if 'Clear completed' in labels(): raise RuntimeError('Old version already exposes new workflow')
                 capture('checklist-before'); tap('Mark working')
             else:
-                find('SYNTHETIC-retained-item'); find('Clear completed'); capture('checklist-after')
+                find('SYNTHETIC-retained-item'); find('Clear completed'); tap('Clear completed')
+                find('0 / 1 completed'); find('SYNTHETIC-retained-item')
+                if 'SYNTHETIC-completed-item' in labels(): raise RuntimeError('Updated workflow did not remove completed item')
+                capture('checklist-after')
                 tap('Close module')
         done('Two exact signed Checklist versions expose different module-owned workflow with saved item intact')
         select_after('Pocket Checklist · 0.2.0', ('Roll back',)); tap('Restore')
-        select_after('Pocket Checklist · 0.1.0', ('Open',)); find('SYNTHETIC-retained-item')
+        select_after('Pocket Checklist · 0.1.0', ('Open',)); find('SYNTHETIC-retained-item'); find('0 / 1 completed')
         if 'Clear completed' in labels(): raise RuntimeError('Rollback retained update-only workflow')
         capture('checklist-rollback'); tap('Close module'); verify_installed(a.new_sha)
         receipt['moduleOnlyUpdate'] = {'versions': candidates['checklist'], 'apkSha256Before':before, 'apkSha256After':a.new_sha}
