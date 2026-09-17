@@ -1,6 +1,6 @@
 # Pocket Measure — module-owned measurement
 
-Pocket Measure **0.2.0** uses **API 0.10 / alpha29**. Its signed module owns
+Pocket Measure **0.2.1** uses **API 0.10 / alpha29**. Its signed module owns
 reference selection, calibration, projective geometry, endpoint editing, undo,
 zoom/pan, units and UI. Generic native APIs select/decode one user-chosen image and
 return bounded ArUco detections; the shell does not interpret lengths.

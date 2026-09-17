@@ -18,3 +18,31 @@ test('clear is undoable; no-op drags do not consume undo',()=>{const e=editor();
 test('history bounded, third placement cannot replace current pair',()=>{const e=editor();pair(e);assert.throws(()=>e.place(e.revision,{x:.9,y:.5}));for(let i=0;i<12;i++){e.begin(e.revision,'b');e.move(e.revision,{x:.7+i/1000,y:.6},true);}assert.equal(e.history.length,10);for(let i=0;i<10;i++)e.undo();assert.ok(e.value.b);assert.equal(e.history.length,0);});
 test('fine nudge is a single undo and rejected nudge cancels transaction',()=>{const e=editor();pair(e);const before=e.value;e.nudge('b',1,0,1200,900);close(e.value.b.x,b.x+1/1200);e.undo();assert.deepEqual(e.value,before);assert.throws(()=>e.nudge('b',1200,0,1200,900));assert.deepEqual(e.value,before);assert.equal(e.drag,null);});
 test('module scripts compile and capabilities exclude native launcher/network/storage/log',()=>{assert.doesNotThrow(()=>new vm.Script(['bridge.js','geometry.js','app.js'].map(n=>fs.readFileSync('examples/measure-module/ui/'+n,'utf8')).join('\n')));const m=JSON.parse(fs.readFileSync('examples/measure-module/manifest.json'));assert.deepEqual(m.capabilities.map(c=>c.id),['image.read','image.markers']);assert.equal(m.constructApi.min,'0.10.0');});
+
+// Exercise the actual UI event wiring, not just Editor.cancel(). The Android 17
+// WebView trace delivered touchcancel without a corresponding pointercancel.
+function measureUi() {
+  class Element {
+    constructor(){this.value='';this.hidden=false;this.listeners={};this.clientWidth=600;this.clientHeight=450;this.classList={toggle(){}};}
+    addEventListener(type,fn){(this.listeners[type]??=[]).push(fn);}
+    dispatch(type,extra={}){const event={type,preventDefault(){},...extra};this['on'+type]?.(event);for(const fn of this.listeners[type]||[])fn(event);}
+    setAttribute(){} blur(){} setPointerCapture(){}
+    getBoundingClientRect(){return {left:0,top:0};}
+    getContext(){return new Proxy({},{get:()=>()=>{}});}
+  }
+  const html=fs.readFileSync('examples/measure-module/ui/index.html','utf8');
+  const elements=Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map(m=>[m[1],new Element()]));
+  elements.units.value='cm';const window=new Element();window.devicePixelRatio=1;
+  const sandbox={document:{getElementById:id=>elements[id]},window,Measure:require('../examples/measure-module/ui/geometry.js'),ResizeObserver:class{observe(){}},Image:class{set src(_){queueMicrotask(()=>this.onload());}},call:async method=>method==='image.read'?{handle:'synthetic',url:'https://synthetic.invalid/image.png',width:1200,height:900}:{markers:[{id:0,corners:square}]}};
+  vm.runInNewContext(fs.readFileSync('examples/measure-module/ui/app.js','utf8'),sandbox);
+  const pointer=(type,x,y)=>elements.photo.dispatch(type,{pointerId:1,clientX:x,clientY:y});
+  return {elements,pointer,tap(x,y){pointer('pointerdown',x,y);pointer('pointerup',x,y);}};
+}
+for(const cancellation of ['pointercancel','touchcancel','lostpointercapture'])test('actual module UI restores a drag on '+cancellation+' and ignores late release',async()=>{
+  const {elements:e,pointer,tap}=measureUi();await e.choose.onclick();e.side.value='100';e.setup.dispatch('submit');
+  tap(180,270);tap(480,270);assert.equal(e.result.textContent,'Length: 25.0 cm');
+  pointer('pointerdown',480,270);pointer('pointermove',420,270);assert.equal(e.result.textContent,'Length: 20.0 cm');
+  e.photo.dispatch(cancellation);assert.equal(e.result.textContent,'Length: 25.0 cm');
+  pointer('pointerup',420,270);assert.equal(e.result.textContent,'Length: 25.0 cm');
+  e.undo.onclick();assert.equal(e.result.textContent,'No length yet','cancel must not add a committed undo step');
+});

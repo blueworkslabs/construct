@@ -89,7 +89,12 @@
     else if(old?.type==='tap'&&editor.plane)run(()=>editor.place(editor.revision,point(p)));
     gesture=null;if(pointers.size)gesture={type:'ignore'};render();
   };
-  canvas.onpointercancel=()=>{cancelGesture();clearError();render();};
+  const cancelInput=()=>{cancelGesture();clearError();render();};
+  canvas.onpointercancel=cancelInput;
+  // Some Android WebViews emit touchcancel without pointercancel. Neither a
+  // cancelled touch nor lost capture may leave a preview waiting for release.
+  canvas.ontouchcancel=cancelInput;
+  canvas.onlostpointercapture=()=>{if(gesture)cancelInput();};
   new ResizeObserver(()=>{cancelGesture();zoom=1;offset={x:0,y:0};render();}).observe(el('viewport'));
   window.addEventListener('constructvisibilitychange',event=>{
     visible=event.detail.visible;cancelGesture();

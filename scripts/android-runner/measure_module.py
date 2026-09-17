@@ -20,7 +20,7 @@ p.add_argument('--sha', required=True)
 p.add_argument('--catalog', required=True)
 p.add_argument('--module-sha', required=True)
 p.add_argument('--module-name', default='Pocket Measure')
-p.add_argument('--module-version', default='0.2.0')
+p.add_argument('--module-version', default='0.2.1')
 a = p.parse_args()
 from config import catalog
 catalog(a.catalog)
