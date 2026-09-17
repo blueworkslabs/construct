@@ -155,7 +155,7 @@ try:
     time.sleep(16);click('50 km');tap('100 km');ready('ADSB.lol');click('Zoom in');click('Zoom out');click('Center map')
     # Reveal an actual live list row; do not select a hard-coded aircraft.
     for _ in range(8):
-        candidates=[n for n in nodes() if re.match(r'^\d+(?:\.\d+)? km · ',n.get('text','')) and visible(n)]
+        candidates=[n for n in nodes() if n.get('class')=='android.widget.Button' and re.search(r'\d+(?:\.\d+)? km · ',n.get('text','')+' '+n.get('content-desc','')) and visible(n)]
         if candidates:tap_node(candidates[0]);break
         scroll()
     else:raise RuntimeError('No selectable live aircraft row')
