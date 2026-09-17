@@ -86,6 +86,21 @@ def consent_switch(label):
         time.sleep(.3)
     raise RuntimeError('Trusted consent switch did not appear: '+label)
 
+def settled_host_surface():
+    # A version review closes a ModalBottomSheet asynchronously. Never swipe
+    # its disappearing accessibility window or retry the preceding action.
+    from host_cards import host_viewport
+    deadline=time.monotonic()+20; previous=None
+    while time.monotonic()<deadline:
+        current=nodes()
+        texts={n.get('text') for n in current}
+        try: viewport=host_viewport(current)
+        except RuntimeError: viewport=None
+        if viewport and 'Close versions' not in texts and 'Browse' in texts and viewport==previous:
+            return
+        previous=viewport; time.sleep(.4)
+    raise RuntimeError('Host did not settle after version review')
+
 def install_hello(version):
     select_after('Hello Module · ' + version, ('Review & install',))
     tap('Allow & install')
@@ -224,7 +239,7 @@ try:
         select_after('Sky Watch · '+candidates['sky']['version'], ('Open',)); find('Choose area')
         tap('Construct menu'); tap('Mark working'); library()
         done('Rollback to retired native code is blocked and current modern module stays runnable')
-        select_after('Sky Watch · 0.1.0', ('Review & install',)); scroll_top(); find(error)
+        select_after('Sky Watch · 0.1.0', ('Review & install',)); settled_host_surface(); scroll_top(); find(error)
         if 'Allow & install' in labels(): raise RuntimeError('Retired package reached install consent')
         capture('retired-install-blocked'); library(); open_hello('0.2.0'); find('3'); tap('Close module')
         done('Retired reinstallation rejected before consent; saved unrelated module data remains intact')
@@ -236,7 +251,9 @@ except Exception as e:
     raise
 finally:
     if started:
-        try: (run / 'crash-buffer.txt').write_text(adb('logcat', '-b', 'crash', '-d'))
+        try:
+            (run / 'crash-buffer.txt').write_text(adb('logcat', '-b', 'crash', '-d'))
+            (run / 'runtime.log').write_text(adb('logcat', '-d', '-t', '6000'))
         except Exception: pass
         subprocess.run([str(CONFIG.root / 'runner.sh'), 'stop'], check=True)
         receipt['stopped'] = subprocess.run(['systemctl', '--user', 'is-active', '--quiet', CONFIG.service]).returncode != 0
