@@ -107,3 +107,58 @@ revocation are covered by deterministic tests. Live checks use a public airport
 reference, never a personal location. Actual optimized-APK emulator and physical
 phone evidence must be reported separately; source tests alone do not establish
 GPS, map rendering, lifecycle, physical location accuracy or phone acceptance.
+
+## Aircraft identity and optional details (alpha25)
+
+The selected card and nearby list decode a small, hand-curated glossary of common
+ICAO type designators into readable model names. Unknown codes remain visible;
+coverage is intentionally incomplete. The glossary consists of short factual
+model/designator associations, not a copied aircraft database. Reference:
+ICAO Aircraft Type Designators (Doc 8643), <https://www.icao.int/publications/DOC8643>.
+A designator may cover multiple variants (for example B77L covers the 777-200LR
+and freighter); the glossary is not a passenger/cargo/private-flight classifier.
+
+ADSB.lol emitter categories and OpenSky's optional `extended=1` category are
+normalized separately from models. Weight categories are not airline categories.
+Reported rotorcraft/glider categories and known model families inform symbols;
+unknown/conflicting classifications retain a generic symbol. Unknown ground
+track still uses a non-directional dot. Speed/altitude never classify an aircraft.
+
+Combined fills missing registration/type/category from other **active, recent**
+source observations, with per-field provenance and an explicit disagreement note.
+The newest coherent position/altitude/speed/time is unchanged. Switching to a
+single source does not import identity from the disabled provider. Identity
+expires with its supporting observation, even if a later position still exists.
+
+**More aircraft info** first opens local information and a disclosure. Only the
+separate **Look up with ADSBdb** button sends requests to the documented public
+`https://api.adsbdb.com/v0/aircraft/{icao24}` and, when a recognizable callsign
+prefix exists, `/v0/airline/{icao}` endpoints. No route endpoint, photograph,
+redirect, arbitrary URL, API credential or phone coordinate is used. ADSBdb sees
+the selected aircraft ID, optional three-letter airline prefix and connection IP.
+The tracking-source selector still controls only live tracking providers.
+
+Registry owner and callsign-associated airline are labelled separately. Leasing,
+old records and callsign reuse can explain disagreements; neither field proves
+current operator, occupants or flight purpose. Lookup facts never replace the
+map's live identity. Errors/not-found are independent of tracking. Returned
+identity is checked against the requested address before displaying any record.
+
+Lookups have a separate worker, 8-second connect/read timeouts, 32 KiB response
+bounds, no redirects, system TLS, capability checks before and after requests
+and on cached reads, and a conservative 30-request/minute persisted limit plus
+429 backoff. Cache only parsed aircraft/airline fields in memory: at most 64
+records, one hour for successes, five minutes for not-found. No positions,
+queries, owners or lookup responses are saved to disk. Leaving clears the cache,
+closes connections and invalidates pending UI results. Reopening requires a new
+explicit lookup. The retrieved timestamp is **not** the database's update date.
+
+ADSBdb documents its public GET API and rate limits at <https://www.adsbdb.com/>
+and <https://github.com/mrjackwills/adsbdb>. Aircraft data is credited to PlaneBase.
+This integration uses individual public API lookups with a transient session
+cache; it does **not** bundle, scrape or redistribute an aircraft database. The
+software's MIT license is not presented as a license for upstream databases.
+ADSBdb's separately restricted flight-route data is excluded entirely. Bulk or
+persistent database reuse needs a separate terms assessment; no such rights or
+provider agreement are claimed by this pilot. Photos and live routes remain
+out of scope.

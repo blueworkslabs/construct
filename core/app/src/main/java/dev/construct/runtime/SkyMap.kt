@@ -167,10 +167,34 @@ private fun DrawScope.marker(a: SkyAircraft, p: Offset, now: Double, chosen: Boo
     val outline=if(stale) SkyInk.fresh else SkyInk.halo
     if(chosen) { drawCircle(SkyInk.selection.copy(alpha=0.35f),20.dp.toPx(),p); drawCircle(SkyInk.selection,15.dp.toPx(),p,style=Stroke(2.dp.toPx())) }
     val r=(if(chosen) 11.dp else 10.dp).toPx()
-    if(a.track==null) {
+    skyGlyph(SkyIdentity.kind(a),a.track,p,r,fill,outline)
+}
+
+/** Shape is model/category evidence; rotation is ground track, never inferred nose direction. */
+internal fun DrawScope.skyGlyph(kind: SkyKind,track: Double?,p: Offset,r: Float,fill: Color,outline: Color) {
+    if(track==null) {
         drawCircle(outline,r*0.7f,p); drawCircle(fill,r*0.5f,p)
-    } else rotate(a.track.toFloat(),p) {
-        val path=Path().apply { moveTo(p.x,p.y-r); lineTo(p.x+r*0.75f,p.y+r); lineTo(p.x,p.y+r*0.5f); lineTo(p.x-r*0.75f,p.y+r); close() }
+    } else rotate(track.toFloat(),p) {
+        val path=Path().apply {
+            when(kind) {
+                SkyKind.ROTORCRAFT -> {
+                    moveTo(p.x,p.y-r); lineTo(p.x+r*0.3f,p.y-r*0.3f); lineTo(p.x+r,p.y-r*0.2f)
+                    lineTo(p.x+r,p.y+r*0.05f); lineTo(p.x+r*0.25f,p.y+r*0.05f); lineTo(p.x+r*0.1f,p.y+r)
+                    lineTo(p.x-r*0.1f,p.y+r); lineTo(p.x-r*0.25f,p.y+r*0.05f); lineTo(p.x-r,p.y+r*0.05f)
+                    lineTo(p.x-r,p.y-r*0.2f); lineTo(p.x-r*0.3f,p.y-r*0.3f)
+                }
+                SkyKind.JET,SkyKind.BUSINESS,SkyKind.TURBOPROP,SkyKind.PISTON,SkyKind.GLIDER -> {
+                    val wing=if(kind==SkyKind.GLIDER) 1.15f else 1f
+                    moveTo(p.x,p.y-r); lineTo(p.x+r*0.18f,p.y-r*0.3f); lineTo(p.x+r*wing,p.y+r*0.25f)
+                    lineTo(p.x+r*wing,p.y+r*0.45f); lineTo(p.x+r*0.16f,p.y+r*0.1f); lineTo(p.x+r*0.12f,p.y+r*0.7f)
+                    lineTo(p.x+r*0.4f,p.y+r); lineTo(p.x-r*0.4f,p.y+r); lineTo(p.x-r*0.12f,p.y+r*0.7f)
+                    lineTo(p.x-r*0.16f,p.y+r*0.1f); lineTo(p.x-r*wing,p.y+r*0.45f); lineTo(p.x-r*wing,p.y+r*0.25f)
+                    lineTo(p.x-r*0.18f,p.y-r*0.3f)
+                }
+                else -> { moveTo(p.x,p.y-r); lineTo(p.x+r*0.75f,p.y+r); lineTo(p.x,p.y+r*0.5f); lineTo(p.x-r*0.75f,p.y+r) }
+            }
+            close()
+        }
         drawPath(path,outline,style=Stroke(3.dp.toPx())); drawPath(path,fill)
     }
 }

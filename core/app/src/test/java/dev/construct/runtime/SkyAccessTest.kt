@@ -64,8 +64,10 @@ class SkyAccessTest {
         val result=network.fetch(SkySource.ADSB,SkyPoint(50.0,8.0),25)
         assertFalse(result.ok);assertEquals(1,calls);assertTrue(result.aircraft.isEmpty())
         denied("CAPABILITY_DENIED") { network.tile(8,134,86) }
+        denied("CAPABILITY_DENIED") { network.lookup(SkyLookupRequest("abc123",null)) }
         network.close();val before=calls
         assertFalse(network.fetch(SkySource.OPENSKY,SkyPoint(50.0,8.0),25).ok)
+        denied("SKY_CLOSED") { network.lookup(SkyLookupRequest("abc123",null)) }
         denied("SKY_CLOSED") { network.tile(8,134,86) }; assertEquals(before,calls)
     }
 }

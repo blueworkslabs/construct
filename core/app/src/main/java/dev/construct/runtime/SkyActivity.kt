@@ -39,9 +39,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -95,6 +92,12 @@ class SkyActivity : ComponentActivity() {
     private var lonText by mutableStateOf("")
     private var now by mutableDoubleStateOf(System.currentTimeMillis()/1000.0)
     private var generation=0
+    private val infoWorker=Executors.newSingleThreadExecutor()
+    private var infoTarget by mutableStateOf<SkyAircraft?>(null)
+    private var infoResult by mutableStateOf<SkyMetadataResult?>(null)
+    private var infoBusy by mutableStateOf(false)
+    private var infoError by mutableStateOf<String?>(null)
+    private var infoGeneration=0
     private val permission=registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         if(live && !isFinishing) {
             if(hasLocation()) locate() else note("Location permission not granted. Enter coordinates instead, or enable permission in Android Settings.",WorkshopTone.ERROR)
@@ -115,11 +118,11 @@ class SkyActivity : ComponentActivity() {
     }
     override fun onStart() { super.onStart(); live=true }
     override fun onStop() {
-        live=false; generation++; stopLocation(); feeds=emptyList(); center=null; selected=null; latText=""; lonText=""; updatedAt=null
+        live=false; generation++; infoGeneration++; infoTarget=null; infoResult=null; infoError=null; infoWorker.shutdownNow(); stopLocation(); feeds=emptyList(); center=null; selected=null; latText=""; lonText=""; updatedAt=null
         if(::network.isInitialized) network.close()
         super.onStop(); finish()
     }
-    override fun onDestroy() { live=false; stopLocation(); if(::network.isInitialized) network.close(); launched.set(false); super.onDestroy() }
+    override fun onDestroy() { live=false; infoWorker.shutdownNow(); stopLocation(); if(::network.isInitialized) network.close(); launched.set(false); super.onDestroy() }
     private fun access() { store.withCapability(installed,"sky.watch") { } }
     private fun note(text: String,tone: WorkshopTone=WorkshopTone.NEUTRAL) { status=text; statusTone=tone }
     private fun hasLocation()=checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED || checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED
@@ -169,7 +172,7 @@ class SkyActivity : ComponentActivity() {
     }
     private fun choose(p: SkyPoint,fromPhone: Boolean=false) {
         try { access() } catch(_: Exception) { finish(); return }
-        stopLocation(); generation++; center=p; feeds=emptyList(); selected=null; showArea=false; updatedAt=null
+        stopLocation(); generation++; infoGeneration++; infoTarget=null; infoResult=null; center=p; feeds=emptyList(); selected=null; showArea=false; updatedAt=null
         if(!fromPhone) locationLabel="Chosen area"
         latText=String.format(Locale.ROOT,"%.5f",p.lat); lonText=String.format(Locale.ROOT,"%.5f",p.lon)
         refresh()
@@ -280,6 +283,7 @@ class SkyActivity : ComponentActivity() {
                 }
             }
         }
+        infoTarget?.let { InfoDialog(it) }
         if(showArea) AlertDialog(onDismissRequest={ showArea=false },title={ Text("Choose area") },text={
             Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)) { AreaFields() }
         },confirmButton={ TextButton(onClick={ showArea=false }) { Text("Cancel") } })
@@ -373,11 +377,12 @@ class SkyActivity : ComponentActivity() {
                 val current=a.key==selected
                 Row(Modifier.fillMaxWidth().then(if(current) Modifier.background(ConstructColors.surface2,RoundedCornerShape(8.dp)) else Modifier)
                     .clickable { selected=a.key }.padding(horizontal=4.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically) {
-                    HeadingGlyph(a.track,a.age(now)>SkyData.STALE_AGE)
+                    HeadingGlyph(a.track,a.age(now)>SkyData.STALE_AGE,kind=SkyIdentity.kind(a))
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(a.label,style=MaterialTheme.typography.titleSmall)
                         Text(details(a,p),style=MaterialTheme.typography.bodySmall,color=ConstructColors.text)
+                        Text(SkyIdentity.name(a.type),style=MaterialTheme.typography.bodySmall,color=ConstructColors.muted)
                         Text(a.sources.joinToString(" + ") { it.label },style=MaterialTheme.typography.labelSmall,color=ConstructColors.muted)
                     }
                 }
@@ -394,21 +399,96 @@ class SkyActivity : ComponentActivity() {
             border=BorderStroke(1.dp,ConstructColors.jade)) {
             Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment=Alignment.CenterVertically) {
-                    HeadingGlyph(a.track,stale,size=26.dp)
+                    HeadingGlyph(a.track,stale,size=26.dp,kind=SkyIdentity.kind(a))
                     Spacer(Modifier.width(10.dp))
                     Text(a.label,style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f))
                     if(stale) WorkshopBadgeChip(WorkshopBadge("stale",WorkshopTone.ATTENTION))
                 }
-                Text("${a.registration ?: "Registration unknown"} · ${a.type ?: "Type unknown"}",style=MaterialTheme.typography.bodySmall,color=ConstructColors.muted)
+                Text("${a.registration ?: "Registration unknown"} · ${SkyIdentity.name(a.type)}",style=MaterialTheme.typography.bodySmall,color=ConstructColors.muted)
+                Text(a.category?.let { "Reported: $it" } ?: SkyIdentity.kind(a).label,style=MaterialTheme.typography.labelSmall,color=ConstructColors.muted)
+                if(a.identityConflict) Text("Identity reports differ · newest known values shown",style=MaterialTheme.typography.labelSmall,color=ConstructColors.amber)
                 val bearing=SkyData.bearing(p,a.point)
                 DetailLine("Where",String.format(Locale.ROOT,"%.1f km %s of your area · bearing %03.0f°",SkyData.distance(p,a.point),SkyData.compass(bearing),bearing))
                 DetailLine("Altitude",a.altitudeM?.let { String.format(Locale.ROOT,"%,d ft barometric",(it/0.3048).toInt()) } ?: "Unknown")
                 DetailLine("Speed",a.speedMps?.let { "${(it*3.6).toInt()} km/h over ground" } ?: "Unknown")
                 DetailLine("Heading",a.track?.let { String.format(Locale.ROOT,"%03.0f° %s ground track",it,SkyData.compass(it)) } ?: "Unknown")
                 DetailLine("Seen","${ageText(a)} · ${a.source.label} position · reported by ${a.sources.joinToString(" + ") { it.label }}")
+                TextButton(onClick={ infoGeneration++; infoTarget=a; infoResult=null; infoError=null },contentPadding=PaddingValues(horizontal=4.dp),
+                    colors=ButtonDefaults.textButtonColors(contentColor=ConstructColors.jade)) { Text("More aircraft info") }
                 TextButton(onClick={ selected=null },contentPadding=PaddingValues(horizontal=4.dp),
                     colors=ButtonDefaults.textButtonColors(contentColor=ConstructColors.jade)) { Text("Dismiss details") }
             }
+        }
+    }
+    private fun lookupInfo(a: SkyAircraft) {
+        val request=SkyLookupRequest.from(a) ?: return
+        if(!live || isFinishing || infoBusy) return
+        try { access() } catch(_: Exception) { finish(); return }
+        val token=infoGeneration
+        infoBusy=true; infoError=null
+        infoWorker.execute {
+            val result=runCatching { network.lookup(request) }
+            runOnUiThread {
+                if(live && !isFinishing) {
+                    infoBusy=false
+                    if(token==infoGeneration) try {
+                        access()
+                        result.onSuccess { infoResult=it }.onFailure { infoError="Aircraft lookup unavailable. Tracking still works." }
+                    } catch(_: Exception) { finish() }
+                }
+            }
+        }
+    }
+    @Composable private fun InfoDialog(a: SkyAircraft) {
+        val request=SkyLookupRequest.from(a)
+        fun closeInfo() { infoGeneration++; infoTarget=null; infoResult=null; infoError=null }
+        AlertDialog(onDismissRequest={ closeInfo() },title={ Text("Aircraft info · ${a.label}") },text={
+            Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                Text(SkyIdentity.name(a.type),style=MaterialTheme.typography.titleMedium)
+                Text("${a.registration ?: "Registration unknown"} · ${a.type ?: "Type code unknown"}",style=MaterialTheme.typography.bodySmall)
+                Text("Model type: ${SkyIdentity.kind(a).label}",style=MaterialTheme.typography.bodySmall)
+                if(a.typeSource!=null) Text("Type: ${a.typeSource.label} · registration: ${a.registrationSource?.label ?: "unknown"}",style=MaterialTheme.typography.labelSmall)
+                if(a.category!=null) Text("Reported category: ${a.category} · ${a.categorySource?.label ?: "unknown source"}",style=MaterialTheme.typography.bodySmall)
+                if(a.identityConflict) Text("Live sources disagree on identity/category. Newest known fields are shown.",color=ConstructColors.amber)
+                HorizontalDivider()
+                val result=infoResult?.takeIf { it.request==request }
+                if(result==null) {
+                    Text("Optional lookup: ADSBdb can add manufacturer, model and registry details. Its records may be incomplete or out of date.",style=MaterialTheme.typography.bodySmall)
+                    Text("Only after you tap Look up: sends this aircraft’s ICAO address${if(request?.airline!=null) " and callsign prefix ${request.airline}" else ""} to ADSBdb, which also sees your IP address. Your coordinates are not sent. Results stay in memory until you leave Sky Watch.",style=MaterialTheme.typography.bodySmall)
+                    if(request==null) Text("No standard ICAO address is available for this aircraft.",style=MaterialTheme.typography.bodySmall)
+                } else {
+                    Text("ADSBdb record",style=MaterialTheme.typography.titleSmall)
+                    result.aircraft.aircraft?.let { info ->
+                        MetadataLine("Model",listOfNotNull(info.manufacturer,info.model).joinToString(" ").ifBlank { "Unknown" })
+                        MetadataLine("Type code",info.typeCode ?: "Unknown")
+                        MetadataLine("Registration",info.registration ?: "Unknown")
+                        MetadataLine("Registry owner",info.owner ?: "Unknown")
+                        MetadataLine("Registry country",info.country ?: "Unknown")
+                        if((a.type!=null && info.typeCode!=null && a.type!=info.typeCode) ||
+                            (a.registration!=null && info.registration!=null && a.registration!=info.registration))
+                            Text("This record differs from the live feed. It has not replaced the map identity.",color=ConstructColors.amber,style=MaterialTheme.typography.bodySmall)
+                    }
+                    result.aircraft.message?.let { Text(it,style=MaterialTheme.typography.bodySmall) }
+                    result.airline?.let { part ->
+                        MetadataLine("Callsign airline",part.airline?.let { "$it (${request?.airline})" } ?: part.message ?: "Unknown")
+                    }
+                    Text("Registry owner and callsign airline can differ through leasing or old records. These are not a verified current operator or private/cargo flight classification.",style=MaterialTheme.typography.bodySmall)
+                    val at=java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT,java.text.DateFormat.SHORT)
+                    Text("Aircraft retrieved ${at.format(java.util.Date(result.aircraft.checkedAt))}",style=MaterialTheme.typography.labelSmall)
+                    result.airline?.let { Text("Airline retrieved ${at.format(java.util.Date(it.checkedAt))}",style=MaterialTheme.typography.labelSmall) }
+                    Text("ADSBdb / PlaneBase aircraft data. Retrieval times are not database update dates.",style=MaterialTheme.typography.labelSmall)
+                }
+                if(infoBusy) { CircularProgressIndicator(Modifier.size(22.dp)); Text("Looking up aircraft…",style=MaterialTheme.typography.bodySmall) }
+                infoError?.let { Text(it,color=ConstructColors.amber,style=MaterialTheme.typography.bodySmall) }
+            }
+        },confirmButton={
+            if(request!=null) TextButton(onClick={ lookupInfo(a) },enabled=!infoBusy) { Text(if(infoResult==null) "Look up with ADSBdb" else "Look up again") }
+        },dismissButton={ TextButton(onClick={ closeInfo() },modifier=Modifier.semantics { contentDescription="Close aircraft info" }) { Text("Close") } })
+    }
+    @Composable private fun MetadataLine(label: String,value: String) {
+        Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
+            Text(label,style=MaterialTheme.typography.labelMedium,color=ConstructColors.muted)
+            Text(value,style=MaterialTheme.typography.bodyMedium,color=ConstructColors.text)
         }
     }
     @Composable private fun DetailLine(label: String,value: String) {
@@ -418,16 +498,12 @@ class SkyActivity : ComponentActivity() {
         }
     }
     /** Small ground-track arrow matching the map marker; a dot when the track is unknown. */
-    @Composable private fun HeadingGlyph(track: Double?,stale: Boolean,size: androidx.compose.ui.unit.Dp=22.dp) {
+    @Composable private fun HeadingGlyph(track: Double?,stale: Boolean,size: androidx.compose.ui.unit.Dp=22.dp,kind: SkyKind=SkyKind.UNKNOWN) {
         val fill=if(stale) ConstructColors.amber else ConstructColors.jade
         // Decorative: the row text carries the meaning, so the glyph adds no accessible label.
         Canvas(Modifier.size(size)) {
             val c=center; val r=this.size.minDimension/2*0.85f
-            if(track==null) { drawCircle(fill,r*0.45f,c); drawCircle(fill,r*0.75f,c,style=Stroke(1.5f.dp.toPx())) }
-            else rotate(track.toFloat(),c) {
-                val path=Path().apply { moveTo(c.x,c.y-r); lineTo(c.x+r*0.72f,c.y+r*0.9f); lineTo(c.x,c.y+r*0.45f); lineTo(c.x-r*0.72f,c.y+r*0.9f); close() }
-                drawPath(path,fill)
-            }
+            skyGlyph(kind,track,c,r,fill,fill)
         }
     }
     private fun ageText(a: SkyAircraft): String { val s=a.age(now).toInt(); return if(s<60) "$s s ago" else "${s/60} min ${s%60} s ago" }
