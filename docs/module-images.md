@@ -16,7 +16,9 @@ workflow or domain result belongs in that primitive.
 - `{op:"pick"}` opens Android's single-image picker. No caller URI/path, persistent
   grant or broad media permission. It returns `{handle,url,width,height,mime}`.
   The URL is a run-private same-origin raster resource, not an original provider
-  URI. Replacing the image invalidates the previous handle. User cancellation is
+  URI. The `construct-images/` path prefix is reserved only for modules declaring
+  `image.read`; older modules retain their packaged-resource paths. Replacing the
+  image invalidates the previous handle. User cancellation is
   `IMAGE_CANCELLED`; no image is selected automatically.
 - `{op:"release",handle}` discards that run's image. Unknown/expired/foreign
   handles fail `IMAGE_STALE`. One current image and one pending operation per run.
@@ -70,5 +72,7 @@ perspective and EXIF images, negative/multiple markers, offline detection,
 calibration changes, placement/drag/nudge/undo, stable viewport, zoom/pan, rotation,
 large text, picker cancellation, lifecycle and fresh consent. Verify two signed
 module versions changing real measurement behavior and rollback on an identical
-APK. Only then remove the legacy native workspace and retire `photo.measure`
-using the same explicit update-required/data-preserving boundary as Sky.
+APK. The candidate removes the legacy implementation after core prototype checks;
+publishing/promoting that retirement requires the full optimized-APK checks above
+and the installed-version transition. `photo.measure` uses the same explicit
+update-required/data-preserving boundary as Sky.

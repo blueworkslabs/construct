@@ -125,7 +125,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             if (!local(request.url)) return reject("external-origin")
             if (request.method != "GET") return reject("method")
             val path = request.url.path?.removePrefix("/") ?: return reject("path")
-            if (path.startsWith("construct-images/")) {
+            if (images != null && path.startsWith("construct-images/")) {
                 if (request.isForMainFrame || request.url.query != null) return reject("image-context")
                 val bytes = runCatching { images?.resource(path) }.getOrNull() ?: return reject("image-authority")
                 val stream = object : ByteArrayInputStream(bytes) {
