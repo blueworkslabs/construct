@@ -65,3 +65,21 @@ ratchet. Aviation behavior tests now live with the module, not native Sky code.
 The migration also requires live exact-artifact Android checks and a separate
 synthetic, signed module-only update demonstration on the same APK. JVM/Node tests
 alone are not a completed migration or physical-phone acceptance.
+
+## Retired capability transition (alpha28 candidate)
+
+The configured disposable runner can execute `retirement.py --old OLD_APK
+--old-sha OLD_SHA256 --new NEW_APK --new-sha NEW_SHA256 --candidates CANDIDATES_JSON`.
+The old APK is alpha27; use exact file hashes. Candidate metadata contains `sky`
+(version/SHA256 of published Sky 0.2.2) and `checklist` (version/SHA256 records for
+published Checklist 0.1.0 and 0.2.0). Both hosts must trust the catalog publisher;
+the configured public catalog is used for signed-package review. Normal runner
+configuration, exclusive lock, app-free snapshot, pinned Android 17 WebView and
+stop-on-exit rules apply. This script refuses an already-running emulator.
+
+Run it again with `--checklist-only` for an independent clean-snapshot proof of
+Checklist's added Clear completed workflow, retained data and supported rollback
+on the identical candidate APK. Run the existing `--sky-module-candidates` suite
+separately for live modern Sky behavior and its signed glossary update/rollback.
+Record each completed scope independently and review the retirement UI screenshots;
+partial runs are not acceptance. See [the retirement contract](shell-retirement.md).

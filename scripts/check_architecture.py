@@ -13,11 +13,11 @@ ACTIVITIES = {'.MainActivity', '.ModuleActivity', '.CameraActivity', '.MeasureAc
 def check(root=ROOT):
     errors = []
     src = root/'core/app/src/main/java/dev/construct/runtime'
-    for path in src.glob('*.kt'):
+    for path in src.rglob('*.kt'):
         text = path.read_text()
         if re.search(r'\bSky(?:Activity|Data|Identity|Map|Metadata|Network|Aircraft|Source|Point)\b|api\.adsb|opensky-network|tile\.openstreetmap', text):
             errors.append(f'{path.name}: aviation implementation/provider dependency belongs in a module')
-        if '"sky.watch"' in text and path.name != 'CapabilityLifecycle.kt':
+        if '"sky.watch"' in text and path != src/'CapabilityLifecycle.kt':
             errors.append(f'{path.name}: historical ID belongs only in the retirement registry')
         if re.search(r'\bDexClassLoader\b|\bInMemoryDexClassLoader\b', text):
             errors.append(f'{path.name}: downloadable native execution is not the module contract')
