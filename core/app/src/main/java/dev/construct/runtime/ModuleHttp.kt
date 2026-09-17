@@ -106,12 +106,7 @@ internal class ModuleHttp(context: Context, private val module: ModuleManifest, 
                 val bytes = body.byteStream().use { it.readBytesBounded(limit) }; authorize()
                 if (format == "json") out.put("text", bytes.toString(Charsets.UTF_8))
                 else {
-                    checkRule(HttpPolicy.raster(bytes, mime), "HTTP_DATA", "Invalid raster response")
-                    val dimensions = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, dimensions)
-                    checkRule(dimensions.outWidth in 1..4096 && dimensions.outHeight in 1..4096 &&
-                        dimensions.outWidth.toLong() * dimensions.outHeight <= 4_194_304,
-                        "HTTP_SIZE", "Raster dimensions exceed bounds")
+                    ModuleImages.validate(bytes, mime)
                     out.put("dataUrl", "data:$mime;base64," + Base64.getEncoder().encodeToString(bytes))
                 }
                 out

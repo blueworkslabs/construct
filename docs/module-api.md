@@ -272,3 +272,9 @@ API 0.9 module text follows Android font scale through WebView text zoom (50–3
 Font-scale configuration changes retain the live module session, like rotation.
 Module layouts must allow wrapping/scrolling; a module-owned Canvas supplies its
 own accessible text/list alternative. Older API modules retain legacy text sizing.
+
+API 0.9 also serves bounded base64 PNG/JPEG/WebP `data:` subresources through the
+local resource filter. These are local bytes, not a network permission; the same
+256 KiB and pixel bounds apply. Main-frame data navigation, SVG/HTML data URLs and
+other external resource schemes remain blocked. A module may render its own local
+raster data without an HTTP grant; previously delivered data is not revocable.

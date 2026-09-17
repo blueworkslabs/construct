@@ -108,6 +108,15 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                 auditBlock("REQUEST_BLOCKED", category)
                 return blocked()
             }
+            // Android intercepts data: resources too. Keep this local raster path
+            // bounded; returning null here would bypass our byte/format policy.
+            if (request.url.scheme == "data") {
+                if (module.api != "0.9.0" || request.isForMainFrame || request.method != "GET") return reject("inline-image-context")
+                val raster = runCatching { ModuleImages.dataUrl(request.url.toString()) }.getOrNull()
+                    ?: return reject("inline-image-format")
+                return WebResourceResponse(raster.first, null, 200, "OK",
+                    mapOf("X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-store"), ByteArrayInputStream(raster.second))
+            }
             if (!local(request.url)) return reject("external-origin")
             if (request.method != "GET") return reject("method")
             val path = request.url.path?.removePrefix("/") ?: return reject("path")
