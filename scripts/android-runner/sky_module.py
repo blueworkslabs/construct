@@ -38,7 +38,14 @@ def scroll(direction='down'):
     # The gutter outside the module Canvas scrolls HTML without panning the map.
     current=nodes();web=next((n for n in current if n.get('class')=='android.webkit.WebView' and visible(n)),None)
     if web is None:raise RuntimeError('No module WebView viewport for scrolling')
-    x1,y1,x2,y2=bounds(web);x=(x1+x2)//2 if 'Close aircraft info' in labels() else x1+4;lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
+    x1,y1,x2,y2=bounds(web)
+    close=next((n for n in current if 'Close aircraft info' in (n.get('text'),n.get('content-desc')) and visible(n)),None)
+    x=(x1+x2)//2 if close is not None else x1+4
+    lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
+    if close is not None:
+        # Start inside scrollable content, never on the sticky action row.
+        hi=min(hi,bounds(close)[1]-24);lo=min(lo,hi-100)
+        if lo<=y1 or hi<=lo:raise RuntimeError('Dialog has no usable scroll viewport')
     adb('shell','input','swipe',str(x),str(hi if direction=='down' else lo),str(x),str(lo if direction=='down' else hi),'300')
     time.sleep(.3)
 
