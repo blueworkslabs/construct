@@ -49,7 +49,21 @@ p.add_argument('--sky-details', action='store_true', help='Also exercise alpha25
 p.add_argument('--sky-location-only', action='store_true', help='Only Sky Watch location/lifecycle continuation, excluding map/source/layout acceptance')
 p.add_argument('--sky-sha256', help='Exact signed Sky Watch 0.1.0 launcher')
 p.add_argument('--sky-module-candidates', type=Path, help='Exact module-owned Sky and synthetic update artifact metadata; separate scope')
+p.add_argument('--http-consent-candidates', type=Path, help='Only signed HTTP consent regressions and old-to-new APK upgrade; disposable app data')
 a = p.parse_args()
+if a.http_consent_candidates:
+    if any((a.sky_module_candidates,a.sky_only,a.ux_candidates,a.measure_only,a.reliability_only,a.modules_only,a.tone_consent_only,a.focus_sha256,a.snake_sha256,a.contacts_sha256,a.camera_sha256,a.camera_only,a.focus_only,a.snake_only,a.contacts_only)):
+        p.error('HTTP consent cannot mix scopes')
+    consent=json.loads(a.http_consent_candidates.read_text())
+    from config import catalog as validate_catalog
+    validate_catalog(consent['catalog'])
+    if hashlib.sha256(Path(consent['oldApk']).read_bytes()).hexdigest()!=consent['oldSha256']:
+        p.error('Old consent APK checksum mismatch')
+    for item in consent['versions']:
+        if not __import__('re').fullmatch(r'[0-9a-f]{64}',item['sha256']): p.error('Invalid consent artifact hash')
+        if not __import__('re').fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+',item['version']): p.error('Invalid consent artifact version')
+    consent.update(newApk=str(a.apk.resolve()),newSha256=a.sha256.lower())
+    os.environ['CONSTRUCT_HTTP_CONSENT_CANDIDATES']=json.dumps(consent)
 if a.sky_module_candidates:
     if any((a.sky_only,a.ux_candidates,a.measure_only,a.reliability_only,a.modules_only,a.tone_consent_only,a.focus_sha256,a.snake_sha256,a.contacts_sha256,a.camera_sha256,a.camera_only,a.focus_only,a.snake_only,a.contacts_only)):
         p.error('Modular Sky cannot mix scopes')
@@ -124,6 +138,7 @@ receipt = {'started': datetime.datetime.now(datetime.timezone.utc).isoformat(), 
            'complete': False, 'scope': 'Checklist regression, classified bounded probes, injected renderer loss, and tone grant lifecycle; not complete sandbox/egress proof'}
 
 if a.sky_module_candidates: receipt['scope']='Module-owned Sky live providers, native HTTP/location grants, lifecycle, layouts and separate synthetic module-only update/rollback; not physical GPS or full host baseline'
+if a.http_consent_candidates: receipt['scope']='Signed synthetic HTTP consent removal/narrowing, rollback and old-to-new APK upgrade; no live provider or full host baseline checks'
 
 if a.sky_only: receipt['scope']='Sky Watch native foreground map, source switching, live provider responses, optional synthetic location and lifecycle; not physical GPS accuracy or host baseline'
 
@@ -258,13 +273,14 @@ try:
         os.environ['CONSTRUCT_SKY_SHA256']=a.sky_sha256
         children=[('sky.py','sky-result.json')]
     if a.sky_module_candidates: children=[('sky_module.py','sky-module-result.json')]
+    if a.http_consent_candidates: children=[('http_consent.py','http-consent-result.json')]
     for script, result in children:
         with (run/(script+'.log')).open('w') as log:
             subprocess.run([str(BASE/'venv/bin/python'), str(BASE/script)], check=True,
                            stdout=log, stderr=subprocess.STDOUT, timeout=1800 if script in ('ux.py','sky_module.py') else 900)
         if not json.loads((run/result).read_text()).get('complete'):
             raise RuntimeError('Incomplete child receipt: '+result)
-    if not (a.sky_module_candidates or a.sky_only or a.ux_candidates or a.measure_only or a.reliability_only or a.modules_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_only):
+    if not (a.http_consent_candidates or a.sky_module_candidates or a.sky_only or a.ux_candidates or a.measure_only or a.reliability_only or a.modules_only or a.focus_only or a.snake_only or a.contacts_only or a.camera_only):
         if not a.tone_consent_only:
             receipt['probeCounts'] = json.loads((run/'probe-summary.json').read_text())['counts']
             receipt['rendererVerdict'] = json.loads((run/'renderer-result.json').read_text())['verdict']
@@ -300,6 +316,9 @@ try:
     if a.sky_module_candidates:
         receipt['skyModule']=json.loads((run/'sky-module-result.json').read_text())
         if receipt['skyModule']['environment']['apkSha256'] != actual: raise RuntimeError('Modular Sky APK hash mismatch')
+    if a.http_consent_candidates:
+        receipt['httpConsent']=json.loads((run/'http-consent-result.json').read_text())
+        if receipt['httpConsent']['environment']['apkSha256'] != actual: raise RuntimeError('HTTP consent APK hash mismatch')
     receipt['complete'] = True
 except Exception as error:
     receipt['error'] = str(error)
