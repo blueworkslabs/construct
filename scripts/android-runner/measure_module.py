@@ -202,11 +202,14 @@ def panel_rect(ns):
     return x1,rect(photo)[3],x2,y2
 def in_panel(n,box):
     r=rect(n)
-    return len(r)==4 and box[0]<=r[0]<r[2]<=box[2] and box[1]<=r[1]<r[3]<=box[3] and (n.get('class')!='android.widget.Button' or r[3]-r[1]>=52)
+    return len(r)==4 and box[0]<=r[0]<r[2]<=box[2] and box[1]<=r[1]<r[3]<=box[3] and (n.get('class') not in ('android.widget.Button','android.widget.EditText') or r[3]-r[1]>=52)
 def scroll_panel(box,direction):
     x1,y1,x2,y2=box;top=y1+(y2-y1)//5;bottom=y2-(y2-y1)//5
     adb('shell','input','swipe',str((x1+x2)//2),str(bottom if direction==1 else top),str((x1+x2)//2),str(top if direction==1 else bottom),'350')
     time.sleep(.3)
+def matches_control(n,text):
+    if text=='Measured black-square side (mm)':return n.get('resource-id')=='side' and n.get('class')=='android.widget.EditText'
+    return text in (n.get('text'),n.get('content-desc'))
 def control(text):
     ns=nodes();box=panel_rect(ns)
     show=[n for n in ns if n.get('text')=='Show controls' and in_panel(n,box)]
@@ -214,14 +217,14 @@ def control(text):
     for direction in (1,-1):
         for _ in range(12):
             ns=nodes();box=panel_rect(ns)
-            matches=[n for n in ns if text in (n.get('text'),n.get('content-desc')) and n.get('enabled')!='false' and in_panel(n,box)]
+            matches=[n for n in ns if matches_control(n,text) and n.get('enabled')!='false' and in_panel(n,box)]
             if len(matches)==1:
                 prior=matches[0].get('bounds');time.sleep(.5)
                 ns=nodes();box=panel_rect(ns)
-                settled=[n for n in ns if text in (n.get('text'),n.get('content-desc')) and n.get('enabled')!='false' and n.get('bounds')==prior and in_panel(n,box)]
+                settled=[n for n in ns if matches_control(n,text) and n.get('enabled')!='false' and n.get('bounds')==prior and in_panel(n,box)]
                 if len(settled)==1:return settled[0]
                 continue
-            raw=[n for n in ns if text in (n.get('text'),n.get('content-desc')) and len(rect(n))==4]
+            raw=[n for n in ns if matches_control(n,text) and len(rect(n))==4]
             effective=direction
             if len(raw)==1:
                 rr=rect(raw[0])
@@ -421,7 +424,14 @@ try:
     action('Use this size');expect('Enter the measured black-square side: 10–300 mm.');no_measurement()
     size('100');endpoints(entry)
     done('Out-of-range calibration is rejected before a length can be produced')
-    adb('shell','input','keyevent','3');time.sleep(1);opened();no_measurement()
+    adb('shell','input','keyevent','3')
+    # Returning during the launcher animation can resume before onStop. Wait
+    # for the actual stop/removal boundary rather than a fixed one-second delay.
+    deadline=time.monotonic()+20
+    while 'dev.construct.runtime/.ModuleActivity' in adb('shell','dumpsys','activity','activities'):
+        if time.monotonic()>deadline:raise RuntimeError('Background did not terminate module Activity')
+        time.sleep(.5)
+    opened();no_measurement()
     if 'Change reference size' in labels():raise RuntimeError('Background retained calibration')
     done('Ordinary background discards selected image, calibration and endpoints')
     measured();adb('shell','am','force-stop','dev.construct.runtime');opened();no_measurement()
