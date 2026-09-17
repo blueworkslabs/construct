@@ -83,3 +83,41 @@ on the identical candidate APK. Run the existing `--sky-module-candidates` suite
 separately for live modern Sky behavior and its signed glossary update/rollback.
 Record each completed scope independently and review the retirement UI screenshots;
 partial runs are not acceptance. See [the retirement contract](shell-retirement.md).
+
+## Module-owned Measure (alpha29 candidate)
+
+Run `node scripts/test_measure.cjs` for module reference policy, independent
+perspective geometry and transactional editor behavior. JVM checks include
+`ImageAccessTest`, `ModuleImageSessionTest` and `MeasureRetirementTest`.
+
+On the configured disposable Android 17 runner, copy the hash-locked
+`examples/measure-fixtures` directory as `measure-fixtures`. The following scripts
+use the same exclusive-lock, app-free snapshot, pinned WebView and stop-on-exit
+rules. Each refuses an already-running emulator. Pass exact APK/module hashes;
+none builds or substitutes candidate bytes.
+
+- `measure_module.py --apk APK --sha APK_SHA --catalog HTTPS_INDEX_URL
+  --module-sha MODULE_SHA`: real picker, default/fresh/revoked grants, offline
+  detection, calibration/editor/gestures, perspective/EXIF/negative fixtures,
+  portrait/landscape/large text, lifecycle and original-image/diagnostic checks.
+  Default module is Pocket Measure 0.2.0; explicit `--module-name` and
+  `--module-version` permit an identified later candidate.
+- `measure_retirement.py --old ALPHA28_APK --old-sha OLD_SHA --new ALPHA29_APK
+  --new-sha NEW_SHA --catalog HTTPS_INDEX_URL --candidates CANDIDATES_JSON`:
+  install the real signed Pocket Measure 0.1.3 on alpha28, upgrade in place,
+  preserve unrelated saved data/catalog choice, check update-required recovery,
+  fresh image consent and retired install/rollback rejection. Metadata contains
+  `{"measure":{"version":"0.2.0","sha256":"EXPECTED_MODULE_SHA"}}`.
+- `measure_update.py --apk APK --sha APK_SHA --catalog HTTPS_FIXTURE_INDEX_URL
+  --module-sha BEFORE_SHA --after-sha AFTER_SHA`: separate signed Measure Preview
+  0.1.0/0.2.0 fixtures add a working cm/mm selector, then roll back on identical
+  APK bytes. Selected photos/calibration are intentionally transient between runs;
+  do not claim persisted measurement data. These fixtures are not production
+  module versions.
+
+Image-capable modules use secure Android windows. Ordinary Android screenshots
+are therefore black; do not disable that protection for acceptance. These runners
+also retain synthetic emulator-console display captures in `*-display` folders
+for operator review. Inspect those actual images; functional receipts alone do
+not establish layout quality. Partial runs stay separate from completed scopes,
+and debug-prototype evidence never substitutes for optimized-APK acceptance.
