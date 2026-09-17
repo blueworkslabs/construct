@@ -25,8 +25,9 @@ See [the bounded image contract](module-images.md) for pixel disclosure, resourc
 bounds and retirement. Alpha28 is the last native Measure host. On alpha29 old
 0.1.x packages remain manageable but need an update; rollback into the retired
 native workspace is blocked without erasing data. No APK downgrade is promised.
-Final alpha29 device evidence is pending; historical receipts below are not
-acceptance of this new module or APK.
+The [alpha29 acceptance record](measure-module-alpha29-acceptance.md) covers the
+exact optimized APK and signed 0.2.2 module, including independent updating.
+Historical receipts below are not acceptance of the new module or physical phone.
 
 ## Historical native baseline (0.1.x / through alpha28)
 

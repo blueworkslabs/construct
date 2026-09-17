@@ -98,6 +98,7 @@ are blocked. The native workspace itself never saved measurements or photos.
 
 Pocket Measure 0.2.2 requires API 0.10 and two new explicit image grants; old native
 measurement consent must not be inherited. Alpha28 is the final native Measure
-host. Full optimized-candidate acceptance is pending; the completed debug prototype
-is not release acceptance. See [the image contract](module-images.md) and
+host. [Optimized-candidate acceptance](measure-module-alpha29-acceptance.md) covers
+functional/lifecycle checks, this in-place transition and independent module
+updating; the earlier debug prototype remains separate. See [the image contract](module-images.md) and
 [the modern user flow](pocket-measure.md). Camera is the remaining native exception.

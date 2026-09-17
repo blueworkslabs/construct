@@ -21,6 +21,7 @@ p.add_argument('--catalog', required=True)
 p.add_argument('--module-sha', required=True)
 p.add_argument('--module-name', default='Pocket Measure')
 p.add_argument('--module-version', default='0.2.2')
+p.add_argument('--lifecycle-only', action='store_true', help='Focused consent, image setup and lifecycle scope; excludes editor/layout checks')
 a = p.parse_args()
 from config import catalog
 catalog(a.catalog)
@@ -45,6 +46,7 @@ from ui import adb, nodes, labels, tap, tap_node, find, capture
 from host_ui import host_ready, catalog_settings, apply_catalog, library, select_after, installed_status, scroll_top, _stable_card, diagnostics
 
 receipt = {'scope':'Module-owned Measure exact-APK functional and lifecycle acceptance','moduleSha256':a.module_sha,'apkSha256':a.sha,'checks':[],'complete':False,'stopped':False}
+receipt['focusedLifecycle']=a.lifecycle_only
 started = False
 
 def save():
@@ -350,86 +352,89 @@ try:
     if abs(value-240)>3:raise RuntimeError('Flat reference failed: '+str(value))
     receipt['flatMm']=value;capture_display('module-measure-flat')
     done('Real system picker, private image resource and local detector feed module-owned 240 mm measurement offline')
-    units('Millimetres')
-    millimetres=expect('Length: ')
-    if not millimetres.endswith(' mm') or abs(length()-receipt['flatMm'])>.51:raise RuntimeError('Units conversion exceeds cm display rounding')
-    receipt['unitsMm']=length();units('Centimetres');expect('Length: 24.0 cm')
-    done('Module-owned unit selector converts centimetres to millimetres within displayed rounding')
-    # A real drag commits one undo step; pointer cancellation restores its start.
-    bx,by=screen_point(entry,entry['endpoints'][1]);ax,ay=screen_point(entry,entry['endpoints'][0])
-    ui._device.swipe(bx,by,bx-60,by,duration=.5);time.sleep(.5)
-    if not 180<length()<240:raise RuntimeError('Endpoint drag did not adjust length')
-    action('Undo');collapse()
-    if length()!=receipt['flatMm']:raise RuntimeError('Drag Undo failed')
-    # UiAutomator's JSON-RPC supports DOWN/MOVE/UP but not CANCEL. Use
-    # Android's input tool for the complete stream, never mix injectors.
-    for motion,x,y in [('DOWN',bx,by),('MOVE',bx-60,by),('CANCEL',bx-60,by)]:
-        adb('shell','input','touchscreen','motionevent',motion,str(x),str(y));time.sleep(.2)
-    time.sleep(.5)
-    if length()!=receipt['flatMm']:raise RuntimeError('Pointer cancellation retained drag preview')
-    done('Real endpoint drag commits once; Undo and Android pointer cancellation restore the prior length')
-    action('Endpoint B')
-    for _ in range(4):action('Move endpoint left')
-    if not receipt['flatMm']-3<=length()<receipt['flatMm']:raise RuntimeError('Pixel nudge did not reduce length')
-    for _ in range(4):action('Undo')
-    collapse()
-    if length()!=receipt['flatMm']:raise RuntimeError('Nudge undo failed')
-    done('Accessible photo-pixel nudges are individually undoable')
-    action('Clear');collapse();no_measurement()
-    fit_pixels=photo_pixels('module-gesture-fit')
-    x1,y1,x2,y2=rect(find(WORKSPACE));cx,cy=(x1+x2)//2,(y1+y2)//2
-    # Start with separated fingers: the convenience pinch starts near-zero
-    # separation, reaches the 8x cap, and loses all features in this white fixture.
-    ui._device(description=WORKSPACE).gesture((cx-100,cy),(cx+100,cy),(cx-160,cy),(cx+160,cy),steps=25)
-    time.sleep(.5);no_measurement()
-    zoom_pixels=photo_pixels('module-gesture-zoom')
-    if zoom_pixels==fit_pixels:raise RuntimeError('Pinch did not visibly zoom the photograph')
-    x1,y1,x2,y2=rect(find(WORKSPACE));ui._device.swipe((x1+x2)//2,(y1+y2)//2,(x1+x2)//2-60,(y1+y2)//2-40,duration=.4)
-    no_measurement()
-    if photo_pixels('module-gesture-pan')==zoom_pixels:raise RuntimeError('Zoomed pan did not move the photograph')
-    tap('Reset photo view');time.sleep(.5)
-    if photo_pixels('module-gesture-reset')!=fit_pixels:raise RuntimeError('Fit reset did not restore the original rendered photograph')
-    if abs(endpoints(entry)-240)>3:raise RuntimeError('Fit reset changed photo coordinates')
-    done('Real pinch and pan do not place endpoints; reset restores calibrated fit coordinates')
-    size('95');value=endpoints(entry)
-    if abs(value-228)>3:raise RuntimeError('Actual marker-size scaling failed: '+str(value))
-    done('Module-owned recalibration produces 228 mm from the same endpoints')
-    tap('Construct menu');tap('Return to module');expect('Length: 22.8 cm')
-    adb('shell','settings','put','system','accelerometer_rotation','0');adb('shell','settings','put','system','user_rotation','1');time.sleep(2)
-    expect('Length: 22.8 cm');capture_display('module-measure-landscape')
-    adb('shell','settings','put','system','user_rotation','0');time.sleep(2);expect('Length: 22.8 cm')
-    done('Menu and rotation preserve the current module measurement')
-    for rotation in ('0','1'):
-        adb('shell','settings','put','system','font_scale','2.0')
-        adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2)
-        expect('Length: 22.8 cm');action('Choose photo')
-        find('Photos');adb('shell','input','keyevent','4');expect('No photo selected')
-        # Cancellation intentionally clears the previous selection; load again to
-        # inspect both the large-text controls and a completed measurement.
-        entry=measured();capture_display('module-measure-large-'+rotation)
-        size('95');endpoints(entry)
-    adb('shell','settings','put','system','font_scale','1.0');adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
-    done('Two-times text remains operable in portrait and landscape with real picker and measurement')
-    for name,key,tolerance in [('measure-angled.png','angledMm',4),('measure-oriented.jpg','orientedMm',3)]:
-        entry=measured(name);value=length()
-        if abs(value-240)>tolerance:raise RuntimeError(name+' outside tolerance')
-        receipt[key]=value;capture_display('module-'+key)
-    done('Perspective and EXIF-oriented photos recover the expected 240 mm length')
-    for name,message in [('measure-blank.png','No reference marker found.'),('measure-multiple.png','Use only one reference card')]:
-        stage(name);pick();expect(message);no_measurement()
-        if 'Use this size' in labels():raise RuntimeError('Invalid reference exposed calibration')
-    done('Blank and duplicate reference cards reject calibration and clear earlier results')
-    entry=stage('measure-flat.png');pick();expect('Reference found.')
-    control('Measured black-square side (mm)');ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text('9')
-    action('Use this size');expect('Enter the measured black-square side: 10–300 mm.');no_measurement()
-    size('100');endpoints(entry)
-    done('Out-of-range calibration is rejected before a length can be produced')
+    if not a.lifecycle_only:
+        units('Millimetres')
+        millimetres=expect('Length: ')
+        if not millimetres.endswith(' mm') or abs(length()-receipt['flatMm'])>.51:raise RuntimeError('Units conversion exceeds cm display rounding')
+        receipt['unitsMm']=length();units('Centimetres');expect('Length: 24.0 cm')
+        done('Module-owned unit selector converts centimetres to millimetres within displayed rounding')
+        # A real drag commits one undo step; pointer cancellation restores its start.
+        bx,by=screen_point(entry,entry['endpoints'][1]);ax,ay=screen_point(entry,entry['endpoints'][0])
+        ui._device.swipe(bx,by,bx-60,by,duration=.5);time.sleep(.5)
+        if not 180<length()<240:raise RuntimeError('Endpoint drag did not adjust length')
+        action('Undo');collapse()
+        if length()!=receipt['flatMm']:raise RuntimeError('Drag Undo failed')
+        # UiAutomator's JSON-RPC supports DOWN/MOVE/UP but not CANCEL. Use
+        # Android's input tool for the complete stream, never mix injectors.
+        for motion,x,y in [('DOWN',bx,by),('MOVE',bx-60,by),('CANCEL',bx-60,by)]:
+            adb('shell','input','touchscreen','motionevent',motion,str(x),str(y));time.sleep(.2)
+        time.sleep(.5)
+        if length()!=receipt['flatMm']:raise RuntimeError('Pointer cancellation retained drag preview')
+        done('Real endpoint drag commits once; Undo and Android pointer cancellation restore the prior length')
+        action('Endpoint B')
+        for _ in range(4):action('Move endpoint left')
+        if not receipt['flatMm']-3<=length()<receipt['flatMm']:raise RuntimeError('Pixel nudge did not reduce length')
+        for _ in range(4):action('Undo')
+        collapse()
+        if length()!=receipt['flatMm']:raise RuntimeError('Nudge undo failed')
+        done('Accessible photo-pixel nudges are individually undoable')
+        action('Clear');collapse();no_measurement()
+        fit_pixels=photo_pixels('module-gesture-fit')
+        x1,y1,x2,y2=rect(find(WORKSPACE));cx,cy=(x1+x2)//2,(y1+y2)//2
+        # Start with separated fingers: the convenience pinch starts near-zero
+        # separation, reaches the 8x cap, and loses all features in this white fixture.
+        ui._device(description=WORKSPACE).gesture((cx-100,cy),(cx+100,cy),(cx-160,cy),(cx+160,cy),steps=25)
+        time.sleep(.5);no_measurement()
+        zoom_pixels=photo_pixels('module-gesture-zoom')
+        if zoom_pixels==fit_pixels:raise RuntimeError('Pinch did not visibly zoom the photograph')
+        x1,y1,x2,y2=rect(find(WORKSPACE));ui._device.swipe((x1+x2)//2,(y1+y2)//2,(x1+x2)//2-60,(y1+y2)//2-40,duration=.4)
+        no_measurement()
+        if photo_pixels('module-gesture-pan')==zoom_pixels:raise RuntimeError('Zoomed pan did not move the photograph')
+        tap('Reset photo view');time.sleep(.5)
+        if photo_pixels('module-gesture-reset')!=fit_pixels:raise RuntimeError('Fit reset did not restore the original rendered photograph')
+        if abs(endpoints(entry)-240)>3:raise RuntimeError('Fit reset changed photo coordinates')
+        done('Real pinch and pan do not place endpoints; reset restores calibrated fit coordinates')
+        size('95');value=endpoints(entry)
+        if abs(value-228)>3:raise RuntimeError('Actual marker-size scaling failed: '+str(value))
+        done('Module-owned recalibration produces 228 mm from the same endpoints')
+        tap('Construct menu');tap('Return to module');expect('Length: 22.8 cm')
+        adb('shell','settings','put','system','accelerometer_rotation','0');adb('shell','settings','put','system','user_rotation','1');time.sleep(2)
+        expect('Length: 22.8 cm');capture_display('module-measure-landscape')
+        adb('shell','settings','put','system','user_rotation','0');time.sleep(2);expect('Length: 22.8 cm')
+        done('Menu and rotation preserve the current module measurement')
+        for rotation in ('0','1'):
+            adb('shell','settings','put','system','font_scale','2.0')
+            adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2)
+            expect('Length: 22.8 cm');action('Choose photo')
+            find('Photos');adb('shell','input','keyevent','4');expect('No photo selected')
+            # Cancellation intentionally clears the previous selection; load again to
+            # inspect both the large-text controls and a completed measurement.
+            entry=measured();capture_display('module-measure-large-'+rotation)
+            size('95');endpoints(entry)
+        adb('shell','settings','put','system','font_scale','1.0');adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
+        done('Two-times text remains operable in portrait and landscape with real picker and measurement')
+        for name,key,tolerance in [('measure-angled.png','angledMm',4),('measure-oriented.jpg','orientedMm',3)]:
+            entry=measured(name);value=length()
+            if abs(value-240)>tolerance:raise RuntimeError(name+' outside tolerance')
+            receipt[key]=value;capture_display('module-'+key)
+        done('Perspective and EXIF-oriented photos recover the expected 240 mm length')
+        for name,message in [('measure-blank.png','No reference marker found.'),('measure-multiple.png','Use only one reference card')]:
+            stage(name);pick();expect(message);no_measurement()
+            if 'Use this size' in labels():raise RuntimeError('Invalid reference exposed calibration')
+        done('Blank and duplicate reference cards reject calibration and clear earlier results')
+        entry=stage('measure-flat.png');pick();expect('Reference found.')
+        control('Measured black-square side (mm)');ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text('9')
+        action('Use this size');expect('Enter the measured black-square side: 10–300 mm.');no_measurement()
+        size('100');endpoints(entry)
+        done('Out-of-range calibration is rejected before a length can be produced')
     adb('shell','input','keyevent','3')
-    # Returning during the launcher animation can resume before onStop. Wait
-    # for the actual stop/removal boundary rather than a fixed one-second delay.
+    # Match live history entries, not Android's retained mLastPausedActivity.
     deadline=time.monotonic()+20
-    while 'dev.construct.runtime/.ModuleActivity' in adb('shell','dumpsys','activity','activities'):
-        if time.monotonic()>deadline:raise RuntimeError('Background did not terminate module Activity')
+    while True:
+        activity_state=adb('shell','dumpsys','activity','activities')
+        (run/'background-activities.txt').write_text(activity_state)
+        if not any('* Hist ' in line and 'dev.construct.runtime/.ModuleActivity' in line for line in activity_state.splitlines()):break
+        if time.monotonic()>deadline:raise RuntimeError('Background retained a live module Activity')
         time.sleep(.5)
     opened();no_measurement()
     if 'Change reference size' in labels():raise RuntimeError('Background retained calibration')

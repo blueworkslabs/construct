@@ -101,7 +101,9 @@ none builds or substitutes candidate bytes.
   detection, calibration/editor/gestures, perspective/EXIF/negative fixtures,
   portrait/landscape/large text, lifecycle and original-image/diagnostic checks.
   Default module is Pocket Measure 0.2.2; explicit `--module-name` and
-  `--module-version` permit an identified later candidate.
+  `--module-version` permit an identified later candidate. `--lifecycle-only`
+  runs eight focused setup/consent/lifecycle checks; it is not a substitute for
+  the complete eighteen-check functional scope.
 - `measure_retirement.py --old ALPHA28_APK --old-sha OLD_SHA --new ALPHA29_APK
   --new-sha NEW_SHA --catalog HTTPS_INDEX_URL --candidates CANDIDATES_JSON`:
   install the real signed Pocket Measure 0.1.3 on alpha28, upgrade in place,
