@@ -38,7 +38,7 @@ def scroll(direction='down'):
     # The gutter outside the module Canvas scrolls HTML without panning the map.
     current=nodes();web=next((n for n in current if n.get('class')=='android.webkit.WebView' and visible(n)),None)
     if web is None:raise RuntimeError('No module WebView viewport for scrolling')
-    x1,y1,x2,y2=bounds(web);x=x1+4;lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
+    x1,y1,x2,y2=bounds(web);x=(x1+x2)//2 if 'Close aircraft info' in labels() else x1+4;lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
     adb('shell','input','swipe',str(x),str(hi if direction=='down' else lo),str(x),str(lo if direction=='down' else hi),'300')
     time.sleep(.3)
 
@@ -58,8 +58,6 @@ def use_catalog(url):
     adb('shell','input','keyevent','111');apply_catalog();find('Catalog refreshed.')
 
 def exact_install(name,version,sha,from_versions=False):
-    if from_versions:
-        select_after(name+' · '+C['updates'][-1]['version'],('Versions',))
     select_after(name+' · '+version,('Review & install','Review update','Review version','Install'))
     tap('Allow & install');installed_status()
     events=diagnostics()
@@ -127,6 +125,9 @@ def screenshot_layouts(prefix,expected):
         adb('shell','settings','put','system','font_scale',scale)
         adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2)
         contains(expected);capture(prefix+'-'+suffix)
+        if prefix=='modular-metadata':
+            target=next((x for x in ('Registry owner','Callsign airline') if x in labels()),None)
+            if target:reveal(target);capture(prefix+'-'+suffix+'-fields')
     adb('shell','settings','put','system','user_rotation','0')
     adb('shell','settings','put','system','font_scale',font);time.sleep(2)
 
@@ -188,7 +189,7 @@ try:
     exact_install('Synthetic Sky',v2['version'],v2['sha256'])
     open_module('Synthetic Sky',v2['version']);area();contains('Beechcraft King Air 300');capture('module-update-after')
     if adb('shell','sha256sum',path).split()[0]!=apk:raise RuntimeError('Host APK changed during module-only update')
-    close_module();select_after('Synthetic Sky · '+v2['version'],('Restore '+v1['version'],'Restore previous','Rollback'))
+    close_module();select_after('Synthetic Sky · '+v2['version'],('Roll back','Restore '+v1['version'],'Restore previous'))
     tap('Restore');library();open_module('Synthetic Sky',v1['version']);area();contains('Beechcraft King Air')
     if any('Beechcraft King Air 300' in x for x in labels()):raise RuntimeError('Rollback failed to restore glossary')
     capture('module-update-rollback');close_module()
