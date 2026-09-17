@@ -1,10 +1,10 @@
 # Sky Watch — module-owned map
 
-Sky Watch **0.2.0** runs its aircraft logic and UI in the signed HTML/CSS/JavaScript
+Sky Watch **0.2.1** runs its aircraft logic and UI in the signed HTML/CSS/JavaScript
 module, using host **API 0.9 / alpha26**. The new package does not call `sky.watch`.
 Camera/AR remains deferred.
 
-## Module 0.2.0: installation and ownership
+## Module 0.2.x: installation and ownership
 
 Install the compatible host first, then update Sky Watch through Browse. The old
 `sky.watch` grant does **not** grant the new APIs. Allow **approved internet sources**
