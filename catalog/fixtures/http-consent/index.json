@@ -40,6 +40,42 @@
           "sha256": "8b2083bc586eab145f83330f7e5e9b43e93eabf94ed50defbd737a667c2e6451",
           "signature": "ZZq06Bx2G63Temgkn0+pmuweNZA4BTBubrSOiWGl35yA0nJm8al0s2cvxfeXjvr613bS6Uc9sIwcj8wQqjTpxClH8A7I2MdVeEnczhFimvaVACSC/m+t2b6DmKyCks9LaBZ+lyqiHspzxpJXM2EmciqjmiatNqLTGI1Qa2mSK3iGaP0/+WtiUUPk3SUuQfxLafBIwiHfQ3EQ/sNAGQT122WP7WxDigsbJ98abSYQk2p5IyGFGAQ+wwaNRo7qpty7nKxENg8ykK8OEqNNfcFnTTqmDpuPgyQKYsE+EF3acARNk8wCHMFpUx6di/+SbSFyNWgL0GrLg9qa3zhoV0l3uA==",
           "testFixture": true
+        },
+        {
+          "id": "dev.construct.consent-fixture",
+          "name": "Consent Probe",
+          "version": "1.1.0",
+          "artifact": "dev.construct.consent-fixture-1.1.0.zip",
+          "sha256": "e857258b198c611ca8a72bebb635786b3c3f0006a6aa8c9e34b44062de9c4f08",
+          "signature": "XRM/0y/NDqg223G5HQpEDmI31kZyxsJhh0wUP0lhyJby1TO9myu87167/MoiATkQdH5oxna7yUZOUDJnSdLvi1pRVEIey8WjFGRZ+NmARuidZ55FKhy7UftoVex7RxUHund/315/9KrQ5ODhwF56uSstHHyomAs8iSW9EX9d/emvba2Hx3gkU/bnQ+7s29KA1q7fhYm4LVNF09yWIwvBlmLfgup5ehcuX2coP0hwU6B5IIAudmbP3RLoJWGZfejic39BBQZoOnPuyYZrUj/lnWPjjHvffw0OXru9hISA+s3YjaXIQJOTKG/MevGSG46e9wST0/UlXB8brYgJOQCVhw==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.consent-fixture",
+          "name": "Consent Probe",
+          "version": "1.2.0",
+          "artifact": "dev.construct.consent-fixture-1.2.0.zip",
+          "sha256": "99e05a9bb298288b284f656e76d8c73d8959b04f3c604bb3fcb27f8ccc813bdb",
+          "signature": "T2gicVSWjXw56QhLeBkFkmi2qbyTvH6asYxd86LFNIYxjpyLkx3WLJPePW7Sd05DUtYZJT7NTXMsvhnVi5P29HX8pRIe4YpH5lbfDhdTW4oMhlXyYlqcY7DUULA8t96nAM0wdxecj8MKUJ0npbnQUyNSafbKvdu2NPLInZD3x1iUnYTOYoDC8Zz7oAja4p54gLhZIyZNBQBxSmd5dLVe0/vIZbm5tvVVvNKHq1l4k0G5ufh7Myv83TRIs6VGkyQZVDrb5wgGaOkDc+8VO8oPkUOFYUj4ZrrzVjqlaTxPSFawFNrrNlumn5P0l3hUV2zYzviGumKSE+WAinESce4n/g==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.consent-fixture",
+          "name": "Consent Probe",
+          "version": "1.3.0",
+          "artifact": "dev.construct.consent-fixture-1.3.0.zip",
+          "sha256": "8faf4a02c2c59211914d5adf720b18acef1414b4d2c6d41711434cf6b00314a7",
+          "signature": "g31/ungrRGRPAaXHN7WJ0DGN+GwQ07XpATEONqdfm/aSLo6iOeMLnG9SLhbxPEXWhhznF1BU3ZSL+DGKqyH9oP4d+899kDw79MlLPV/YSbFh9fhS3HsRcpIGMgbXYpGJJXCUfdLmDaCeaIb2wwWZ7yHb1albnLWFsdpLic+GG36X9RkK8apMG4OCEXNiT1sb80M2cio3ONkOusR7s1izUT8Wne0PPKenfmj05Yo8j4LPI4zTpoacgcLGArNfZWbhtkvPPfL1daBrOZLuFG+NJHBhfkjiPsANY/nt2MdLZUUMLDbry/AF3UuXaoDicjw8WLDppSuZHikgmZYuDlET4Q==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.consent-fixture",
+          "name": "Consent Probe",
+          "version": "1.4.0",
+          "artifact": "dev.construct.consent-fixture-1.4.0.zip",
+          "sha256": "2cbce93caf51740b276ad71d8f7adae37bdadd99c4d40867efc7161a33cdfe22",
+          "signature": "CAptbTPtCIbJmFLeQHb5ENLhK8B2yr/KuX8etBnU2gz9AwhFFKYCG6rHXJaVASwd1dSo83h3HLAi5jmn/TBzP+mMhkAaIolVgcwbu1YbF8/o0uz0mnswwnLJT5h6L9Y9lRH681OJvW9IDQcTsaN64ZOXR+36Y9VXbpL6qKgJmwQoy/mqZ1CZoKMw30u3NICe5eHgjKUyYywx8ERrgIWzD1eBGWMzyEAiEuK2RiYznsGMto39e9LJYGRYu+gWZMwkTe0f5JfEs1enKDrDyG6ZRMaRArGu/S9n3wGkAOlxpMUboSl9aOmu4STqCam0b1PN5zw1ZVWUrTInT/4P8h5Xcw==",
+          "testFixture": true
         }
       ]
     }

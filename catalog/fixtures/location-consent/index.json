@@ -49,6 +49,51 @@
           "sha256": "5f1078a576054696c6928305c67cdc58f0b30127e07a001f68c90f5e8bda49e9",
           "signature": "Ol9gWIfZuP8hfFNNrUfjZOMlmkAnXwvBtzI/9NEgL0q3WTHcF67281TQrUfSW8AOvX/Ee0fLvv9cek07/hipXf/hT6y+4gYUVy0C5TjfF2hz3CwMTmMqSbAkHhsAsncqK5qGRXIZKRZZex8aU4yZWu7kNrqLf5+hd4RAzxZh5r5VHUxBXQALLANkzavQTwIYGTaQsAwM4v4O5F0nnOEwXV3z4DyWG0laqscUQegDz2X3VWSvPrMhdGdE/0DYHZELeaY1kWW9XM+9IDivVZLJ/iTcOaOWVcTd51bHcBcT82/1n+ng7nRVfpyt5/F4C6Hu3Hws/yjCPRLe6EMrvd/Fyg==",
           "testFixture": true
+        },
+        {
+          "id": "dev.construct.location-fixture",
+          "name": "Location Probe",
+          "version": "1.1.0",
+          "artifact": "dev.construct.location-fixture-1.1.0.zip",
+          "sha256": "c3772675313ea5e62a84e488ca664afe641a6b93477d4d64870ebcc8987f372d",
+          "signature": "Q22MQakLOJ38pH/bM/IQRUcLdnsvhwQhzgcyuYQS7A/IWkxngQ2zcSliceocqHWyDsFQ5mzDaswrCtB34V+EMvZtxWjGoJKJXXWe4ZZVvgZYV3fgnbh8Aj/T+Y1T+8vIbNDSfcfHj642YW78rP59+VTe0UKNp1orc1CqOpbuZZYw5hwtTMqdB6MTxrctmIz241z4t5NZ0FTjJOisb8exRGpLdi9E7XLRM/mnUF0URX7+4G3KQFKzOE1V2rgW61846b22ya9Dp23CddntrtqYKW+Qap0bKFz2ac+UNEb9eYLwexUgdwlcQj1URDr7c0su6llSQRTwz6CUATw23FKEcQ==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.location-fixture",
+          "name": "Location Probe",
+          "version": "1.2.0",
+          "artifact": "dev.construct.location-fixture-1.2.0.zip",
+          "sha256": "d13136fb6cdced6e03aabfc4a07954196fa077417f2c01cfd558b1f65b3bab2a",
+          "signature": "BzR2pjQTVEtXvJht3ejTJWHxt9pmdyaHqcu9Ugi3MK7M6ETdYKuFn/CMWsJ9v7CUGWOq7ji+D78nMTBvxjR2dlPhJVg8HI/VnqQd2unJq3ld2yMz6V95sgA30ee7PTi2g8t4aNJENl7cbpPI6wZcTpeu7Hmahjhh29P9pOSndnucXGMe31An8W6/yo5gD6vzrh7m3BHrY1mV0IalQoB+HunBycq3bNHRnvaXaTYBwzAMDpobKPcRBu+PjY/kXklg38D+cHTL7Ifm8tB3tyGZzOwtUtvsFMh6Vel/jvZ1xn0qgH2Fnr2Gbd3eUTAnx4jlSQiVbqvDV4Sm4HqyeucR3A==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.location-fixture",
+          "name": "Location Probe",
+          "version": "1.3.0",
+          "artifact": "dev.construct.location-fixture-1.3.0.zip",
+          "sha256": "c55c4c6f7dc4ab859c10cbb472149d85c89acb3699d7395b28593b1ef8569fec",
+          "signature": "bzAEw1lmoI/H8bUtQvXZr1c9MZT8Qf9JRa837irw3ueVErhg6bYywVDFSBtCNAMtuwysfRcy/3dX1f9dgZfpIKeopYyYj7gcNvwSNmWgyB4AxouFuV6rK9vWCaRg23mH14v9b5OBVqf3lj02tDAcX4Ijtr+MgQ/pr8fZttgMDCV6vxxvDEM8Nn+7S696QVL31LFcQ7hEASyxneEXlz44mY+mvQktXSXrDuodSZAyDKxIYwV1AInkw/IkkN1EtEIrMajfhlN0VH42ILuzE9SWBZhDM9N+1o07qfn2JxzMSsGKEGevSiklzod8cjiaS/WymVFHRQ19Q40FRsqwmP90Bw==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.location-fixture",
+          "name": "Location Probe",
+          "version": "1.4.0",
+          "artifact": "dev.construct.location-fixture-1.4.0.zip",
+          "sha256": "29fd9c3049898ba225b7f73d35f1fe85732f1760d69e46207365574c2f20adc9",
+          "signature": "Pjw8/sozSKiA5WUSBr4/Q/zKWt7uEWBA2jeewTPjMWoa962Bn4n9dT61Qrk6WpLgd5z2RbrH5Zdby92CTcwWWj8Lrlht41Hb9IiGmSot7mvVDq+qe2+Tmb5YmOhmb2EiZhbbE1mJxUMIiM/ZZpSD3iz2/OkzAHzhTfARQ5ieVbeU9qfm3Ch91zZR1J08RyK1QVWzIpvE4zvVYrMFKESyKu4KbrBHHun4QpNAtH5qKcfuao9ejXh+aNlaQowWD8k37JZBy0nOimMCDfkS0fqdxYhl7I+OD0p7iGDlKUE75sR+MHW1GOzoqwkrPj7Pxy1YEgFoU7flnLkIqMiZq0jQfQ==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.location-fixture",
+          "name": "Location Probe",
+          "version": "1.5.0",
+          "artifact": "dev.construct.location-fixture-1.5.0.zip",
+          "sha256": "3718edcc8412188140a8d3770bfd19f2beb66459843b5e723cbfb4ff01bc06c4",
+          "signature": "Yc1XkI8AdhMbsbd87j29WpWUrWZSMY3QDoOU4NDRp/wkwHVLg9JpNYo1HkuiTp308sTVurY5zfhGT4oZJY9YEhvFVbJvolRKytQMJyvxCku/73QfG6j4iEKmSSw+T9IX2sMI7tFJnH++/bxtMaHPVrn+rnnRxAQiIqrEtSzur2iDzjZVTLMyUbmDeJb6vA/XTZw2boG3aXqE6yWbJi/IWTwvTnADnD1HFo0FzcaWfv/snS+tpfgntqiiLIQaegAjxqhbgQP3LjqvYSYiuSvYDn6mhEaQsXz+m0WLtzl9DvNdRfz6nV6Pye5VK1RrARvrDXSUT+PgRXkomcqeiHo5Rw==",
+          "testFixture": true
         }
       ]
     }
