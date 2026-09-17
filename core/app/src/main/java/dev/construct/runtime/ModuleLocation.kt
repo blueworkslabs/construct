@@ -55,7 +55,11 @@ internal class ModuleLocation(private val context: Context, private val authoriz
         checkRule(now - lastRequest >= 15000, "LOCATION_RATE", "Wait 15 seconds between location requests")
         lastRequest = now; completion = done
         try {
-            val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER).filter { manager.isProviderEnabled(it) }
+            // Android 9's GPS provider requires fine permission. Do not let its
+            // registration failure cancel a valid coarse network request.
+            val fine = context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
+                .filter { (it != LocationManager.GPS_PROVIDER || fine) && manager.isProviderEnabled(it) }
             checkRule(providers.isNotEmpty(), "LOCATION_UNAVAILABLE", "Turn on phone location or choose an area manually")
             val recent = providers.mapNotNull { runCatching { manager.getLastKnownLocation(it) }.getOrNull() }
                 .filter { SystemClock.elapsedRealtimeNanos() - it.elapsedRealtimeNanos in 0..120000000000L }

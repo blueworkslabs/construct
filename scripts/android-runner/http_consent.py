@@ -21,7 +21,7 @@ versions={v['version']:v['sha256'] for v in C['versions']}
 NAME='Consent Probe'; SWITCH='Allow approved internet sources'
 PROBE='Check HTTP access'; PREFIX='HTTP result: '
 result={'complete':False,'checks':[],'oldSha256':C['oldSha256'],
-        'scope':'Synthetic HTTP/location consent; undeclared URL rejected locally and Android location permission remains off; no outbound request or actual position'}
+        'scope':'Synthetic HTTP/location consent plus a coarse-only mock network fix; HTTP probes are rejected locally; no real position or outbound request'}
 for path,digest in [(C['oldApk'],C['oldSha256']),(C['newApk'],C['newSha256'])]:
     if hashlib.sha256(Path(path).read_bytes()).hexdigest()!=digest:raise RuntimeError('APK checksum mismatch')
 
@@ -133,6 +133,26 @@ try:
     install('0.2.0');probe('0.2.0','CAPABILITY_DENIED',keep=True)
     install('0.3.0',expected=False);probe('0.3.0','CAPABILITY_DENIED')
     done('Corrected host permits explicit location grant but defaults reintroduced location off; no OS permission or position requested')
+    # Separate, explicitly synthetic position test. GPS is enabled, but only the
+    # coarse Android permission is granted; a network fix arrives after registration.
+    install('0.5.0',expected=False,approve=True)
+    mock_added=False
+    try:
+        adb('shell','appops','set','com.android.shell','android:mock_location','allow')
+        adb('shell','cmd','location','providers','add-test-provider','network','--accuracy','2')
+        mock_added=True
+        adb('shell','cmd','location','providers','set-test-provider-enabled','network','true')
+        adb('shell','pm','grant','dev.construct.runtime','android.permission.ACCESS_COARSE_LOCATION')
+        permissions=adb('shell','dumpsys','package','dev.construct.runtime')
+        if 'android.permission.ACCESS_FINE_LOCATION: granted=true' in permissions:raise RuntimeError('Expected coarse-only location permission')
+        restart();select_after(NAME+' · 0.5.0',('Open',));find('Counter: 3');tap(PROBE);time.sleep(1)
+        adb('shell','cmd','location','providers','set-test-provider-location','network','--location','50.0,8.0','--accuracy','5000')
+        find('Location result: APPROXIMATE');capture('coarse-only-network-fix')
+        tap('Construct menu');tap('Close module');library()
+        done('Coarse-only Android permission delivers an approximate synthetic network fix without requiring fine/GPS access')
+    finally:
+        if mock_added:adb('shell','cmd','location','providers','remove-test-provider','network')
+        adb('shell','appops','set','com.android.shell','android:mock_location','default')
     verify_apk(C['newSha256'])
     result['environment']={'apkSha256':C['newSha256']};result['complete']=True
 except Exception as error:

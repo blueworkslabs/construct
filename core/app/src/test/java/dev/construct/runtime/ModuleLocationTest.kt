@@ -46,12 +46,42 @@ class ModuleLocationTest {
     }
     @Test fun recentFixCarriesAccuracyAndApproximateFlagAndRateLimit() {
         shadowOf(app).grantPermissions(Manifest.permission.ACCESS_COARSE_LOCATION)
-        shadowOf(manager).setLastKnownLocation(LocationManager.GPS_PROVIDER,fix())
+        shadowOf(manager).setProviderEnabled(LocationManager.NETWORK_PROVIDER,true)
+        shadowOf(manager).setLastKnownLocation(LocationManager.NETWORK_PROVIDER,fix().apply { provider=LocationManager.NETWORK_PROVIDER })
         var value:JSONObject?=null
         source.get(params()){v,e->assertNull(e);value=v}
         assertEquals(50.0,value!!.getDouble("latitude"),0.0);assertEquals(20.0,value!!.getDouble("accuracyM"),0.0)
         assertTrue(value!!.getBoolean("approximate"))
         rejected("LOCATION_RATE") { source.get(params()){_,_->fail()} }
+    }
+    @Test fun coarseOnlyRequestRegistersNetworkWithoutTouchingFineOnlyGps() {
+        shadowOf(app).grantPermissions(Manifest.permission.ACCESS_COARSE_LOCATION)
+        shadowOf(manager).setProviderEnabled(LocationManager.NETWORK_PROVIDER,true)
+        var value:JSONObject?=null
+        source.get(params()){v,e->assertNull(e);value=v}
+        assertEquals(0,shadowOf(manager).getLocationUpdateListeners(LocationManager.GPS_PROVIDER).size)
+        assertEquals(1,shadowOf(manager).getLocationUpdateListeners(LocationManager.NETWORK_PROVIDER).size)
+        shadowOf(manager).simulateLocation(fix().apply { provider=LocationManager.NETWORK_PROVIDER;accuracy=5000f })
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(value!!.getBoolean("approximate"))
+        assertEquals(5000.0,value!!.getDouble("accuracyM"),0.0)
+        assertTrue(shadowOf(manager).getRequestLocationUpdateListeners().isEmpty())
+    }
+    @Test fun coarseOnlyPermissionWithOnlyGpsEnabledFailsWithoutRegisteringGps() {
+        shadowOf(app).grantPermissions(Manifest.permission.ACCESS_COARSE_LOCATION)
+        var code:String?=null
+        source.get(params()){v,e->assertNull(v);code=e?.code}
+        assertEquals("LOCATION_UNAVAILABLE",code)
+        assertTrue(shadowOf(manager).getRequestLocationUpdateListeners().isEmpty())
+    }
+    @Test fun precisePermissionRetainsNetworkAndGpsProviders() {
+        shadowOf(app).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        shadowOf(manager).setProviderEnabled(LocationManager.NETWORK_PROVIDER,true)
+        source.get(params()){_,_->}
+        assertEquals(1,shadowOf(manager).getLocationUpdateListeners(LocationManager.GPS_PROVIDER).size)
+        assertEquals(1,shadowOf(manager).getLocationUpdateListeners(LocationManager.NETWORK_PROVIDER).size)
+        source.close()
+        assertTrue(shadowOf(manager).getRequestLocationUpdateListeners().isEmpty())
     }
     @Test fun cancelDropsPendingFixAndRemovesTimeout() {
         shadowOf(app).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
