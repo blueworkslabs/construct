@@ -19,7 +19,7 @@ from ui import adb,nodes,labels,tap,tap_node,find,capture
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
 from adb_identity import restore_shell_identity
-receipt={'complete':False,'stopped':False,'prototypeDebug':a.prototype,'apkSha256':a.sha,'moduleSha256':a.module_sha,'checks':[],'timings':[]}
+receipt={'complete':False,'stopped':False,'prototypeDebug':a.prototype,'apkSha256':a.sha,'moduleSha256':a.module_sha,'oldModuleSha256':a.old_module_sha,'oldModuleVersion':'0.2.0','newModuleVersion':a.module_version,'checks':[],'timings':[]}
 started=False;rooted=False
 heading='Pocket Camera · 0.2.0'
 folder='/data/user/0/dev.construct.runtime/files/camera-photos/dev.construct.camera/'
@@ -87,7 +87,12 @@ def grant(label):
  n=reach(label,True)
  matches=[n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true']
  assert len(matches)==1 and matches[0].get('checked')=='false','Fresh grant not off: '+label
- tap_node(matches[0]);find(label+': on.')
+ tap_node(matches[0])
+ deadline=time.monotonic()+10
+ while time.monotonic()<deadline:
+  if any(n.get('content-desc')==label and n.get('checkable')=='true' and n.get('checked')=='true' for n in nodes()):return
+  time.sleep(.25)
+ raise RuntimeError('Grant did not become checked: '+label)
 def no_camera_client():
  until=time.monotonic()+12
  while time.monotonic()<until:

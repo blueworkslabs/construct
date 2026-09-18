@@ -252,7 +252,12 @@ try:
     tap_node(reach('Open private album'));find('[CAPABILITY_DENIED] Access is off. Enable it in Module access. Open Construct menu → Module access to check the separate grants and Android permission.')
     tap('Construct menu');tap('Module access');find('Module access')
     for label in ('Allow this module’s private photo library','Allow selected image pixels'):
-        grant=consent_switch(label);assert grant.get('checked')=='false';tap_node(grant);find(label+': on.')
+        grant=consent_switch(label);assert grant.get('checked')=='false';tap_node(grant)
+        deadline=time.monotonic()+10
+        while time.monotonic()<deadline:
+            if consent_switch(label).get('checked')=='true':break
+            time.sleep(.25)
+        else:raise RuntimeError('New grant did not become checked')
     tap_node(reach('Reopen module'));find('Take a photo');tap_node(reach('Open private album'));find('Private photo 1 of 1')
     capture('modern-camera-preserved-photo');assert private_hashes()==original
     tap('Construct menu');tap('Close module');library()

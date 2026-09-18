@@ -87,7 +87,12 @@ def grant(label):
  n=reach(label,True)
  matches=[n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true']
  assert len(matches)==1 and matches[0].get('checked')=='false','Fresh grant not off: '+label
- tap_node(matches[0]);find(label+': on.')
+ tap_node(matches[0])
+ deadline=time.monotonic()+10
+ while time.monotonic()<deadline:
+  if any(n.get('content-desc')==label and n.get('checkable')=='true' and n.get('checked')=='true' for n in nodes()):return
+  time.sleep(.25)
+ raise RuntimeError('Grant did not become checked: '+label)
 def no_camera_client():
  until=time.monotonic()+12
  while time.monotonic()<until:
@@ -226,8 +231,8 @@ try:
  done('EXIF, blank and object fixtures work through the same bounded image pipeline')
  controlled_probe()
  for rotation in ('0','1'):
-  adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2);w,h=ui._device.window_size();assert (w>h)==(rotation=='1'),'Rotation did not take effect';action('Find objects');finish_analysis();display('layout-'+rotation)
-  adb('shell','settings','put','system','font_scale','2.0');time.sleep(2);action('Find objects');finish_analysis();display('large-'+rotation);adb('shell','settings','put','system','font_scale','1.0')
+  adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2);w,h=ui._device.window_size();assert (w>h)==(rotation=='1'),'Rotation did not take effect';action('Find objects');finish_analysis();display('layout-'+rotation);reach('Local processing:',prefix=True);display('layout-results-'+rotation)
+  adb('shell','settings','put','system','font_scale','2.0');time.sleep(2);action('Find objects');finish_analysis();display('large-'+rotation);reach('Local processing:',prefix=True);display('large-results-'+rotation);adb('shell','settings','put','system','font_scale','1.0')
  adb('shell','settings','put','system','user_rotation','0');done('Photo and analysis controls operate in both orientations and two-times text')
  action('Save to phone gallery');find('Save this photo to phone gallery?');tap('Cancel');expect('Canceled. Private photo unchanged.')
  action('Save to phone gallery');find('Save this photo to phone gallery?');tap('Save copy');expect('Copy saved to phone gallery.');done('Gallery export requires native confirmation and preserves private original')
