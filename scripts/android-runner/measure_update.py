@@ -20,6 +20,7 @@ p.add_argument('--sha', required=True)
 p.add_argument('--catalog', required=True)
 p.add_argument('--module-sha', required=True)
 p.add_argument('--after-sha', required=True)
+p.add_argument('--loupe-update', action='store_true', help='Compare published Measure 0.2.2 with loupe-enabled 0.2.3 and roll back, retaining held-drag captures')
 p.add_argument('--module-name', default='Pocket Measure')
 p.add_argument('--module-version', default='0.2.0')
 a = p.parse_args()
@@ -270,6 +271,19 @@ def endpoints(entry):
         x,y=screen_point(entry,point);adb('shell','input','tap',str(x),str(y));time.sleep(.6)
         if find(WORKSPACE).get('bounds')!=bounds:raise RuntimeError('Photo area moved during placement')
     return length()
+def capture_held_drag(entry,name):
+    collapse();before=length();x,y=screen_point(entry,entry['endpoints'][1])
+    try:
+        adb('shell','input','touchscreen','motionevent','DOWN',str(x),str(y))
+        adb('shell','input','touchscreen','motionevent','MOVE',str(x-60),str(y))
+        time.sleep(.5)
+        if not 180<length()<before:raise RuntimeError('Held drag did not preview length')
+        capture_display(name)
+    finally:
+        adb('shell','input','touchscreen','motionevent','CANCEL',str(x-60),str(y))
+    time.sleep(.5)
+    if length()!=before:raise RuntimeError('Held drag did not cancel transactionally')
+
 try:
     print('RESULTS:', run, flush=True)
     avd, snapshot, _ = CONFIG.profile(False)
@@ -313,10 +327,12 @@ try:
     replace_text(nodes,lambda value:ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value),a.catalog)
     apply_catalog();find('Catalog refreshed.')
     before_sha=a.sha
-    for version,digest in [('0.1.0',a.module_sha),('0.2.0',a.after_sha)]:
-        heading='Measure Preview · '+version
+    before_version,after_version=('0.2.2','0.2.3') if a.loupe_update else ('0.1.0','0.2.0')
+    module_name='Pocket Measure' if a.loupe_update else 'Measure Preview'
+    for version,digest in [(before_version,a.module_sha),(after_version,a.after_sha)]:
+        heading=module_name+' · '+version
         select_after(heading,('Review & install',));find('Allow & install')
-        if version=='0.1.0':
+        if version==before_version:
             for label in ('Allow selected image pixels','Allow local marker detection'):
                 switch=consent_switch(label)
                 if switch.get('checked')!='false':raise RuntimeError('Fresh preview grant was not off')
@@ -326,7 +342,10 @@ try:
         if not any(e.get('code')=='INSTALLED_TRIAL' and e.get('packageDigest')==digest for e in events):raise RuntimeError('Incorrect signed preview bytes')
         library();select_after(heading,('Open',));find('Choose photo')
         entry=measured();expect('Length: 24.0 cm')
-        if version=='0.1.0':
+        if a.loupe_update:
+            capture_held_drag(entry,'loupe-update-'+('before' if version==before_version else 'after'))
+            tap('Construct menu');tap('Mark working' if version==before_version else 'Close module')
+        elif version==before_version:
             if 'Show controls' in labels():tap('Show controls')
             if 'Length units' in labels():raise RuntimeError('Old preview already has the new units workflow')
             capture_display('measure-preview-before');tap('Construct menu');tap('Mark working')
@@ -335,16 +354,20 @@ try:
             if not expect('Length: ').endswith(' mm') or abs(length()-240)>3:raise RuntimeError('New units workflow does not show expected millimetres')
             capture_display('measure-preview-after');tap('Construct menu');tap('Close module')
         verify_installed(a.sha)
-    done('Signed module update adds a working cm/mm conversion selector on identical installed APK bytes')
-    select_after('Measure Preview · 0.2.0',('Roll back',));tap('Restore')
-    heading='Measure Preview · 0.1.0';select_after(heading,('Open',));find('Choose photo');no_measurement()
+    done('Signed module update preserves measurement on identical APK; held-drag captures compare loupe behavior' if a.loupe_update else 'Signed module update adds a working cm/mm conversion selector on identical installed APK bytes')
+    select_after(module_name+' · '+after_version,('Roll back',));tap('Restore')
+    heading=module_name+' · '+before_version;select_after(heading,('Open',));find('Choose photo');no_measurement()
     entry=measured();expect('Length: 24.0 cm')
-    if 'Show controls' in labels():tap('Show controls')
-    if 'Length units' in labels():raise RuntimeError('Rollback kept update-only units selector')
-    capture_display('measure-preview-rollback');tap('Construct menu');tap('Close module')
+    if a.loupe_update:
+        capture_held_drag(entry,'loupe-update-rollback')
+    else:
+        if 'Show controls' in labels():tap('Show controls')
+        if 'Length units' in labels():raise RuntimeError('Rollback kept update-only units selector')
+        capture_display('measure-preview-rollback')
+    tap('Construct menu');tap('Close module')
     verify_installed(a.sha)
     receipt['moduleOnlyUpdate']={'beforeModuleSha256':a.module_sha,'afterModuleSha256':a.after_sha,'apkSha256Before':before_sha,'apkSha256After':a.sha,'transientPhotoAndCalibration':'intentionally cleared between runs'}
-    done('Supported rollback removes update-only controls and original measurement behavior works on the same APK')
+    done('Supported rollback restores the original signed module and working measurement on the same APK; held-drag captures require visual review' if a.loupe_update else 'Supported rollback removes update-only controls and original measurement behavior works on the same APK')
     receipt['complete']=True
 except Exception as e:
     receipt['error'] = str(e)
