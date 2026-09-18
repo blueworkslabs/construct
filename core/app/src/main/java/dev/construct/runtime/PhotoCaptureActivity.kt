@@ -24,6 +24,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.clipToBounds
+import android.view.ViewOutlineProvider
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.viewinterop.AndroidView
@@ -195,30 +197,51 @@ class PhotoCaptureActivity : ComponentActivity() {
             } catch (e: Exception) { runOnUiThread { busy = false; if (live) error(e) } }
         }
     }
+    @OptIn(ExperimentalLayoutApi::class)
     @Composable private fun Screen() {
         BackHandler { finish() }
-        Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        @Composable fun Viewfinder(modifier: Modifier) {
+            // Give the embedded Android view exact bounds before CameraX applies its transform.
+            Box(modifier.clipToBounds().semantics { contentDescription = "Camera viewfinder" }) {
+                AndroidView(factory = { context -> PreviewView(context).apply {
+                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                    scaleType = PreviewView.ScaleType.FIT_CENTER
+                    clipChildren = true
+                    outlineProvider = ViewOutlineProvider.BOUNDS
+                    clipToOutline = true
+                }.also { bind(it) } }, modifier = Modifier.fillMaxSize().clipToBounds())
+            }
+        }
+        @Composable fun Controls(modifier: Modifier) {
+            Column(modifier.verticalScroll(rememberScrollState()).semantics { contentDescription = "Capture controls" },
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Construct · Take photo", style = MaterialTheme.typography.titleLarge)
                 Text(installed.manifest.name, style = MaterialTheme.typography.bodySmall)
-                AndroidView(factory = { context -> PreviewView(context).apply {
-                    // SurfaceView can escape Compose bounds during landscape/large-text layout.
-                    // Match the proven native acquisition path: a bounds-respecting TextureView.
-                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                }.also { bind(it) } },
-                    modifier = Modifier.fillMaxWidth().weight(1f).semantics { contentDescription = "Camera viewfinder" })
-                Column(Modifier.heightIn(max = 180.dp).verticalScroll(rememberScrollState())) {
-                    Text(status, style = MaterialTheme.typography.bodyMedium)
-                    Text("Only this shutter saves a private photo. No live frames reach the module.", style = MaterialTheme.typography.bodySmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(enabled = ready && !busy, onClick = ::shoot) { Text("Take photo") }
-                        OutlinedButton(enabled = canSwitch && !busy, onClick = {
-                            val view = preview
-                            stopPreview(); front = !front
-                            if (view != null) bind(view)
-                        }) { Text("Switch camera") }
+                Text(status, style = MaterialTheme.typography.bodyMedium)
+                Text("Only this shutter saves a private photo. No live frames reach the module.", style = MaterialTheme.typography.bodySmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Button(enabled = ready && !busy, onClick = ::shoot) { Text("Take photo") }
+                    OutlinedButton(enabled = canSwitch && !busy, onClick = {
+                        val view = preview
+                        stopPreview(); front = !front
+                        if (view != null) bind(view)
+                    }) { Text("Switch camera") }
+                }
+                TextButton(onClick = { finish() }) { Text("Cancel capture") }
+            }
+        }
+        Surface(Modifier.fillMaxSize()) {
+            BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp)) {
+                if (maxWidth > maxHeight) {
+                    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Viewfinder(Modifier.weight(.56f).fillMaxHeight())
+                        Controls(Modifier.weight(.44f).fillMaxHeight())
                     }
-                    TextButton(onClick = { finish() }) { Text("Cancel capture") }
+                } else {
+                    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Viewfinder(Modifier.fillMaxWidth().weight(.58f))
+                        Controls(Modifier.fillMaxWidth().weight(.42f))
+                    }
                 }
             }
         }
