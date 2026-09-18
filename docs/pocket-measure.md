@@ -34,9 +34,9 @@ flipped below near the top edge and clamped inside the viewport, showing a 2.5×
 crop relative to the current zoom. The crop is centred on the *accepted* endpoint,
 so a rejected preview keeps showing the last valid position; near photo edges the
 crop is clipped and shifted rather than drifting off the point. The crosshair turns
-error-toned when a placement preview lies outside the reference plane. Placement
-previews exist only at fit zoom; when zoomed in, a one-finger drag pans and a tap
-places. The magnifier never selects, places or moves an endpoint by itself; it
+error-toned when a placement preview lies outside the reference plane. At fit zoom, a dragged placement preview follows the finger. When zoomed in,
+a stationary press still previews the next point, but a one-finger drag pans
+and a tap places. The magnifier never selects, places or moves an endpoint by itself; it
 disappears on release, second finger, pointer/touch cancellation or lost capture.
 
 Pointer-driven redraws are coalesced to one canvas paint per animation frame; DOM
