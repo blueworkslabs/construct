@@ -23,7 +23,7 @@ function render(){
 function clearAnalysis(){state.analysis=null;$('summary').textContent='Analysis runs only when you choose.';$('timing').textContent='';}
 async function task(message,operation){
  if(state.busy)return;const token=++state.generation;state.busy=true;$('status').textContent=message;render();
- try{await operation(token);}catch(e){if(token===state.generation)$('status').textContent='['+(e.code||'PHOTO_ERROR')+'] '+e.message;}
+ try{await operation(token);}catch(e){if(token===state.generation)$('status').textContent='['+(e.code||'PHOTO_ERROR')+'] '+e.message+(['CAPABILITY_DENIED','ANDROID_PERMISSION_DENIED'].includes(e.code)?' Open Construct menu → Module access to check the separate grants and Android permission.':'');}
  finally{if(token===state.generation){state.busy=false;render();}}
 }
 async function display(data,token){
