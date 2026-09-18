@@ -40,3 +40,21 @@ repeat relevant lifecycle, consent and independent-update checks after changes.
 
 No merge or replacement pilot has been authorized by this handoff. Final packaging,
 version provenance and exact-artifact acceptance must precede release claims.
+
+## Local verification of review corrections
+
+Host source `40db18c`: **175 JVM tests pass; lint has zero errors**. Module tests
+pass **21/21**, including simulated selection/cancellation after 30 minutes and
+bounded noninteractive requests. Publisher/script tests pass **31/31**; schema
+dependency checks cover both optional flags, declaration orders and read-only
+modules. The new picker tests and publisher dependency cases failed before the
+fixes. Architecture and whitespace/link checks pass.
+
+No new optimized APK or signed 0.2.3 package was published for these corrections.
+The next combined UX candidate still requires exact-artifact Android verification;
+alpha29's completed device evidence does not cover alpha30 or the upcoming UI.
+
+Historical loupe reference: `MeasureOverlay.kt` at commit `65f6cc5` used a 96 dp
+circle, 2.5× image magnification and 72 dp offset, flipped/clamped at edges with
+a contrasting crosshair. Treat these as reference behavior, not fixed dimensions
+for a responsive WebView implementation.
