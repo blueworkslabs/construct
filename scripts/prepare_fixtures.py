@@ -26,7 +26,7 @@ def prepare(output):
     # Relabeled current-source fixtures exercise version/grant/rollback behavior;
     # these are not redistributions of historical private release packages.
     add('contacts-module',['0.1.0','0.2.0'],'contacts-registry')
-    add('camera-module',['0.1.0'],'camera-registry')
+    add('fixtures/legacy-camera',['0.1.0'],'camera-registry')
     add('fixtures/legacy-measure',[None],'measure-legacy-registry')
     add('fixtures/legacy-sky-watch',[None],'sky-legacy-registry')
     add('isolation-probe',[None],'probe-registry','test-registry',fixture=True)

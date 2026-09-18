@@ -8,7 +8,8 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 # Existing debt may shrink, not silently grow. See docs/shell-retirement.md.
 NATIVE_WORKSPACES = {'camera.capture': 'CameraActivity'}
-ACTIVITIES = {'.MainActivity', '.ModuleActivity', '.CameraActivity'}
+# PhotoCaptureActivity is a generic foreground acquisition surface, not an album/workflow.
+ACTIVITIES = {'.MainActivity', '.ModuleActivity', '.CameraActivity', '.PhotoCaptureActivity'}
 
 def check(root=ROOT):
     errors = []
@@ -23,6 +24,9 @@ def check(root=ROOT):
             errors.append(f'{path.name}: historical ID belongs only in the retirement registry')
         if re.search(r'\bDexClassLoader\b|\bInMemoryDexClassLoader\b', text):
             errors.append(f'{path.name}: downloadable native execution is not the module contract')
+    capture = src/'PhotoCaptureActivity.kt'
+    if capture.exists() and re.search(r'PhotoAnalyzer|GalleryExport|showGallery|analyzePhoto|deletePhoto', capture.read_text()):
+        errors.append('Capture surface must not own album/analysis application workflow')
     bridge = (src/'ModuleWebView.kt').read_text()
     workspaces = dict(re.findall(r'"([\w.]+)"\s*->\s*\{\s*(\w+Activity)\.open\(', bridge))
     if workspaces != NATIVE_WORKSPACES:

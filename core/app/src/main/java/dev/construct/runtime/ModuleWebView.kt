@@ -36,6 +36,8 @@ internal fun moduleChromeClient(onError: (Int) -> Unit, onPopup: () -> Unit) = o
 @SuppressLint("SetJavaScriptEnabled")
 internal fun moduleWebView(context: Context, store: ModuleStore, installed: Installed,
     pickImage: ((Uri?) -> Unit) -> Unit = { throw ConstructError("IMAGE_UNAVAILABLE", "Image picker unavailable") },
+    capturePhoto: ((Boolean) -> Unit) -> Unit = { throw ConstructError("CAMERA_UNAVAILABLE", "Capture unavailable") },
+    confirmPhoto: (String, Bitmap, (Boolean) -> Unit) -> Unit = { _, _, _ -> throw ConstructError("PHOTO_UNAVAILABLE", "Confirmation unavailable") },
     onFailure: (WebView, String) -> Unit): ModuleSessionView {
     if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
         throw ConstructError("WEBVIEW_UNSUPPORTED", "Update Android System WebView or Chrome before opening modules")
@@ -51,8 +53,9 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
     var http: ModuleHttp? = null
     var location: ModuleLocation? = null
     var images: ModuleImageSession? = null
+    var library: ModulePhotoLibrary? = null
     val view = object : ModuleSessionView(context) {
-        override fun releaseSession() { active.set(false); contacts.close(); tone.close(); http?.close(); location?.close(); images?.close() }
+        override fun releaseSession() { active.set(false); contacts.close(); tone.close(); http?.close(); location?.close(); images?.close(); library?.close() }
     }
     contacts = ContactsReader(context) {
         view.gate.authorize("contacts.read")
@@ -65,7 +68,11 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
     if (module.capabilities.any { it.id == "net.http" }) http = ModuleHttp(context, module) { authorizeCapability("net.http") }
     if (module.capabilities.any { it.id == "location.read" }) location = ModuleLocation(context) { authorizeCapability("location.read") }
     if (module.capabilities.any { it.id == "image.read" }) images = ModuleImageSession(context, origin, ::authorizeCapability, pickImage)
-    view.stopImageEffects = { images?.cancel() }
+    if (module.capabilities.any { it.id == "photos.library" }) library = ModulePhotoLibrary(context, module.id, images!!, ::authorizeCapability,
+        { action -> store.withCapability(installed, "photos.library") {
+            authorizeCapability("image.read"); view.gate.authorize("photos.library"); action()
+        } }, confirmPhoto)
+    view.stopImageEffects = { images?.cancel(); library?.cancel() }
     view.stopEffects = { tone.pause(); http?.cancel(); location?.cancel() }
     val reportedBlocks = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     var calls = 0
@@ -78,14 +85,14 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
         // Persist failure before posting the UI transition, so a queued Mark working
         // action cannot confirm a failed run even if the view has not closed yet.
         runCatching { store.runtimeFailed(installed, code) }
-        view.post { contacts.close(); tone.close(); http?.close(); location?.close(); images?.close(); onFailure(view, code) }
+        view.post { contacts.close(); tone.close(); http?.close(); location?.close(); images?.close(); library?.close(); onFailure(view, code) }
     }
     fun auditBlock(code: String, category: String = "policy") {
         if (active.get() && reportedBlocks.add("$code:$category"))
             store.log("runtime", code, module, "Blocked category=$category; URL/payload omitted")
     }
     with(view.settings) {
-        if (module.api in setOf("0.9.0", "0.10.0")) textZoom = (context.resources.configuration.fontScale * 100).toInt().coerceIn(50, 300)
+        if (module.api in setOf("0.9.0", "0.10.0", "0.11.0")) textZoom = (context.resources.configuration.fontScale * 100).toInt().coerceIn(50, 300)
         javaScriptEnabled = true
         domStorageEnabled = false
         allowFileAccess = false
@@ -116,7 +123,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             // Android intercepts data: resources too. Keep this local raster path
             // bounded; returning null here would bypass our byte/format policy.
             if (request.url.scheme == "data") {
-                if (module.api !in setOf("0.9.0", "0.10.0") || request.isForMainFrame || request.method != "GET") return reject("inline-image-context")
+                if (module.api !in setOf("0.9.0", "0.10.0", "0.11.0") || request.isForMainFrame || request.method != "GET") return reject("inline-image-context")
                 val raster = runCatching { ModuleImages.dataUrl(request.url.toString()) }.getOrNull()
                     ?: return reject("inline-image-format")
                 return WebResourceResponse(raster.first, null, 200, "OK",
@@ -142,7 +149,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                     "X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-store"), stream)
             }
             if (!Packages.safePath(path)) return reject("path")
-            if (module.api in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0") && path == "construct-host.css") {
+            if (module.api in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0") && path == "construct-host.css") {
                 return WebResourceResponse("text/css", "UTF-8", 200, "OK",
                     mapOf("X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-store"),
                     ByteArrayInputStream(ModuleLayout.css.toByteArray()))
@@ -214,7 +221,34 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                 if (method == "net.http") http!!.get(params, complete) else location!!.get(params, complete)
                 return@addWebMessageListener
             }
-            if (method == "image.read" || method == "image.markers") {
+            if (method == "camera.photo" || method == "photos.library") {
+                authorizeCapability(method)
+                val id = requestId; val generation = view.gate.generation.get()
+                val human = method == "camera.photo" || params.optString("op") in setOf("delete", "export")
+                val complete: (JSONObject?, ConstructError?) -> Unit = { value, error ->
+                    val delivery = view.gate.generation.get()
+                    view.post { if (active.get()) {
+                        val response = JSONObject().put("id", id)
+                        val denied = try {
+                            view.gate.authorizeReply(if (human) delivery else generation); authorizeCapability(method)
+                            if (method == "photos.library") {
+                                authorizeCapability("image.read")
+                                if (value?.has("handle") == true) images!!.authorizeCurrent(value.getString("handle"))
+                            }
+                            error
+                        } catch (e: ConstructError) { e }
+                        if (denied == null) response.put("result", value)
+                        else response.put("error", JSONObject().put("code", denied.code).put("message", denied.message))
+                        reply.postMessage(response.toString())
+                    } }
+                }
+                if (method == "camera.photo") {
+                    checkRule(params.keys().asSequence().toSet() == setOf("op") && params.optString("op") == "capture", "CAMERA_PARAMS", "Expected op:capture")
+                    capturePhoto { saved -> complete(JSONObject().put("saved", saved), null) }
+                } else library!!.request(params, complete)
+                return@addWebMessageListener
+            }
+            if (method == "image.read" || method == "image.markers" || method == "image.analyze") {
                 authorizeCapability(method)
                 val id = requestId; val generation = view.gate.generation.get()
                 val picking = method == "image.read" && params.optString("op") == "pick"
@@ -228,7 +262,9 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                                 // Only the tracked system-picker handoff may cross a pause;
                                 // its session token, current digest and grant are rechecked.
                                 view.gate.authorizeReply(if (picking) deliveredGeneration else generation)
-                                authorizeCapability(method); authorizeCapability("image.read"); error
+                                authorizeCapability(method); authorizeCapability("image.read")
+                                if (error == null && method == "image.analyze") session.authorizeCurrent(params.getString("handle"))
+                                error
                             } catch (e: ConstructError) { e }
                             if (denied == null) response.put("result", value)
                             else response.put("error", JSONObject().put("code", denied.code).put("message", denied.message))

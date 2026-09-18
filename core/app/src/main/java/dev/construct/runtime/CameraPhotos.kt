@@ -6,7 +6,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 
-/** No bridge file API: only the native camera workspace uses these paths. */
+/** Private per-module originals; native-only paths, bounded by acquisition and library APIs. */
 internal class CameraPhotos(context: Context, moduleId: String) {
     companion object {
         const val MAX_PHOTOS = 8
@@ -77,11 +77,13 @@ internal class CameraPhotos(context: Context, moduleId: String) {
             throw error
         } finally { stage.delete(); temp.delete() }
     }
-    fun delete(photo: File) = synchronized(lock) {
+    fun delete(photo: File, publish: ((() -> Unit) -> Unit) = { it() }) = synchronized(lock) {
         checkRule(photo.parentFile == folder && name.matches(photo.name) && photo.canonicalFile == photo.absoluteFile,
             "CAMERA_STORAGE", "Invalid saved photo")
-        checkRule(!photo.exists() || photo.delete(), "CAMERA_STORAGE", "Could not delete photo")
-        if (folder.isDirectory) sync(folder)
+        publish {
+            checkRule(!photo.exists() || photo.delete(), "CAMERA_STORAGE", "Could not delete photo")
+            if (folder.isDirectory) sync(folder)
+        }
     }
     fun deleteAll() = synchronized(lock) { entries().forEach { delete(it) } }
 }
