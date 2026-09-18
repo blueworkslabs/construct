@@ -147,3 +147,14 @@ test('a second finger cancels the preview and pinch/pan never place or move endp
   assert.equal(e.result.textContent,'Length: 10.0 cm','fit coordinates unchanged after reset');
   e.undo.onclick();e.undo.onclick();assert.equal(e.result.textContent,'No length yet');
 });
+
+// Canvas supports fractional crops: the crosshair and overlay line must share
+// the exact accepted endpoint and scale, including under noninteger zoom.
+test('loupe preserves subpixel endpoints and exact magnification at arbitrary zoom',()=>{
+  for(const fitWidth of [317,693.7,2400,5173.25])for(const point of [{x:.31237,y:.67291},{x:0,y:.9999},{x:1,y:0}]){
+    const crop=loupe(point,1200,900,fitWidth,127,2.5);
+    close(crop.dx+(point.x*1200-crop.x)*crop.scale,63.5);
+    close(crop.dy+(point.y*900-crop.y)*crop.scale,63.5);
+    close(crop.scale,fitWidth/1200*2.5);
+  }
+});
