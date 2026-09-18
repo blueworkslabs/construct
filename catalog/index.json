@@ -223,9 +223,17 @@
           "artifact": "dev.construct.camera-0.2.0.zip",
           "sha256": "03f704952b52aaa62c235e7240c180279afab5f68934851863ade9595e5f7c78",
           "signature": "CQaQT/YFklMLeNeSLav7njX5Alnec3/4DtmIiW5Yh+0zwRk5EbwDotbR/0g4wFqEAbO4TOK/N9/DMqBdpopw/FgzSZPJlN2pF8qeqWtwt9M+OcCEfZBeRkiiqvWWaiC412tLAqwkTbPDu1oNDaHhvNeYPnfz/hQX4pplgddW5nXUQSVHDK9pFdxTBrfpT4cIV0pDhnfdQ8M3WnPv3doJd3ckocWQ81OjMFBLeLs8kZkck2erdWYLehlM3ByKjk3T/tWhZiXgiF/383Rz+JrxUIErhAPjMOZuJDXPv/KwqXSfqlyqWljo17DidFxfeA4pi+uAQwiZMl7PEZBQbXtwEQ=="
+        },
+        {
+          "id": "dev.construct.camera",
+          "name": "Pocket Camera",
+          "version": "0.2.1",
+          "artifact": "dev.construct.camera-0.2.1.zip",
+          "sha256": "6bf8b7d63557b920a1d3b3f63bd061a50d9e141c65009d84720ca4fb15548b22",
+          "signature": "fdQ1eoCrn2I/yXrLDDyNizRKcDyvoQcxivQPu0LqniTgPJKuuB0uDf5Wtelf+98OpmNhwZfIUEGauN/FNh0hmJqnvtUVuxAHrs9vxw9NmQFcGxlCeM1/nvyzRsuNMGI2wmLJLm8YUZc2hh8h45mD0Oiu0dbEVfIWtIeNzXh0Jrpj8y60MiD5xD8d64w8GUC8EJWnqForuCzYyrdgM15FWGB3esHQKCeM1HtGox4xKZA0I6pvvEwQIukQSE4CZHRdZ5kccT74EjvuKkpsF0gXHBpuk3X9z97W9kMiR8qBB8CUwlGO3B0wlZx6gXn+okv9kALncDWTn2axSW3HBmvIYg=="
         }
       ],
-      "latest": "0.2.0"
+      "latest": "0.2.1"
     },
     {
       "id": "dev.construct.measure",
