@@ -21,7 +21,7 @@ test('module scripts compile and capabilities exclude native launcher/network/st
 
 // Exercise the actual UI event wiring, not just Editor.cancel(). The Android 17
 // WebView trace delivered touchcancel without a corresponding pointercancel.
-function measureUi(calls=null) {
+function measureUi(calls=null,frames=null) {
   class Element {
     constructor(){this.captures=new Set();this.value='';this.hidden=false;this.listeners={};this.clientWidth=600;this.clientHeight=450;this.classList={toggle(){}};}
     addEventListener(type,fn){(this.listeners[type]??=[]).push(fn);}
@@ -33,6 +33,7 @@ function measureUi(calls=null) {
   const html=fs.readFileSync('examples/measure-module/ui/index.html','utf8');
   const elements=Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map(m=>[m[1],new Element()]));
   elements.units.value='cm';const window=new Element();window.devicePixelRatio=1;
+  if(frames)window.requestAnimationFrame=fn=>{frames.push(fn);return 1;};
   const sandbox={document:{getElementById:id=>elements[id]},window,Measure:require('../examples/measure-module/ui/geometry.js'),ResizeObserver:class{observe(){}},Image:class{set src(_){queueMicrotask(()=>this.onload());}},call:async method=>method==='image.read'?{handle:'synthetic',url:'https://synthetic.invalid/image.png',width:1200,height:900}:{markers:[{id:0,corners:square}]}};
   vm.runInNewContext(fs.readFileSync('examples/measure-module/ui/app.js','utf8'),sandbox);
   const pointer=(type,x,y,pointerId=1)=>elements.photo.dispatch(type,{pointerId,clientX:x,clientY:y});
@@ -157,4 +158,20 @@ test('loupe preserves subpixel endpoints and exact magnification at arbitrary zo
     close(crop.dy+(point.y*900-crop.y)*crop.scale,63.5);
     close(crop.scale,fitWidth/1200*2.5);
   }
+});
+
+test('pending animation frame coalesces pointer moves and cannot paint a cancelled loupe',async()=>{
+  const calls=[],frames=[],flush=()=>{while(frames.length)frames.shift()();};
+  const {elements:e,pointer,tap}=measureUi(calls,frames);
+  await e.choose.onclick();e.side.value='100';e.setup.dispatch('submit');flush();
+  tap(180,270);tap(480,270);flush();calls.length=0;
+  pointer('pointerdown',480,270);
+  for(let x=479;x>=420;x--)pointer('pointermove',x,270);
+  assert.equal(e.result.textContent,'Length: 20.0 cm','DOM stays current before the scheduled paint');
+  assert.equal(frames.length,1,'all pending moves share one animation frame');
+  assert.equal(calls.length,0,'no synchronous canvas painting');
+  e.photo.dispatch('touchcancel');
+  assert.equal(e.result.textContent,'Length: 25.0 cm');
+  assert.equal(frames.length,1);flush();
+  assert.equal(calls.filter(c=>c.name==='drawImage').length,1,'only the base photo draws: no stale loupe after cancellation');
 });
