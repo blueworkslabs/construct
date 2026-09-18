@@ -66,8 +66,8 @@ const Measure = (() => {
   function loupe(point,width,height,fitWidth,diameter,magnification){
     require(inside(point)&&width>0&&height>0&&fitWidth>0&&diameter>0&&magnification>0,'Magnifier needs a photo point.');
     const pixelsPerScreen=width/fitWidth;
-    const half=Math.max(1,Math.round(diameter/2/magnification*pixelsPerScreen));
-    const cx=Math.round(point.x*width),cy=Math.round(point.y*height);
+    const half=diameter/2/magnification*pixelsPerScreen;
+    const cx=point.x*width,cy=point.y*height;
     const x=Math.max(0,cx-half),y=Math.max(0,cy-half);
     const w=Math.max(0,Math.min(width,cx+half)-x),h=Math.max(0,Math.min(height,cy+half)-y);
     const scale=diameter/(half*2);
