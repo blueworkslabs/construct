@@ -41,7 +41,7 @@ repeat relevant lifecycle, consent and independent-update checks after changes.
 No merge or replacement pilot has been authorized by this handoff. Final packaging,
 version provenance and exact-artifact acceptance must precede release claims.
 
-## Local verification of review corrections
+## Local verification of review corrections (before UX acceptance)
 
 Host source `40db18c`: **175 JVM tests pass; lint has zero errors**. Module tests
 pass **21/21**, including simulated selection/cancellation after 30 minutes and
@@ -58,3 +58,16 @@ Historical loupe reference: `MeasureOverlay.kt` at commit `65f6cc5` used a 96 dp
 circle, 2.5× image magnification and 72 dp offset, flipped/clamped at edges with
 a contrasting crosshair. Treat these as reference behavior, not fixed dimensions
 for a responsive WebView implementation.
+
+## Combined UX candidate acceptance — 2026-09-18
+
+The source reservation above was followed by Fable's module-only magnifier/UX pass
+and Android verification. The accepted test candidate is **alpha30 + Measure
+0.2.5**; intermediate 0.2.3/0.2.4 packages were not accepted. Final scopes passed
+**19/19 functional** and **2/2 signed module update/rollback** on identical APK
+bytes, with actual normal/2×-text and magnifier captures reviewed. See the
+[exact-artifact record and limits](measure-loupe-alpha30-acceptance.md).
+
+This is candidate evidence only: neither PR has been merged, no replacement APK
+pilot has been released, and the production catalog is unchanged. Phone acceptance
+remains separate from the emulator results.
