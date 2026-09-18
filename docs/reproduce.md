@@ -104,6 +104,11 @@ none builds or substitutes candidate bytes.
   `--module-version` permit an identified later candidate. `--lifecycle-only`
   runs eight focused setup/consent/lifecycle checks; it is not a substitute for
   the complete eighteen-check functional scope.
+  Add `--precision-checks --module-version 0.2.5` for the loupe candidate. This
+  holds real touchscreen placement/drag streams across emulator-console captures,
+  verifies release-only placement and cancelled-drag rollback, and retains the
+  images for visual review. It does not substitute screenshot collection for
+  review of the crop/crosshair and disappearance.
 - `measure_retirement.py --old ALPHA28_APK --old-sha OLD_SHA --new ALPHA29_APK
   --new-sha NEW_SHA --catalog HTTPS_INDEX_URL --candidates CANDIDATES_JSON`:
   install the real signed Pocket Measure 0.1.3 on alpha28, upgrade in place,
@@ -123,3 +128,13 @@ also retain synthetic emulator-console display captures in `*-display` folders
 for operator review. Inspect those actual images; functional receipts alone do
 not establish layout quality. Partial runs stay separate from completed scopes,
 and debug-prototype evidence never substitutes for optimized-APK acceptance.
+
+### Loupe delivery regression
+
+Use `measure_update.py --loupe-update --apk APK --sha APK_SHA --catalog HTTPS_INDEX_URL
+--module-sha MEASURE_0_2_2_SHA --after-sha MEASURE_0_2_5_SHA` with a candidate catalog
+containing both immutable versions. It installs 0.2.2, exercises measurement and
+holds a real endpoint drag, updates only the signed module to 0.2.5, repeats the
+interaction, then rolls back to 0.2.2. APK hashes are checked throughout; photos
+and calibration are intentionally recreated between module sessions. Review the
+three held-drag captures to confirm the loupe appears only in the new module.

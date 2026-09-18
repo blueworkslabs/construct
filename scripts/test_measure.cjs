@@ -21,22 +21,24 @@ test('module scripts compile and capabilities exclude native launcher/network/st
 
 // Exercise the actual UI event wiring, not just Editor.cancel(). The Android 17
 // WebView trace delivered touchcancel without a corresponding pointercancel.
-function measureUi() {
+function measureUi(calls=null,frames=null) {
+  let resizeCallback,observing=false;
   class Element {
-    constructor(){this.captures=new Set();this.value='';this.hidden=false;this.listeners={};this.clientWidth=600;this.clientHeight=450;this.classList={toggle(){}};}
+    constructor(){this.captures=new Set();this.value='';this.hidden=false;this.listeners={};this.clientWidth=600;this.clientHeight=450;this.classList={toggle(){assert.equal(observing,false,'Layout mutation during ResizeObserver delivery');}};}
     addEventListener(type,fn){(this.listeners[type]??=[]).push(fn);}
     dispatch(type,extra={}){const event={type,preventDefault(){},...extra};this['on'+type]?.(event);for(const fn of this.listeners[type]||[])fn(event);}
     setAttribute(){} blur(){} setPointerCapture(id){this.captures.add(id);} releasePointerCapture(id){this.captures.delete(id);}
     getBoundingClientRect(){return {left:0,top:0};}
-    getContext(){return new Proxy({},{get:()=>()=>{}});}
+    getContext(){return new Proxy({},{get:(_,name)=>(...args)=>{calls?.push({name,args});return name==='measureText'?{width:args[0].length*8}:undefined;}});}
   }
   const html=fs.readFileSync('examples/measure-module/ui/index.html','utf8');
   const elements=Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map(m=>[m[1],new Element()]));
   elements.units.value='cm';const window=new Element();window.devicePixelRatio=1;
-  const sandbox={document:{getElementById:id=>elements[id]},window,Measure:require('../examples/measure-module/ui/geometry.js'),ResizeObserver:class{observe(){}},Image:class{set src(_){queueMicrotask(()=>this.onload());}},call:async method=>method==='image.read'?{handle:'synthetic',url:'https://synthetic.invalid/image.png',width:1200,height:900}:{markers:[{id:0,corners:square}]}};
+  if(frames)window.requestAnimationFrame=fn=>{frames.push(fn);return 1;};
+  const sandbox={document:{getElementById:id=>elements[id]},window,Measure:require('../examples/measure-module/ui/geometry.js'),ResizeObserver:class{constructor(fn){resizeCallback=fn;}observe(){}},Image:class{set src(_){queueMicrotask(()=>this.onload());}},call:async method=>method==='image.read'?{handle:'synthetic',url:'https://synthetic.invalid/image.png',width:1200,height:900}:{markers:[{id:0,corners:square}]}};
   vm.runInNewContext(fs.readFileSync('examples/measure-module/ui/app.js','utf8'),sandbox);
-  const pointer=(type,x,y)=>elements.photo.dispatch(type,{pointerId:1,clientX:x,clientY:y});
-  return {elements,pointer,tap(x,y){pointer('pointerdown',x,y);pointer('pointerup',x,y);}};
+  const pointer=(type,x,y,pointerId=1)=>elements.photo.dispatch(type,{pointerId,clientX:x,clientY:y});
+  return {elements,pointer,resize(){observing=true;try{resizeCallback();}finally{observing=false;}},tap(x,y){pointer('pointerdown',x,y);pointer('pointerup',x,y);}};
 }
 for(const cancellation of ['pointercancel','touchcancel','lostpointercapture'])test('actual module UI restores a drag on '+cancellation+' and ignores late release',async()=>{
   const {elements:e,pointer,tap}=measureUi();await e.choose.onclick();e.side.value='100';e.setup.dispatch('submit');
@@ -86,4 +88,98 @@ test('noninteractive marker and release calls retain bounded response timeouts',
     bridge.advance(20000);await rejected;assert.equal(bridge.timers.size,0);
     bridge.reply({id:bridge.sent[0].id,result:{late:true}});
   }
+});
+
+// Magnifier geometry is pure: the crop is centred on the point, honest at photo edges and scaled to the loupe.
+const {loupe,loupePlacement}=require('../examples/measure-module/ui/geometry.js');
+test('loupe crop centres on the point at the current zoom and shifts instead of drifting at edges',()=>{
+  const centre=loupe({x:.5,y:.5},1200,900,600,120,2.5);
+  assert.equal(centre.w,centre.h);assert.equal(centre.x+centre.w/2,600);assert.equal(centre.y+centre.h/2,450);assert.equal(centre.dx,0);close(centre.w*centre.scale,120);
+  const zoomed=loupe({x:.5,y:.5},1200,900,2400,120,2.5);assert.ok(zoomed.w<centre.w,'zoomed-in view magnifies fewer photo pixels');
+  const corner=loupe({x:0,y:0},1200,900,600,120,2.5);assert.equal(corner.x,0);assert.equal(corner.y,0);assert.equal(corner.w,centre.w/2);
+  assert.ok(corner.dx>0&&Math.abs(corner.dx-60)<1e-9,'crop start lands at the loupe centre so the crosshair still marks the point');
+  const far=loupe({x:1,y:1},1200,900,600,120,2.5);assert.equal(far.x+far.w,1200);assert.equal(far.y+far.h,900);assert.equal(far.dx,0);
+  assert.throws(()=>loupe({x:1.2,y:.5},1200,900,600,120,2.5));
+});
+test('loupe placement lifts above the finger, flips below near the top and stays inside the view',()=>{
+  assert.deepEqual(loupePlacement({x:300,y:300},600,450,120,80),{x:300,y:220,r:60});
+  assert.deepEqual(loupePlacement({x:300,y:100},600,450,120,80),{x:300,y:180,r:60});
+  assert.deepEqual(loupePlacement({x:10,y:440},600,450,120,80),{x:60,y:360,r:60});
+  assert.deepEqual(loupePlacement({x:595,y:300},600,450,120,80),{x:540,y:220,r:60});
+  const tiny=loupePlacement({x:5,y:5},40,40,120,80);assert.ok(tiny.x>=0&&tiny.y>=0,'undersized views never invert the clamp');
+});
+test('magnifier draws the actual photo crop around the dragged endpoint and disappears on release',async()=>{
+  const calls=[];const {elements:e,pointer,tap}=measureUi(calls);await e.choose.onclick();e.side.value='100';e.setup.dispatch('submit');
+  tap(180,270);tap(480,270);calls.length=0;
+  pointer('pointerdown',480,270);pointer('pointermove',420,270);
+  const draws=calls.filter(c=>c.name==='drawImage');assert.ok(draws.length>=2,'photo plus loupe crop');
+  const crop=draws[draws.length-1].args;assert.equal(crop.length,9);
+  assert.equal(crop[1]+crop[3]/2,840,'crop centred on the accepted x of B (0.7 × 1200)');assert.equal(crop[2]+crop[4]/2,540);
+  calls.length=0;pointer('pointerup',420,270);
+  assert.equal(calls.filter(c=>c.name==='drawImage').length,1,'no magnifier once the drag is committed');
+  assert.equal(e.result.textContent,'Length: 20.0 cm');
+});
+test('press-and-hold previews the next endpoint and places it where the finger is released',async()=>{
+  const calls=[];const {elements:e,pointer}=measureUi(calls);await e.choose.onclick();e.side.value='100';e.setup.dispatch('submit');calls.length=0;
+  pointer('pointerdown',180,270);assert.equal(calls.filter(c=>c.name==='drawImage').length,2,'magnifier shows on the initial press');
+  pointer('pointermove',300,300);pointer('pointermove',180,270);
+  assert.equal(e.result.textContent,'No length yet','preview alone never places a point');
+  pointer('pointerup',180,270);calls.length=0;
+  pointer('pointerdown',400,300);pointer('pointermove',480,270);pointer('pointerup',480,270);
+  assert.equal(e.result.textContent,'Length: 25.0 cm','B lands at the release position, not the press');
+  calls.length=0;pointer('pointerdown',300,100);assert.equal(calls.filter(c=>c.name==='drawImage').length,1,'a completed pair shows no placement preview');pointer('pointerup',300,100);
+  assert.equal(e.result.textContent,'Length: 25.0 cm','a third tap cannot replace the pair and shows no preview');
+});
+test('a second finger cancels the preview and pinch/pan never place or move endpoints',async()=>{
+  const calls=[];const {elements:e,pointer,tap}=measureUi(calls);await e.choose.onclick();e.side.value='100';e.setup.dispatch('submit');
+  tap(180,270);tap(480,270);
+  pointer('pointerdown',480,270);pointer('pointermove',440,270);assert.equal(e.result.textContent,'Length: 21.7 cm');
+  pointer('pointerdown',200,200,2);assert.equal(e.result.textContent,'Length: 25.0 cm','second finger restores the drag start');
+  calls.length=0;pointer('pointermove',100,200,2);
+  assert.equal(calls.filter(c=>c.name==='drawImage').length,1,'no magnifier while pinching');
+  pointer('pointerup',100,200,2);pointer('pointerup',480,270);
+  assert.equal(e.result.textContent,'Length: 25.0 cm');
+  e.clear.onclick();assert.equal(e.result.textContent,'No length yet');
+  assert.equal(e.reset.hidden,false,'pinch left the view zoomed in');
+  pointer('pointerdown',300,225);pointer('pointermove',360,225);pointer('pointerup',360,225);
+  pointer('pointerdown',300,225);pointer('pointerup',300,225);
+  assert.equal(e.result.textContent,'No length yet','zoomed-in drag panned instead of placing A, so this tap is A');
+  e.reset.onclick();assert.equal(e.reset.hidden,true);e.clear.onclick();
+  pointer('pointerdown',300,225);pointer('pointerup',300,225);pointer('pointerdown',420,225);pointer('pointerup',420,225);
+  assert.equal(e.result.textContent,'Length: 10.0 cm','fit coordinates unchanged after reset');
+  e.undo.onclick();e.undo.onclick();assert.equal(e.result.textContent,'No length yet');
+});
+
+// Canvas supports fractional crops: the crosshair and overlay line must share
+// the exact accepted endpoint and scale, including under noninteger zoom.
+test('loupe preserves subpixel endpoints and exact magnification at arbitrary zoom',()=>{
+  for(const fitWidth of [317,693.7,2400,5173.25])for(const point of [{x:.31237,y:.67291},{x:0,y:.9999},{x:1,y:0}]){
+    const crop=loupe(point,1200,900,fitWidth,127,2.5);
+    close(crop.dx+(point.x*1200-crop.x)*crop.scale,63.5);
+    close(crop.dy+(point.y*900-crop.y)*crop.scale,63.5);
+    close(crop.scale,fitWidth/1200*2.5);
+  }
+});
+
+test('pending animation frame coalesces pointer moves and cannot paint a cancelled loupe',async()=>{
+  const calls=[],frames=[],flush=()=>{while(frames.length)frames.shift()();};
+  const {elements:e,pointer,tap}=measureUi(calls,frames);
+  await e.choose.onclick();e.side.value='100';e.setup.dispatch('submit');flush();
+  tap(180,270);tap(480,270);flush();calls.length=0;
+  pointer('pointerdown',480,270);
+  for(let x=479;x>=420;x--)pointer('pointermove',x,270);
+  assert.equal(e.result.textContent,'Length: 20.0 cm','DOM stays current before the scheduled paint');
+  assert.equal(frames.length,1,'all pending moves share one animation frame');
+  assert.equal(calls.length,0,'no synchronous canvas painting');
+  e.photo.dispatch('touchcancel');
+  assert.equal(e.result.textContent,'Length: 25.0 cm');
+  assert.equal(frames.length,1);flush();
+  assert.equal(calls.filter(c=>c.name==='drawImage').length,1,'only the base photo draws: no stale loupe after cancellation');
+});
+
+test('resize delivery cannot mutate viewport layout before the next animation frame',async()=>{
+  const frames=[],flush=()=>{while(frames.length)frames.shift()();};
+  const ui=measureUi([],frames);await ui.elements.choose.onclick();flush();
+  ui.resize();ui.resize();assert.equal(frames.length,1,'coalesce repeated resize notifications');
+  assert.doesNotThrow(flush,'layout work runs after observer delivery');
 });

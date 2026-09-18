@@ -21,6 +21,8 @@ p.add_argument('--catalog', required=True)
 p.add_argument('--module-sha', required=True)
 p.add_argument('--module-name', default='Pocket Measure')
 p.add_argument('--module-version', default='0.2.2')
+p.add_argument('--layout-only', action='store_true', help='Focused consent, measurement and normal/2x layout checks; not full acceptance')
+p.add_argument('--precision-checks', action='store_true', help='Capture real held placement/drag loupe and verify transactional interruption (requires loupe module)')
 p.add_argument('--lifecycle-only', action='store_true', help='Focused consent, image setup and lifecycle scope; excludes editor/layout checks')
 a = p.parse_args()
 from config import catalog
@@ -47,6 +49,8 @@ from host_ui import host_ready, catalog_settings, apply_catalog, library, select
 
 receipt = {'scope':'Module-owned Measure exact-APK functional and lifecycle acceptance','moduleSha256':a.module_sha,'apkSha256':a.sha,'checks':[],'complete':False,'stopped':False}
 receipt['focusedLifecycle']=a.lifecycle_only
+receipt['focusedLayout']=a.layout_only
+receipt['precisionChecks']=a.precision_checks
 started = False
 
 def save():
@@ -219,6 +223,15 @@ def control(text):
     for direction in (1,-1):
         for _ in range(12):
             ns=nodes();box=panel_rect(ns)
+            # Rotation/text zoom can settle after the initial query. Expand
+            # only a stable, fully visible toggle; never swipe hidden controls.
+            show=[n for n in ns if n.get('text')=='Show controls' and in_panel(n,box)]
+            if len(show)==1:
+                prior=show[0].get('bounds');time.sleep(.4)
+                now=nodes();visible_box=panel_rect(now)
+                stable=[n for n in now if n.get('text')=='Show controls' and n.get('bounds')==prior and in_panel(n,visible_box)]
+                if len(stable)==1:tap_node(stable[0]);time.sleep(.5)
+                continue
             matches=[n for n in ns if matches_control(n,text) and n.get('enabled')!='false' and in_panel(n,box)]
             if len(matches)==1:
                 prior=matches[0].get('bounds');time.sleep(.5)
@@ -283,8 +296,23 @@ def measured(name='measure-flat.png'):
 def endpoints(entry):
     collapse();bounds=find(WORKSPACE).get('bounds')
     for point in entry['endpoints']:
-        x,y=screen_point(entry,point);adb('shell','input','tap',str(x),str(y));time.sleep(.6)
+        x,y=screen_point(entry,point)
+        if a.precision_checks and not receipt.get('precisionPlacementCaptured'):
+            index=entry['endpoints'].index(point)
+            # Keep a real touchscreen stream held across the emulator-console
+            # capture. A preview must not commit either endpoint before UP.
+            try:
+                adb('shell','input','touchscreen','motionevent','DOWN',str(x+24),str(y-20))
+                adb('shell','input','touchscreen','motionevent','MOVE',str(x),str(y))
+                time.sleep(.4);no_measurement()
+                capture_display('precision-placement-'+('a' if index==0 else 'b'))
+                adb('shell','input','touchscreen','motionevent','UP',str(x),str(y))
+            except BaseException:
+                adb('shell','input','touchscreen','motionevent','CANCEL',str(x),str(y));raise
+        else:adb('shell','input','tap',str(x),str(y))
+        time.sleep(.6)
         if find(WORKSPACE).get('bounds')!=bounds:raise RuntimeError('Photo area moved during placement')
+    if a.precision_checks:receipt['precisionPlacementCaptured']=True
     return length()
 try:
     print('RESULTS:', run, flush=True)
@@ -352,7 +380,7 @@ try:
     if abs(value-240)>3:raise RuntimeError('Flat reference failed: '+str(value))
     receipt['flatMm']=value;capture_display('module-measure-flat')
     done('Real system picker, private image resource and local detector feed module-owned 240 mm measurement offline')
-    if not a.lifecycle_only:
+    if not a.lifecycle_only and not a.layout_only:
         units('Millimetres')
         millimetres=expect('Length: ')
         if not millimetres.endswith(' mm') or abs(length()-receipt['flatMm'])>.51:raise RuntimeError('Units conversion exceeds cm display rounding')
@@ -371,6 +399,24 @@ try:
         time.sleep(.5)
         if length()!=receipt['flatMm']:raise RuntimeError('Pointer cancellation retained drag preview')
         done('Real endpoint drag commits once; Undo and Android pointer cancellation restore the prior length')
+        if a.precision_checks:
+            # Retain screenshots of the loupe during a genuine held adjustment,
+            # then prove cancellation and a late UP cannot commit that preview.
+            try:
+                for motion,x,y in [('DOWN',bx,by),('MOVE',bx-60,by)]:
+                    adb('shell','input','touchscreen','motionevent',motion,str(x),str(y))
+                time.sleep(.5)
+                if not 180<length()<240:raise RuntimeError('Held magnifier drag did not preview adjusted length')
+                capture_display('precision-drag-held')
+                adb('shell','input','touchscreen','motionevent','CANCEL',str(bx-60),str(by))
+                time.sleep(.5)
+                if length()!=receipt['flatMm']:raise RuntimeError('Held magnifier cancellation did not restore measurement')
+                capture_display('precision-drag-cancelled')
+                adb('shell','input','touchscreen','motionevent','UP',str(bx-60),str(by))
+                if length()!=receipt['flatMm']:raise RuntimeError('Late release committed cancelled magnifier preview')
+            except BaseException:
+                adb('shell','input','touchscreen','motionevent','CANCEL',str(bx),str(by));raise
+            done('Precision placement commits on release; held loupe drag cancels and ignores late release (captures require visual review)')
         action('Endpoint B')
         for _ in range(4):action('Move endpoint left')
         if not receipt['flatMm']-3<=length()<receipt['flatMm']:raise RuntimeError('Pixel nudge did not reduce length')
@@ -394,6 +440,7 @@ try:
         if photo_pixels('module-gesture-reset')!=fit_pixels:raise RuntimeError('Fit reset did not restore the original rendered photograph')
         if abs(endpoints(entry)-240)>3:raise RuntimeError('Fit reset changed photo coordinates')
         done('Real pinch and pan do not place endpoints; reset restores calibrated fit coordinates')
+    if not a.lifecycle_only:
         size('95');value=endpoints(entry)
         if abs(value-228)>3:raise RuntimeError('Actual marker-size scaling failed: '+str(value))
         done('Module-owned recalibration produces 228 mm from the same endpoints')
@@ -405,7 +452,10 @@ try:
         for rotation in ('0','1'):
             adb('shell','settings','put','system','font_scale','2.0')
             adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2)
-            expect('Length: 22.8 cm');action('Choose photo')
+            # Integer touchscreen coordinates round differently after text zoom
+            # changes the fitted photo size. Keep the existing calibration tolerance.
+            if abs(length()-228)>3:raise RuntimeError('Large-text calibrated length outside tolerance')
+            action('Choose photo')
             find('Photos');adb('shell','input','keyevent','4');expect('No photo selected')
             # Cancellation intentionally clears the previous selection; load again to
             # inspect both the large-text controls and a completed measurement.
@@ -413,6 +463,9 @@ try:
             size('95');endpoints(entry)
         adb('shell','settings','put','system','font_scale','1.0');adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
         done('Two-times text remains operable in portrait and landscape with real picker and measurement')
+        if a.layout_only:
+            receipt['complete']=True
+            raise SystemExit(0)
         for name,key,tolerance in [('measure-angled.png','angledMm',4),('measure-oriented.jpg','orientedMm',3)]:
             entry=measured(name);value=length()
             if abs(value-240)>tolerance:raise RuntimeError(name+' outside tolerance')
