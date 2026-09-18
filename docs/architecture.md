@@ -92,8 +92,9 @@ This is not a claim that every possible JavaScript timer or WebView audio path s
 Web modules retain their live session through orientation changes. Snake explicitly
 pauses rather than catching up after rotation. Leaving the app ends the session;
 reopening uses each module's saved state. Process death is not silently treated as
-an in-memory resume. The native camera workspace has a separate policy: rotation
-or backgrounding closes/releases it; previously saved photos remain.
+an in-memory resume. The bounded native capture surface has a separate policy: rotation
+or backgrounding closes/releases it and ends its parent image run; previously
+saved photos remain. An explicit shutter/cancel returns to the same module run.
 
 ## Deployment boundaries
 
@@ -109,4 +110,8 @@ The alpha28 candidate removes native Sky implementation code. Old `sky.watch`
 packages remain readable for management but require a module update; they cannot
 execute or be restored through rollback. See the [compatibility boundary](shell-retirement.md).
 Alpha29 also retires `photo.measure`; see [the image/migration contract](module-images.md).
-Camera remains the single inventoried native-workflow exception.
+The alpha31 candidate also retires `camera.capture`: no native application
+workspaces remain in its source. Generic visible acquisition and bounded local
+inference remain host capabilities; the module owns the album and analysis UI.
+See [photo contracts](module-photos.md) and [measured prototype limits](camera-prototype-results.md).
+This source boundary does not substitute for exact-artifact migration acceptance.

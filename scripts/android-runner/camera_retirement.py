@@ -193,6 +193,7 @@ try:
     replace_text(nodes,lambda value:ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value),URL)
     apply_catalog(); find('Catalog refreshed.')
     select_after('Pocket Camera · 0.1.4', ('Review & install',))
+    find('Allow & install');time.sleep(1)
     grant=consent_switch('Allow camera workspace')
     if grant.get('checked')!='false': raise RuntimeError('Expected default-off old grant')
     tap_node(grant); tap_node(reach('Allow & install')); installed_status()
@@ -241,6 +242,7 @@ try:
     replace_text(nodes,lambda value:ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value),URL)
     apply_catalog(); find('Catalog refreshed.')
     select_after('Pocket Camera · '+candidates['camera']['version'], ('Review & install',))
+    find('Allow & install');time.sleep(1)
     for label in ('Allow taking private photos','Allow this module’s private photo library','Allow selected image pixels','Allow local face and object detection'):
         grant=consent_switch(label)
         if grant.get('checked')!='false': raise RuntimeError('Old native grant leaked into new image authority')
