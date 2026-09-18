@@ -9,7 +9,7 @@ API 0.9 adds bounded transport and one-shot location. API 0.10 adds
 Unrestricted WebView networking/geolocation and general native rendering remain unavailable.
 
 The current host accepts exact `constructApi.min == constructApi.target` versions
-0.1.0 through 0.10.0. Module versions are three numeric components. See the
+0.1.0 through 0.11.0. Module versions are three numeric components. See the
 [manifest schema](../schemas/module-manifest.schema.json) and runnable
 [examples](../examples); the native validator is authoritative.
 
@@ -99,6 +99,13 @@ busy; close/reopen guidance is intentional, not a claim that timeout kills the
 provider. Module and Android permission are checked before delivering data.
 
 ## Camera
+
+API 0.11 candidate adds fresh `camera.photo`, `photos.library` and
+`image.analyze` capabilities for module-owned saved-photo workflows. See
+[the bounded photo contracts](module-photos.md) and
+[the experiment/acceptance boundary](camera-module-plan.md). They do not expose
+a continuous camera frame stream. The following workspace is the legacy path,
+still retained while the replacement is verified.
 
 Only `{op:'open'}` is supported. `{opened:true}` acknowledges a native workspace,
 **not** a captured image. Both module grant and Android CAMERA are required.

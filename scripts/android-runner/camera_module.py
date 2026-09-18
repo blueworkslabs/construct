@@ -46,9 +46,9 @@ def reach(label,host=False):
     if previous==n.get('bounds'):return n
     previous=n.get('bounds');time.sleep(.3);break
   else:
-   w,h=ui._device.window_size();x=int(w*.45)
-   if i<12:adb('shell','input','swipe',str(x),str(int(h*.9)),str(x),str(int(h*(.45 if host else .62))),'250')
-   else:adb('shell','input','swipe',str(x),str(int(h*(.45 if host else .62))),str(x),str(int(h*.9)),'250')
+   w,h=ui._device.window_size();x=int(w*(.8 if w>h and not host else .45))
+   if i<12:adb('shell','input','swipe',str(x),str(int(h*.9)),str(x),str(int(h*(.35 if w>h else .45 if host else .62))),'250')
+   else:adb('shell','input','swipe',str(x),str(int(h*(.35 if w>h else .45 if host else .62))),str(x),str(int(h*.9)),'250')
   time.sleep(.2)
  raise RuntimeError('Control not reachable: '+label)
 def action(label):tap_node(reach(label))
@@ -68,7 +68,7 @@ def unroot():
  global rooted
  restore_shell_identity(adb);rooted=False
 
-def prototype_metrics():
+def prototype_evaluate(expression):
  if not a.prototype:return None
  import urllib.request,websocket
  pid=adb('shell','pidof','dev.construct.runtime').strip();assert pid.isdigit(),'Expected one app process'
@@ -76,14 +76,39 @@ def prototype_metrics():
  try:
   with urllib.request.urlopen('http://127.0.0.1:9224/json',timeout=5) as response:pages=json.load(response)
   page=next(p for p in pages if p.get('url','').startswith('https://dev.construct.camera.construct.invalid/'))
-  ws=websocket.create_connection(page['webSocketDebuggerUrl'],timeout=5,suppress_origin=True)
+  ws=websocket.create_connection(page['webSocketDebuggerUrl'],timeout=60,suppress_origin=True)
   try:
-   ws.send(json.dumps({'id':1,'method':'Runtime.evaluate','params':{'expression':'JSON.stringify(window.cameraMetrics)','returnByValue':True}}))
+   ws.send(json.dumps({'id':1,'method':'Runtime.evaluate','params':{'expression':expression,'returnByValue':True,'awaitPromise':True}}))
    while True:
     result=json.loads(ws.recv())
     if result.get('id')==1:return json.loads(result['result']['result']['value'])
   finally:ws.close()
  finally:adb('forward','--remove','tcp:9224')
+
+def prototype_metrics():
+ return prototype_evaluate('JSON.stringify(window.cameraMetrics)')
+
+def controlled_probe():
+ if not a.prototype:return
+ # No accessibility dumps, screenshots or native-driver polling during these samples.
+ expression="""(async()=>{
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  async function baseline(painting){
+   const gaps=[];let previous=performance.now(),start=previous;
+   await new Promise(resolve=>{const tick=now=>{gaps.push(now-previous);previous=now;
+    if(painting)schedulePaint();if(now-start<2000)requestAnimationFrame(tick);else resolve();};requestAnimationFrame(tick);});
+   gaps.sort((a,b)=>a-b);return {frames:gaps.length,maxGapMs:gaps.at(-1),medianGapMs:gaps[Math.floor(gaps.length/2)]};
+  }
+  const result={idle:await baseline(false),canvasOnly:await baseline(true),inference:[]};
+  for(const kind of ['faces','objects','faces','objects']){
+   await wait(1200);const start=performance.now();await document.getElementById(kind).onclick();
+   if(window.cameraMetrics?.kind!==kind||!document.getElementById('status').textContent.startsWith('Analysis complete.'))throw Error('Controlled inference failed');
+   await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+   result.inference.push({...window.cameraMetrics,throughNextPaintMs:performance.now()-start});
+  }
+  return JSON.stringify(result);
+ })()"""
+ receipt['controlledFrameProbe']=prototype_evaluate(expression);save()
 
 def measure(kind,expected,index):
  action('Find '+kind);expect('Analysis complete. Original unchanged.',60)
@@ -117,6 +142,7 @@ try:
  receipt['snapshot']={'avd':avd,'name':snapshot,'loaded':True};receipt['apiLevel']=adb('shell','getprop','ro.build.version.sdk').strip()
  wellbeing='com.google.android.apps.wellbeing'
  if 'package:'+wellbeing in adb('shell','pm','list','packages',wellbeing):adb('shell','pm','disable-user','--user','0',wellbeing)
+ adb('shell','settings','put','system','accelerometer_rotation','0')
  adb('logcat','-c');adb('install',str(a.apk.resolve()),timeout=120);launch();catalog_settings()
  replace_text(nodes,lambda v:ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(v),a.catalog)
  apply_catalog();find('Catalog refreshed.');select_after(heading,('Review & install',));tap('Allow & install');installed_status()
@@ -154,14 +180,15 @@ try:
  action('Previous photo');expect('Private photo 2 of 4');measure('faces','0','blank')
  action('Previous photo');expect('Private photo 1 of 4');measure('objects','cat','cat')
  done('EXIF, blank and object fixtures work through the same bounded image pipeline')
+ controlled_probe()
  for rotation in ('0','1'):
-  adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2);action('Find objects');expect('Analysis complete. Original unchanged.');display('layout-'+rotation)
+  adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2);w,h=ui._device.window_size();assert (w>h)==(rotation=='1'),'Rotation did not take effect';action('Find objects');expect('Analysis complete. Original unchanged.');display('layout-'+rotation)
   adb('shell','settings','put','system','font_scale','2.0');time.sleep(2);action('Find objects');expect('Analysis complete. Original unchanged.');display('large-'+rotation);adb('shell','settings','put','system','font_scale','1.0')
  adb('shell','settings','put','system','user_rotation','0');done('Photo and analysis controls operate in both orientations and two-times text')
  action('Save to phone gallery');find('Save this photo to phone gallery?');tap('Cancel');expect('Canceled. Private photo unchanged.')
  action('Save to phone gallery');find('Save this photo to phone gallery?');tap('Save copy');expect('Copy saved to phone gallery.');done('Gallery export requires native confirmation and preserves private original')
  adb('shell','input','keyevent','3');time.sleep(3);opened();expect('No photo selected');action('Open private album');expect('Private photo 4 of 4');done('Background clears transient display and preserves private album')
- tap('Construct menu');tap('Module access');find('Module access');label='Allow local face and object detection';tap_node(reach(label,True));tap('Turn off');find(label+': off.');tap_node(reach('Reopen module',True));find('Take a photo');action('Open private album');expect('Private photo 4 of 4');action('Find faces');expect('[CAPABILITY_DENIED]');done('Inference grant is independently revocable without losing photos')
+ tap('Construct menu');tap('Module access');find('Module access');label='Allow local face and object detection';reach(label,True);switch=next(n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true');assert switch.get('checked')=='true';tap_node(switch);tap('Turn off');find(label+': off.');tap_node(reach('Reopen module',True));find('Take a photo');action('Open private album');expect('Private photo 4 of 4');action('Find faces');expect('[CAPABILITY_DENIED]');done('Inference grant is independently revocable without losing photos')
  adb('shell','am','force-stop','dev.construct.runtime');root()
  for name,digest in hashes.items():assert hashlib.sha256(adb('exec-out','cat',folder+name,binary=True)).hexdigest()==digest,'Private original changed'
  unroot();done('Original private photo bytes unchanged after inference, lifecycle and export')
