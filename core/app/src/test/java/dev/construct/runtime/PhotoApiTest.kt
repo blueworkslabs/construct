@@ -57,6 +57,12 @@ class PhotoApiTest {
         allowed.close()
         denied("RUN_STALE") { allowed.openPhoto({ fail("Must not read a closed photo"); ByteArray(0) }) { _, _ -> fail() } }
     }
+    @Test fun captureRequestCannotImpersonateShutterOrSupplyStoragePath() {
+        PhotoCaptureActivity.validate(JSONObject().put("op", "capture"))
+        for (args in listOf("{op:shoot}", "{op:capture,shutter:true}", "{op:capture,path:'/private/photo.jpg'}", "{op:capture,background:true}")) {
+            denied("CAMERA_PARAMS") { PhotoCaptureActivity.validate(JSONObject(args)) }
+        }
+    }
     @Test fun libraryCannotListOrConfirmUsingOldCameraGrant() {
         val app = RuntimeEnvironment.getApplication()
         val images = ModuleImageSession(app, "https://test.construct.invalid", {}, {})

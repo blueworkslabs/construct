@@ -243,7 +243,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                     } }
                 }
                 if (method == "camera.photo") {
-                    checkRule(params.keys().asSequence().toSet() == setOf("op") && params.optString("op") == "capture", "CAMERA_PARAMS", "Expected op:capture")
+                    PhotoCaptureActivity.validate(params)
                     capturePhoto { saved -> complete(JSONObject().put("saved", saved), null) }
                 } else library!!.request(params, complete)
                 return@addWebMessageListener

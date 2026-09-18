@@ -12,3 +12,4 @@ requests==2.34.2
 retry2==0.9.5
 uiautomator2==3.7.0
 urllib3==2.7.0
+websocket-client==1.9.2

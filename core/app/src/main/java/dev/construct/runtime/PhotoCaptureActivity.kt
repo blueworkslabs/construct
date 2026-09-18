@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.ImageDecoder
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -18,21 +17,12 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
@@ -48,6 +38,10 @@ class PhotoCaptureActivity : ComponentActivity() {
     companion object {
         private val launched = AtomicBoolean(false)
         private val io = Executors.newSingleThreadExecutor()
+        fun validate(args: JSONObject) {
+            checkRule(args.keys().asSequence().toSet() == setOf("op") && args.optString("op") == "capture",
+                "CAMERA_PARAMS", "Expected op:capture")
+        }
         fun hasPermission(context: Context) = context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         fun intent(context: Context, installed: Installed) = Intent(context, PhotoCaptureActivity::class.java)
             .putExtra("module", installed.manifest.id).putExtra("digest", installed.digest)
@@ -68,7 +62,6 @@ class PhotoCaptureActivity : ComponentActivity() {
     private var busy by mutableStateOf(false)
     private var front by mutableStateOf(false)
     private var canSwitch by mutableStateOf(false)
-    private var gallery by mutableStateOf(false)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -125,7 +118,7 @@ class PhotoCaptureActivity : ComponentActivity() {
         preview = view; ready = false
         val future = ProcessCameraProvider.getInstance(this)
         future.addListener({
-            if (!live || generation != bindGeneration || gallery || isFinishing) return@addListener
+            if (!live || generation != bindGeneration || isFinishing) return@addListener
             try {
                 checkAccess()
                 val p = future.get(); provider = p; p.unbindAll()
@@ -149,7 +142,7 @@ class PhotoCaptureActivity : ComponentActivity() {
                 capture = image
                 view.previewStreamState.removeObservers(this)
                 view.previewStreamState.observe(this) { stream ->
-                    if (generation == bindGeneration && live && !gallery) {
+                    if (generation == bindGeneration && live) {
                         ready = stream == PreviewView.StreamState.STREAMING
                         status = if (ready) "Camera preview ready. Tap Take photo to save." else "Waiting for camera preview…"
                     }

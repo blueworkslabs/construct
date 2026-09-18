@@ -40,7 +40,7 @@ test('late inference after a native menu interruption cannot paint results',asyn
 test('overlay toggles redraw locally without another inference and respect normalized boxes',async()=>{
  const r=rig(async(m)=>m==='image.read'?image:{kind:'objects',processingMs:10,boxes:[{label:'cat',score:.8,left:.1,top:.2,right:.5,bottom:.6}]});
  await r.get('pick').onclick();await r.get('objects').onclick();r.eval('paint()');assert.ok(r.drawing.some(x=>x[0]==='strokeRect'&&x[1]===40&&x[2]===90&&x[3]===160));
- const count=r.calls.length;r.get('overlays').checked=false;r.get('overlays').onchange();r.eval('paint()');assert.equal(r.calls.length,count);assert.equal(r.get('summary').textContent,'Objects found: 1 · on-device estimate');
+ const count=r.calls.length;r.get('overlays').checked=false;r.get('overlays').onchange();r.eval('paint()');assert.equal(r.calls.length,count);assert.equal(r.get('summary').textContent,'Objects found: 1 · showing 1 · on-device estimate');
 });
 test('bridge does not time out a human capture or native confirmation',async()=>{
  const timers=[];const construct={postMessage(){}};const c=vm.createContext({construct,setTimeout:(f,ms)=>{timers.push({f,ms});return timers.length;},clearTimeout(){}});
@@ -56,3 +56,20 @@ test('startup has no privileged calls and denial offers the access route with re
  await r.get('album').onclick();assert.match(r.get('status').textContent,/Module access/);assert.equal(r.get('album').disabled,false);
 });
 test('actual bridge and camera scripts compile together',()=>{assert.doesNotThrow(()=>new vm.Script(['bridge.js','app.js'].map(n=>fs.readFileSync('examples/camera-module/ui/'+n,'utf8')).join('\n')));});
+
+test('minimum score filters both list and overlay without recomputing or changing detector results',async()=>{
+ const r=rig(async(m)=>m==='image.read'?image:{kind:'objects',processingMs:10,boxes:[{label:'cat',score:.8,left:.1,top:.2,right:.5,bottom:.6}]});
+ await r.get('pick').onclick();await r.get('objects').onclick();const calls=r.calls.length;
+ r.get('minimum').value='0.9';r.get('minimum').onchange();r.drawing.length=0;r.eval('paint()');
+ assert.equal(r.get('results').children.length,0);assert.match(r.get('summary').textContent,/found: 1 · showing 0/);
+ assert.ok(!r.drawing.some(x=>x[0]==='strokeRect'));assert.equal(r.state().analysis.boxes.length,1);
+ r.get('minimum').value='0.5';r.get('minimum').onchange();assert.equal(r.get('results').children.length,1);assert.equal(r.calls.length,calls);
+});
+
+test('repeated overlay paints retain the canvas backing store until the viewport changes',()=>{
+ const r=rig();let width=0,height=0,allocations=0;
+ Object.defineProperty(r.get('photo'),'width',{get:()=>width,set:v=>{width=v;allocations++;}});
+ Object.defineProperty(r.get('photo'),'height',{get:()=>height,set:v=>{height=v;allocations++;}});
+ r.eval('paint()');assert.equal(allocations,2);r.eval('paint();paint();paint()');assert.equal(allocations,2);
+ r.get('photo').getBoundingClientRect=()=>({width:600,height:300});r.eval('paint()');assert.equal(width,1200);assert.equal(allocations,4);
+});
