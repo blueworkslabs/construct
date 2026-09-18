@@ -4,11 +4,12 @@ const state={items:[],index:-1,image:null,raster:null,analysis:null,busy:false,g
 let paintFrame=0;
 function fit(iw,ih,w,h){const s=Math.min(w/iw,h/ih);return {x:(w-iw*s)/2,y:(h-ih*s)/2,w:iw*s,h:ih*s};}
 function schedulePaint(){if(!paintFrame)paintFrame=requestAnimationFrame(()=>{paintFrame=0;paint();});}
+function visibleBoxes(){const minimum=Number($('minimum').value)||.5;return state.analysis?.boxes.filter(b=>b.score>=minimum)||[];}
 function paint(){
  const r=canvas.getBoundingClientRect(),d=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,r.width,r.height);
  if(!state.raster)return;const f=fit(state.raster.naturalWidth,state.raster.naturalHeight,r.width,r.height);ctx.drawImage(state.raster,f.x,f.y,f.w,f.h);
  if(!$('overlays').checked||!state.analysis)return;ctx.lineWidth=2;ctx.font='bold 13px sans-serif';
- for(const b of state.analysis.boxes){const x=f.x+b.left*f.w,y=f.y+b.top*f.h,w=(b.right-b.left)*f.w,h=(b.bottom-b.top)*f.h;ctx.strokeStyle='#8ff8b4';ctx.strokeRect(x,y,w,h);const text=b.label+' '+Math.round(b.score*100)+'%',tw=ctx.measureText(text).width+10,tx=Math.max(f.x,Math.min(x,f.x+f.w-tw)),ty=Math.max(f.y+16,y);ctx.fillStyle='#07100c';ctx.fillRect(tx,ty-16,tw,18);ctx.fillStyle='#b3ffcc';ctx.fillText(text,tx+5,ty-2);}
+ for(const b of visibleBoxes()){const x=f.x+b.left*f.w,y=f.y+b.top*f.h,w=(b.right-b.left)*f.w,h=(b.bottom-b.top)*f.h;ctx.strokeStyle='#8ff8b4';ctx.strokeRect(x,y,w,h);const text=b.label+' '+Math.round(b.score*100)+'%',tw=ctx.measureText(text).width+10,tx=Math.max(f.x,Math.min(x,f.x+f.w-tw)),ty=Math.max(f.y+16,y);ctx.fillStyle='#07100c';ctx.fillRect(tx,ty-16,tw,18);ctx.fillStyle='#b3ffcc';ctx.fillText(text,tx+5,ty-2);}
 }
 function render(){
  document.body.classList.toggle('working',state.busy);$('empty').hidden=!!state.raster;$('empty').style.display=state.raster?'none':'grid';
@@ -17,7 +18,8 @@ function render(){
  $('previous').disabled=state.busy||!state.private||state.index<=0;$('next').disabled=state.busy||!state.private||state.index>=state.items.length-1;
  for(const id of ['delete','export'])$(id).disabled=state.busy||!state.private||state.index<0;
  $('clear').disabled=!state.analysis;$('position').textContent=state.private?'Private photo '+(state.index+1)+' of '+state.items.length:state.image?'Selected phone photo':'No photo selected';
- $('results').replaceChildren();if(state.analysis)for(const b of state.analysis.boxes){const li=document.createElement('li');li.textContent=b.label+' · '+Math.round(b.score*100)+'% score';$('results').append(li);}
+ $('results').replaceChildren();if(state.analysis)for(const b of visibleBoxes()){const li=document.createElement('li');li.textContent=b.label+' · '+Math.round(b.score*100)+'% score';$('results').append(li);}
+ if(state.analysis){const kind=state.analysis.kind;$('summary').textContent=kind[0].toUpperCase()+kind.slice(1)+' found: '+state.analysis.boxes.length+' · showing '+visibleBoxes().length+' · on-device estimate';}
  schedulePaint();
 }
 function clearAnalysis(){state.analysis=null;$('summary').textContent='Analysis runs only when you choose.';$('timing').textContent='';}
@@ -54,7 +56,7 @@ for(const kind of ['faces','objects'])$(kind).onclick=()=>task('Finding '+kind+'
   $('timing').textContent='Local processing: '+Math.round(result.processingMs)+' ms · Ready in '+Math.round(elapsed)+' ms';$('status').textContent='Analysis complete. Original unchanged.';
  }finally{live=false;}
 });
-$('overlays').onchange=schedulePaint;$('clear').onclick=()=>{clearAnalysis();render();};
+$('minimum').onchange=render;$('overlays').onchange=schedulePaint;$('clear').onclick=()=>{clearAnalysis();render();};
 for(const op of ['delete','export'])$(op).onclick=()=>task('Waiting for your confirmation…',async t=>{
  const r=await call('photos.library',{op,ref:state.items[state.index].ref});if(t!==state.generation)return;
  if(!r.completed){$('status').textContent='Canceled. Private photo unchanged.';return;}

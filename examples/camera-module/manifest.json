@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "dev.construct.camera",
   "name": "Pocket Camera",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Private photo album with on-device face/object detection. Capture is human-operated; the module draws analysis over bounded images.",
   "constructApi": {
     "min": "0.11.0",
