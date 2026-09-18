@@ -17,5 +17,8 @@
     "33df0cac535dc01244799cc4f96d82a27b0b9ee32093f789045feca97453e80d"
   ],
   "moduleVersion": "0.2.1",
-  "moduleSha256": "6bf8b7d63557b920a1d3b3f63bd061a50d9e141c65009d84720ca4fb15548b22"
+  "moduleSha256": "6bf8b7d63557b920a1d3b3f63bd061a50d9e141c65009d84720ca4fb15548b22",
+  "hostSource": "e153819eeef2257aff8d24111f6c9146519cc912",
+  "candidateAccepted": false,
+  "note": "This migration scope passed, but subsequent native preview visual review rejected this APK. Not final replacement acceptance."
 }
