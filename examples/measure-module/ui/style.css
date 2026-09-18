@@ -1,1 +1,37 @@
-:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#0b1410;color:#e1eee7}*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden}main{height:100%;display:flex;flex-direction:column}header{padding:8px calc(var(--construct-menu-width,56px) + 12px) 8px 12px;min-height:56px;flex-shrink:0}h1{font-size:1.2rem;margin:0}header p{font-size:.8rem;color:#a5bbae;margin:2px 0}button,input,select{font:inherit;color:inherit}button{min-height:44px;border:1px solid #486b58;border-radius:12px;padding:8px 12px;background:#193528;touch-action:manipulation}button:disabled{opacity:.45}button[aria-pressed=true],#choose,#confirm{background:#64d7a7;color:#09291c}input,select{background:#102319;border:1px solid #86ac96;border-radius:8px;min-height:44px;padding:8px;width:100%;max-width:14rem}label{display:block;margin-bottom:6px}#viewport{position:relative;flex:1;min-height:0;overflow:hidden;background:#080e0b}canvas{display:block;width:100%;height:100%;touch-action:none}#placeholder{position:absolute;inset:25% 15%;text-align:center;pointer-events:none}#reset{position:absolute;top:8px;left:8px;font-size:.85rem}#panel{flex:0 0 40%;min-height:100px;max-height:55%;padding:8px 12px;background:#13261c;overflow-y:auto;border-top:1px solid #486b58}#panel.collapsed{flex-basis:112px}.summary{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px}output{font-weight:700;font-size:1.25rem}#status{margin:6px 0;font-size:.9rem}#error{color:#ffd0a1;border-left:3px solid #f9be74;padding:8px}#controls{padding-bottom:12px}.actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}fieldset{margin:8px 0;border:1px solid #486b58;border-radius:10px}fieldset legend{font-size:.85rem}details{font-size:.85rem;margin-top:10px;color:#b4c9bd}summary{min-height:44px;padding:10px 0}form{margin:10px 0}form button{margin-top:8px}#calibration{font-size:.85rem;color:#a5c6b4}[hidden]{display:none!important}@media(orientation:landscape){header p{display:none}header{padding-top:4px;padding-bottom:4px;min-height:48px}#panel{flex-basis:38%;max-height:50%}#panel.collapsed{flex-basis:80px;min-height:80px}.summary{min-height:38px}.summary button{min-height:38px;padding:4px 10px}#status{margin:3px 0}}
+/* Pocket Measure layout on top of construct-ui.css tokens. Photo first; controls in a bounded panel below. */
+html,body{height:100%;overflow:hidden}
+main{max-width:none;height:100%;display:flex;flex-direction:column;padding:0}
+header.construct-head{padding:6px calc(var(--construct-menu-width,56px) + 12px) 6px var(--gutter);flex-shrink:0;background:var(--bg)}
+#viewport{position:relative;flex:1;min-height:0;overflow:hidden;background:#080e0b;border-top:1px solid var(--border)}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+#placeholder{position:absolute;inset:25% 15%;text-align:center;color:var(--muted);pointer-events:none}
+button.chip{position:absolute;top:8px;left:8px;min-height:36px;padding:4px 12px;font-size:13px;font-weight:600;border-radius:999px;background:rgba(18,32,25,.92);border-color:var(--control-border)}
+#panel{flex:0 0 40%;min-height:100px;max-height:55%;padding:6px var(--gutter) 0;background:var(--surface);overflow-y:auto;border-top:1px solid var(--border)}
+/* Collapsed height is fixed per text size (em), so status changes never move the photo. */
+#panel.collapsed{flex-basis:7.9em;min-height:7.9em}
+.summary{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 8px;min-height:44px}
+output{font-weight:600;font-size:20px;line-height:1.3;flex:1 1 auto;min-width:0}
+.summary button{flex:none;padding:8px 10px;margin-left:auto}
+#step{margin:0;font-weight:600}
+#status{margin:4px 0 6px;color:var(--text);font-size:14px}
+#error{color:var(--error);border-left:3px solid var(--error);padding:6px 10px;margin:6px 0;font-size:14px;overflow-wrap:anywhere}
+#controls{padding-bottom:12px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.actions.arrows button{min-width:56px;font-size:18px}
+form{margin:10px 0;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-card)}
+.reference{display:flex;gap:12px;align-items:flex-start}
+.reference svg{flex:none;border-radius:8px;background:#fff;padding:4px}
+.reference>div{flex:1;min-width:0}
+.reference label{display:block;margin-bottom:6px}
+.reference input{width:100%;max-width:12rem}
+.hint{margin:6px 0 0;font-size:13px;color:var(--muted)}
+form button{margin-top:10px}
+#calibration{font-size:14px;color:var(--jade);margin:4px 0}
+.row label{flex:none}
+select{font:inherit;color:var(--text);background:var(--surface2);border:1px solid var(--control-border);border-radius:var(--r-btn);min-height:44px;padding:8px 12px;min-width:10rem}
+fieldset{margin:8px 0;padding:6px 12px 10px;border:1px solid var(--border);border-radius:var(--r-card)}
+fieldset legend{font-size:13px;color:var(--muted);padding:0 4px}
+fieldset:disabled{opacity:.55}
+button[aria-pressed=true]{background:var(--jade);color:var(--jade-ink);border-color:var(--jade)}
+details.help{margin-bottom:0}
+@media(orientation:landscape){header.construct-head p{display:none}header.construct-head{padding-top:2px;padding-bottom:2px;min-height:48px}#panel{flex-basis:38%;max-height:50%}#panel.collapsed{flex-basis:5.6em;min-height:5.6em}.summary{min-height:38px}.summary button{min-height:38px;padding:4px 10px}#step{display:none}#status{margin:2px 0}}

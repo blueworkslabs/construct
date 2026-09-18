@@ -16,10 +16,35 @@ and the native menu preserve completed work; interrupted edits are cancelled.
    and measure its outer black square.
 2. Choose one saved photo with that card and the item on the same flat plane.
 3. Enter the measured marker side (10–300 mm), then tap A and B.
-4. Drag endpoints or select A/B for one-image-pixel nudges. Undo reverses committed
-   edits; Clear starts another pair. Pinch/zoom and pan; Reset view fits the image.
+4. Press and hold on the photo to preview the next endpoint in the precision
+   magnifier, then release to place it. Drag a handle to adjust it; the magnifier
+   follows above the finger, showing the actual photo pixels under the point with a
+   crosshair and the line to the other endpoint. Select A/B for one-image-pixel
+   nudges. Undo reverses committed edits; Clear starts another pair. Pinch/zoom
+   and pan while zoomed; Reset view fits the image. A second finger, cancellation
+   or leaving the module discards the preview without moving anything.
 5. Choose centimetres or millimetres in the controls. These are approximate lengths,
    not a certified accuracy bound. No photo, calibration or measurement is saved.
+
+### Magnifier and rendering (0.2.3)
+
+The magnifier is module-owned drawing over the existing decoded image: a circle of
+roughly 42% of the shorter viewport side (72–128 CSS px) lifted above the finger,
+flipped below near the top edge and clamped inside the viewport, showing a 2.5×
+crop relative to the current zoom. The crop is centred on the *accepted* endpoint,
+so a rejected preview keeps showing the last valid position; near photo edges the
+crop is clipped and shifted rather than drifting off the point. The crosshair turns
+error-toned when a placement preview lies outside the reference plane. Placement
+previews exist only at fit zoom; when zoomed in, a one-finger drag pans and a tap
+places. The magnifier never selects, places or moves an endpoint by itself; it
+disappears on release, second finger, pointer/touch cancellation or lost capture.
+
+Pointer-driven redraws are coalesced to one canvas paint per animation frame; DOM
+state (result, status, controls) still updates synchronously. The collapsed panel
+height is fixed in text-relative units so status changes never move the photo,
+and it scales with Android text size. Handles carry A/B pills placed away from the
+line, the length is shown in a pill at the line midpoint, the reference marker has a
+dashed outline, and all marks use Construct tokens with dark under-strokes.
 
 See [the bounded image contract](module-images.md) for pixel disclosure, resource
 bounds and retirement. Alpha28 is the last native Measure host. On alpha29 old

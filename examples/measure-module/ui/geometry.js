@@ -61,6 +61,25 @@ const Measure = (() => {
     clear(){this.cancel();if(this.value){this.remember(this.value);this.value=null;}}
     nudge(end,dx,dy,width,height){const p=this.value?.[end];require(p,'Select an existing endpoint.');this.begin(this.revision,end);try{this.move(this.revision,{x:p.x+dx/width,y:p.y+dy/height},true);}catch(e){this.cancel();throw e;}}
   }
-  return {Plane,Editor,reference,sideMm,inside};
+  // Magnifier crop for a photo-space point: source rectangle in image pixels plus
+  // where that crop lands inside the loupe, so edge crops stay centred on the point.
+  function loupe(point,width,height,fitWidth,diameter,magnification){
+    require(inside(point)&&width>0&&height>0&&fitWidth>0&&diameter>0&&magnification>0,'Magnifier needs a photo point.');
+    const pixelsPerScreen=width/fitWidth;
+    const half=Math.max(1,Math.round(diameter/2/magnification*pixelsPerScreen));
+    const cx=Math.round(point.x*width),cy=Math.round(point.y*height);
+    const x=Math.max(0,cx-half),y=Math.max(0,cy-half);
+    const w=Math.max(0,Math.min(width,cx+half)-x),h=Math.max(0,Math.min(height,cy+half)-y);
+    const scale=diameter/(half*2);
+    return {x,y,w,h,scale,dx:(x-(cx-half))*scale,dy:(y-(cy-half))*scale};
+  }
+  // Loupe centre: lifted above the finger, flipped below near the top, clamped inside the view.
+  function loupePlacement(finger,width,height,diameter,lift){
+    const r=diameter/2,clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+    const x=clamp(finger.x,r,Math.max(r,width-r));
+    const y=clamp(finger.y-lift-r>=0?finger.y-lift:finger.y+lift,r,Math.max(r,height-r));
+    return {x,y,r};
+  }
+  return {Plane,Editor,reference,sideMm,inside,loupe,loupePlacement};
 })();
 if (typeof module !== 'undefined') module.exports = Measure;
