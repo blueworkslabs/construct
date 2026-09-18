@@ -195,6 +195,24 @@ try:
  for label in ['Allow taking private photos','Allow this module’s private photo library','Allow selected image pixels','Allow local face and object detection']:grant(label)
  tap_node(reach('Allow Android camera access',True));find('While using the app');tap('While using the app');find('Android camera access: allowed')
  tap_node(reach('Reopen module',True));find('Take a photo');action('Take a photo');expect('Camera preview ready.',60);display('native-capture')
+ def connected_camera():
+  dump=adb('shell','dumpsys','media.camera');active=dump.split('Active Camera Clients:',1)[1].split('Allowed user IDs:',1)[0]
+  assert 'dev.construct.runtime' in active,'No active Construct capture client'
+  matches=re.findall(r'(?<!DIS)CONNECT device ([^ ]+) client for package dev\.construct\.runtime',dump)
+  assert matches,'No camera connection event';return matches[0]
+ original_camera=connected_camera()
+ for expected in (None,original_camera):
+  tap('Switch camera');deadline=time.monotonic()+30
+  while time.monotonic()<deadline:
+   try:
+    selected=connected_camera()
+    if (selected!=original_camera if expected is None else selected==expected):break
+   except AssertionError:pass
+   time.sleep(.3)
+  else:raise RuntimeError('Camera selector did not change the active camera device')
+  expect('Camera preview ready.',60)
+ display('native-camera-switched-back')
+ done('Native camera switching binds the other synthetic device and returns to the original')
  tap('Cancel capture');find('Take a photo');expect('Capture canceled.')
  action('Open private album');expect('No private photos yet.');done('Native capture can cancel without creating a private photo')
  action('Take a photo');expect('Camera preview ready.',60);tap('Take photo');expect('Private photo ready.',60);expect('Private photo 1 of 1');display('captured-photo')

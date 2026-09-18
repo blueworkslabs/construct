@@ -1,0 +1,21 @@
+{
+  "scope": "Native Camera retirement across exact alpha30-to-alpha31 upgrade",
+  "oldSha256": "d18e78aa5c09d78d674a4195b51c79401910675ecac1ef3ede90096c82d15bb4",
+  "newSha256": "ed0f12969e48405506c98ff2d95f8aa8e2d48a8c0cc9202dfbae424f1d3fc91d",
+  "checks": [
+    "In-place host upgrade preserves selected catalog, unrelated installed module and saved counter",
+    "Retired installed trial remains manageable with visible Find update and disabled old authority",
+    "Unconfirmed retired module updates to exact modern signed module and displays retained originals only after new pixel/library consent",
+    "Rollback to retired native code is blocked and current modern module stays runnable",
+    "Retired reinstallation rejected before consent; saved unrelated module data remains intact",
+    "Real native shutter original remains byte-identical after migration and rejected rollback"
+  ],
+  "complete": true,
+  "stopped": true,
+  "apiLevel": "37",
+  "originalPhotoSha256": [
+    "33df0cac535dc01244799cc4f96d82a27b0b9ee32093f789045feca97453e80d"
+  ],
+  "moduleVersion": "0.2.1",
+  "moduleSha256": "6bf8b7d63557b920a1d3b3f63bd061a50d9e141c65009d84720ca4fb15548b22"
+}
