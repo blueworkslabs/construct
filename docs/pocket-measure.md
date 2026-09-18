@@ -26,7 +26,7 @@ and the native menu preserve completed work; interrupted edits are cancelled.
 5. Choose centimetres or millimetres in the controls. These are approximate lengths,
    not a certified accuracy bound. No photo, calibration or measurement is saved.
 
-### Magnifier and rendering (0.2.3)
+### Magnifier and rendering (0.2.4)
 
 The magnifier is module-owned drawing over the existing decoded image: a circle of
 roughly 42% of the shorter viewport side (72–128 CSS px) lifted above the finger,
@@ -41,8 +41,9 @@ disappears on release, second finger, pointer/touch cancellation or lost capture
 
 Pointer-driven redraws are coalesced to one canvas paint per animation frame; DOM
 state (result, status, controls) still updates synchronously. The collapsed panel
-height is fixed in text-relative units so status changes never move the photo,
-and it scales with Android text size. Handles carry A/B pills placed away from the
+height uses fixed layout splits so status changes never move the photo. Android
+text zoom is detected from rendered text height, with a larger collapsed panel
+and an explicit scroll reset to keep the result and controls visible. Handles carry A/B pills placed away from the
 line, the length is shown in a pill at the line midpoint, the reference marker has a
 dashed outline, and all marks use Construct tokens with dark under-strokes.
 

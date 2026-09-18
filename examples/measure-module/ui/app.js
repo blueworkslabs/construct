@@ -12,7 +12,7 @@
   function screen(p){const f=fit();return {x:f.x+p.x*f.w,y:f.y+p.y*f.h};}
   function position(event){const r=canvas.getBoundingClientRect();return {x:event.clientX-r.left,y:event.clientY-r.top};}
   function format(mm){const units=el('units').value;return (units==='mm'?mm:mm/10).toFixed(1)+' '+units;}
-  function expanded(value){el('controls').hidden=!value;el('panel').classList.toggle('collapsed',!value);el('expand').textContent=value?'Hide controls':'Show controls';el('expand').setAttribute('aria-expanded',String(value));}
+  function expanded(value){el('controls').hidden=!value;el('panel').classList.toggle('collapsed',!value);el('expand').textContent=value?'Hide controls':'Show controls';el('expand').setAttribute('aria-expanded',String(value));el('panel').scrollTop=0;}
   function fail(error){const message=error.code==='CAPABILITY_DENIED'?'Allow selected image pixels and local marker detection in Module access, then reopen.':(error.message||'Could not complete this action.');el('error').textContent=(error.code?'['+error.code+'] ':'')+message;el('error').hidden=false;expanded(true);}
   function clearError(){el('error').hidden=true;el('error').textContent='';}
   function run(action){try{action();clearError();}catch(error){fail(error);}render();}
@@ -83,6 +83,11 @@
     for(const end of ['a','b'])el('select-'+end).setAttribute('aria-pressed',String(endpoint===end));
     for(const direction of ['left','up','down','right'])el(direction).disabled=!endpoint;
     el('placeholder').hidden=!!image;el('reset').hidden=!image||zoom<=1;el('reset').textContent='Reset view · '+zoom.toFixed(1)+'×';
+    // Android WebView textZoom enlarges glyph metrics without scaling em boxes.
+    // Reserve a stable larger photo/panel split from rendered result metrics,
+    // independent of the changing instruction text.
+    el('panel').classList.toggle('large-text',el('result').getBoundingClientRect().height>36);
+    if(el('controls').hidden)el('panel').scrollTop=0;
     paint();
   }
   function cancelGesture(){
