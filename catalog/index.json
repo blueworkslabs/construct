@@ -250,13 +250,13 @@
         {
           "id": "dev.construct.measure",
           "name": "Pocket Measure",
-          "version": "0.2.4",
-          "artifact": "dev.construct.measure-0.2.4.zip",
-          "sha256": "f927fd2b7c31254567412cff10670c5775781663816ceef96cf7ce77e2973e89",
-          "signature": "DKVuer+fAcG6Vqvl7d6iK5iUprhU62bknFJljDpnLDa57S45Swt+JMZ85g8n4q+BQi1hgh2ckC5FP3dhUX9Xn4BgB9hit6Vn4dtbdmlcBkPDYa+kMDvR3fN+CrUwZlCdOsc6AEpC3xrtE3kmlaWSNmMARMNzSKOApbvlA11VJ7uavXjEHUmWTCinT70t0H0kBi6gBM5eew+KlX5SkGLnT2YyT3CyliTmJIA3KeaOZMAE9lj0pdkPVc5bdnOu6QGx/p3/U+8+SPcTp2f0J3S8+0X7tQGlBzACoaogqDLGwdhHwhpzTbjy6Te2d2nQP/wDUihmXdWqAjQ0/V4K4slK/g=="
+          "version": "0.2.5",
+          "artifact": "dev.construct.measure-0.2.5.zip",
+          "sha256": "0645bafbee886ef83610db171a329ee2115c0dd441415da0b1cd81a9e0e5d61f",
+          "signature": "M72ZE3zkaNRX6exAFJKirjX8w9TbEO3fwlVo0NUOF9j9XYj9Tmz9WOeYzFCfw9BH2NXlq1ySEz/d5HO6VsdKX1NWfEb3LVsYoMirsCoLFQqu6q6gvgce0Y4zMjLF9VGoFEe1KcZL3fxFRNaHUU4IcQwLMVQKL3DLJBWA+FN82Fq4Nb8quWHjIMSnvF4Kjq9bwswKv6RfeW8AXNxHzW7uu7rNrOswMlk0DOdPs32Cd6ONnRX/SNc0HgkNMyVmtkZ+ailDPCMve6qEfUd7JVitHN+N40uN2W1TBS2CO7ZwqzzaeWVfYX8j5RTZ9tUFNSKXhPXJHjcalyzf5oM2kbhsxg=="
         }
       ],
-      "latest": "0.2.4"
+      "latest": "0.2.5"
     },
     {
       "id": "dev.construct.hello",
