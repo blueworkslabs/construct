@@ -88,3 +88,11 @@ change to module inference or evidence of a WebView video limitation. A correcte
 optimized build requires fresh exact-artifact scopes. The debug measurements
 above ran on the separate, saved-photo module screen with the native preview
 closed; they remain debug measurements, not replacement-APK acceptance.
+
+The compatible-mode-only build (`7fad73a`) still showed overflow in its real
+landscape capture and was also stopped/unaccepted. The next correction gives the
+Android preview an explicit containing Box, clips both the Compose container and
+Android view, uses fit-center scaling, and separates viewfinder from scrollable
+acquisition controls in landscape. A focused native layout probe precedes the
+next full acceptance run. No module bytes or inference policy change with this
+native-layout investigation; native capture remains acquisition-only.
