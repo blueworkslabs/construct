@@ -26,7 +26,7 @@ and the native menu preserve completed work; interrupted edits are cancelled.
 5. Choose centimetres or millimetres in the controls. These are approximate lengths,
    not a certified accuracy bound. No photo, calibration or measurement is saved.
 
-### Magnifier and rendering (0.2.4)
+### Magnifier and rendering (0.2.5)
 
 The magnifier is module-owned drawing over the existing decoded image: a circle of
 roughly 42% of the shorter viewport side (72–128 CSS px) lifted above the finger,

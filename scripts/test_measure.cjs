@@ -22,8 +22,9 @@ test('module scripts compile and capabilities exclude native launcher/network/st
 // Exercise the actual UI event wiring, not just Editor.cancel(). The Android 17
 // WebView trace delivered touchcancel without a corresponding pointercancel.
 function measureUi(calls=null,frames=null) {
+  let resizeCallback,observing=false;
   class Element {
-    constructor(){this.captures=new Set();this.value='';this.hidden=false;this.listeners={};this.clientWidth=600;this.clientHeight=450;this.classList={toggle(){}};}
+    constructor(){this.captures=new Set();this.value='';this.hidden=false;this.listeners={};this.clientWidth=600;this.clientHeight=450;this.classList={toggle(){assert.equal(observing,false,'Layout mutation during ResizeObserver delivery');}};}
     addEventListener(type,fn){(this.listeners[type]??=[]).push(fn);}
     dispatch(type,extra={}){const event={type,preventDefault(){},...extra};this['on'+type]?.(event);for(const fn of this.listeners[type]||[])fn(event);}
     setAttribute(){} blur(){} setPointerCapture(id){this.captures.add(id);} releasePointerCapture(id){this.captures.delete(id);}
@@ -34,10 +35,10 @@ function measureUi(calls=null,frames=null) {
   const elements=Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map(m=>[m[1],new Element()]));
   elements.units.value='cm';const window=new Element();window.devicePixelRatio=1;
   if(frames)window.requestAnimationFrame=fn=>{frames.push(fn);return 1;};
-  const sandbox={document:{getElementById:id=>elements[id]},window,Measure:require('../examples/measure-module/ui/geometry.js'),ResizeObserver:class{observe(){}},Image:class{set src(_){queueMicrotask(()=>this.onload());}},call:async method=>method==='image.read'?{handle:'synthetic',url:'https://synthetic.invalid/image.png',width:1200,height:900}:{markers:[{id:0,corners:square}]}};
+  const sandbox={document:{getElementById:id=>elements[id]},window,Measure:require('../examples/measure-module/ui/geometry.js'),ResizeObserver:class{constructor(fn){resizeCallback=fn;}observe(){}},Image:class{set src(_){queueMicrotask(()=>this.onload());}},call:async method=>method==='image.read'?{handle:'synthetic',url:'https://synthetic.invalid/image.png',width:1200,height:900}:{markers:[{id:0,corners:square}]}};
   vm.runInNewContext(fs.readFileSync('examples/measure-module/ui/app.js','utf8'),sandbox);
   const pointer=(type,x,y,pointerId=1)=>elements.photo.dispatch(type,{pointerId,clientX:x,clientY:y});
-  return {elements,pointer,tap(x,y){pointer('pointerdown',x,y);pointer('pointerup',x,y);}};
+  return {elements,pointer,resize(){observing=true;try{resizeCallback();}finally{observing=false;}},tap(x,y){pointer('pointerdown',x,y);pointer('pointerup',x,y);}};
 }
 for(const cancellation of ['pointercancel','touchcancel','lostpointercapture'])test('actual module UI restores a drag on '+cancellation+' and ignores late release',async()=>{
   const {elements:e,pointer,tap}=measureUi();await e.choose.onclick();e.side.value='100';e.setup.dispatch('submit');
@@ -174,4 +175,11 @@ test('pending animation frame coalesces pointer moves and cannot paint a cancell
   assert.equal(e.result.textContent,'Length: 25.0 cm');
   assert.equal(frames.length,1);flush();
   assert.equal(calls.filter(c=>c.name==='drawImage').length,1,'only the base photo draws: no stale loupe after cancellation');
+});
+
+test('resize delivery cannot mutate viewport layout before the next animation frame',async()=>{
+  const frames=[],flush=()=>{while(frames.length)frames.shift()();};
+  const ui=measureUi([],frames);await ui.elements.choose.onclick();flush();
+  ui.resize();ui.resize();assert.equal(frames.length,1,'coalesce repeated resize notifications');
+  assert.doesNotThrow(flush,'layout work runs after observer delivery');
 });

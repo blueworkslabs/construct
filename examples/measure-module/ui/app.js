@@ -162,7 +162,13 @@
   // cancelled touch nor lost capture may leave a preview waiting for release.
   canvas.ontouchcancel=cancelInput;
   canvas.onlostpointercapture=()=>{if(gesture)cancelInput();};
-  new ResizeObserver(()=>{cancelGesture();zoom=1;offset={x:0,y:0};render();}).observe(el('viewport'));
+  // Layout changes must leave ResizeObserver delivery before touching layout:
+  // WebView treats its loop-error event as a module failure.
+  let resizeFrame=0;
+  new ResizeObserver(()=>{
+    if(resizeFrame)return;
+    resizeFrame=window.requestAnimationFrame(()=>{resizeFrame=0;cancelGesture();zoom=1;offset={x:0,y:0};render();});
+  }).observe(el('viewport'));
   window.addEventListener('constructvisibilitychange',event=>{
     visible=event.detail.visible;cancelGesture();
     // Picker handoff pauses natively without this menu event. A real menu cancels work.
