@@ -36,6 +36,20 @@ def expect(prefix,timeout=35):
   if any('[IMAGE_ANALYSIS_UNAVAILABLE]' in x or '[JAVASCRIPT_ERROR]' in x for x in texts):raise RuntimeError('Inference or module failure')
   time.sleep(.25)
  raise RuntimeError('Missing: '+prefix)
+def finish_analysis(timeout=60):
+ # Status is in the scrollable panel, not guaranteed to remain in the accessibility tree.
+ until=time.monotonic()+timeout
+ while time.monotonic()<until:
+  texts=labels()
+  if any(t.startswith('Analysis complete. Original unchanged.') for t in texts):return
+  errors=[t for t in texts if t.startswith('[')]
+  if errors:raise RuntimeError('Analysis failed: '+errors[0])
+  if not any(t.startswith('Finding ') for t in texts):
+   w,h=ui._device.window_size();x=int(w*(.8 if w>h else .45));top=int(h*(.3 if w>h else .63))
+   adb('shell','input','swipe',str(x),str(top),str(x),str(int(h*.9)),'250')
+  time.sleep(.3)
+ raise RuntimeError('Analysis status did not become visible')
+
 def reach(label,host=False):
  previous=None
  for i in range(22):
@@ -111,7 +125,7 @@ def controlled_probe():
  receipt['controlledFrameProbe']=prototype_evaluate(expression);save()
 
 def measure(kind,expected,index):
- action('Find '+kind);expect('Analysis complete. Original unchanged.',60)
+ action('Find '+kind);finish_analysis()
  text=expect(kind.title()+' found:')
  if kind=='faces':assert expected in text,(kind,text)
  else:assert any(expected in item for item in labels()),(kind,labels())
@@ -182,8 +196,8 @@ try:
  done('EXIF, blank and object fixtures work through the same bounded image pipeline')
  controlled_probe()
  for rotation in ('0','1'):
-  adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2);w,h=ui._device.window_size();assert (w>h)==(rotation=='1'),'Rotation did not take effect';action('Find objects');expect('Analysis complete. Original unchanged.');display('layout-'+rotation)
-  adb('shell','settings','put','system','font_scale','2.0');time.sleep(2);action('Find objects');expect('Analysis complete. Original unchanged.');display('large-'+rotation);adb('shell','settings','put','system','font_scale','1.0')
+  adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2);w,h=ui._device.window_size();assert (w>h)==(rotation=='1'),'Rotation did not take effect';action('Find objects');finish_analysis();display('layout-'+rotation)
+  adb('shell','settings','put','system','font_scale','2.0');time.sleep(2);action('Find objects');finish_analysis();display('large-'+rotation);adb('shell','settings','put','system','font_scale','1.0')
  adb('shell','settings','put','system','user_rotation','0');done('Photo and analysis controls operate in both orientations and two-times text')
  action('Save to phone gallery');find('Save this photo to phone gallery?');tap('Cancel');expect('Canceled. Private photo unchanged.')
  action('Save to phone gallery');find('Save this photo to phone gallery?');tap('Save copy');expect('Copy saved to phone gallery.');done('Gallery export requires native confirmation and preserves private original')

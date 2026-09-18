@@ -65,3 +65,11 @@ test('minimum score filters both list and overlay without recomputing or changin
  assert.ok(!r.drawing.some(x=>x[0]==='strokeRect'));assert.equal(r.state().analysis.boxes.length,1);
  r.get('minimum').value='0.5';r.get('minimum').onchange();assert.equal(r.get('results').children.length,1);assert.equal(r.calls.length,calls);
 });
+
+test('repeated overlay paints retain the canvas backing store until the viewport changes',()=>{
+ const r=rig();let width=0,height=0,allocations=0;
+ Object.defineProperty(r.get('photo'),'width',{get:()=>width,set:v=>{width=v;allocations++;}});
+ Object.defineProperty(r.get('photo'),'height',{get:()=>height,set:v=>{height=v;allocations++;}});
+ r.eval('paint()');assert.equal(allocations,2);r.eval('paint();paint();paint()');assert.equal(allocations,2);
+ r.get('photo').getBoundingClientRect=()=>({width:600,height:300});r.eval('paint()');assert.equal(width,1200);assert.equal(allocations,4);
+});

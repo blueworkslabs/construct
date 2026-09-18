@@ -6,7 +6,7 @@ function fit(iw,ih,w,h){const s=Math.min(w/iw,h/ih);return {x:(w-iw*s)/2,y:(h-ih
 function schedulePaint(){if(!paintFrame)paintFrame=requestAnimationFrame(()=>{paintFrame=0;paint();});}
 function visibleBoxes(){const minimum=Number($('minimum').value)||.5;return state.analysis?.boxes.filter(b=>b.score>=minimum)||[];}
 function paint(){
- const r=canvas.getBoundingClientRect(),d=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,r.width,r.height);
+ const r=canvas.getBoundingClientRect(),d=Math.min(window.devicePixelRatio||1,2),w=Math.max(1,Math.round(r.width*d)),h=Math.max(1,Math.round(r.height*d));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,r.width,r.height);
  if(!state.raster)return;const f=fit(state.raster.naturalWidth,state.raster.naturalHeight,r.width,r.height);ctx.drawImage(state.raster,f.x,f.y,f.w,f.h);
  if(!$('overlays').checked||!state.analysis)return;ctx.lineWidth=2;ctx.font='bold 13px sans-serif';
  for(const b of visibleBoxes()){const x=f.x+b.left*f.w,y=f.y+b.top*f.h,w=(b.right-b.left)*f.w,h=(b.bottom-b.top)*f.h;ctx.strokeStyle='#8ff8b4';ctx.strokeRect(x,y,w,h);const text=b.label+' '+Math.round(b.score*100)+'%',tw=ctx.measureText(text).width+10,tx=Math.max(f.x,Math.min(x,f.x+f.w-tw)),ty=Math.max(f.y+16,y);ctx.fillStyle='#07100c';ctx.fillRect(tx,ty-16,tw,18);ctx.fillStyle='#b3ffcc';ctx.fillText(text,tx+5,ty-2);}
