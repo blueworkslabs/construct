@@ -198,8 +198,8 @@ try:
  def connected_camera():
   dump=adb('shell','dumpsys','media.camera');active=dump.split('Active Camera Clients:',1)[1].split('Allowed user IDs:',1)[0]
   assert 'dev.construct.runtime' in active,'No active Construct capture client'
-  matches=re.findall(r'(?<!DIS)CONNECT device ([^ ]+) client for package dev\.construct\.runtime',dump)
-  assert matches,'No camera connection event';return matches[0]
+  matches=re.findall(r'Camera ID:\s*([^,]+),[^\n]*Client Package Name:\s*dev\.construct\.runtime(?:,|\))',active)
+  assert len(matches)==1,'Expected one active Construct camera descriptor';return matches[0].strip()
  original_camera=connected_camera()
  for expected in (None,original_camera):
   tap('Switch camera');deadline=time.monotonic()+30
