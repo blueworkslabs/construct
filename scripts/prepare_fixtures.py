@@ -27,6 +27,7 @@ def prepare(output):
     # these are not redistributions of historical private release packages.
     add('contacts-module',['0.1.0','0.2.0'],'contacts-registry')
     add('camera-module',['0.1.0'],'camera-registry')
+    add('fixtures/legacy-measure',[None],'measure-legacy-registry')
     add('fixtures/legacy-sky-watch',[None],'sky-legacy-registry')
     add('isolation-probe',[None],'probe-registry','test-registry',fixture=True)
     for source in ('focus-module','snake-module','contacts-module','camera-module','measure-module','sky-watch-module'):
@@ -38,14 +39,14 @@ def prepare(output):
 def prepare_sensitive(output, key):
     with tempfile.TemporaryDirectory() as tmp:
         probe=Path(tmp); (probe/'index.html').write_text('<p>Signed sensitive grant fixture</p>')
-        for version in ('1.1.0','1.2.0','1.3.0','1.4.0'):
-            caps=[] if version=='1.4.0' else [dict(id='storage.kv',reason='Keep synthetic counter data')]
-            if version not in ('1.2.0','1.4.0'):
+        for version in ('2.1.0','2.2.0','2.3.0','2.4.0'):
+            caps=[] if version=='2.4.0' else [dict(id='storage.kv',reason='Keep synthetic counter data')]
+            if version not in ('2.2.0','2.4.0'):
                 caps += [dict(id=cap,reason='Verify explicit native consent') for cap in
-                         ('device.tone','contacts.read','camera.capture','photo.measure','location.read')]
+                         ('device.tone','contacts.read','camera.capture','image.read','image.markers','location.read')]
                 caps.append(dict(id='net.http',reason='Verify explicit source consent',origins=['https://example.org']))
             manifest=dict(schemaVersion=1,id='dev.construct.sensitive-probe',name='Sensitive probe',version=version,
-                constructApi=dict(min='0.9.0',target='0.9.0'),runtime=dict(kind='webview-js'),entry='index.html',capabilities=caps)
+                constructApi=dict(min='0.10.0',target='0.10.0'),runtime=dict(kind='webview-js'),entry='index.html',capabilities=caps)
             (probe/'manifest.json').write_text(json.dumps(manifest))
             publish(output/'sensitive-registry',*build(probe,key),fixture=True)
 

@@ -18,4 +18,4 @@
 -dontwarn com.google.mediapipe.proto.GraphTemplateProto$CalculatorGraphTemplate
 
 # Narrow, host-owned JNI bridge instead of the full OpenCV Java wrapper.
--keep class dev.construct.runtime.MeasureNative { *; }
+-keep class dev.construct.runtime.ImageMarkerNative { *; }

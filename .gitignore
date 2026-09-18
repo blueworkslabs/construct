@@ -49,3 +49,4 @@ core/app/libs/*.aar
 !catalog/*.zip
 # Local publisher coordination lock, not a catalog artifact
 catalog/.publish.lock
+catalog/**/.publish.lock

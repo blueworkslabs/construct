@@ -1,4 +1,4 @@
-# Shell cleanup: retiring the native Sky workspace
+# Shell cleanup: retiring native application workspaces
 
 ## Delivery and boundary
 
@@ -52,11 +52,12 @@ The store enforces install, run, grant, confirmation and rollback boundaries, an
 the Activity/WebView check the runtime boundary again. Library provides a recovery
 path even when an old trial cannot run.
 
-Run `python scripts/check_architecture.py`. CI rejects the known native Sky domain
+Run `python scripts/check_architecture.py`. CI rejects known native Sky and Measure domain
 classes/provider dependencies, new native workspace dispatches, unreviewed Activity
 registrations and DEX loader introduction. This small source ratchet is a backstop,
 not a semantic proof or a reason to evade ownership review by renaming code.
-Camera and Measure are explicitly inventoried remaining exceptions.
+Camera is the remaining exception in the alpha29 candidate; Measure retirement
+is described below.
 
 Required candidate acceptance: JVM retirement/consent/rollback tests, lint, shipped
 module tests and the architecture ratchet; exact-APK Android upgrade from alpha27
@@ -65,13 +66,12 @@ retired install/rollback rejection, normal modern-module operation and supported
 module update/rollback on the same APK. Review the actual transition UI in portrait,
 landscape and large text. Do not attach alpha27 evidence to alpha28.
 
-## Next extractions (not implemented by this change)
+## Extraction roadmap after alpha28
 
-1. **[Measure (#26)](https://github.com/blueworkslabs/construct/issues/26):** module owns calibration/reference selection, units, endpoint edits,
-   interpretation and screen flow. Specify bounded image acquisition and reusable
-   detection/geometry results, opaque per-run image handles, cancellation and
-   explicit pixel/data exposure before replacing `photo.measure`. Preserve current
-   native image privacy until the new data-flow contract is implemented.
+1. **[Measure (#26)](https://github.com/blueworkslabs/construct/issues/26):** implemented
+   in the alpha29 candidate below. Module owns geometry, calibration and screens;
+   the host provides bounded image acquisition and marker detections with fresh
+   consent for pixel exposure. Candidate verification remains a separate gate.
 2. **[Camera (#27)](https://github.com/blueworkslabs/construct/issues/27):** module owns album and analysis presentation/workflow. Separate native
    shutter/permission controls, bounded capture/storage/export and reusable analysis
    from the application. Preserve existing private photos and deletion/export paths.
@@ -79,5 +79,26 @@ landscape and large text. Do not attach alpha27 evidence to alpha28.
    generic facilities on the same frozen APK; change module behavior independently.
    Do not invent a large map/rendering API or downloadable DEX runtime for this proof.
 
-These require their own implementations and exact-artifact evidence. Removing Sky
-is not a claim that Camera/Measure are modular or that the complete shell is clean.
+Each extraction needs its own exact-artifact evidence. Alpha28 Sky evidence does
+not establish alpha29 Measure acceptance, and Camera remains unfinished. The
+Checklist proof recorded with alpha28 demonstrates an unrelated independent
+consumer; it is not a substitute for Measure-specific update/rollback checks.
+
+
+## Measure retirement (alpha29 candidate)
+
+After the module-owned picker/measurement prototype passed, the alpha29 candidate
+removes the seven native Measure workflow/geometry/UI classes, Activity and bridge
+dispatch. Generic bounded image selection/decoding and marker detection remain;
+ID selection, calibration, endpoints, units and interpretation do not.
+`photo.measure` is retained only as a historical API 0.7+ identifier. Installed
+0.1.x packages receive the same data-preserving Update required / Find update
+handling described above. New installs and rollback into the retired workspace
+are blocked. The native workspace itself never saved measurements or photos.
+
+Pocket Measure 0.2.2 requires API 0.10 and two new explicit image grants; old native
+measurement consent must not be inherited. Alpha28 is the final native Measure
+host. [Optimized-candidate acceptance](measure-module-alpha29-acceptance.md) covers
+functional/lifecycle checks, this in-place transition and independent module
+updating; the earlier debug prototype remains separate. See [the image contract](module-images.md) and
+[the modern user flow](pocket-measure.md). Camera is the remaining native exception.

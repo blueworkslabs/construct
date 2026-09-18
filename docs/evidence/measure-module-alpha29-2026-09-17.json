@@ -1,0 +1,253 @@
+{
+  "date": "2026-09-17",
+  "source": "c26c85e7f061f5f539e7f29d12d2022cc1809dae",
+  "hostVersion": "0.1.0-alpha29",
+  "moduleSource": "1022428b9dc0d6fd02a836662681a25c5c4704f9",
+  "candidateCatalog": {
+    "url": "https://00fe7344.construct-20x.pages.dev/index.json",
+    "versions": [
+      "0.1.2",
+      "0.1.3",
+      "0.2.2"
+    ],
+    "moduleSha256": "108cc29499c48a4b23cdc1610c245b8e86f5ca9d66e4328884f95dd9a654c9d0",
+    "verified": true
+  },
+  "module": {
+    "id": "dev.construct.measure",
+    "name": "Pocket Measure",
+    "version": "0.2.2",
+    "sha256": "108cc29499c48a4b23cdc1610c245b8e86f5ca9d66e4328884f95dd9a654c9d0"
+  },
+  "artifacts": [
+    {
+      "abi": "arm64-v8a",
+      "name": "construct-0.1.0-alpha29-arm64-v8a-c26c85e.apk",
+      "bytes": 23806322,
+      "sha256": "43a5b088bb91c0910bd53a59158a1b25d360cf45a59a4ad3f97e74d2d82bea1b",
+      "protectedAssets": 17,
+      "changedNative": [
+        "lib/arm64-v8a/libconstruct_measure.so"
+      ]
+    },
+    {
+      "abi": "x86_64",
+      "name": "construct-0.1.0-alpha29-x86_64-c26c85e.apk",
+      "bytes": 26689907,
+      "sha256": "a01995389a31f03b05114cae75d8baf529c747b62f7205eac07e54b178d1b177",
+      "protectedAssets": 17,
+      "changedNative": [
+        "lib/x86_64/libconstruct_measure.so"
+      ]
+    }
+  ],
+  "signerSha256": "c066034d20f4f9f625b5b2bda525a5b94f32961583f837d0e3437746013443cb",
+  "localChecks": {
+    "jvmTests": 174,
+    "lintErrors": 0,
+    "moduleTests": 18,
+    "runnerTests": 67,
+    "publisherScriptTests": 30
+  },
+  "architecture": {
+    "nativeSkyClassesAbsent": true,
+    "nativeMeasureClassesAbsent": true,
+    "remainingNativeWorkflows": [
+      "camera.capture"
+    ],
+    "historicalCapabilities": [
+      "sky.watch",
+      "photo.measure"
+    ]
+  },
+  "android": {
+    "functional": {
+      "run": "functional-20260917T224311Z-measure-module-4951d354",
+      "complete": true,
+      "stopped": true,
+      "checks": [
+        "Pixel access denied by default before Android picker opens",
+        "Fresh independent grants and native picker cancellation return to same module",
+        "Real system picker, private image resource and local detector feed module-owned 240 mm measurement offline",
+        "Module-owned unit selector converts centimetres to millimetres within displayed rounding",
+        "Real endpoint drag commits once; Undo and Android pointer cancellation restore the prior length",
+        "Accessible photo-pixel nudges are individually undoable",
+        "Real pinch and pan do not place endpoints; reset restores calibrated fit coordinates",
+        "Module-owned recalibration produces 228 mm from the same endpoints",
+        "Menu and rotation preserve the current module measurement",
+        "Two-times text remains operable in portrait and landscape with real picker and measurement",
+        "Perspective and EXIF-oriented photos recover the expected 240 mm length",
+        "Blank and duplicate reference cards reject calibration and clear earlier results",
+        "Out-of-range calibration is rejected before a length can be produced",
+        "Ordinary background discards selected image, calibration and endpoints",
+        "Process restart retains no selected photo or measurement",
+        "Marker detection has its own revocable grant even when image selection is still allowed",
+        "Revoking pixel access closes the old image session and denies a fresh picker request",
+        "Synthetic source bytes remain unchanged and diagnostics contain no photo URI or measurement data"
+      ],
+      "apkSha256": "a01995389a31f03b05114cae75d8baf529c747b62f7205eac07e54b178d1b177",
+      "flatMm": 240.0,
+      "angledMm": 240.0,
+      "orientedMm": 240.0,
+      "moduleSha256": "108cc29499c48a4b23cdc1610c245b8e86f5ca9d66e4328884f95dd9a654c9d0"
+    },
+    "retirement": {
+      "run": "retirement-20260917T223133Z-retirement-b1d465be",
+      "complete": true,
+      "stopped": true,
+      "checks": [
+        "In-place host upgrade preserves selected catalog, unrelated installed module and saved counter",
+        "Retired installed trial remains manageable with visible Find update and disabled old authority",
+        "Unconfirmed retired module updates to exact modern signed module without reusing legacy photo consent",
+        "Rollback to retired native code is blocked and current modern module stays runnable",
+        "Retired reinstallation rejected before consent; saved unrelated module data remains intact"
+      ],
+      "apkSha256": "a01995389a31f03b05114cae75d8baf529c747b62f7205eac07e54b178d1b177"
+    },
+    "update": {
+      "run": "update-20260917T223839Z-measure-module-c8ec69c8",
+      "complete": true,
+      "stopped": true,
+      "checks": [
+        "Signed module update adds a working cm/mm conversion selector on identical installed APK bytes",
+        "Supported rollback removes update-only controls and original measurement behavior works on the same APK"
+      ],
+      "apkSha256": "a01995389a31f03b05114cae75d8baf529c747b62f7205eac07e54b178d1b177",
+      "moduleOnlyUpdate": {
+        "beforeModuleSha256": "5724f854847e8201ee3b95b08a8587509cf14618785a05522185aa39459136ec",
+        "afterModuleSha256": "0579f28aea151c6e75d12e53fcde0fd645bd9b3ac18b15c9430860fd8b0f68eb",
+        "apkSha256Before": "a01995389a31f03b05114cae75d8baf529c747b62f7205eac07e54b178d1b177",
+        "apkSha256After": "a01995389a31f03b05114cae75d8baf529c747b62f7205eac07e54b178d1b177",
+        "transientPhotoAndCalibration": "intentionally cleared between runs"
+      }
+    }
+  },
+  "visualReview": {
+    "reviewed": true,
+    "apkSha256": "a01995389a31f03b05114cae75d8baf529c747b62f7205eac07e54b178d1b177",
+    "images": [
+      {
+        "scope": "retirement",
+        "run": "retirement-20260917T223133Z-retirement-b1d465be",
+        "file": "retired-portrait.png",
+        "sha256": "0f4a2df4a41d0bd3b22f15be2c03f25f4e6c9a2a08727b96f1b9da1966573ef1",
+        "reviewed": true
+      },
+      {
+        "scope": "retirement",
+        "run": "retirement-20260917T223133Z-retirement-b1d465be",
+        "file": "retired-landscape.png",
+        "sha256": "576f295c1bdc98c05365d616b3b06d35d4f40fca390223e5c69ecc14589e0d0f",
+        "reviewed": true
+      },
+      {
+        "scope": "retirement",
+        "run": "retirement-20260917T223133Z-retirement-b1d465be",
+        "file": "retired-font2.png",
+        "sha256": "def2a87dfe2b5effe7a7bba1bdd03b9c689eab8446eac0c5fe18dc2987c61777",
+        "reviewed": true
+      },
+      {
+        "scope": "retirement",
+        "run": "retirement-20260917T223133Z-retirement-b1d465be",
+        "file": "retired-font2-landscape.png",
+        "sha256": "8d9fb6494b10cfca836e0ab130602ba9a453295576141fd79bec4fd1aa517e05",
+        "reviewed": true
+      },
+      {
+        "scope": "retirement",
+        "run": "retirement-20260917T223133Z-retirement-b1d465be",
+        "file": "retired-access.png",
+        "sha256": "337c1fc3512c6a55f16f53e10c400e5a49da33168d3477681085b872a430990b",
+        "reviewed": true
+      },
+      {
+        "scope": "retirement",
+        "run": "retirement-20260917T223133Z-retirement-b1d465be",
+        "file": "fresh-image-consent.png",
+        "sha256": "737e1eb4c2330e8091bd8d903707b338fe52506680ab3b28d5e981f367c568fe",
+        "reviewed": true
+      },
+      {
+        "scope": "update",
+        "run": "update-20260917T223839Z-measure-module-c8ec69c8",
+        "file": "measure-preview-before-display/Screenshot_1789684843.png",
+        "sha256": "0d333ef38fc4372392f4929d1ddbbf3f7140404b543303991b1c9551eb6ef402",
+        "reviewed": true
+      },
+      {
+        "scope": "update",
+        "run": "update-20260917T223839Z-measure-module-c8ec69c8",
+        "file": "measure-preview-after-display/Screenshot_1789684925.png",
+        "sha256": "28a39c87065679c168fd6b453f1e71e5b77c9120fa416d89e6718fbc1e4d0ede",
+        "reviewed": true
+      },
+      {
+        "scope": "update",
+        "run": "update-20260917T223839Z-measure-module-c8ec69c8",
+        "file": "measure-preview-rollback-display/Screenshot_1789684978.png",
+        "sha256": "d15f39e52263f7ddc95825e5a2748936b55fca0da1886edc29adb3476ede41fb",
+        "reviewed": true
+      },
+      {
+        "scope": "functional",
+        "run": "functional-20260917T224311Z-measure-module-4951d354",
+        "file": "module-measure-flat-display/Screenshot_1789685127.png",
+        "sha256": "e2a2e742aa028bffe15dc44fc902071e7121379b9314d882eb6dfdbb6b9d5723",
+        "reviewed": true
+      },
+      {
+        "scope": "functional",
+        "run": "functional-20260917T224311Z-measure-module-4951d354",
+        "file": "module-measure-landscape-display/Screenshot_1789685225.png",
+        "sha256": "bd969ba2dbe16be4ea6b42baee73c0ab60792bfd48b8a78a2b0da46f3dfc6aac",
+        "reviewed": true
+      },
+      {
+        "scope": "functional",
+        "run": "functional-20260917T224311Z-measure-module-4951d354",
+        "file": "module-measure-large-0-display/Screenshot_1789685262.png",
+        "sha256": "550a42bf9832139a5efa89e6683529f1519a72d54b8eb49549f516bb2f8e606d",
+        "reviewed": true
+      },
+      {
+        "scope": "functional",
+        "run": "functional-20260917T224311Z-measure-module-4951d354",
+        "file": "module-measure-large-1-display/Screenshot_1789685316.png",
+        "sha256": "aba92185c2e4bd4431231956598e43c3af9026c05c71a876a71d3e58c636adba",
+        "reviewed": true
+      },
+      {
+        "scope": "functional",
+        "run": "functional-20260917T224311Z-measure-module-4951d354",
+        "file": "module-angledMm-display/Screenshot_1789685360.png",
+        "sha256": "9b31ba7b3023bcfca92819ffb2a666a035d58bf9b6cbe1d292d10102f963a788",
+        "reviewed": true
+      },
+      {
+        "scope": "functional",
+        "run": "functional-20260917T224311Z-measure-module-4951d354",
+        "file": "module-orientedMm-display/Screenshot_1789685385.png",
+        "sha256": "27d85643ca74a7e69fa768e62540f2624b093f72e51791df94310c840e7cdfce",
+        "reviewed": true
+      }
+    ],
+    "notes": [
+      "Retirement explanation and Find update action readable at normal and 2\u00d7 font in portrait and landscape. Retired grant disabled; both new image grants visibly off in fresh consent.",
+      "Preview before and rollback show 24.0 cm with older controls; update shows 240.1 mm. Selector existence and operation also asserted on-device.",
+      "Secure module windows retain FLAG_SECURE; synthetic module display evidence comes from the emulator console, not weakened Android screenshot protection.",
+      "Final 0.2.2 flat, perspective and EXIF-oriented photos show 24.0 cm; normal landscape preserves the recalibrated 22.8 cm result. Photo and endpoint markers are visible.",
+      "At 2\u00d7 font, result and Show controls remain readable/operable in both orientations; supporting instructions require scrolling within the bounded panel. No claim that all copy fits simultaneously.",
+      "Raw landscape emulator-console captures are rotated relative to the saved raster; they were reviewed as captured, without image alteration."
+    ]
+  },
+  "limits": [
+    "Separate completed clean-snapshot Android 17 x86_64 scopes; not physical ARM64 execution or a continuous single run.",
+    "Synthetic planar images validate implementation and controls, not physical-camera accuracy.",
+    "Selected pixels reach module code under fresh explicit consent; revocation cannot erase copies already delivered.",
+    "Photos, calibration and measurements are intentionally transient and are not claimed to persist across update, rollback or background.",
+    "Camera native workflow remains migration debt; its full device suite was not rerun.",
+    "Only the marker JNI bridge native library changes; bundled models, other native libraries, signing identity and Android permissions match alpha28.",
+    "Debug prototype and failed/incomplete device runs are not acceptance of these optimized artifacts."
+  ]
+}

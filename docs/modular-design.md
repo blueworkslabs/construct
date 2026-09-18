@@ -98,9 +98,11 @@ implemented and verified before a module depends on them.
   native implementation; old required `sky.watch` callers are manageable but need
   a module update. See the [retirement boundary](shell-retirement.md), including
   data preservation and unsupported rollback handling.
-- **Pocket Measure:** `photo.measure` opens the native measurement workspace;
-  no pixels, endpoints or measurement results return to the module. Separate
-  reusable image access/compute from the feature workflow in a future migration.
+- **Pocket Measure:** 0.2.x owns geometry, calibration, editor, units and UI in
+  its signed module. API 0.10 exposes a bounded selected raster and generic marker
+  detections with fresh consent. Alpha29 retires the old native workspace; see
+  [the image contract](module-images.md). Exact candidate acceptance is separate
+  from this ownership statement.
 - **Pocket Camera / analysis:** the native camera workspace includes album and
   analysis interactions. Audit reusable acquisition/compute and trusted controls
   separately from application-specific presentation when defining its migration.

@@ -1,4 +1,63 @@
-# Pocket Measure prototype
+# Pocket Measure — module-owned measurement
+
+Pocket Measure **0.2.2** uses **API 0.10 / alpha29**. Its signed module owns
+reference selection, calibration, projective geometry, endpoint editing, undo,
+zoom/pan, units and UI. Generic native APIs select/decode one user-chosen image and
+return bounded ArUco detections; the shell does not interpret lengths.
+
+Install the compatible host and update the module through Browse. Explicitly allow
+**selected image pixels** and **local marker detection** in native consent or
+Module access. The old native measurement grant does not authorize pixels reaching
+JavaScript. This module declares no internet, saved-data or diagnostic capability.
+Pixels and results are transient; leaving/backgrounding discards the run. Rotation
+and the native menu preserve completed work; interrupted edits are cancelled.
+
+1. Print the [reference card](assets/pocket-measure-reference-A4.pdf) at actual size
+   and measure its outer black square.
+2. Choose one saved photo with that card and the item on the same flat plane.
+3. Enter the measured marker side (10–300 mm), then tap A and B.
+4. Press and hold on the photo to preview the next endpoint in the precision
+   magnifier, then release to place it. Drag a handle to adjust it; the magnifier
+   follows above the finger, showing the actual photo pixels under the point with a
+   crosshair and the line to the other endpoint. Select A/B for one-image-pixel
+   nudges. Undo reverses committed edits; Clear starts another pair. Pinch/zoom
+   and pan while zoomed; Reset view fits the image. A second finger, cancellation
+   or leaving the module discards the preview without moving anything.
+5. Choose centimetres or millimetres in the controls. These are approximate lengths,
+   not a certified accuracy bound. No photo, calibration or measurement is saved.
+
+### Magnifier and rendering (0.2.5)
+
+The magnifier is module-owned drawing over the existing decoded image: a circle of
+roughly 42% of the shorter viewport side (72–128 CSS px) lifted above the finger,
+flipped below near the top edge and clamped inside the viewport, showing a 2.5×
+crop relative to the current zoom. The crop is centred on the *accepted* endpoint,
+so a rejected preview keeps showing the last valid position; near photo edges the
+crop is clipped and shifted rather than drifting off the point. The crosshair turns
+error-toned when a placement preview lies outside the reference plane. At fit zoom, a dragged placement preview follows the finger. When zoomed in,
+a stationary press still previews the next point, but a one-finger drag pans
+and a tap places. The magnifier never selects, places or moves an endpoint by itself; it
+disappears on release, second finger, pointer/touch cancellation or lost capture.
+
+Pointer-driven redraws are coalesced to one canvas paint per animation frame; DOM
+state (result, status, controls) still updates synchronously. The collapsed panel
+height uses fixed layout splits so status changes never move the photo. Android
+text zoom is detected from rendered text height, with a larger collapsed panel
+and an explicit scroll reset to keep the result and controls visible. Handles carry A/B pills placed away from the
+line, the length is shown in a pill at the line midpoint, the reference marker has a
+dashed outline, and all marks use Construct tokens with dark under-strokes.
+
+See [the bounded image contract](module-images.md) for pixel disclosure, resource
+bounds and retirement. Alpha28 is the last native Measure host. On alpha29 old
+0.1.x packages remain manageable but need an update; rollback into the retired
+native workspace is blocked without erasing data. No APK downgrade is promised.
+The [alpha29 acceptance record](measure-module-alpha29-acceptance.md) covers the
+exact optimized APK and signed 0.2.2 module, including independent updating.
+Historical receipts below are not acceptance of the new module or physical phone.
+
+## Historical native baseline (0.1.x / through alpha28)
+
+The remainder describes the retired workspace, not current module/API behavior.
 
 Status: implementation, local checks and exact optimized Android measurement
 acceptance complete. Accompanying host/vision regression receipts are tracked in
@@ -7,7 +66,7 @@ Physical-phone placement and rotation checks passed through alpha 18. See the
 [current placement UX and acceptance record](pocket-measure-slice1.md) for later
 changes. Not an accuracy guarantee.
 
-## User flow
+### User flow
 
 Print the [A4 reference card](assets/pocket-measure-reference-A4.pdf) at actual
 size, and check that the outer black square has equal measured width and height.
@@ -34,7 +93,7 @@ object height contribute error. Three exploratory real-photo views supported
 feasibility, but those private photos are neither repository fixtures nor an
 independent validation set. Fresh physical-photo checks remain necessary.
 
-## Contract and boundaries
+### Contract and boundaries
 
 `photo.measure`, API 0.7.0, accepts only `{op:"open"}`. There is no URI/path,
 marker size, endpoint, capture or export argument. Replies only acknowledge
@@ -61,7 +120,7 @@ and rejects invalid/nonconvex quadrilaterals, projective horizons, invalid scale
 non-finite values, coincident endpoints and out-of-photo taps. Image coordinates
 are normalized; fit/letterboxing is shared by rendering and input.
 
-## Reproduction and evidence
+### Reproduction and evidence
 
 - `python scripts/prepare_fixtures.py` signs the example launcher with the local
   independent fixture key. This includes the example in home/test catalogs.
@@ -93,7 +152,7 @@ Manager, unrestricted module networking or automatic object recognition are adde
 The [capability-pack proposal](capability-packs.md) describes a future small-core
 direction; it is not an implemented native plugin downloader.
 
-## Integration notes
+### Integration notes
 
 The selected photo's display rectangle is reserved across endpoint taps: status,
 result and clear-control space do not appear/disappear between A and B. Android
@@ -109,7 +168,7 @@ passed flat, angled and EXIF-oriented 240 mm controls. Those exploratory receipt
 remain separate from final candidate acceptance; no real-camera accuracy claim
 is inferred from them.
 
-## Historical alpha 15 optimized measurement acceptance
+### Historical alpha 15 optimized measurement acceptance
 
 Candidate source `5d86ce9`, host `0.1.0-alpha15`, universal APK 197794762 bytes:
 `1ea3d7bab2f2ff0e59ad99c62ff3255721760707495abd16c3b34e7f58f9fffc`.

@@ -233,6 +233,7 @@ class MainActivity : ComponentActivity() {
                                 Text(cap.reason, style = MaterialTheme.typography.bodySmall)
                                 cap.origins.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
                             }
+                            if (module.manifest.capabilities.any { it.id == "image.read" }) Text("Selected image pixels reach this module. Other granted storage or diagnostics may retain copies; approved internet sources may receive them. Revocation cannot erase copies already delivered. You choose each image in Android’s picker; no broad photo-library access.")
                             if (module.manifest.capabilities.any { it.id == "location.read" }) {
                                 Text("Android location access: " + if (androidLocation) "allowed" else "not allowed")
                                 Text("This permits an allowed module to receive foreground coordinates and accuracy. Approximate location works. With internet access the module can send that data to its approved sources; stored copies are not erased by revocation.")
@@ -431,12 +432,12 @@ class MainActivity : ComponentActivity() {
                         cap.origins.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
                     }
                     Text("Existing access choices are kept unless you change them. New sensitive capabilities start off. You can change access later in Module access.")
-                    if (verified.manifest.capabilities.any { it.id == "photo.measure" }) Text("You choose one image through Android’s photo picker. Measurement is local and approximate; photos and results are not shared with JavaScript or saved by this workspace.")
                     if (verified.manifest.capabilities.any { it.id == "camera.capture" }) Text("Camera also needs Android permission through Module access. Photos are saved privately by the native workspace, not shared with JavaScript. No microphone or general file access.")
                     if (verified.manifest.capabilities.any { it.id == "contacts.read" }) Text("Contacts also need Android permission. After installing, open Module access to allow Android contacts access. This does not grant any module automatically.")
                     if (verified.manifest.capabilities.any { it.id == "contacts.read" } && verified.manifest.capabilities.any { it.id == "storage.kv" }) Text("This module can save contact data on this phone when both contacts and saved-data access are allowed. Revoking contacts access does not erase data it already saved.")
                     if (verified.manifest.capabilities.any { it.id == "net.http" }) Text("Approved internet access lets this module send data to the exact sources above, which see your IP address. New sources need new consent. Other granted data, including location or contacts, can be sent to those sources. Raster responses may be cached; revocation does not erase previously received data.")
                     else Text("No module network access.")
+                    if (verified.manifest.capabilities.any { it.id == "image.read" }) Text("Selected image pixels reach this module's code. You choose each image in Android's picker. Other granted storage or diagnostics may retain copies, and approved internet sources may receive them. Revocation cannot erase copies already delivered. No broad photo-library access.")
                     if (verified.manifest.capabilities.any { it.id == "location.read" }) Text("The module can receive a foreground location fix only after both its location grant and Android permission are enabled. Allow Android location in Module access after installation. Approximate location works; no background tracking.")
                     Text("Installed code starts as a trial. Previous code is kept where available, but versions requiring retired capabilities cannot be restored.")
                 } },

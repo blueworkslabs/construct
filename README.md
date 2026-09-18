@@ -78,7 +78,10 @@ No identity recognition, contacts editing or LAN discovery. See
 for scope and current verification status. Alpha 15 adds
 [Pocket Measure](docs/pocket-measure.md): choose one photo, confirm a printed
 reference marker’s actual size, and tap two endpoints for an approximate planar
-length. Processing stays native; no photo/result is exposed to module JavaScript.
+length. Through alpha28, its processing stayed native and no photo/result reached
+module JavaScript. Alpha29 replaces that workspace with Pocket Measure 0.2.2:
+selected pixels reach the module under fresh consent, and it owns measurement
+logic and UI. See the [image contract](docs/module-images.md).
 Alpha 15's universal prototype was approximately 198 MB. Alpha 16's ARM64 pilot
 is about **23.3 MB**, using architecture-specific APKs and a trimmed OpenCV
 measurement bridge; see [size and verification details](docs/apk-optimization.md)
@@ -103,8 +106,9 @@ flowchart LR
 ```
 
 **The design goal is module updates without a new APK once the required host API
-exists. New native capabilities need host updates.** Pocket Measure and Camera
-still contain host-owned application workflows.
+exists. New native capabilities need host updates.** Camera remains a host-owned
+application workflow. Pocket Measure 0.2.x moves geometry, editor and UI into its
+module using [API 0.10 image primitives](docs/module-images.md) and fresh consent.
 The alpha28 candidate removes native Sky Watch and provides an explicit
 [old-module update path](docs/shell-retirement.md). Sky Watch 0.2.x keeps aircraft
 logic, glossary, map and controls in the signed module; API 0.9 supplies only

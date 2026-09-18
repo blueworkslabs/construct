@@ -16,11 +16,12 @@ fun checkRule(ok: Boolean, code: String, message: String) {
 }
 
 data class Capability(val id: String, val reason: String, val optional: Boolean = false, val origins: List<String> = emptyList()) {
-    val explicitOptIn: Boolean get() = id in CapabilityLifecycle.retired || id in setOf("device.tone", "contacts.read", "camera.capture", "photo.measure", "net.http", "location.read")
+    val explicitOptIn: Boolean get() = id in CapabilityLifecycle.retired || id in setOf("device.tone", "contacts.read", "camera.capture", "net.http", "location.read", "image.read", "image.markers")
     val label: String get() = when (id) {
         "net.http" -> "Allow approved internet sources"
+        "image.read" -> "Allow selected image pixels"
+        "image.markers" -> "Allow local marker detection"
         "location.read" -> "Allow reading phone location"
-        "photo.measure" -> "Allow photo measurement"
         "camera.capture" -> "Allow camera workspace"
         "contacts.read" -> "Allow reading contacts"
         "device.tone" -> "Allow short tones"
@@ -38,7 +39,7 @@ object Packages {
     const val MAX_ZIP = 4 * 1024 * 1024
     const val MAX_EXPANDED = 12 * 1024 * 1024
     const val MAX_FILE = 2 * 1024 * 1024
-    val supported = setOf("device.toast", "log.write", "storage.kv", "device.tone", "contacts.read", "camera.capture", "photo.measure", "net.http", "location.read")
+    val supported = setOf("device.toast", "log.write", "storage.kv", "device.tone", "contacts.read", "camera.capture", "net.http", "location.read", "image.read", "image.markers")
     val recognized = supported + CapabilityLifecycle.retired
     private val idPattern = Regex("[a-z][a-z0-9]*(\\.[a-z][a-z0-9-]*)+")
     private val versionPattern = Regex("(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)")
@@ -66,7 +67,7 @@ object Packages {
         checkRule(idPattern.matches(id) && versionPattern.matches(version), "MANIFEST_SCHEMA", "Invalid module identity or version")
         val api = m.getJSONObject("constructApi")
         keys(api, setOf("min", "target"), setOf("min", "target"))
-        checkRule(api.get("min") in setOf("0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0") && api.get("target") == api.get("min"), "API_INCOMPATIBLE", "This module needs a different Construct API")
+        checkRule(api.get("min") in setOf("0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0") && api.get("target") == api.get("min"), "API_INCOMPATIBLE", "This module needs a different Construct API")
         val runtime = m.getJSONObject("runtime")
         keys(runtime, setOf("kind"), setOf("kind"))
         checkRule(runtime.get("kind") == "webview-js", "RUNTIME_UNSUPPORTED", "Only WebView modules are supported")
@@ -81,7 +82,7 @@ object Packages {
             val capId = string(cap, "id", 80)
             checkRule(capId in recognized, "CAPABILITY_DENIED", "Unsupported capability: $capId")
             val origins = if (capId == "net.http") {
-                checkRule(api.get("min") == "0.9.0", "API_INCOMPATIBLE", "HTTP requires Construct API 0.9.0")
+                checkRule(api.get("min") in setOf("0.9.0", "0.10.0"), "API_INCOMPATIBLE", "HTTP requires Construct API 0.9.0")
                 val list = cap.optJSONArray("origins") ?: throw ConstructError("MANIFEST_SCHEMA", "HTTP sources are required")
                 checkRule(list.length() in 1..8, "MANIFEST_SCHEMA", "Declare 1–8 HTTP sources")
                 (0 until list.length()).map { n -> HttpPolicy.origin(list.opt(n)) }.also {
@@ -91,21 +92,23 @@ object Packages {
                 checkRule(!cap.has("origins"), "MANIFEST_SCHEMA", "Sources apply only to HTTP")
                 emptyList()
             }
-            checkRule(capId != "location.read" || api.get("min") == "0.9.0", "API_INCOMPATIBLE", "Location requires Construct API 0.9.0")
+            checkRule(capId != "location.read" || api.get("min") in setOf("0.9.0", "0.10.0"), "API_INCOMPATIBLE", "Location requires Construct API 0.9.0")
+            checkRule(capId !in setOf("image.read", "image.markers") || api.get("min") == "0.10.0", "API_INCOMPATIBLE", "Images require Construct API 0.10.0")
             Capability(capId, string(cap, "reason", 240), cap.optBoolean("optional", false), origins)
         }
-        checkRule(caps.none { it.id == "device.tone" } || api.get("min") in setOf("0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0"), "API_INCOMPATIBLE", "Tone requires Construct API 0.2.0")
-        checkRule(caps.none { it.id == "contacts.read" } || api.get("min") in setOf("0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0"), "API_INCOMPATIBLE", "Contacts require Construct API 0.3.0")
-        checkRule(caps.none { it.id == "camera.capture" } || api.get("min") in setOf("0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0"), "API_INCOMPATIBLE", "Camera requires Construct API 0.4.0")
-        checkRule(caps.none { it.id == "photo.measure" } || api.get("min") in setOf("0.7.0", "0.8.0", "0.9.0"), "API_INCOMPATIBLE", "Photo measurement requires Construct API 0.7.0")
+        checkRule(caps.none { it.id == "device.tone" } || api.get("min") in setOf("0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"), "API_INCOMPATIBLE", "Tone requires Construct API 0.2.0")
+        checkRule(caps.none { it.id == "contacts.read" } || api.get("min") in setOf("0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"), "API_INCOMPATIBLE", "Contacts require Construct API 0.3.0")
+        checkRule(caps.none { it.id == "camera.capture" } || api.get("min") in setOf("0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"), "API_INCOMPATIBLE", "Camera requires Construct API 0.4.0")
         CapabilityLifecycle.validateHistoricalApi(caps, api.getString("min"))
         checkRule(caps.map { it.id }.distinct().size == caps.size, "MANIFEST_SCHEMA", "Duplicate capabilities")
+        checkRule(caps.none { it.id == "image.markers" } || caps.any { it.id == "image.read" },
+            "MANIFEST_SCHEMA", "image.markers requires image.read")
         for ((field, max) in listOf("description" to 500, "author" to 120, "homepage" to 500)) {
             if (m.has(field)) checkRule(m.get(field) is String && m.getString(field).length <= max, "MANIFEST_SCHEMA", "Invalid $field")
         }
         val themeColor = if (m.has("themeColor")) string(m, "themeColor", 7) else null
         checkRule(themeColor == null || Regex("#[0-9a-fA-F]{6}").matches(themeColor), "MANIFEST_SCHEMA", "themeColor must be #RRGGBB")
-        checkRule(themeColor == null || api.get("min") in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0"), "API_INCOMPATIBLE", "Theme colour requires Construct API 0.6.0")
+        checkRule(themeColor == null || api.get("min") in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"), "API_INCOMPATIBLE", "Theme colour requires Construct API 0.6.0")
         return ModuleManifest(id, string(m, "name", 80), version, entry, caps, api.getString("min"), themeColor)
     }
 

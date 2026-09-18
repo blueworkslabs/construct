@@ -105,10 +105,38 @@
               "type": "string",
               "maxLength": 260
             },
-            "description": "Exact public HTTPS origins; required only for net.http in API0.9. Native and publisher validators enforce origin syntax and capability/version binding."
+            "description": "Exact public HTTPS origins; required only for net.http in API0.9 or later. Native and publisher validators enforce origin syntax and capability/version binding."
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "contains": {
+              "properties": {
+                "id": {
+                  "const": "image.markers"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            }
+          },
+          "then": {
+            "contains": {
+              "properties": {
+                "id": {
+                  "const": "image.read"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            }
+          }
+        }
+      ]
     },
     "author": {
       "type": "string",

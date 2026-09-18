@@ -7,8 +7,8 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 # Existing debt may shrink, not silently grow. See docs/shell-retirement.md.
-NATIVE_WORKSPACES = {'camera.capture': 'CameraActivity', 'photo.measure': 'MeasureActivity'}
-ACTIVITIES = {'.MainActivity', '.ModuleActivity', '.CameraActivity', '.MeasureActivity'}
+NATIVE_WORKSPACES = {'camera.capture': 'CameraActivity'}
+ACTIVITIES = {'.MainActivity', '.ModuleActivity', '.CameraActivity'}
 
 def check(root=ROOT):
     errors = []
@@ -17,7 +17,9 @@ def check(root=ROOT):
         text = path.read_text()
         if re.search(r'\bSky(?:Activity|Data|Identity|Map|Metadata|Network|Aircraft|Source|Point)\b|api\.adsb|opensky-network|tile\.openstreetmap', text):
             errors.append(f'{path.name}: aviation implementation/provider dependency belongs in a module')
-        if '"sky.watch"' in text and path != src/'CapabilityLifecycle.kt':
+        if re.search(r'\bMeasure(?:Activity|Editor|Geometry|Overlay|Sheet|Viewport|Detector|Point|Plane)\b', text):
+            errors.append(f'{path.name}: measurement interpretation/workflow belongs in a module')
+        if any(literal in text for literal in ('"sky.watch"', '"photo.measure"')) and path != src/'CapabilityLifecycle.kt':
             errors.append(f'{path.name}: historical ID belongs only in the retirement registry')
         if re.search(r'\bDexClassLoader\b|\bInMemoryDexClassLoader\b', text):
             errors.append(f'{path.name}: downloadable native execution is not the module contract')
@@ -35,4 +37,4 @@ if __name__ == '__main__':
     errors = check()
     for error in errors: print(error, file=sys.stderr)
     if errors: sys.exit(1)
-    print('Architecture ratchet passed: no native Sky domain, two inventoried legacy workspaces.')
+    print('Architecture ratchet passed: no native Sky/Measure domain, one inventoried legacy workspace.')

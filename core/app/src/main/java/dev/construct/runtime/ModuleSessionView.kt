@@ -45,12 +45,18 @@ internal open class ModuleSessionView(context: Context) : WebView(context) {
     }
     val gate = ModuleSessionGate()
     var stopEffects: () -> Unit = {}
+    var stopImageEffects: () -> Unit = {}
+    fun pauseForPicker() {
+        if (released) return
+        gate.setPaused(true); stopEffects(); onPause()
+    }
     protected open fun dispatchVisibility(visible: Boolean, delivered: () -> Unit) {
         evaluateJavascript("window.dispatchEvent(new CustomEvent('constructvisibilitychange',{detail:{visible:$visible,reason:'menu'}}));") { delivered() }
     }
     fun setMenuPaused(paused: Boolean) {
         if (released || !gate.setPaused(paused)) return
         if (paused) {
+            stopImageEffects()
             stopEffects() // Native authority is already denied; no JS acknowledgement needed.
             val generation = gate.generation.get()
             var applied = false

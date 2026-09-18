@@ -1,5 +1,8 @@
 # Pocket Measure: placement UX integration
 
+Historical native-workspace record (through alpha28). For the module-owned
+replacement and fresh image consent, see [Pocket Measure](pocket-measure.md).
+
 This is the first slice of the [UX proposal](pocket-measure-ux-proposal.md), built on
 its isolated overlay, viewport and controls components. It intentionally retains
 one A–B measurement, no persistence and no gallery export. The existing

@@ -35,6 +35,7 @@ internal fun moduleChromeClient(onError: (Int) -> Unit, onPopup: () -> Unit) = o
 
 @SuppressLint("SetJavaScriptEnabled")
 internal fun moduleWebView(context: Context, store: ModuleStore, installed: Installed,
+    pickImage: ((Uri?) -> Unit) -> Unit = { throw ConstructError("IMAGE_UNAVAILABLE", "Image picker unavailable") },
     onFailure: (WebView, String) -> Unit): ModuleSessionView {
     if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
         throw ConstructError("WEBVIEW_UNSUPPORTED", "Update Android System WebView or Chrome before opening modules")
@@ -49,8 +50,9 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
     lateinit var contacts: ContactsReader
     var http: ModuleHttp? = null
     var location: ModuleLocation? = null
+    var images: ModuleImageSession? = null
     val view = object : ModuleSessionView(context) {
-        override fun releaseSession() { active.set(false); contacts.close(); tone.close(); http?.close(); location?.close() }
+        override fun releaseSession() { active.set(false); contacts.close(); tone.close(); http?.close(); location?.close(); images?.close() }
     }
     contacts = ContactsReader(context) {
         view.gate.authorize("contacts.read")
@@ -62,6 +64,8 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
     }
     if (module.capabilities.any { it.id == "net.http" }) http = ModuleHttp(context, module) { authorizeCapability("net.http") }
     if (module.capabilities.any { it.id == "location.read" }) location = ModuleLocation(context) { authorizeCapability("location.read") }
+    if (module.capabilities.any { it.id == "image.read" }) images = ModuleImageSession(context, origin, ::authorizeCapability, pickImage)
+    view.stopImageEffects = { images?.cancel() }
     view.stopEffects = { tone.pause(); http?.cancel(); location?.cancel() }
     val reportedBlocks = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     var calls = 0
@@ -74,14 +78,14 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
         // Persist failure before posting the UI transition, so a queued Mark working
         // action cannot confirm a failed run even if the view has not closed yet.
         runCatching { store.runtimeFailed(installed, code) }
-        view.post { contacts.close(); tone.close(); http?.close(); location?.close(); onFailure(view, code) }
+        view.post { contacts.close(); tone.close(); http?.close(); location?.close(); images?.close(); onFailure(view, code) }
     }
     fun auditBlock(code: String, category: String = "policy") {
         if (active.get() && reportedBlocks.add("$code:$category"))
             store.log("runtime", code, module, "Blocked category=$category; URL/payload omitted")
     }
     with(view.settings) {
-        if (module.api == "0.9.0") textZoom = (context.resources.configuration.fontScale * 100).toInt().coerceIn(50, 300)
+        if (module.api in setOf("0.9.0", "0.10.0")) textZoom = (context.resources.configuration.fontScale * 100).toInt().coerceIn(50, 300)
         javaScriptEnabled = true
         domStorageEnabled = false
         allowFileAccess = false
@@ -112,7 +116,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             // Android intercepts data: resources too. Keep this local raster path
             // bounded; returning null here would bypass our byte/format policy.
             if (request.url.scheme == "data") {
-                if (module.api != "0.9.0" || request.isForMainFrame || request.method != "GET") return reject("inline-image-context")
+                if (module.api !in setOf("0.9.0", "0.10.0") || request.isForMainFrame || request.method != "GET") return reject("inline-image-context")
                 val raster = runCatching { ModuleImages.dataUrl(request.url.toString()) }.getOrNull()
                     ?: return reject("inline-image-format")
                 return WebResourceResponse(raster.first, null, 200, "OK",
@@ -121,8 +125,24 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             if (!local(request.url)) return reject("external-origin")
             if (request.method != "GET") return reject("method")
             val path = request.url.path?.removePrefix("/") ?: return reject("path")
+            if (images != null && path.startsWith("construct-images/")) {
+                if (request.isForMainFrame || request.url.query != null) return reject("image-context")
+                val bytes = runCatching { images?.resource(path) }.getOrNull() ?: return reject("image-authority")
+                val stream = object : ByteArrayInputStream(bytes) {
+                    private fun checkStream() {
+                        try { checkRule(images?.resource(path) != null, "IMAGE_STALE", "Image expired") }
+                        catch (_: Exception) { throw java.io.IOException("Image unavailable") }
+                    }
+                    override fun read(): Int { checkStream(); return super.read() }
+                    override fun read(buffer: ByteArray, offset: Int, count: Int): Int {
+                        checkStream(); return super.read(buffer, offset, count)
+                    }
+                }
+                return WebResourceResponse("image/png", null, 200, "OK", mapOf(
+                    "X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-store"), stream)
+            }
             if (!Packages.safePath(path)) return reject("path")
-            if (module.api in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0") && path == "construct-host.css") {
+            if (module.api in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0") && path == "construct-host.css") {
                 return WebResourceResponse("text/css", "UTF-8", 200, "OK",
                     mapOf("X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-store"),
                     ByteArrayInputStream(ModuleLayout.css.toByteArray()))
@@ -194,6 +214,30 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                 if (method == "net.http") http!!.get(params, complete) else location!!.get(params, complete)
                 return@addWebMessageListener
             }
+            if (method == "image.read" || method == "image.markers") {
+                authorizeCapability(method)
+                val id = requestId; val generation = view.gate.generation.get()
+                val picking = method == "image.read" && params.optString("op") == "pick"
+                val session = images ?: throw ConstructError("CAPABILITY_DENIED", "Declare image.read before using images")
+                session.request(method, params) { value, error ->
+                    val deliveredGeneration = view.gate.generation.get()
+                    view.post {
+                        if (active.get()) {
+                            val response = JSONObject().put("id", id)
+                            val denied = try {
+                                // Only the tracked system-picker handoff may cross a pause;
+                                // its session token, current digest and grant are rechecked.
+                                view.gate.authorizeReply(if (picking) deliveredGeneration else generation)
+                                authorizeCapability(method); authorizeCapability("image.read"); error
+                            } catch (e: ConstructError) { e }
+                            if (denied == null) response.put("result", value)
+                            else response.put("error", JSONObject().put("code", denied.code).put("message", denied.message))
+                            reply.postMessage(response.toString())
+                        }
+                    }
+                }
+                return@addWebMessageListener
+            }
             if (method == "contacts.read") {
                 val id = requestId
                 val generation = view.gate.generation.get()
@@ -225,7 +269,6 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                 }
                 "storage.kv" -> store.storage(module.id, params)
                 "device.tone" -> tone.play(params)
-                "photo.measure" -> { MeasureActivity.open(context, store, installed, params); JSONObject().put("opened", true) }
                 "camera.capture" -> { CameraActivity.open(context, store, installed, params); JSONObject().put("opened", true) }
                 else -> throw ConstructError("CAPABILITY_DENIED", "Unsupported capability")
             }
