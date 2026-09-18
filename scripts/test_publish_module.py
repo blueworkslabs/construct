@@ -85,6 +85,22 @@ class PublisherTest(unittest.TestCase):
         (self.source/'manifest.json').write_text(json.dumps(self.manifest))
         build(self.source,self.key)
 
+    def test_marker_declaration_requires_image_read_even_when_optional(self):
+        self.manifest['constructApi'] = dict(min='0.10.0', target='0.10.0')
+        for optional in (False, True):
+            with self.subTest(optional=optional):
+                marker = dict(id='image.markers', reason='Marker corners', optional=optional)
+                self.manifest['capabilities'] = [marker]
+                (self.source/'manifest.json').write_text(json.dumps(self.manifest))
+                with self.assertRaisesRegex(ValueError, 'image.markers requires image.read'):
+                    build(self.source, self.key)
+                for capabilities in ([marker, dict(id='image.read', reason='Selected pixels')],
+                                     [dict(id='image.read', reason='Selected pixels'), marker],
+                                     [dict(id='image.read', reason='Selected pixels')]):
+                    self.manifest['capabilities'] = capabilities
+                    (self.source/'manifest.json').write_text(json.dumps(self.manifest))
+                    build(self.source, self.key)
+
     def test_deterministic_signature_and_version(self):
         self.assertEqual(build(self.source,self.key),build(self.source,self.key))
         self.assertNotEqual(build(self.source,self.key)[0],build(self.source,self.key,'0.2.0')[0])

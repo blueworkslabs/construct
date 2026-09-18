@@ -1,6 +1,7 @@
 package dev.construct.runtime
 
 import org.json.JSONObject
+import org.json.JSONArray
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -39,4 +40,19 @@ class ImageAccessTest {
         store = ModuleStore(app)
         denied("CAPABILITY_DENIED") { store.withCapability(store.installed().single(),"image.read") {} }
     }
+    @Test fun markerDeclarationRequiresImageReadRegardlessOfOrderOrOptionalFlag() {
+        val modern = fixture("home-registry")
+        val m = JSONObject(modern.files.getValue("manifest.json").toString(Charsets.UTF_8))
+        val read = JSONObject().put("id", "image.read").put("reason", "Selected pixels")
+        for (optional in listOf(false, true)) {
+            val marker = JSONObject().put("id", "image.markers").put("reason", "Marker corners").put("optional", optional)
+            m.put("capabilities", JSONArray().put(marker))
+            denied("MANIFEST_SCHEMA") { Packages.manifest(m.toString().toByteArray()) }
+            for (caps in listOf(JSONArray().put(marker).put(read), JSONArray().put(read).put(marker), JSONArray().put(read))) {
+                m.put("capabilities", caps)
+                assertEquals(caps.length(), Packages.manifest(m.toString().toByteArray()).capabilities.size)
+            }
+        }
+    }
+
 }

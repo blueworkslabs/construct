@@ -101,6 +101,8 @@ object Packages {
         checkRule(caps.none { it.id == "camera.capture" } || api.get("min") in setOf("0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"), "API_INCOMPATIBLE", "Camera requires Construct API 0.4.0")
         CapabilityLifecycle.validateHistoricalApi(caps, api.getString("min"))
         checkRule(caps.map { it.id }.distinct().size == caps.size, "MANIFEST_SCHEMA", "Duplicate capabilities")
+        checkRule(caps.none { it.id == "image.markers" } || caps.any { it.id == "image.read" },
+            "MANIFEST_SCHEMA", "image.markers requires image.read")
         for ((field, max) in listOf("description" to 500, "author" to 120, "homepage" to 500)) {
             if (m.has(field)) checkRule(m.get(field) is String && m.getString(field).length <= max, "MANIFEST_SCHEMA", "Invalid $field")
         }

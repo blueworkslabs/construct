@@ -54,3 +54,36 @@ test('touch-only cancellation releases capture before subsequent controls can re
   e['select-b'].onclick();e.left.onclick();assert.equal(e.result.textContent,'Length: 25.0 cm');
   e.units.value='mm';e.units.onchange();assert.equal(e.result.textContent,'Length: 249.6 mm');
 });
+
+function measureBridge() {
+  let now=0,nextTimer=0;const timers=new Map(),sent=[];
+  const sandbox={construct:{postMessage:raw=>sent.push(JSON.parse(raw))},
+    setTimeout(fn,delay){const id=++nextTimer;timers.set(id,{fn,at:now+delay});return id;},
+    clearTimeout(id){timers.delete(id);}};
+  vm.runInNewContext(fs.readFileSync('examples/measure-module/ui/bridge.js','utf8'),sandbox);
+  return {call:sandbox.call,sent,timers,
+    advance(ms){now+=ms;for(const [id,t] of [...timers])if(t.at<=now){timers.delete(id);t.fn();}},
+    reply(response){sandbox.construct.onmessage({data:JSON.stringify(response)});}};
+}
+test('human picker request survives beyond five minutes and accepts its original reply',async()=>{
+  const bridge=measureBridge();let state='pending';
+  const result=bridge.call('image.read',{op:'pick'});result.then(()=>state='resolved',()=>state='rejected');
+  bridge.advance(30*60*1000);await Promise.resolve();assert.equal(state,'pending');
+  bridge.reply({id:bridge.sent[0].id,result:{handle:'chosen-after-browsing'}});
+  assert.equal((await result).handle,'chosen-after-browsing');assert.equal(bridge.timers.size,0);
+});
+test('late picker cancellation still rejects with the host cancellation reason',async()=>{
+  const bridge=measureBridge();const result=bridge.call('image.read',{op:'pick'});
+  const rejected=assert.rejects(result,error=>error.code==='IMAGE_CANCELLED');
+  bridge.advance(30*60*1000);
+  bridge.reply({id:bridge.sent[0].id,error:{code:'IMAGE_CANCELLED',message:'No photo selected'}});
+  await rejected;assert.equal(bridge.timers.size,0);
+});
+test('noninteractive marker and release calls retain bounded response timeouts',async()=>{
+  for(const [method,params] of [['image.markers',{op:'detect'}],['image.read',{op:'release',handle:'old'}]]){
+    const bridge=measureBridge();const result=bridge.call(method,params);
+    const rejected=assert.rejects(result,error=>error.code==='TIMEOUT');
+    bridge.advance(20000);await rejected;assert.equal(bridge.timers.size,0);
+    bridge.reply({id:bridge.sent[0].id,result:{late:true}});
+  }
+});

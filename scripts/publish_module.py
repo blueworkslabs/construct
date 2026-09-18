@@ -70,6 +70,8 @@ def validate_manifest(m):
         require(isinstance(cap['reason'], str) and 0 < len(cap['reason'].strip()) <= 240, 'Capability reason')
         require('optional' not in cap or type(cap['optional']) is bool, 'Optional flag')
     require(len({c['id'] for c in caps}) == len(caps), 'Duplicate capability')
+    declared = {c['id'] for c in caps}
+    require('image.markers' not in declared or 'image.read' in declared, 'image.markers requires image.read')
     for field, maxlen in [('description', 500), ('author', 120), ('homepage', 500)]:
         require(field not in m or isinstance(m[field], str) and len(m[field]) <= maxlen, field)
 

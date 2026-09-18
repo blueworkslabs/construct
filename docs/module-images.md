@@ -19,7 +19,10 @@ workflow or domain result belongs in that primitive.
   URI. The `construct-images/` path prefix is reserved only for modules declaring
   `image.read`; older modules retain their packaged-resource paths. Replacing the
   image invalidates the previous handle. User cancellation is
-  `IMAGE_CANCELLED`; no image is selected automatically.
+  `IMAGE_CANCELLED`; no image is selected automatically. The human-operated picker
+  has no deadline; modules must keep its request pending until a host reply or
+  session teardown, not time out while the user is still choosing. The processing
+  deadline below starts after the picker returns.
 - `{op:"release",handle}` discards that run's image. Unknown/expired/foreign
   handles fail `IMAGE_STALE`. One current image and one pending operation per run.
   Chooser launches have a two-second floor; detection calls a one-second floor.
@@ -50,6 +53,9 @@ repeated IDs. The module chooses which reference and how many are acceptable.
 No marker-side length, calibration, length/result formatting or endpoint input is
 accepted. Only this fixed dictionary is initially implemented; unknown dictionaries
 and fields fail. Requires both its own grant and live `image.read` authority.
+The manifest must also declare `image.read`, even when `image.markers` is optional.
+The host and publisher reject missing dependencies before installation/signing;
+declaration order does not matter. Neither declaration substitutes for live grants.
 Detection reads only the current run's opaque handle; no path/image uploads.
 
 Selected-image module windows retain Android’s secure-window protection against
