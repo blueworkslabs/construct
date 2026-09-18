@@ -206,6 +206,21 @@ try:
  action('Take a photo');expect('Camera preview ready.',60);adb('shell','settings','put','system','user_rotation','1');time.sleep(3);host_ready();no_camera_client()
  adb('shell','settings','put','system','user_rotation','0');time.sleep(2);opened();expect('No photo selected');action('Open private album');expect('Private photo 1 of 1')
  done('Background and rotation release the native camera, discard the transient run and preserve originals')
+ for scale,rotation in [('1.0','0'),('1.0','1'),('2.0','0'),('2.0','1')]:
+  tap('Construct menu');tap('Close module');host_ready()
+  adb('shell','settings','put','system','font_scale',scale);adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2)
+  opened();action('Take a photo')
+  deadline=time.monotonic()+60
+  while time.monotonic()<deadline:
+   shutter=reach('Take photo',True)
+   if shutter.get('enabled')=='true':break
+   time.sleep(.5)
+  else:raise RuntimeError('Capture shutter not enabled in layout case')
+  display('capture-layout-'+scale+'-'+rotation)
+  tap_node(reach('Cancel capture',True));find('Take a photo');expect('Capture canceled.');no_camera_client()
+ tap('Construct menu');tap('Close module');host_ready();adb('shell','settings','put','system','font_scale','1.0');adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
+ opened();action('Open private album');expect('Private photo 1 of 1')
+ done('Native capture shutter and cancel remain usable in portrait/landscape and two-times text')
  action('Delete private photo');find('Delete this private photo?');display('trusted-delete');tap('Cancel');expect('Canceled. Private photo unchanged.')
  action('Delete private photo');find('Delete this private photo?');tap('Delete photo');expect('No private photos yet.');done('Deletion requires a native image confirmation; cancel preserves the original')
  adb('shell','am','force-stop','dev.construct.runtime');root()
@@ -237,7 +252,20 @@ try:
  action('Save to phone gallery');find('Save this photo to phone gallery?');tap('Cancel');expect('Canceled. Private photo unchanged.')
  action('Save to phone gallery');find('Save this photo to phone gallery?');tap('Save copy');expect('Copy saved to phone gallery.');done('Gallery export requires native confirmation and preserves private original')
  adb('shell','input','keyevent','3');time.sleep(3);opened();expect('No photo selected');action('Open private album');expect('Private photo 4 of 4');done('Background clears transient display and preserves private album')
- tap('Construct menu');tap('Module access');find('Module access');label='Allow local face and object detection';reach(label,True);switch=next(n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true');assert switch.get('checked')=='true';tap_node(switch);tap('Turn off');find(label+': off.');tap_node(reach('Reopen module',True));find('Take a photo');action('Open private album');expect('Private photo 4 of 4');action('Find faces');expect('[CAPABILITY_DENIED]');done('Inference grant is independently revocable without losing photos')
+ tap('Construct menu');tap('Module access');find('Module access');label='Allow local face and object detection';reach(label,True);switch=next(n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true');assert switch.get('checked')=='true';tap_node(switch);tap('Turn off')
+ deadline=time.monotonic()+10
+ while time.monotonic()<deadline:
+  if any(n.get('content-desc')==label and n.get('checkable')=='true' and n.get('checked')=='false' for n in nodes()):break
+  time.sleep(.25)
+ else:raise RuntimeError('Analysis grant did not turn off')
+ tap_node(reach('Reopen module',True));find('Take a photo');action('Open private album');expect('Private photo 4 of 4');action('Find faces');expect('[CAPABILITY_DENIED]');done('Inference grant is independently revocable without losing photos')
+ for label,button in [('Allow this module’s private photo library','Open private album'),('Allow selected image pixels','Open private album'),('Allow taking private photos','Take a photo')]:
+  tap('Construct menu');tap('Module access');find('Module access');reach(label,True)
+  switch=next(n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true');assert switch.get('checked')=='true';tap_node(switch);tap('Turn off')
+  tap_node(reach('Reopen module',True));find('Take a photo');action(button);expect('[CAPABILITY_DENIED]')
+  if button=='Take a photo':no_camera_client()
+  tap('Construct menu');tap('Module access');find('Module access');grant(label);tap_node(reach('Reopen module',True));find('Take a photo');action('Open private album');expect('Private photo 4 of 4')
+  done(label+' independently blocks its operation; restoring consent leaves originals accessible')
  adb('shell','am','force-stop','dev.construct.runtime');root()
  for name,digest in hashes.items():assert hashlib.sha256(adb('exec-out','cat',folder+name,binary=True)).hexdigest()==digest,'Private original changed'
  unroot();done('Original private photo bytes unchanged after inference, lifecycle and export')
