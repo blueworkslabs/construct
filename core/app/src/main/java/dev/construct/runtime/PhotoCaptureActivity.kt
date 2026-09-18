@@ -201,7 +201,11 @@ class PhotoCaptureActivity : ComponentActivity() {
             Column(Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Construct · Take photo", style = MaterialTheme.typography.titleLarge)
                 Text(installed.manifest.name, style = MaterialTheme.typography.bodySmall)
-                AndroidView(factory = { context -> PreviewView(context).also { bind(it) } },
+                AndroidView(factory = { context -> PreviewView(context).apply {
+                    // SurfaceView can escape Compose bounds during landscape/large-text layout.
+                    // Match the proven native acquisition path: a bounds-respecting TextureView.
+                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                }.also { bind(it) } },
                     modifier = Modifier.fillMaxWidth().weight(1f).semantics { contentDescription = "Camera viewfinder" })
                 Column(Modifier.heightIn(max = 180.dp).verticalScroll(rememberScrollState())) {
                     Text(status, style = MaterialTheme.typography.bodyMedium)
