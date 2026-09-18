@@ -21,6 +21,7 @@ p.add_argument('--catalog', required=True)
 p.add_argument('--module-sha', required=True)
 p.add_argument('--module-name', default='Pocket Measure')
 p.add_argument('--module-version', default='0.2.2')
+p.add_argument('--layout-only', action='store_true', help='Focused consent, measurement and normal/2x layout checks; not full acceptance')
 p.add_argument('--precision-checks', action='store_true', help='Capture real held placement/drag loupe and verify transactional interruption (requires loupe module)')
 p.add_argument('--lifecycle-only', action='store_true', help='Focused consent, image setup and lifecycle scope; excludes editor/layout checks')
 a = p.parse_args()
@@ -48,6 +49,7 @@ from host_ui import host_ready, catalog_settings, apply_catalog, library, select
 
 receipt = {'scope':'Module-owned Measure exact-APK functional and lifecycle acceptance','moduleSha256':a.module_sha,'apkSha256':a.sha,'checks':[],'complete':False,'stopped':False}
 receipt['focusedLifecycle']=a.lifecycle_only
+receipt['focusedLayout']=a.layout_only
 receipt['precisionChecks']=a.precision_checks
 started = False
 
@@ -378,7 +380,7 @@ try:
     if abs(value-240)>3:raise RuntimeError('Flat reference failed: '+str(value))
     receipt['flatMm']=value;capture_display('module-measure-flat')
     done('Real system picker, private image resource and local detector feed module-owned 240 mm measurement offline')
-    if not a.lifecycle_only:
+    if not a.lifecycle_only and not a.layout_only:
         units('Millimetres')
         millimetres=expect('Length: ')
         if not millimetres.endswith(' mm') or abs(length()-receipt['flatMm'])>.51:raise RuntimeError('Units conversion exceeds cm display rounding')
@@ -438,6 +440,7 @@ try:
         if photo_pixels('module-gesture-reset')!=fit_pixels:raise RuntimeError('Fit reset did not restore the original rendered photograph')
         if abs(endpoints(entry)-240)>3:raise RuntimeError('Fit reset changed photo coordinates')
         done('Real pinch and pan do not place endpoints; reset restores calibrated fit coordinates')
+    if not a.lifecycle_only:
         size('95');value=endpoints(entry)
         if abs(value-228)>3:raise RuntimeError('Actual marker-size scaling failed: '+str(value))
         done('Module-owned recalibration produces 228 mm from the same endpoints')
@@ -457,6 +460,9 @@ try:
             size('95');endpoints(entry)
         adb('shell','settings','put','system','font_scale','1.0');adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
         done('Two-times text remains operable in portrait and landscape with real picker and measurement')
+        if a.layout_only:
+            receipt['complete']=True
+            raise SystemExit(0)
         for name,key,tolerance in [('measure-angled.png','angledMm',4),('measure-oriented.jpg','orientedMm',3)]:
             entry=measured(name);value=length()
             if abs(value-240)>tolerance:raise RuntimeError(name+' outside tolerance')
