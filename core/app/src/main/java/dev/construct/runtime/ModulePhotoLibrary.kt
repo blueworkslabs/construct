@@ -116,8 +116,11 @@ internal class ModulePhotoLibrary(
                             else work(token) {
                                 val publish: (() -> Unit) -> Unit = { action -> synchronized(lock) { valid(token); commit(action) } }
                                 if (op == "delete") photos.delete(file, publish)
-                                else photos.readSelected(file) { input, size ->
-                                    GalleryExport.copy(input, size, MediaStorePhoto(context.contentResolver), publish)
+                                else {
+                                    if (android.os.Build.VERSION.SDK_INT < 29) throw ConstructError("PHOTO_EXPORT_UNAVAILABLE", "Gallery copy needs Android 10 or later")
+                                    photos.readSelected(file) { input, size ->
+                                        GalleryExport.copy(input, size, MediaStorePhoto(context.contentResolver), publish)
+                                    }
                                 }
                                 val finished: () -> Unit = {
                                     if (op == "delete") { images.clearPhoto(); refs.clear() }
