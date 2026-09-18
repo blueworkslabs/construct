@@ -28,7 +28,7 @@ internal object PhotoBoxes {
     }
 }
 
-/** Per-request CPU detector; bundled models, no download manager or module bridge. */
+/** Per-request CPU detector; bundled models, reusable bounded image API; no download manager. */
 internal object PhotoAnalyzer {
     fun detect(context: Context, image: Bitmap, kind: AnalysisKind): PhotoAnalysis {
         checkRule(image.width in 1..1024 && image.height in 1..1024, "PHOTO_ANALYSIS", "Photo exceeds analysis limits.")
@@ -53,23 +53,5 @@ internal object PhotoAnalyzer {
             }
             return PhotoAnalysis(kind, boxes)
         } finally { input.close(); if (!copy.isRecycled) copy.recycle() }
-    }
-}
-
-/** Each selection/close invalidates pending output even if native inference finishes later. */
-internal class AnalysisGeneration {
-    private var generation = 0L
-    @Synchronized fun invalidate(): Long { generation++; return generation }
-    @Synchronized fun current(token: Long): Boolean = generation == token
-}
-
-internal data class PhotoFit(val left: Float, val top: Float, val width: Float, val height: Float) {
-    companion object {
-        fun fit(imageWidth: Int, imageHeight: Int, width: Float, height: Float): PhotoFit {
-            require(imageWidth > 0 && imageHeight > 0 && width >= 0 && height >= 0)
-            val scale = minOf(width / imageWidth, height / imageHeight)
-            val w = imageWidth * scale; val h = imageHeight * scale
-            return PhotoFit((width - w) / 2, (height - h) / 2, w, h)
-        }
     }
 }

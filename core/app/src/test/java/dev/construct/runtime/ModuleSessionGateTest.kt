@@ -10,12 +10,12 @@ class ModuleSessionGateTest {
     }
     @Test fun menuBlocksDeviceEffectsButAllowsOutstandingSave() {
         val gate = ModuleSessionGate()
-        gate.authorize("camera.capture")
+        gate.authorize("camera.photo")
         gate.setPaused(true)
-        for (method in listOf("camera.capture", "contacts.read", "device.tone", "device.toast", "log.write")) denied { gate.authorize(method) }
+        for (method in listOf("camera.photo", "contacts.read", "device.tone", "device.toast", "log.write")) denied { gate.authorize(method) }
         gate.authorize("storage.kv")
         gate.setPaused(false)
-        gate.authorize("camera.capture")
+        gate.authorize("camera.photo")
     }
     @Test fun inFlightContactReplyCannotCrossMenuEvenAfterReturn() {
         val gate = ModuleSessionGate(); val before = gate.generation.get()

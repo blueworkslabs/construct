@@ -7,8 +7,9 @@ The native live CameraX viewfinder is acquisition infrastructure. The module own
 the album, selected photo, analysis commands, detection list, overlays and ordinary
 application UI. Analysis operates on an explicitly selected **still photo**, not
 on a video stream. This does not establish feasibility of high-frame-rate web
-video processing. The older native Camera workspace remains until replacement
-verification is complete.
+video processing. The alpha31 source candidate retires the older workspace, but it must not be
+promoted without complete replacement and migration verification. Alpha30 remains
+the available native baseline.
 
 ## Authority and data
 

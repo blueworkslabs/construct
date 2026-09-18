@@ -7,9 +7,9 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 # Existing debt may shrink, not silently grow. See docs/shell-retirement.md.
-NATIVE_WORKSPACES = {'camera.capture': 'CameraActivity'}
+NATIVE_WORKSPACES = {}
 # PhotoCaptureActivity is a generic foreground acquisition surface, not an album/workflow.
-ACTIVITIES = {'.MainActivity', '.ModuleActivity', '.CameraActivity', '.PhotoCaptureActivity'}
+ACTIVITIES = {'.MainActivity', '.ModuleActivity', '.PhotoCaptureActivity'}
 
 def check(root=ROOT):
     errors = []
@@ -20,8 +20,10 @@ def check(root=ROOT):
             errors.append(f'{path.name}: aviation implementation/provider dependency belongs in a module')
         if re.search(r'\bMeasure(?:Activity|Editor|Geometry|Overlay|Sheet|Viewport|Detector|Point|Plane)\b', text):
             errors.append(f'{path.name}: measurement interpretation/workflow belongs in a module')
-        if any(literal in text for literal in ('"sky.watch"', '"photo.measure"')) and path != src/'CapabilityLifecycle.kt':
+        if any(literal in text for literal in ('"sky.watch"', '"photo.measure"', '"camera.capture"')) and path != src/'CapabilityLifecycle.kt':
             errors.append(f'{path.name}: historical ID belongs only in the retirement registry')
+        if re.search(r'\bCameraActivity\b', text):
+            errors.append(f'{path.name}: camera application workflow belongs in a module')
         if re.search(r'\bDexClassLoader\b|\bInMemoryDexClassLoader\b', text):
             errors.append(f'{path.name}: downloadable native execution is not the module contract')
     capture = src/'PhotoCaptureActivity.kt'
@@ -41,4 +43,4 @@ if __name__ == '__main__':
     errors = check()
     for error in errors: print(error, file=sys.stderr)
     if errors: sys.exit(1)
-    print('Architecture ratchet passed: no native Sky/Measure domain, one inventoried legacy workspace.')
+    print('Architecture ratchet passed: no native Sky/Measure/Camera application workspaces; bounded acquisition and inference only.')

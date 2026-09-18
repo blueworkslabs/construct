@@ -2,8 +2,8 @@
 
 This reference describes implemented contracts, not the target architecture.
 Read the [modular design contract](modular-design.md) when proposing capabilities.
-The broad native-workspace launch operations below are compatibility exceptions;
-new modules should own their feature logic and UI through reusable capabilities.
+The former broad native-workspace launch operations are retired;
+modules own their feature logic and UI through reusable capabilities.
 API 0.9 adds bounded transport and one-shot location. API 0.10 adds
 [bounded image selection and marker detection](module-images.md).
 Unrestricted WebView networking/geolocation and general native rendering remain unavailable.
@@ -69,7 +69,9 @@ a granted module can retain data it has read; revocation is not retroactive eras
   session loses authority. Silent/vibrate/DND policy can return `AUDIO_MUTED`.
   This capability does not grant arbitrary audio streaming or microphone access.
 - **`contacts.read` (0.3+):** bounded native provider search/details, below.
-- **`camera.capture` (0.4+):** native human-operated workspace, below.
+- **`camera.photo`, `photos.library`, `image.analyze` (0.11):** bounded acquisition,
+  private-photo access and reusable inference; [contracts](module-photos.md).
+- **`camera.capture` (historical 0.4+):** retired in the alpha31 candidate; below.
 
 Denials are structured errors, not permission prompts initiated by JavaScript.
 Android permission is requested only from native Module access UI. Malformed,
@@ -104,10 +106,16 @@ API 0.11 candidate adds fresh `camera.photo`, `photos.library` and
 `image.analyze` capabilities for module-owned saved-photo workflows. See
 [the bounded photo contracts](module-photos.md) and
 [the experiment/acceptance boundary](camera-module-plan.md). They do not expose
-a continuous camera frame stream. The following workspace is the legacy path,
-still retained while the replacement is verified.
+a continuous camera frame stream. The following documents the historical
+workspace through alpha30. Alpha31 retains its identifier but removes its Activity
+and dispatch. Required callers show **Update required**; new installation and
+rollback into that old workflow are blocked, without deleting private originals.
+See [retirement](shell-retirement.md). This candidate is not accepted until its
+exact-artifact migration and functional scopes pass.
 
-Only `{op:'open'}` is supported. `{opened:true}` acknowledges a native workspace,
+### Historical native workspace (through alpha30)
+
+Only `{op:'open'}` was supported. `{opened:true}` acknowledges a native workspace,
 **not** a captured image. Both module grant and Android CAMERA are required.
 Opening closes the WebView. Capture and confirmed deletion are native human
 controls. Backgrounding or rotation closes the camera; saved photos remain.

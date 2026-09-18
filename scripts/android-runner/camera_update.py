@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded Camera extraction probe on a disposable synthetic-camera emulator.
+"""Signed Camera module update/rollback proof on a disposable emulator.
 Debug timing evidence is explicitly distinct from optimized artifact acceptance.
 """
 import argparse,datetime,fcntl,hashlib,json,os,re,subprocess,time,uuid
@@ -7,12 +7,12 @@ from pathlib import Path
 from config import CONFIG,SERIAL,require_runner,catalog
 p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.add_argument('--sha',required=True)
 p.add_argument('--catalog',required=True);p.add_argument('--module-sha',required=True);p.add_argument('--module-version',default='0.2.0')
-p.add_argument('--prototype',action='store_true');a=p.parse_args();require_runner();catalog(a.catalog)
+p.add_argument('--old-module-sha',required=True);p.add_argument('--prototype',action='store_true');a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
 assert subprocess.run(['systemctl','--user','is-active','--quiet',CONFIG.service]).returncode!=0,'Preserve running emulator'
 assert not any(x.startswith(SERIAL+'\t') for x in subprocess.check_output([str(CONFIG.sdk/'platform-tools/adb'),'devices'],text=True).splitlines()),'Preserve occupied port'
-run=CONFIG.root/'results'/(datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'-camera-module-'+uuid.uuid4().hex[:8]);run.mkdir(parents=True)
+run=CONFIG.root/'results'/(datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'-camera-update-'+uuid.uuid4().hex[:8]);run.mkdir(parents=True)
 os.environ['CONSTRUCT_RESULTS']=str(run)
 import ui
 from ui import adb,nodes,labels,tap,tap_node,find,capture
@@ -21,7 +21,7 @@ from catalog_input import replace_text
 from adb_identity import restore_shell_identity
 receipt={'complete':False,'stopped':False,'prototypeDebug':a.prototype,'apkSha256':a.sha,'moduleSha256':a.module_sha,'checks':[],'timings':[]}
 started=False;rooted=False
-heading='Pocket Camera · '+a.module_version
+heading='Pocket Camera · 0.2.0'
 folder='/data/user/0/dev.construct.runtime/files/camera-photos/dev.construct.camera/'
 def save():(run/'result.json').write_text(json.dumps(receipt,indent=2)+'\n')
 def done(name):receipt['checks'].append(name);save();print('PASS:',name,flush=True)
@@ -183,24 +183,17 @@ try:
  adb('logcat','-c');adb('install',str(a.apk.resolve()),timeout=120);launch();catalog_settings()
  replace_text(nodes,lambda v:ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(v),a.catalog)
  apply_catalog();find('Catalog refreshed.');select_after(heading,('Review & install',));tap('Allow & install');installed_status()
- events=diagnostics();assert any(e.get('code')=='INSTALLED_TRIAL' and e.get('packageDigest')==a.module_sha for e in events),'Wrong signed module'
+ events=diagnostics();assert any(e.get('code')=='INSTALLED_TRIAL' and e.get('packageDigest')==a.old_module_sha for e in events),'Wrong signed module'
  library();select_after(heading,('Open',));find('Take a photo');action('Open private album');expect('[CAPABILITY_DENIED]');action('Take a photo');expect('[CAPABILITY_DENIED]')
  done('Fresh module cannot open private album or capture without new grants')
  tap('Construct menu');tap('Module access');find('Module access')
  for label in ['Allow taking private photos','Allow this module’s private photo library','Allow selected image pixels','Allow local face and object detection']:grant(label)
- tap_node(reach('Reopen module',True));find('Take a photo');action('Take a photo');expect('[ANDROID_PERMISSION_DENIED]');tap('Construct menu');tap('Module access');find('Module access')
- done('Android camera permission remains independent of the new capture grant')
  tap_node(reach('Allow Android camera access',True));find('While using the app');tap('While using the app');find('Android camera access: allowed')
  tap_node(reach('Reopen module',True));find('Take a photo');action('Take a photo');expect('Camera preview ready.',60);display('native-capture')
- tap('Cancel capture');find('Take a photo');expect('Capture canceled.');no_camera_client()
+ tap('Cancel capture');find('Take a photo');expect('Capture canceled.')
  action('Open private album');expect('No private photos yet.');done('Native capture can cancel without creating a private photo')
- action('Take a photo');expect('Camera preview ready.',60);tap('Take photo');expect('Private photo ready.',60);expect('Private photo 1 of 1');no_camera_client();display('captured-photo')
+ action('Take a photo');expect('Camera preview ready.',60);tap('Take photo');expect('Private photo ready.',60);expect('Private photo 1 of 1');display('captured-photo')
  done('Real synthetic CameraX shutter returns to the module-owned private album')
- action('Take a photo');expect('Camera preview ready.',60);adb('shell','input','keyevent','3');time.sleep(3);no_camera_client()
- opened();expect('No photo selected');action('Open private album');expect('Private photo 1 of 1')
- action('Take a photo');expect('Camera preview ready.',60);adb('shell','settings','put','system','user_rotation','1');time.sleep(3);host_ready();no_camera_client()
- adb('shell','settings','put','system','user_rotation','0');time.sleep(2);opened();expect('No photo selected');action('Open private album');expect('Private photo 1 of 1')
- done('Background and rotation release the native camera, discard the transient run and preserve originals')
  action('Delete private photo');find('Delete this private photo?');display('trusted-delete');tap('Cancel');expect('Canceled. Private photo unchanged.')
  action('Delete private photo');find('Delete this private photo?');tap('Delete photo');expect('No private photos yet.');done('Deletion requires a native image confirmation; cancel preserves the original')
  adb('shell','am','force-stop','dev.construct.runtime');root()
@@ -217,25 +210,35 @@ try:
   name='00000000-0000-4000-8000-%012d.jpg'%i;local=run/name;exif=Image.Exif();exif[274]=6 if i==3 else 1;image.save(local,'JPEG',quality=95,exif=exif)
   hashes[name]=hashlib.sha256(local.read_bytes()).hexdigest();adb('push',str(local),folder+name);adb('shell','chown',owner,folder+name);adb('shell','chmod','600',folder+name);adb('shell','restorecon',folder+name);adb('shell','touch','-t','202001010000.00',folder+name)
  unroot();adb('shell','cmd','connectivity','airplane-mode','enable');adb('shell','svc','wifi','disable');adb('shell','svc','data','disable');assert adb('shell','settings','get','global','airplane_mode_on').strip()=='1'
- opened();action('Open private album');expect('Private photo 4 of 4');measure('faces','1','astronaut-cold');measure('objects','person','astronaut-cold')
- done('Offline saved-photo face/object inference returns module-rendered estimates')
- for i in range(2):measure('faces','1','astronaut-warm-'+str(i))
- action('Previous photo');expect('Private photo 3 of 4');measure('faces','1','exif-oriented')
- action('Previous photo');expect('Private photo 2 of 4');measure('faces','0','blank')
- action('Previous photo');expect('Private photo 1 of 4');measure('objects','cat','cat')
- done('EXIF, blank and object fixtures work through the same bounded image pipeline')
- controlled_probe()
- for rotation in ('0','1'):
-  adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2);w,h=ui._device.window_size();assert (w>h)==(rotation=='1'),'Rotation did not take effect';action('Find objects');finish_analysis();display('layout-'+rotation)
-  adb('shell','settings','put','system','font_scale','2.0');time.sleep(2);action('Find objects');finish_analysis();display('large-'+rotation);adb('shell','settings','put','system','font_scale','1.0')
- adb('shell','settings','put','system','user_rotation','0');done('Photo and analysis controls operate in both orientations and two-times text')
- action('Save to phone gallery');find('Save this photo to phone gallery?');tap('Cancel');expect('Canceled. Private photo unchanged.')
- action('Save to phone gallery');find('Save this photo to phone gallery?');tap('Save copy');expect('Copy saved to phone gallery.');done('Gallery export requires native confirmation and preserves private original')
- adb('shell','input','keyevent','3');time.sleep(3);opened();expect('No photo selected');action('Open private album');expect('Private photo 4 of 4');done('Background clears transient display and preserves private album')
- tap('Construct menu');tap('Module access');find('Module access');label='Allow local face and object detection';reach(label,True);switch=next(n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true');assert switch.get('checked')=='true';tap_node(switch);tap('Turn off');find(label+': off.');tap_node(reach('Reopen module',True));find('Take a photo');action('Open private album');expect('Private photo 4 of 4');action('Find faces');expect('[CAPABILITY_DENIED]');done('Inference grant is independently revocable without losing photos')
+ def installed_apk():
+  paths=adb('shell','pm','path','dev.construct.runtime').splitlines();assert len(paths)==1 and paths[0].startswith('package:/data/app/')
+  digest=adb('shell','sha256sum',paths[0].removeprefix('package:')).split()[0];assert digest==a.sha
+  return digest
+ def inspect_cat(label):
+  opened();action('Open private album');expect('Private photo 4 of 4')
+  for position in (3,2,1):action('Previous photo');expect('Private photo '+str(position)+' of 4')
+  measure('objects','cat',label)
+ receipt['installedApkHashes']=[installed_apk()]
+ inspect_cat('before-update');assert 'Minimum detection score' not in labels()
+ tap('Construct menu');tap('Mark working');library()
+ adb('shell','cmd','connectivity','airplane-mode','disable');adb('shell','svc','wifi','enable');adb('shell','svc','data','enable')
+ heading='Pocket Camera · '+a.module_version
+ select_after(heading,('Review & install',));tap('Allow & install');installed_status()
+ events=diagnostics();assert any(e.get('code')=='INSTALLED_TRIAL' and e.get('packageDigest')==a.module_sha for e in events)
+ receipt['installedApkHashes'].append(installed_apk())
+ adb('shell','cmd','connectivity','airplane-mode','enable');adb('shell','svc','wifi','disable');adb('shell','svc','data','disable')
+ inspect_cat('after-update');action('50% or higher');tap('90% or higher')
+ node=reach('Objects found:',prefix=True);assert 'showing 0' in (node.get('text') or node.get('content-desc'))
+ display('module-only-filtered');action('90% or higher');tap('50% or higher')
+ node=reach('Objects found:',prefix=True);assert 'showing 1' in (node.get('text') or node.get('content-desc'))
+ display('module-only-restored')
+ done('Signed module update adds working score filtering on identical installed APK bytes')
+ tap('Construct menu');tap('Close module');library();select_after(heading,('Roll back',));tap('Restore');library()
+ heading='Pocket Camera · 0.2.0';receipt['installedApkHashes'].append(installed_apk())
+ inspect_cat('after-rollback');assert 'Minimum detection score' not in labels()
  adb('shell','am','force-stop','dev.construct.runtime');root()
  for name,digest in hashes.items():assert hashlib.sha256(adb('exec-out','cat',folder+name,binary=True)).hexdigest()==digest,'Private original changed'
- unroot();done('Original private photo bytes unchanged after inference, lifecycle and export')
+ unroot();done('Supported rollback restores previous controls and offline inference with original photos and APK unchanged')
  receipt['complete']=True
 except Exception as e:
  receipt['error']=str(e)

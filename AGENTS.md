@@ -42,9 +42,11 @@ a broad framework or changing the runtime when a small reusable contract suffice
 
 ## Existing exceptions are not templates
 
-The camera workspace still includes host-owned feature workflows.
-These are documented migration debt, not precedents for new module architecture.
-`sky.watch` and `photo.measure` are retired: retain only their historical
+The alpha31 candidate has no remaining native application-workspace exception.
+`PhotoCaptureActivity` is bounded acquisition only; it must not acquire album,
+analysis presentation or application workflow. Candidate acceptance is separate
+from this source ownership statement.
+`sky.watch`, `photo.measure` and `camera.capture` are retired: retain only their historical
 identifiers, never reintroduce their implementations. Follow [retirement handling](docs/shell-retirement.md) and run
 `scripts/check_architecture.py`. Preserve supported contracts while migrating deliberately; do not remove working functionality or
 rewrite unrelated modules opportunistically. Prototype success is useful behavior

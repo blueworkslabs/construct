@@ -3,6 +3,7 @@ package dev.construct.runtime
 /** Historical identifiers are readable for upgrades, never executable authority. */
 internal object CapabilityLifecycle {
     private val historicalApis = mapOf(
+        "camera.capture" to setOf("0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"),
         "sky.watch" to setOf("0.8.0", "0.9.0", "0.10.0", "0.11.0"),
         "photo.measure" to setOf("0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"),
     )

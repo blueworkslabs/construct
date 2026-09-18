@@ -1,5 +1,11 @@
 # Selected-photo analysis — alpha 13
 
+Historical native-workspace behavior through alpha30. The alpha31 candidate
+reuses the bounded native engine/storage but retires that workspace: modern
+Camera owns the saved-photo UI and receives pixels/results under fresh grants.
+See [the new API and consent boundary](module-photos.md). Statements below about
+no JavaScript image/result/export access describe the old workspace only.
+
 Native **Find faces** and **Find objects** analyze the selected private photo,
 only after a user tap. Both use bundled CPU models: no photo upload and no app-time
 model download. The module bridge still only opens the camera workspace. No

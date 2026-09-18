@@ -1,6 +1,8 @@
 # Camera extraction experiment — API 0.11 proposal
 
-Status: implementation experiment, not a shipped contract or acceptance claim.
+Status: implementation/retirement candidate, not a shipped contract or acceptance claim.
+The native workspace is absent from the source candidate; alpha30 remains the
+released baseline until exact-artifact replacement and migration acceptance.
 
 ## Question and boundary
 

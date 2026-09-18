@@ -106,8 +106,10 @@ flowchart LR
 ```
 
 **The design goal is module updates without a new APK once the required host API
-exists. New native capabilities need host updates.** Camera remains a host-owned
-application workflow. Pocket Measure 0.2.x moves geometry, editor and UI into its
+exists. New native capabilities need host updates.** The alpha31 Camera candidate
+moves album and analysis presentation into its signed module, with fresh
+[bounded photo APIs](docs/module-photos.md). The native viewfinder and inference
+remain reusable services; this is saved-photo processing, not a web video stream. Pocket Measure 0.2.x moves geometry, editor and UI into its
 module using [API 0.10 image primitives](docs/module-images.md) and fresh consent.
 The alpha28 candidate removes native Sky Watch and provides an explicit
 [old-module update path](docs/shell-retirement.md). Sky Watch 0.2.x keeps aircraft
