@@ -225,7 +225,7 @@
           "signature": "CQaQT/YFklMLeNeSLav7njX5Alnec3/4DtmIiW5Yh+0zwRk5EbwDotbR/0g4wFqEAbO4TOK/N9/DMqBdpopw/FgzSZPJlN2pF8qeqWtwt9M+OcCEfZBeRkiiqvWWaiC412tLAqwkTbPDu1oNDaHhvNeYPnfz/hQX4pplgddW5nXUQSVHDK9pFdxTBrfpT4cIV0pDhnfdQ8M3WnPv3doJd3ckocWQ81OjMFBLeLs8kZkck2erdWYLehlM3ByKjk3T/tWhZiXgiF/383Rz+JrxUIErhAPjMOZuJDXPv/KwqXSfqlyqWljo17DidFxfeA4pi+uAQwiZMl7PEZBQbXtwEQ=="
         }
       ],
-      "latest": "0.1.4"
+      "latest": "0.2.0"
     },
     {
       "id": "dev.construct.measure",
