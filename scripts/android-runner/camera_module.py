@@ -102,6 +102,36 @@ def no_camera_client():
   time.sleep(.3)
  raise RuntimeError('Capture retained a live camera client')
 
+PICKER_PACKAGES={'com.android.providers.media','com.android.providers.media.module','com.google.android.providers.media.module','com.android.photopicker','com.google.android.photopicker'}
+def picker_ready():
+ until=time.monotonic()+30
+ while time.monotonic()<until:
+  ns=[n for n in nodes() if n.get('package') in PICKER_PACKAGES]
+  if ns:return ns
+  time.sleep(.3)
+ raise RuntimeError('System photo picker did not open')
+def pick_exported_photo():
+ action('Choose from phone');picker_ready();until=time.monotonic()+30;previous=None
+ while time.monotonic()<until:
+  ns=nodes();items=[n for n in ns if n.get('resource-id','').endswith(('/icon_thumbnail','/photopicker_item_thumbnail'))]
+  if not items:items=[n for n in ns if n.get('content-desc','').startswith('Photo taken')]
+  if len(items)>1:raise RuntimeError('Ambiguous picker content: expected only our synthetic gallery export')
+  if len(items)==1:
+   if previous==items[0].get('bounds'):tap_node(items[0]);break
+   previous=items[0].get('bounds')
+  time.sleep(.4)
+ else:raise RuntimeError('Exported synthetic photo missing from picker')
+ until=time.monotonic()+30
+ while time.monotonic()<until:
+  ns=nodes();pn=[n for n in ns if n.get('package') in PICKER_PACKAGES]
+  if not pn and any(n.get('package')=='dev.construct.runtime' for n in ns):return
+  done=[n for n in pn if n.get('text')=='Done' and n.get('enabled')!='false']
+  if len(done)==1:
+   assert len([n for n in pn if n.get('content-desc','').startswith('Selected Photo taken')])==1
+   tap('Done');return
+  time.sleep(.3)
+ raise RuntimeError('System picker did not complete')
+
 def root():
  global rooted
  assert adb('shell','getprop','ro.kernel.qemu').strip()=='1' and adb('shell','getprop','ro.build.type').strip()=='userdebug','Disposable image required'
@@ -251,6 +281,11 @@ try:
  adb('shell','settings','put','system','user_rotation','0');done('Photo and analysis controls operate in both orientations and two-times text')
  action('Save to phone gallery');find('Save this photo to phone gallery?');tap('Cancel');expect('Canceled. Private photo unchanged.')
  action('Save to phone gallery');find('Save this photo to phone gallery?');tap('Save copy');expect('Copy saved to phone gallery.');done('Gallery export requires native confirmation and preserves private original')
+ action('Choose from phone');picker_ready();adb('shell','input','keyevent','4');find('Take a photo');expect('[IMAGE_CANCELLED]')
+ pick_exported_photo();expect('Selected photo ready.');expect('Selected phone photo');measure('objects','cat','system-picker')
+ for label in ('Delete private photo','Save to phone gallery'):
+  assert reach(label).get('enabled')=='false','Phone selection must not mutate an unrelated private original'
+ done('System picker cancellation and actual selection work; phone image inference cannot delete/export a private original')
  adb('shell','input','keyevent','3');time.sleep(3);opened();expect('No photo selected');action('Open private album');expect('Private photo 4 of 4');done('Background clears transient display and preserves private album')
  tap('Construct menu');tap('Module access');find('Module access');label='Allow local face and object detection';reach(label,True);switch=next(n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true');assert switch.get('checked')=='true';tap_node(switch);tap('Turn off')
  deadline=time.monotonic()+10
