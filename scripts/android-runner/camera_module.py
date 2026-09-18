@@ -76,11 +76,13 @@ def prototype_metrics():
  try:
   with urllib.request.urlopen('http://127.0.0.1:9224/json',timeout=5) as response:pages=json.load(response)
   page=next(p for p in pages if p.get('url','').startswith('https://dev.construct.camera.construct.invalid/'))
-  with websocket.create_connection(page['webSocketDebuggerUrl'],timeout=5,suppress_origin=True) as ws:
+  ws=websocket.create_connection(page['webSocketDebuggerUrl'],timeout=5,suppress_origin=True)
+  try:
    ws.send(json.dumps({'id':1,'method':'Runtime.evaluate','params':{'expression':'JSON.stringify(window.cameraMetrics)','returnByValue':True}}))
    while True:
     result=json.loads(ws.recv())
     if result.get('id')==1:return json.loads(result['result']['result']['value'])
+  finally:ws.close()
  finally:adb('forward','--remove','tcp:9224')
 
 def measure(kind,expected,index):
@@ -121,7 +123,7 @@ try:
  events=diagnostics();assert any(e.get('code')=='INSTALLED_TRIAL' and e.get('packageDigest')==a.module_sha for e in events),'Wrong signed module'
  library();select_after(heading,('Open',));find('Take a photo');action('Open private album');expect('[CAPABILITY_DENIED]');action('Take a photo');expect('[CAPABILITY_DENIED]')
  done('Fresh module cannot open private album or capture without new grants')
- tap('Construct menu');tap('Module access');find('Reopen module')
+ tap('Construct menu');tap('Module access');find('Module access')
  for label in ['Allow taking private photos','Allow this module’s private photo library','Allow selected image pixels','Allow local face and object detection']:grant(label)
  tap_node(reach('Allow Android camera access',True));find('While using the app');tap('While using the app');find('Android camera access: allowed')
  tap_node(reach('Reopen module',True));find('Take a photo');action('Take a photo');expect('Camera preview ready.',60);display('native-capture')
@@ -159,7 +161,7 @@ try:
  action('Save to phone gallery');find('Save this photo to phone gallery?');tap('Cancel');expect('Canceled. Private photo unchanged.')
  action('Save to phone gallery');find('Save this photo to phone gallery?');tap('Save copy');expect('Copy saved to phone gallery.');done('Gallery export requires native confirmation and preserves private original')
  adb('shell','input','keyevent','3');time.sleep(3);opened();expect('No photo selected');action('Open private album');expect('Private photo 4 of 4');done('Background clears transient display and preserves private album')
- tap('Construct menu');tap('Module access');find('Reopen module');label='Allow local face and object detection';tap_node(reach(label,True));tap('Turn off');find(label+': off.');tap_node(reach('Reopen module',True));find('Take a photo');action('Open private album');expect('Private photo 4 of 4');action('Find faces');expect('[CAPABILITY_DENIED]');done('Inference grant is independently revocable without losing photos')
+ tap('Construct menu');tap('Module access');find('Module access');label='Allow local face and object detection';tap_node(reach(label,True));tap('Turn off');find(label+': off.');tap_node(reach('Reopen module',True));find('Take a photo');action('Open private album');expect('Private photo 4 of 4');action('Find faces');expect('[CAPABILITY_DENIED]');done('Inference grant is independently revocable without losing photos')
  adb('shell','am','force-stop','dev.construct.runtime');root()
  for name,digest in hashes.items():assert hashlib.sha256(adb('exec-out','cat',folder+name,binary=True)).hexdigest()==digest,'Private original changed'
  unroot();done('Original private photo bytes unchanged after inference, lifecycle and export')
