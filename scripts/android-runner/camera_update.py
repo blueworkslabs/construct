@@ -57,6 +57,11 @@ def reach(label,host=False,prefix=False):
  top_first=prefix and label.startswith(('[','Private photo ready','Capture canceled','No private photos','Copy saved','Canceled.'))
  for i in range(24):
   ns=nodes();w,h=ui._device.window_size();panel=[0,0,w,h]
+  if host:
+   controls=next((n for n in ns if n.get('content-desc')=='Capture controls'),None)
+   if controls is not None:
+    bounds=list(map(int,re.findall(r'-?\d+',controls.get('bounds',''))))
+    if len(bounds)==4 and bounds[2]>bounds[0] and bounds[3]>bounds[1]:panel=bounds
   if not host:
    photo=next((n for n in ns if 'Selected photo with estimated detection boxes' in (n.get('text'),n.get('content-desc'))),None)
    if photo is not None:

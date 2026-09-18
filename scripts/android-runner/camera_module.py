@@ -7,7 +7,7 @@ from pathlib import Path
 from config import CONFIG,SERIAL,require_runner,catalog
 p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.add_argument('--sha',required=True)
 p.add_argument('--catalog',required=True);p.add_argument('--module-sha',required=True);p.add_argument('--module-version',default='0.2.0')
-p.add_argument('--prototype',action='store_true');a=p.parse_args();require_runner();catalog(a.catalog)
+p.add_argument('--prototype',action='store_true');p.add_argument('--capture-layout-only',action='store_true');a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
 assert subprocess.run(['systemctl','--user','is-active','--quiet',CONFIG.service]).returncode!=0,'Preserve running emulator'
@@ -19,7 +19,7 @@ from ui import adb,nodes,labels,tap,tap_node,find,capture
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
 from adb_identity import restore_shell_identity
-receipt={'complete':False,'stopped':False,'prototypeDebug':a.prototype,'apkSha256':a.sha,'moduleSha256':a.module_sha,'checks':[],'timings':[]}
+receipt={'complete':False,'stopped':False,'prototypeDebug':a.prototype,'captureLayoutOnly':a.capture_layout_only,'apkSha256':a.sha,'moduleSha256':a.module_sha,'checks':[],'timings':[]}
 started=False;rooted=False
 heading='Pocket Camera · '+a.module_version
 folder='/data/user/0/dev.construct.runtime/files/camera-photos/dev.construct.camera/'
@@ -57,6 +57,11 @@ def reach(label,host=False,prefix=False):
  top_first=prefix and label.startswith(('[','Private photo ready','Capture canceled','No private photos','Copy saved','Canceled.'))
  for i in range(24):
   ns=nodes();w,h=ui._device.window_size();panel=[0,0,w,h]
+  if host:
+   controls=next((n for n in ns if n.get('content-desc')=='Capture controls'),None)
+   if controls is not None:
+    bounds=list(map(int,re.findall(r'-?\d+',controls.get('bounds',''))))
+    if len(bounds)==4 and bounds[2]>bounds[0] and bounds[3]>bounds[1]:panel=bounds
   if not host:
    photo=next((n for n in ns if 'Selected photo with estimated detection boxes' in (n.get('text'),n.get('content-desc'))),None)
    if photo is not None:
@@ -101,6 +106,23 @@ def no_camera_client():
   if 'dev.construct.runtime' not in section[1].split('\n\n',1)[0]:return
   time.sleep(.3)
  raise RuntimeError('Capture retained a live camera client')
+
+def capture_layouts():
+ for scale,rotation in [('2.0','1'),('1.0','1'),('2.0','0'),('1.0','0')]:
+  tap('Construct menu');tap('Close module');host_ready()
+  adb('shell','settings','put','system','font_scale',scale);adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2)
+  opened();action('Take a photo')
+  deadline=time.monotonic()+60
+  while time.monotonic()<deadline:
+   shutter=reach('Take photo',True)
+   if shutter.get('enabled')=='true':break
+   time.sleep(.5)
+  else:raise RuntimeError('Capture shutter not enabled in layout case')
+  display('capture-layout-'+scale+'-'+rotation)
+  tap_node(reach('Cancel capture',True));find('Take a photo');expect('Capture canceled.');no_camera_client()
+ tap('Construct menu');tap('Close module');host_ready();adb('shell','settings','put','system','font_scale','1.0');adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
+ opened()
+ done('Native capture shutter and cancel remain usable in portrait/landscape and two-times text')
 
 PICKER_PACKAGES={'com.android.providers.media','com.android.providers.media.module','com.google.android.providers.media.module','com.android.photopicker','com.google.android.photopicker'}
 def picker_ready():
@@ -229,6 +251,8 @@ try:
  tap_node(reach('Reopen module',True));find('Take a photo');action('Take a photo');expect('Camera preview ready.',60);display('native-capture')
  tap('Cancel capture');find('Take a photo');expect('Capture canceled.');no_camera_client()
  action('Open private album');expect('No private photos yet.');done('Native capture can cancel without creating a private photo')
+ if a.capture_layout_only:
+  capture_layouts();receipt['complete']=True;raise SystemExit(0)
  action('Take a photo');expect('Camera preview ready.',60);tap('Take photo');expect('Private photo ready.',60);expect('Private photo 1 of 1');no_camera_client();display('captured-photo')
  done('Real synthetic CameraX shutter returns to the module-owned private album')
  action('Take a photo');expect('Camera preview ready.',60);adb('shell','input','keyevent','3');time.sleep(3);no_camera_client()
@@ -236,21 +260,7 @@ try:
  action('Take a photo');expect('Camera preview ready.',60);adb('shell','settings','put','system','user_rotation','1');time.sleep(3);host_ready();no_camera_client()
  adb('shell','settings','put','system','user_rotation','0');time.sleep(2);opened();expect('No photo selected');action('Open private album');expect('Private photo 1 of 1')
  done('Background and rotation release the native camera, discard the transient run and preserve originals')
- for scale,rotation in [('1.0','0'),('1.0','1'),('2.0','0'),('2.0','1')]:
-  tap('Construct menu');tap('Close module');host_ready()
-  adb('shell','settings','put','system','font_scale',scale);adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2)
-  opened();action('Take a photo')
-  deadline=time.monotonic()+60
-  while time.monotonic()<deadline:
-   shutter=reach('Take photo',True)
-   if shutter.get('enabled')=='true':break
-   time.sleep(.5)
-  else:raise RuntimeError('Capture shutter not enabled in layout case')
-  display('capture-layout-'+scale+'-'+rotation)
-  tap_node(reach('Cancel capture',True));find('Take a photo');expect('Capture canceled.');no_camera_client()
- tap('Construct menu');tap('Close module');host_ready();adb('shell','settings','put','system','font_scale','1.0');adb('shell','settings','put','system','user_rotation','0');time.sleep(2)
- opened();action('Open private album');expect('Private photo 1 of 1')
- done('Native capture shutter and cancel remain usable in portrait/landscape and two-times text')
+ capture_layouts();action('Open private album');expect('Private photo 1 of 1')
  action('Delete private photo');find('Delete this private photo?');display('trusted-delete');tap('Cancel');expect('Canceled. Private photo unchanged.')
  action('Delete private photo');find('Delete this private photo?');tap('Delete photo');expect('No private photos yet.');done('Deletion requires a native image confirmation; cancel preserves the original')
  adb('shell','am','force-stop','dev.construct.runtime');root()
