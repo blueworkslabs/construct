@@ -71,7 +71,9 @@ and large text, real offline inference, trusted delete/export cancellation and
 success, EXIF, private original hashes, lifecycle and diagnostics. Upgrade from
 alpha30 with pre-existing private photos; verify fresh authority and preserved
 bytes. Demonstrate a real module workflow update and rollback on identical APKs.
-Only then remove legacy CameraActivity and document the last native-workflow exit.
+The candidate removes legacy CameraActivity only after prototype parity evidence;
+shipping that removal requires all exact-artifact replacement and migration scopes
+to pass. Until then alpha30 remains the released baseline.
 
 User explicitly accepts a demonstrated hybrid limitation as a valid learning.
 A failed probe or incomplete scope stays a failure/incomplete, never acceptance.
