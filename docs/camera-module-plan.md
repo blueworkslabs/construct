@@ -2,7 +2,8 @@
 
 Status: implementation/retirement candidate, not a shipped contract or acceptance claim.
 The native workspace is absent from the source candidate; alpha30 remains the
-released baseline until exact-artifact replacement and migration acceptance.
+released baseline until approval and publication.
+[Exact-artifact results and limitations](camera-alpha31-acceptance.md) are recorded separately.
 
 ## Question and boundary
 

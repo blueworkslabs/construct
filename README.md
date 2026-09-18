@@ -14,8 +14,8 @@ the public static catalog, without a local server.
 **Design principle: the host supplies defined capabilities; the modules contain
 the applications.** Domain logic and feature UI should be independently updateable
 in signed module packages. Released older pilots included native application
-workspaces. The alpha31 Camera candidate removes the last one, subject to its
-replacement/migration acceptance; bounded acquisition and computation stay native. See the
+workspaces. The alpha31 Camera candidate removes the last one; bounded acquisition
+and computation stay native. See its [exact-artifact evidence and limits](docs/camera-alpha31-acceptance.md), the
 [modular design contract](docs/modular-design.md) and [agent guidance](AGENTS.md).
 
 ![Construct's Library with installed tools and quiet per-tool actions](docs/media/ux-refresh/library.png)
@@ -114,7 +114,7 @@ moves album and analysis presentation into its signed module, with fresh
 [bounded photo APIs](docs/module-photos.md). The native viewfinder and inference
 remain reusable services; this is saved-photo processing, not a web video stream. Pocket Measure 0.2.x moves geometry, editor and UI into its
 module using [API 0.10 image primitives](docs/module-images.md) and fresh consent.
-The alpha28 candidate removes native Sky Watch and provides an explicit
+The alpha28 pilot removes native Sky Watch and provides an explicit
 [old-module update path](docs/shell-retirement.md). Sky Watch 0.2.x keeps aircraft
 logic, glossary, map and controls in the signed module; API 0.9 supplies only
 bounded approved-origin HTTP and optional foreground location.

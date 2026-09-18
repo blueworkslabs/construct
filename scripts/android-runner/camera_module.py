@@ -52,7 +52,7 @@ def finish_analysis(timeout=60):
   time.sleep(.3)
  raise RuntimeError('Analysis status did not become visible')
 
-def reach(label,host=False,prefix=False):
+def reach(label,host=False,prefix=False,min_height=1):
  previous=None
  top_first=prefix and label.startswith(('[','Private photo ready','Capture canceled','No private photos','Copy saved','Canceled.'))
  for i in range(24):
@@ -72,7 +72,7 @@ def reach(label,host=False,prefix=False):
   for n in matches:
    b=list(map(int,re.findall(r'-?\d+',n.get('bounds',''))))
    if len(b)!=4:continue
-   if panel[0]<=b[0]<b[2]<=panel[2] and panel[1]<=b[1]<b[3]<=panel[3]:
+   if panel[0]<=b[0]<b[2]<=panel[2] and panel[1]<=b[1]<b[3]<=panel[3] and b[3]-b[1]>=min_height:
     if previous==n.get('bounds'):return n
     previous=n.get('bounds');settling=True;break
    if b[1]<panel[1]:toward_top=True
@@ -119,7 +119,8 @@ def capture_layouts():
    time.sleep(.5)
   else:raise RuntimeError('Capture shutter not enabled in layout case')
   display('capture-layout-'+scale+'-'+rotation)
-  cancel=reach('Cancel capture',True)
+  # Compose reports clipped semantics bounds; require the whole large-text label.
+  cancel=reach('Cancel capture',True,min_height=48 if scale=='2.0' else 24)
   if scale=='2.0':display('capture-cancel-'+scale+'-'+rotation)
   tap_node(cancel);find('Take a photo');expect('Capture canceled.');no_camera_client()
  tap('Construct menu');tap('Close module');host_ready();adb('shell','settings','put','system','font_scale','1.0');adb('shell','settings','put','system','user_rotation','0');time.sleep(2)

@@ -1,0 +1,444 @@
+{
+  "scope": "Camera module extraction \u2014 optimized alpha31 candidate",
+  "hostSource": "b11381e8ea38d73bd678c2715b67c62ef4bb790c",
+  "jvm": {
+    "tests": 187,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lintErrors": 0,
+  "apks": {
+    "arm64-v8a": {
+      "apk": "app-arm64-v8a-pilot.apk",
+      "bytes": 23806330,
+      "abi": "arm64-v8a",
+      "sha256": "edf404f164520aa15ba5d8ae8788b6539d3b595384ba5684a22101744fdfc952",
+      "native": {
+        "libandroidx.graphics.path.so": {
+          "bytes": 10096,
+          "apkBytes": 10096,
+          "sha256": "41e9a793c43a0f4fddb19e33f346bace464f30f888ba7b9eaf96294ea115bfb6"
+        },
+        "libconstruct_measure.so": {
+          "bytes": 3046032,
+          "apkBytes": 3046032,
+          "sha256": "620174bfc567b5aefcbb07872d84bb552389d586ec0f777fbaac72ec79b69472"
+        },
+        "libimage_processing_util_jni.so": {
+          "bytes": 32544,
+          "apkBytes": 32544,
+          "sha256": "f0e4611db0d6b68942d8ba6977519f3dd1cdbffa87b7fc16d8006696ba954af4"
+        },
+        "libmediapipe_tasks_jni.so": {
+          "bytes": 10533656,
+          "apkBytes": 10533656,
+          "sha256": "c0497affbe5c60ddbb61b969403d053ae61d209dc6c7063f38427640c62b8f90"
+        },
+        "libsurface_util_jni.so": {
+          "bytes": 4896,
+          "apkBytes": 4896,
+          "sha256": "6cb2eac3c68e6a82ce2a5ea5aba86749eb8c609914392e125f6cdfbc208992f8"
+        }
+      },
+      "signingMatchesAlpha30": true,
+      "permissionsMatchAlpha30": true,
+      "unchangedAssetsAndLibraries": 22,
+      "legacyActivitiesAbsent": true,
+      "debuggable": false
+    },
+    "x86_64": {
+      "apk": "app-x86_64-pilot.apk",
+      "bytes": 26689915,
+      "abi": "x86_64",
+      "sha256": "237a169c5eccd72d2353ddd8f3090ece106b2332f493e98e0d972b51763d5264",
+      "native": {
+        "libandroidx.graphics.path.so": {
+          "bytes": 10760,
+          "apkBytes": 10760,
+          "sha256": "4e56c996f13670e70082658de7880c4020eabf4f25e43387f88ed78a713fc9f0"
+        },
+        "libconstruct_measure.so": {
+          "bytes": 3380776,
+          "apkBytes": 3380776,
+          "sha256": "ccb44a224fbba9bd7a3b848ffe11992f64539f955f72b50a11f23a6c64b5b066"
+        },
+        "libimage_processing_util_jni.so": {
+          "bytes": 49496,
+          "apkBytes": 49496,
+          "sha256": "f5d02c9c50c33a45c2125f63f4d6c954aec0e9b1a6ade25074f146ed92264efe"
+        },
+        "libmediapipe_tasks_jni.so": {
+          "bytes": 13032744,
+          "apkBytes": 13032744,
+          "sha256": "67fe7c45ce672cc65d121996ad3fe2f87c82ab5419fddfcb7210e4771d011ae0"
+        },
+        "libsurface_util_jni.so": {
+          "bytes": 4912,
+          "apkBytes": 4912,
+          "sha256": "84d8ca201f2160b2ca3a5bd2886994f7287ee7cd09fe73b081f5b236dda8496d"
+        }
+      },
+      "signingMatchesAlpha30": true,
+      "permissionsMatchAlpha30": true,
+      "unchangedAssetsAndLibraries": 22,
+      "legacyActivitiesAbsent": true,
+      "debuggable": false
+    }
+  },
+  "modules": {
+    "0.2.1": {
+      "id": "dev.construct.camera",
+      "version": "0.2.1",
+      "artifact": "dev.construct.camera-0.2.1.zip",
+      "sha256": "6bf8b7d63557b920a1d3b3f63bd061a50d9e141c65009d84720ca4fb15548b22"
+    },
+    "0.2.0": {
+      "id": "dev.construct.camera",
+      "version": "0.2.0",
+      "artifact": "dev.construct.camera-0.2.0.zip",
+      "sha256": "03f704952b52aaa62c235e7240c180279afab5f68934851863ade9595e5f7c78"
+    }
+  },
+  "scopes": {
+    "functional": {
+      "runId": "20260918T131235Z-camera-module-496dacbc",
+      "receiptSha256": "55645aba200926b020527e90a8e6b74f42b14efd91f42b1467d3a4b4c2ccd10a",
+      "complete": true,
+      "stopped": true,
+      "prototypeDebug": false,
+      "captureLayoutOnly": false,
+      "apkSha256": "237a169c5eccd72d2353ddd8f3090ece106b2332f493e98e0d972b51763d5264",
+      "moduleSha256": "6bf8b7d63557b920a1d3b3f63bd061a50d9e141c65009d84720ca4fb15548b22",
+      "checks": [
+        "Fresh module cannot open private album or capture without new grants",
+        "Android camera permission remains independent of the new capture grant",
+        "Native capture can cancel without creating a private photo",
+        "Real synthetic CameraX shutter returns to the module-owned private album",
+        "Background and rotation release the native camera, discard the transient run and preserve originals",
+        "Native capture shutter and cancel remain usable in portrait/landscape and two-times text",
+        "Deletion requires a native image confirmation; cancel preserves the original",
+        "Offline saved-photo face/object inference returns module-rendered estimates",
+        "EXIF, blank and object fixtures work through the same bounded image pipeline",
+        "Photo and analysis controls operate in both orientations and two-times text",
+        "Gallery export requires native confirmation and preserves private original",
+        "System picker cancellation and actual selection work; phone image inference cannot delete/export a private original",
+        "Background clears transient display and preserves private album",
+        "Inference grant is independently revocable without losing photos",
+        "Allow this module\u2019s private photo library independently blocks its operation; restoring consent leaves originals accessible",
+        "Allow selected image pixels independently blocks its operation; restoring consent leaves originals accessible",
+        "Allow taking private photos independently blocks its operation; restoring consent leaves originals accessible",
+        "Original private photo bytes unchanged after inference, lifecycle and export"
+      ],
+      "timings": [
+        {
+          "kind": "faces",
+          "case": "astronaut-cold",
+          "nativeMs": 125,
+          "turnaroundMs": 650,
+          "prototypeFrameProbe": null
+        },
+        {
+          "kind": "objects",
+          "case": "astronaut-cold",
+          "nativeMs": 777,
+          "turnaroundMs": 790,
+          "prototypeFrameProbe": null
+        },
+        {
+          "kind": "faces",
+          "case": "astronaut-warm-0",
+          "nativeMs": 215,
+          "turnaroundMs": 638,
+          "prototypeFrameProbe": null
+        },
+        {
+          "kind": "faces",
+          "case": "astronaut-warm-1",
+          "nativeMs": 221,
+          "turnaroundMs": 627,
+          "prototypeFrameProbe": null
+        },
+        {
+          "kind": "faces",
+          "case": "exif-oriented",
+          "nativeMs": 181,
+          "turnaroundMs": 476,
+          "prototypeFrameProbe": null
+        },
+        {
+          "kind": "faces",
+          "case": "blank",
+          "nativeMs": 148,
+          "turnaroundMs": 597,
+          "prototypeFrameProbe": null
+        },
+        {
+          "kind": "objects",
+          "case": "cat",
+          "nativeMs": 548,
+          "turnaroundMs": 711,
+          "prototypeFrameProbe": null
+        },
+        {
+          "kind": "objects",
+          "case": "system-picker",
+          "nativeMs": 822,
+          "turnaroundMs": 837,
+          "prototypeFrameProbe": null
+        }
+      ],
+      "apiLevel": "37"
+    },
+    "retirement": {
+      "runId": "20260918T132452Z-camera-retirement-e07f2031",
+      "receiptSha256": "e75a1076a517d19e62472d2790d2f79ff24e937638e49fbf0829e55b213c9d27",
+      "oldSha256": "d18e78aa5c09d78d674a4195b51c79401910675ecac1ef3ede90096c82d15bb4",
+      "newSha256": "237a169c5eccd72d2353ddd8f3090ece106b2332f493e98e0d972b51763d5264",
+      "checks": [
+        "In-place host upgrade preserves selected catalog, unrelated installed module and saved counter",
+        "Retired installed trial remains manageable with visible Find update and disabled old authority",
+        "Unconfirmed retired module updates to exact modern signed module and displays retained originals only after new pixel/library consent",
+        "Rollback to retired native code is blocked and current modern module stays runnable",
+        "Retired reinstallation rejected before consent; saved unrelated module data remains intact",
+        "Real native shutter original remains byte-identical after migration and rejected rollback"
+      ],
+      "complete": true,
+      "stopped": true,
+      "apiLevel": "37",
+      "originalPhotoSha256": [
+        "346891a954d7e0eb9120b21812069f1d6dbfa6fd860229b72efc241d74d7ff65"
+      ]
+    },
+    "update": {
+      "runId": "20260918T133309Z-camera-update-2d70f946",
+      "receiptSha256": "42f905dfd40938e0a1076fb08066186739d19d35fb78ef02684ee93475dd4455",
+      "complete": true,
+      "stopped": true,
+      "prototypeDebug": false,
+      "apkSha256": "237a169c5eccd72d2353ddd8f3090ece106b2332f493e98e0d972b51763d5264",
+      "moduleSha256": "6bf8b7d63557b920a1d3b3f63bd061a50d9e141c65009d84720ca4fb15548b22",
+      "oldModuleSha256": "03f704952b52aaa62c235e7240c180279afab5f68934851863ade9595e5f7c78",
+      "oldModuleVersion": "0.2.0",
+      "newModuleVersion": "0.2.1",
+      "checks": [
+        "Fresh module cannot open private album or capture without new grants",
+        "Native camera switching binds the other synthetic device and returns to the original",
+        "Native capture can cancel without creating a private photo",
+        "Real synthetic CameraX shutter returns to the module-owned private album",
+        "Deletion requires a native image confirmation; cancel preserves the original",
+        "Signed module update adds working score filtering on identical installed APK bytes",
+        "Supported rollback restores previous controls and offline inference with original photos and APK unchanged"
+      ],
+      "timings": [
+        {
+          "kind": "objects",
+          "case": "before-update",
+          "nativeMs": 422,
+          "turnaroundMs": 833,
+          "prototypeFrameProbe": null
+        },
+        {
+          "kind": "objects",
+          "case": "after-update",
+          "nativeMs": 372,
+          "turnaroundMs": 773,
+          "prototypeFrameProbe": null
+        },
+        {
+          "kind": "objects",
+          "case": "after-rollback",
+          "nativeMs": 368,
+          "turnaroundMs": 804,
+          "prototypeFrameProbe": null
+        }
+      ],
+      "apiLevel": "37",
+      "installedApkHashes": [
+        "237a169c5eccd72d2353ddd8f3090ece106b2332f493e98e0d972b51763d5264",
+        "237a169c5eccd72d2353ddd8f3090ece106b2332f493e98e0d972b51763d5264",
+        "237a169c5eccd72d2353ddd8f3090ece106b2332f493e98e0d972b51763d5264"
+      ]
+    },
+    "measure": {
+      "runId": "20260918T133927Z-measure-module-56fa08ef",
+      "receiptSha256": "1be59f039bff4ed5630f202e2b8d9e530354173a705429a2644428d8cdad78a8",
+      "moduleSha256": "0645bafbee886ef83610db171a329ee2115c0dd441415da0b1cd81a9e0e5d61f",
+      "apkSha256": "237a169c5eccd72d2353ddd8f3090ece106b2332f493e98e0d972b51763d5264",
+      "checks": [
+        "Pixel access denied by default before Android picker opens",
+        "Fresh independent grants and native picker cancellation return to same module",
+        "Real system picker, private image resource and local detector feed module-owned 240 mm measurement offline",
+        "Module-owned unit selector converts centimetres to millimetres within displayed rounding",
+        "Real endpoint drag commits once; Undo and Android pointer cancellation restore the prior length",
+        "Precision placement commits on release; held loupe drag cancels and ignores late release (captures require visual review)",
+        "Accessible photo-pixel nudges are individually undoable",
+        "Real pinch and pan do not place endpoints; reset restores calibrated fit coordinates",
+        "Module-owned recalibration produces 228 mm from the same endpoints",
+        "Menu and rotation preserve the current module measurement",
+        "Two-times text remains operable in portrait and landscape with real picker and measurement",
+        "Perspective and EXIF-oriented photos recover the expected 240 mm length",
+        "Blank and duplicate reference cards reject calibration and clear earlier results",
+        "Out-of-range calibration is rejected before a length can be produced",
+        "Ordinary background discards selected image, calibration and endpoints",
+        "Process restart retains no selected photo or measurement",
+        "Marker detection has its own revocable grant even when image selection is still allowed",
+        "Revoking pixel access closes the old image session and denies a fresh picker request",
+        "Synthetic source bytes remain unchanged and diagnostics contain no photo URI or measurement data"
+      ],
+      "complete": true,
+      "stopped": true,
+      "apiLevel": "37",
+      "precisionPlacementCaptured": true,
+      "flatMm": 240.0,
+      "unitsMm": 240.1,
+      "angledMm": 240.0,
+      "orientedMm": 240.0
+    },
+    "layout": {
+      "runId": "20260918T135020Z-camera-module-15ab59c6",
+      "receiptSha256": "0a3ad70797c31b6fa2853f9c6b85fba40281ee5b5a858d497bd936127bde19ac",
+      "complete": true,
+      "stopped": true,
+      "prototypeDebug": false,
+      "captureLayoutOnly": true,
+      "apkSha256": "237a169c5eccd72d2353ddd8f3090ece106b2332f493e98e0d972b51763d5264",
+      "moduleSha256": "6bf8b7d63557b920a1d3b3f63bd061a50d9e141c65009d84720ca4fb15548b22",
+      "checks": [
+        "Fresh module cannot open private album or capture without new grants",
+        "Android camera permission remains independent of the new capture grant",
+        "Native capture can cancel without creating a private photo",
+        "Native capture shutter and cancel remain usable in portrait/landscape and two-times text"
+      ],
+      "timings": [],
+      "apiLevel": "37"
+    }
+  },
+  "limitations": [
+    "Synthetic API37 emulator, not physical ARM64 phone acceptance.",
+    "Native live viewfinder and bounded still-photo inference; no WebView video-stream benchmark.",
+    "Timing samples under UI automation are not smoothness guarantees."
+  ],
+  "screenshots": [
+    {
+      "path": "docs/images/camera-alpha31/face-analysis.png",
+      "scope": "functional",
+      "runId": "20260918T131235Z-camera-module-496dacbc",
+      "sourcePath": "analysis-astronaut-cold-faces-display/Screenshot_1789737633.png",
+      "sha256": "95af3164deb7e4704921587a90f448c57454354a923fbcd9a6d6f371640e4de1",
+      "note": "Module-owned face box, score and result list."
+    },
+    {
+      "path": "docs/images/camera-alpha31/analysis-landscape-large.png",
+      "scope": "functional",
+      "runId": "20260918T131235Z-camera-module-496dacbc",
+      "sourcePath": "large-results-1-display/Screenshot_1789737714.png",
+      "sha256": "e3276cf8bff1e6c6683f0e22b2f163da603d7e5e218676cdf72c8841218e39b4",
+      "note": "Two-times text in landscape; result list remains scrollable. Landscape PNG retains device orientation."
+    },
+    {
+      "path": "docs/images/camera-alpha31/analysis-portrait-large.png",
+      "scope": "functional",
+      "runId": "20260918T131235Z-camera-module-496dacbc",
+      "sourcePath": "large-results-0-display/Screenshot_1789737691.png",
+      "sha256": "11f4d5b45a23bcf53f44d821e443be7cace746aa7bf41fe46ee9c636aed06d80",
+      "note": "Two-times text in portrait; result controls scroll separately from photo."
+    },
+    {
+      "path": "docs/images/camera-alpha31/capture-landscape.png",
+      "scope": "functional",
+      "runId": "20260918T131235Z-camera-module-496dacbc",
+      "sourcePath": "capture-layout-1.0-1-display/Screenshot_1789737461.png",
+      "sha256": "fcad326ae500dce743a3a03ec419c651e109783696063cb7b9e1ffa017f8b717",
+      "note": "Native acquisition preview is bounded and does not cover controls; original device orientation."
+    },
+    {
+      "path": "docs/images/camera-alpha31/capture-portrait.png",
+      "scope": "functional",
+      "runId": "20260918T131235Z-camera-module-496dacbc",
+      "sourcePath": "capture-layout-1.0-0-display/Screenshot_1789737549.png",
+      "sha256": "ea78561845381eafd70b3c50c131ec1058fa148d9cf5d53c49cb9e4384b51d7c",
+      "note": "Native acquisition surface, no album or inference workflow."
+    },
+    {
+      "path": "docs/images/camera-alpha31/phone-photo-analysis.png",
+      "scope": "functional",
+      "runId": "20260918T131235Z-camera-module-496dacbc",
+      "sourcePath": "analysis-system-picker-objects-display/Screenshot_1789737749.png",
+      "sha256": "589a0a1009ec5dbcebbca94e9df72288b6789c4505d7a9e6231988bc754f9a98",
+      "note": "Real system picker supplied exported synthetic photo; unrelated private-photo actions disabled."
+    },
+    {
+      "path": "docs/images/camera-alpha31/retired-camera-large.png",
+      "scope": "retirement",
+      "runId": "20260918T132452Z-camera-retirement-e07f2031",
+      "sourcePath": "retired-font2-landscape-display/Screenshot_1789738177.png",
+      "sha256": "7f98b31d27c410e37e6641238a61bfc79600ad7f819c5de9b26fa343857f29df",
+      "note": "Readable two-times-text recovery path; original device orientation."
+    },
+    {
+      "path": "docs/images/camera-alpha31/retired-camera-access.png",
+      "scope": "retirement",
+      "runId": "20260918T132452Z-camera-retirement-e07f2031",
+      "sourcePath": "retired-access-display/Screenshot_1789738194.png",
+      "sha256": "a9bb7d1f226dd1d9c125cad1fdaa1bb440e2460f5a4aac8ea7a12775a4efbc32",
+      "note": "Retired grant disabled; host deletion remains available for retained originals."
+    },
+    {
+      "path": "docs/images/camera-alpha31/fresh-camera-consent.png",
+      "scope": "retirement",
+      "runId": "20260918T132452Z-camera-retirement-e07f2031",
+      "sourcePath": "fresh-image-consent-display/Screenshot_1789738228.png",
+      "sha256": "36c6801594f9cb93371eaf9e911b9fb74be413817ac39dcf4246cb965572b24d",
+      "note": "All four new authorities default off for the old native installation."
+    },
+    {
+      "path": "docs/images/camera-alpha31/preserved-camera-photo.png",
+      "scope": "retirement",
+      "runId": "20260918T132452Z-camera-retirement-e07f2031",
+      "sourcePath": "modern-camera-preserved-photo-display/Screenshot_1789738281.png",
+      "sha256": "2e863d1a240d27334337b0228f0f19514f89a74c99fa34833e815704800634b4",
+      "note": "Old native shutter photo displayed after fresh library/image consent; original hash preserved."
+    },
+    {
+      "path": "docs/images/camera-alpha31/module-score-filter-90.png",
+      "scope": "update",
+      "runId": "20260918T133309Z-camera-update-2d70f946",
+      "sourcePath": "module-only-filtered-display/Screenshot_1789738694.png",
+      "sha256": "8918ff599dc35fa74ff0c9bad2cfccea39226bf041515ce72015ad9ebca325b0",
+      "note": "Signed0.2.1 update adds90% filter;80% cat is hidden without reinference."
+    },
+    {
+      "path": "docs/images/camera-alpha31/module-score-filter-50.png",
+      "scope": "update",
+      "runId": "20260918T133309Z-camera-update-2d70f946",
+      "sourcePath": "module-only-restored-display/Screenshot_1789738699.png",
+      "sha256": "5245e49582f9203282e7cac7028ade9ee74a0d5b387d501ea1201a02e13ce88a",
+      "note": "Returning to50% restores same detection and box on identical APK."
+    },
+    {
+      "path": "docs/images/camera-alpha31/measure-loupe-regression.png",
+      "scope": "measure",
+      "runId": "20260918T133927Z-measure-module-56fa08ef",
+      "sourcePath": "precision-drag-held-display/Screenshot_1789738948.png",
+      "sha256": "3879e7c30b02a777ce8d72777c11ce6b53da07e2918a928b740264b155b50cac",
+      "note": "Existing Measure0.2.5 precision loupe on the changed alpha31 image host; module bytes unchanged."
+    },
+    {
+      "path": "docs/images/camera-alpha31/capture-large-landscape-cancel.png",
+      "scope": "layout",
+      "runId": "20260918T135020Z-camera-module-15ab59c6",
+      "sourcePath": "capture-cancel-2.0-1-display/Screenshot_1789739619.png",
+      "sha256": "16860d04ec6c8f0a1c809db1c89f3b9523ac35f41d330cb1f903461c9bbe9605",
+      "note": "Actual2xlandscape after scrolling: full Cancel label visible, preview contained. Original device orientation."
+    },
+    {
+      "path": "docs/images/camera-alpha31/capture-large-portrait-cancel.png",
+      "scope": "layout",
+      "runId": "20260918T135020Z-camera-module-15ab59c6",
+      "sourcePath": "capture-cancel-2.0-0-display/Screenshot_1789739709.png",
+      "sha256": "8042183fed588bf2018a2fcef294ee94bb64a4366fe4b0d6258bcdae1ec2bfb6",
+      "note": "Actual2xportrait scrolled controls: shutter, switch and Cancel fully visible; preview remains bounded."
+    }
+  ]
+}

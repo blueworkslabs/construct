@@ -108,7 +108,8 @@ implemented and verified before a module depends on them.
   [API 0.11](module-photos.md) supplies bounded native acquisition, private-photo
   operations and inference with fresh consent; the broad native workspace is
   retired. No continuous frame stream is exposed or claimed. Exact-artifact
-  acceptance and physical-phone performance remain separate from ownership.
+  [acceptance evidence](camera-alpha31-acceptance.md) and physical-phone performance
+  remain separate from ownership.
 - **Module-owned examples:** Pocket Snake and Pocket Checklist already keep their
   core behavior in module code. Preserve this direction; not every existing tool
   requires a rewrite.

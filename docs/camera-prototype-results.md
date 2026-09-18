@@ -61,7 +61,8 @@ The runner now asserts real dimensions and visible panel bounds. One wrong-catal
 attempt was deliberately stopped; it is not evidence for either module version.
 The 0.2.0 functional run was incomplete even though its controlled timing samples
 finished. Optimized replacement, migration and same-APK workflow update/rollback
-are separate pending scopes, not implied by these debug results.
+are [separate exact-artifact scopes](camera-alpha31-acceptance.md), not implied
+by these debug results.
 
 ## Conclusion and limits
 
@@ -90,9 +91,11 @@ above ran on the separate, saved-photo module screen with the native preview
 closed; they remain debug measurements, not replacement-APK acceptance.
 
 The compatible-mode-only build (`7fad73a`) still showed overflow in its real
-landscape capture and was also stopped/unaccepted. The next correction gives the
+landscape capture and was also stopped/unaccepted. The final correction
+(`b11381e`) gives the
 Android preview an explicit containing Box, clips both the Compose container and
 Android view, uses fit-center scaling, and separates viewfinder from scrollable
-acquisition controls in landscape. A focused native layout probe precedes the
-next full acceptance run. No module bytes or inference policy change with this
-native-layout investigation; native capture remains acquisition-only.
+acquisition controls in landscape. A focused native layout probe preceded the
+final optimized acceptance scopes; their results are linked above. No module bytes
+or inference policy changed with this native-layout investigation; native capture
+remains acquisition-only.
