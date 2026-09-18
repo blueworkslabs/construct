@@ -15,7 +15,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
-class CameraTest {
+class PhotoStorageTest {
     private val app get() = RuntimeEnvironment.getApplication()
     private lateinit var photos: CameraPhotos
     private lateinit var store: ModuleStore
@@ -32,36 +32,8 @@ class CameraTest {
         f.outputStream().use { b.compress(Bitmap.CompressFormat.JPEG, 85, it) }; b.recycle()
         return f
     }
-    private fun fixture(): VerifiedPackage {
-        val dir = File(System.getProperty("construct.fixtureRoot"), "camera-registry")
-        val entry = Packages.catalog(File(dir, "index.json").readBytes()).single { it.version == "0.1.0" }
-        return Packages.verify(File(dir, entry.artifact).readBytes(), entry, store.publicKey)
-    }
     private fun denied(code: String, action: () -> Unit) {
         try { action(); fail("Expected $code") } catch (e: ConstructError) { assertEquals(code, e.code) }
-    }
-    @Test fun cameraRequiresApi04AndExplicitGrant() {
-        val f = fixture(); val m = JSONObject(f.files.getValue("manifest.json").toString(Charsets.UTF_8))
-        val cap = f.manifest.capabilities.single(); assertTrue(cap.explicitOptIn)
-        assertEquals("Allow camera workspace", cap.label)
-        m.put("constructApi", JSONObject().put("min", "0.3.0").put("target", "0.3.0"))
-        denied("API_INCOMPATIBLE") { Packages.manifest(m.toString().toByteArray()) }
-    }
-    @Test fun workspaceNeverOpensWithoutBothGatesAndRevocationPersists() {
-        store.install(fixture()); val m = store.installed().single()
-        denied("CAPABILITY_DENIED") { CameraActivity.open(app, store, m, JSONObject().put("op", "open")) }
-        store.setCapability(m.manifest.id, "camera.capture", true)
-        denied("ANDROID_PERMISSION_DENIED") { CameraActivity.open(app, store, m, JSONObject().put("op", "open")) }
-        shadowOf(app).grantPermissions(android.Manifest.permission.CAMERA)
-        store.setCapability(m.manifest.id, "camera.capture", false)
-        store = ModuleStore(app)
-        denied("CAPABILITY_DENIED") { CameraActivity.open(app, store, store.installed().single(), JSONObject().put("op", "open")) }
-    }
-    @Test fun moduleCannotTriggerShutterOrProvideAPath() {
-        CameraActivity.validate(JSONObject().put("op", "open"))
-        for (p in listOf(JSONObject().put("op", "capture"), JSONObject().put("op", "export"), JSONObject().put("op", "open").put("path", "/x"), JSONObject())) {
-            denied("INVALID_PARAMS") { CameraActivity.validate(p) }
-        }
     }
     @Test fun privatePhotosSurviveReopenAndStayModuleScoped() {
         val temp = jpeg(); val original = temp.readBytes(); var checked = false

@@ -1,0 +1,228 @@
+{
+  "scope": "Debug emulator prototype, not optimized pilot acceptance",
+  "hostSource": "cc6f3d8",
+  "apkSha256": "b18a4289ec0131e9ce7adf501591d484e33efe1ac058cb78a194c42079052569",
+  "environment": {
+    "apiLevel": 37,
+    "renderer": "SwiftShader",
+    "virtualCpuCount": 2,
+    "camera": "synthetic",
+    "physicalPhone": false
+  },
+  "before": {
+    "version": "0.2.0",
+    "moduleSha256": "03f704952b52aaa62c235e7240c180279afab5f68934851863ade9595e5f7c78",
+    "functionalComplete": false,
+    "controlledFrameProbe": {
+      "idle": {
+        "frames": 121,
+        "maxGapMs": 16.80000000000291,
+        "medianGapMs": 16.69999999999709
+      },
+      "canvasOnly": {
+        "frames": 17,
+        "maxGapMs": 233.40000000000146,
+        "medianGapMs": 166.6999999999971
+      },
+      "inference": [
+        {
+          "kind": "faces",
+          "processingMs": 201,
+          "turnaroundMs": 738.0999999999767,
+          "frames": 6,
+          "maxFrameGapMs": 200.09999999999854,
+          "throughNextPaintMs": 908.7999999999302
+        },
+        {
+          "kind": "objects",
+          "processingMs": 587,
+          "turnaroundMs": 1066.0999999999767,
+          "frames": 8,
+          "maxFrameGapMs": 233.1999999999971,
+          "throughNextPaintMs": 1249.6999999999534
+        },
+        {
+          "kind": "faces",
+          "processingMs": 126,
+          "turnaroundMs": 665,
+          "frames": 6,
+          "maxFrameGapMs": 200,
+          "throughNextPaintMs": 814.2000000000698
+        },
+        {
+          "kind": "objects",
+          "processingMs": 380,
+          "turnaroundMs": 891.1999999999534,
+          "frames": 8,
+          "maxFrameGapMs": 283.29999999999563,
+          "throughNextPaintMs": 1229.0999999999767
+        }
+      ]
+    }
+  },
+  "after": {
+    "version": "0.2.1",
+    "moduleSha256": "6bf8b7d63557b920a1d3b3f63bd061a50d9e141c65009d84720ca4fb15548b22",
+    "functionalComplete": true,
+    "checks": [
+      "Fresh module cannot open private album or capture without new grants",
+      "Android camera permission remains independent of the new capture grant",
+      "Native capture can cancel without creating a private photo",
+      "Real synthetic CameraX shutter returns to the module-owned private album",
+      "Background and rotation release the native camera, discard the transient run and preserve originals",
+      "Deletion requires a native image confirmation; cancel preserves the original",
+      "Offline saved-photo face/object inference returns module-rendered estimates",
+      "EXIF, blank and object fixtures work through the same bounded image pipeline",
+      "Photo and analysis controls operate in both orientations and two-times text",
+      "Gallery export requires native confirmation and preserves private original",
+      "Background clears transient display and preserves private album",
+      "Inference grant is independently revocable without losing photos",
+      "Original private photo bytes unchanged after inference, lifecycle and export"
+    ],
+    "controlledFrameProbe": {
+      "idle": {
+        "frames": 117,
+        "maxGapMs": 33.30000000000291,
+        "medianGapMs": 16.69999999999709
+      },
+      "canvasOnly": {
+        "frames": 16,
+        "maxGapMs": 300,
+        "medianGapMs": 216.70000000000437
+      },
+      "inference": [
+        {
+          "kind": "faces",
+          "processingMs": 176,
+          "turnaroundMs": 212.69999999995343,
+          "frames": 10,
+          "maxFrameGapMs": 33.30000000000291,
+          "throughNextPaintMs": 241.5
+        },
+        {
+          "kind": "objects",
+          "processingMs": 511,
+          "turnaroundMs": 522.3000000000466,
+          "frames": 28,
+          "maxFrameGapMs": 50.10000000000582,
+          "throughNextPaintMs": 549.5
+        },
+        {
+          "kind": "faces",
+          "processingMs": 155,
+          "turnaroundMs": 201.20000000006985,
+          "frames": 10,
+          "maxFrameGapMs": 27.499999999970896,
+          "throughNextPaintMs": 218
+        },
+        {
+          "kind": "objects",
+          "processingMs": 403,
+          "turnaroundMs": 416.29999999993015,
+          "frames": 24,
+          "maxFrameGapMs": 33.29999999998836,
+          "throughNextPaintMs": 447.20000000006985
+        }
+      ]
+    },
+    "uiAutomatorPolledTimings": [
+      {
+        "kind": "faces",
+        "case": "astronaut-cold",
+        "nativeMs": 206,
+        "turnaroundMs": 637,
+        "prototypeFrameProbe": {
+          "kind": "faces",
+          "processingMs": 206,
+          "turnaroundMs": 637.4000000000233,
+          "frames": 6,
+          "maxFrameGapMs": 250
+        }
+      },
+      {
+        "kind": "objects",
+        "case": "astronaut-cold",
+        "nativeMs": 744,
+        "turnaroundMs": 770,
+        "prototypeFrameProbe": {
+          "kind": "objects",
+          "processingMs": 744,
+          "turnaroundMs": 769.6999999999534,
+          "frames": 9,
+          "maxFrameGapMs": 266.7000000000007
+        }
+      },
+      {
+        "kind": "faces",
+        "case": "astronaut-warm-0",
+        "nativeMs": 139,
+        "turnaroundMs": 756,
+        "prototypeFrameProbe": {
+          "kind": "faces",
+          "processingMs": 139,
+          "turnaroundMs": 756.4000000000233,
+          "frames": 7,
+          "maxFrameGapMs": 250
+        }
+      },
+      {
+        "kind": "faces",
+        "case": "astronaut-warm-1",
+        "nativeMs": 183,
+        "turnaroundMs": 499,
+        "prototypeFrameProbe": {
+          "kind": "faces",
+          "processingMs": 183,
+          "turnaroundMs": 498.80000000004657,
+          "frames": 6,
+          "maxFrameGapMs": 200.09999999999854
+        }
+      },
+      {
+        "kind": "faces",
+        "case": "exif-oriented",
+        "nativeMs": 198,
+        "turnaroundMs": 624,
+        "prototypeFrameProbe": {
+          "kind": "faces",
+          "processingMs": 198,
+          "turnaroundMs": 623.5,
+          "frames": 5,
+          "maxFrameGapMs": 216.6999999999971
+        }
+      },
+      {
+        "kind": "faces",
+        "case": "blank",
+        "nativeMs": 174,
+        "turnaroundMs": 640,
+        "prototypeFrameProbe": {
+          "kind": "faces",
+          "processingMs": 174,
+          "turnaroundMs": 639.5999999999767,
+          "frames": 5,
+          "maxFrameGapMs": 216.70000000000437
+        }
+      },
+      {
+        "kind": "objects",
+        "case": "cat",
+        "nativeMs": 526,
+        "turnaroundMs": 1039,
+        "prototypeFrameProbe": {
+          "kind": "objects",
+          "processingMs": 526,
+          "turnaroundMs": 1038.5999999999767,
+          "frames": 10,
+          "maxFrameGapMs": 233.3000000000029
+        }
+      }
+    ]
+  },
+  "limitations": [
+    "Only four controlled inference samples per version",
+    "Native model creation and inference remain native; module owns saved-photo presentation",
+    "Repeated full-canvas drawing remains slow on this software renderer",
+    "No continuous live frame bridge or physical-phone performance claim"
+  ]
+}

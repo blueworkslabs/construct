@@ -13,8 +13,9 @@ the public static catalog, without a local server.
 
 **Design principle: the host supplies defined capabilities; the modules contain
 the applications.** Domain logic and feature UI should be independently updateable
-in signed module packages. Some current native-workspace pilots do not yet meet
-that boundary; they are migration debt, not the template for new tools. See the
+in signed module packages. Released older pilots included native application
+workspaces. The alpha31 Camera candidate removes the last one; bounded acquisition
+and computation stay native. See its [exact-artifact evidence and limits](docs/camera-alpha31-acceptance.md), the
 [modular design contract](docs/modular-design.md) and [agent guidance](AGENTS.md).
 
 ![Construct's Library with installed tools and quiet per-tool actions](docs/media/ux-refresh/library.png)
@@ -62,9 +63,11 @@ publisher key need their own signed catalog.
   separate local data. A failed update does not have to replace a working tool.
 - Run Canvas games and ordinary web interfaces in a module-first native shell,
   with landscape support, native controls and per-module capability grants.
-- Provide bounded local storage, short tones, read-only contacts and a native
-  camera workspace. Contacts and camera require both a module grant and Android
-  permission. Modules do not receive camera frames or arbitrary filesystem access.
+- Provide bounded local storage, short tones and read-only contacts. Camera through
+  alpha30 uses a native workspace; the alpha31 candidate adds bounded native
+  capture and image/inference APIs for a module-owned album and analysis UI.
+  New pixel/library access requires fresh consent. Contacts and capture also need
+  Android permission. No live camera frames or arbitrary filesystem paths are exposed.
 - Keep installed tools usable offline within their capabilities. A registry is a
   delivery service, not a required backend for every module interaction.
 
@@ -106,10 +109,12 @@ flowchart LR
 ```
 
 **The design goal is module updates without a new APK once the required host API
-exists. New native capabilities need host updates.** Camera remains a host-owned
-application workflow. Pocket Measure 0.2.x moves geometry, editor and UI into its
+exists. New native capabilities need host updates.** The alpha31 Camera candidate
+moves album and analysis presentation into its signed module, with fresh
+[bounded photo APIs](docs/module-photos.md). The native viewfinder and inference
+remain reusable services; this is saved-photo processing, not a web video stream. Pocket Measure 0.2.x moves geometry, editor and UI into its
 module using [API 0.10 image primitives](docs/module-images.md) and fresh consent.
-The alpha28 candidate removes native Sky Watch and provides an explicit
+The alpha28 pilot removes native Sky Watch and provides an explicit
 [old-module update path](docs/shell-retirement.md). Sky Watch 0.2.x keeps aircraft
 logic, glossary, map and controls in the signed module; API 0.9 supplies only
 bounded approved-origin HTTP and optional foreground location.

@@ -27,3 +27,11 @@ class ArchitectureTest(unittest.TestCase):
             path = root/'core/app/src/main/java/dev/construct/runtime/ModuleImageSession.kt'
             path.write_text(path.read_text()+'\nclass MeasurePlane {}\n')
             self.assertTrue(any('measurement' in e for e in check(root)))
+
+    def test_ratchet_rejects_native_camera_workflow_even_inside_acquisition_surface(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            shutil.copytree(ROOT/'core/app/src/main',root/'core/app/src/main',ignore=shutil.ignore_patterns('assets','res','cpp'))
+            path=root/'core/app/src/main/java/dev/construct/runtime/PhotoCaptureActivity.kt'
+            path.write_text(path.read_text()+'\n// PhotoAnalyzer.detect(context, photo, kind)\n')
+            self.assertTrue(any('Capture surface' in e for e in check(root)))

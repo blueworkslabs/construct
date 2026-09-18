@@ -103,17 +103,21 @@ implemented and verified before a module depends on them.
   detections with fresh consent. Alpha29 retires the old native workspace; see
   [the image contract](module-images.md). Exact candidate acceptance is separate
   from this ownership statement.
-- **Pocket Camera / analysis:** the native camera workspace includes album and
-  analysis interactions. Audit reusable acquisition/compute and trusted controls
-  separately from application-specific presentation when defining its migration.
+- **Pocket Camera / analysis:** the alpha31 candidate moves album, selection,
+  detection presentation, overlays and score filtering into the signed module.
+  [API 0.11](module-photos.md) supplies bounded native acquisition, private-photo
+  operations and inference with fresh consent; the broad native workspace is
+  retired. No continuous frame stream is exposed or claimed. Exact-artifact
+  [acceptance evidence](camera-alpha31-acceptance.md) and physical-phone performance
+  remain separate from ownership.
 - **Module-owned examples:** Pocket Snake and Pocket Checklist already keep their
   core behavior in module code. Preserve this direction; not every existing tool
   requires a rewrite.
 
 The native pilots established useful behavior, UI and acceptance evidence. Keep
-that baseline working. Their broad `open` capabilities are compatibility debt,
-not examples to copy for the next feature. Maintaining a compatibility path does
-not make it the default home for new application logic.
+that baseline working. Their broad `open` capabilities are historical contracts,
+not examples to copy for the next feature. The current candidate recognizes their
+identifiers for data-preserving recovery, without retaining their implementations.
 
 ## Migration approach and acceptance
 

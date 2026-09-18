@@ -32,7 +32,9 @@ workflow or domain result belongs in that primitive.
 - Host checks declared capability, fresh grant, current package digest and active
   foreground session before selection, decoding, delivery and resource access.
   Reusing the old `photo.measure` grant cannot authorize these pixels.
-- The system picker is the only deliberate background exception. The module is
+- For API 0.10, the system picker is the deliberate background exception.
+  API 0.11 additionally defines a tracked [native capture handoff](module-photos.md);
+  it does not permit arbitrary background work. The module is
   paused while it is open; unrelated privileged requests are cancelled or their
   replies invalidated. A result
   can be delivered only after the same activity resumes and authority is checked

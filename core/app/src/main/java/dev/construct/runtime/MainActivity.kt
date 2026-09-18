@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
         var resetIndex by remember { mutableStateOf(false) }
 
         var deletePhotosId by remember { mutableStateOf<String?>(null) }
-        var androidCamera by remember { mutableStateOf(CameraActivity.hasPermission(this)) }
+        var androidCamera by remember { mutableStateOf(PhotoCaptureActivity.hasPermission(this)) }
         val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
             androidCamera = allowed
             status = if (allowed) "Android camera access allowed. Module grants are separate." else "Android camera access denied. Retry or use Android app settings."
@@ -134,7 +134,7 @@ class MainActivity : ComponentActivity() {
             val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
                 if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                     androidContacts = ContactsReader.hasPermission(this@MainActivity)
-                    androidCamera = CameraActivity.hasPermission(this@MainActivity)
+                    androidCamera = PhotoCaptureActivity.hasPermission(this@MainActivity)
                     androidLocation = ModuleLocation.hasPermission(this@MainActivity)
                 }
             }
@@ -233,7 +233,9 @@ class MainActivity : ComponentActivity() {
                                 Text(cap.reason, style = MaterialTheme.typography.bodySmall)
                                 cap.origins.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
                             }
-                            if (module.manifest.capabilities.any { it.id == "image.read" }) Text("Selected image pixels reach this module. Other granted storage or diagnostics may retain copies; approved internet sources may receive them. Revocation cannot erase copies already delivered. You choose each image in Android’s picker; no broad photo-library access.")
+                            if (module.manifest.capabilities.any { it.id == "photos.library" }) Text("Private-photo access exposes all photos previously captured for this module, including older versions, as bounded pixels. Delete and gallery-copy requests need your confirmation in Construct. Other granted storage or internet access may retain or send delivered pixels. Revocation cannot erase delivered copies.")
+                            if (module.manifest.capabilities.any { it.id == "image.analyze" }) Text("Local analysis returns face regions or estimated object labels, boxes and scores to module code. No face identity or emotion detection; results can be wrong. Models run on this phone.")
+                            if (module.manifest.capabilities.any { it.id == "image.read" }) Text("Selected image pixels reach this module. Other granted storage or diagnostics may retain copies; approved internet sources may receive them. Revocation cannot erase copies already delivered. You choose external images in Android’s picker. A separately granted private-photo library also permits this module to read its own saved photos; no broad phone-gallery access.")
                             if (module.manifest.capabilities.any { it.id == "location.read" }) {
                                 Text("Android location access: " + if (androidLocation) "allowed" else "not allowed")
                                 Text("This permits an allowed module to receive foreground coordinates and accuracy. Approximate location works. With internet access the module can send that data to its approved sources; stored copies are not erased by revocation.")
@@ -247,13 +249,16 @@ class MainActivity : ComponentActivity() {
                                 Button(enabled = !busy && !androidContacts, onClick = { contactsPermission.launch(android.Manifest.permission.READ_CONTACTS) }) { Text("Allow Android contacts access") }
                                 TextButton(onClick = { startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName"))) }) { Text("Android app settings") }
                             }
-                            if (module.manifest.capabilities.any { it.id == "camera.capture" }) {
+                            if (module.manifest.capabilities.any { it.id == "camera.photo" }) {
                                 Text("Android camera access: " + if (androidCamera) "allowed" else "not allowed")
-                                Text("Opens a visible native camera. Only you can press the shutter. Photos stay in this module's private storage; JavaScript gets no frames or photo files.")
+                                Text("Opens a visible native camera. Only you can press the shutter. Photos stay in this module's private storage; No live frames reach JavaScript. Private album pixels require separate photo-library and image grants.")
                                 Button(enabled = !busy && !androidCamera, onClick = { cameraPermission.launch(android.Manifest.permission.CAMERA) }) { Text("Allow Android camera access") }
                                 TextButton(onClick = { startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName"))) }) { Text("Android app settings") }
+                            }
+                            if (module.manifest.capabilities.any { it.id in setOf("camera.photo", "photos.library") } ||
+                                runCatching { CameraPhotos(this@MainActivity, module.manifest.id).list().isNotEmpty() }.getOrDefault(false)) {
                                 TextButton(enabled = !busy, onClick = { deletePhotosId = module.manifest.id }) { Text("Delete all saved photos") }
-                                Text("Deleting saved photos works even with camera access off. Remove keeps photos; reinstall to manage retained photos.")
+                                Text("Deleting saved photos works with access off or an update-required module. Removing a module keeps its photos; install a supported version to browse them again.")
                             }
                             Button(enabled = !busy && module.enabled && !CapabilityLifecycle.needsUpdate(module.manifest), onClick = { work {
                                 store.beginRun(module);
@@ -403,7 +408,7 @@ class MainActivity : ComponentActivity() {
         }
         if (deletePhotosId != null) AlertDialog(onDismissRequest = { deletePhotosId = null },
             title = { Text("Delete all saved photos?") },
-            text = { Text("Permanently deletes this module's private photos. Its camera grant and other data are unchanged.") },
+            text = { Text("Permanently deletes this module's private photos. Its grants and other data are unchanged.") },
             confirmButton = { TextButton(enabled = !busy, onClick = {
                 val id = deletePhotosId!!; deletePhotosId = null
                 work { CameraPhotos(this@MainActivity, id).deleteAll(); { status = "Saved photos deleted." } }
@@ -432,12 +437,14 @@ class MainActivity : ComponentActivity() {
                         cap.origins.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
                     }
                     Text("Existing access choices are kept unless you change them. New sensitive capabilities start off. You can change access later in Module access.")
-                    if (verified.manifest.capabilities.any { it.id == "camera.capture" }) Text("Camera also needs Android permission through Module access. Photos are saved privately by the native workspace, not shared with JavaScript. No microphone or general file access.")
+                    if (verified.manifest.capabilities.any { it.id == "camera.photo" }) Text("Camera also needs Android permission through Module access. The visible native shutter saves privately. Separate photo-library and image grants are needed to read those photos in module code. No microphone or general file access.")
                     if (verified.manifest.capabilities.any { it.id == "contacts.read" }) Text("Contacts also need Android permission. After installing, open Module access to allow Android contacts access. This does not grant any module automatically.")
                     if (verified.manifest.capabilities.any { it.id == "contacts.read" } && verified.manifest.capabilities.any { it.id == "storage.kv" }) Text("This module can save contact data on this phone when both contacts and saved-data access are allowed. Revoking contacts access does not erase data it already saved.")
                     if (verified.manifest.capabilities.any { it.id == "net.http" }) Text("Approved internet access lets this module send data to the exact sources above, which see your IP address. New sources need new consent. Other granted data, including location or contacts, can be sent to those sources. Raster responses may be cached; revocation does not erase previously received data.")
                     else Text("No module network access.")
-                    if (verified.manifest.capabilities.any { it.id == "image.read" }) Text("Selected image pixels reach this module's code. You choose each image in Android's picker. Other granted storage or diagnostics may retain copies, and approved internet sources may receive them. Revocation cannot erase copies already delivered. No broad photo-library access.")
+                    if (verified.manifest.capabilities.any { it.id == "photos.library" }) Text("Private-photo access exposes all photos previously captured for this module, including older versions, as bounded pixels. Delete and gallery-copy requests need your confirmation in Construct. Other granted storage or internet access may retain or send delivered pixels. Revocation cannot erase delivered copies.")
+                    if (verified.manifest.capabilities.any { it.id == "image.analyze" }) Text("Local analysis returns face regions or estimated object labels, boxes and scores to module code. No face identity or emotion detection; results can be wrong. Models run on this phone.")
+                    if (verified.manifest.capabilities.any { it.id == "image.read" }) Text("Selected image pixels reach this module's code. External images are selected with Android's picker. Separate private-photo library access also permits reading this module's saved photos. Other granted storage or diagnostics may retain copies, and approved internet sources may receive them. Revocation cannot erase copies already delivered. No broad photo-library access.")
                     if (verified.manifest.capabilities.any { it.id == "location.read" }) Text("The module can receive a foreground location fix only after both its location grant and Android permission are enabled. Allow Android location in Module access after installation. Approximate location works; no background tracking.")
                     Text("Installed code starts as a trial. Previous code is kept where available, but versions requiring retired capabilities cannot be restored.")
                 } },

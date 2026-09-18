@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "id": "dev.construct.camera",
   "name": "Pocket Camera",
-  "version": "0.1.4",
-  "description": "Native camera and private album, with optional local face/object analysis and explicit gallery copies on supported hosts.",
+  "version": "0.2.1",
+  "description": "Private photo album with on-device face/object detection. Capture is human-operated; the module draws analysis over bounded images.",
   "constructApi": {
-    "min": "0.6.0",
-    "target": "0.6.0"
+    "min": "0.11.0",
+    "target": "0.11.0"
   },
   "runtime": {
     "kind": "webview-js"
@@ -14,8 +14,20 @@
   "entry": "ui/index.html",
   "capabilities": [
     {
-      "id": "camera.capture",
-      "reason": "Open the native camera workspace. Capture, local photo analysis and gallery copies each require your native UI action on supported hosts."
+      "id": "camera.photo",
+      "reason": "Open the visible native viewfinder; only you can press the shutter to save a private photo."
+    },
+    {
+      "id": "photos.library",
+      "reason": "Browse this module\u2019s private photos, including older captures, and request individually confirmed deletion or gallery copies."
+    },
+    {
+      "id": "image.read",
+      "reason": "Display bounded image pixels from your selection or this module\u2019s separately granted private album."
+    },
+    {
+      "id": "image.analyze",
+      "reason": "Run local face or object detection and receive estimated boxes, labels and scores. No identification or upload."
     }
   ],
   "themeColor": "#0B1410"

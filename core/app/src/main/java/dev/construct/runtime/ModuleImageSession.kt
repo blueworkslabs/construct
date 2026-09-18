@@ -27,7 +27,7 @@ internal class ModuleImageSession(
     private val authorize: (String) -> Unit,
     private val picker: ((Uri?) -> Unit) -> Unit,
 ) {
-    private data class Image(val handle: String, val bitmap: Bitmap, val png: ByteArray)
+    private data class Image(val handle: String, val bitmap: Bitmap, val png: ByteArray, val source: String? = null)
     private val generation = AtomicLong()
     private val handler = Handler(Looper.getMainLooper())
     @Volatile private var closed = false
@@ -47,12 +47,15 @@ internal class ModuleImageSession(
     }
     private fun image(handle: String): Image {
         check("image.read")
-        return current?.takeIf { it.handle == handle }
+        val selected = current?.takeIf { it.handle == handle }
             ?: throw ConstructError("IMAGE_STALE", "Image is no longer available; choose it again")
+        selected.source?.let(authorize)
+        return selected
     }
     fun resource(path: String): ByteArray {
         check("image.read")
         val image = current ?: throw ConstructError("IMAGE_STALE", "Image is no longer available")
+        image(image.handle)
         checkRule(path == "construct-images/${image.handle}.png", "IMAGE_STALE", "Image is no longer available")
         return image.png
     }
@@ -74,9 +77,9 @@ internal class ModuleImageSession(
         try {
             check(method)
             val now = android.os.SystemClock.elapsedRealtime()
-            checkRule(method != "image.markers" || now - lastWork >= 1000, "IMAGE_RATE", "Wait a moment before processing another image")
+            checkRule(method !in setOf("image.markers", "image.analyze") || now - lastWork >= 1000, "IMAGE_RATE", "Wait a moment before processing another image")
             checkRule(workerBusy.compareAndSet(false, true), "IMAGE_BUSY", "Previous image processing is still finishing")
-            if (method == "image.markers") lastWork = now
+            if (method in setOf("image.markers", "image.analyze")) lastWork = now
         } catch (e: ConstructError) { deliver(token, null, e); return }
         deadline = Runnable {
             if (token == generation.get()) {
@@ -93,17 +96,46 @@ internal class ModuleImageSession(
                     if (!closed && token == generation.get()) {
                         try {
                             check(method)
+                            replacement?.source?.let(authorize)
+                            current?.source?.let(authorize)
                             if (replacement != null) current = replacement
                             deliver(token, value, null)
                         } catch (e: ConstructError) { deliver(token, null, e) }
                     }
                 }
+            } catch (e: LinkageError) {
+                handler.post { deliver(token, null, ConstructError("IMAGE_ANALYSIS_UNAVAILABLE", "On-device inference is unavailable on this device")) }
             } catch (e: Exception) {
                 val safe = e as? ConstructError ?: ConstructError("IMAGE_INVALID", "Could not process this image; try a smaller saved JPEG or PNG")
                 handler.post { deliver(token, null, safe) }
             } finally { workerBusy.set(false) }
         }
     }
+    private fun decode(bytes: ByteArray, maximum: Int, source: String? = null): Pair<JSONObject, Image?> {
+        val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, info, _ ->
+            checkRule(info.size.width in 1..12000 && info.size.height in 1..12000,
+                "IMAGE_SIZE", "Source image dimensions exceed bounds")
+            val scale = minOf(1.0, maximum.toDouble() / maxOf(info.size.width, info.size.height))
+            decoder.setTargetSize(maxOf(1, (info.size.width * scale).toInt()), maxOf(1, (info.size.height * scale).toInt()))
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            decoder.setOnPartialImageListener { false }
+        }
+        val out = ByteArrayOutputStream()
+        checkRule(bitmap.compress(Bitmap.CompressFormat.PNG, 100, out), "IMAGE_INVALID", "Could not prepare image")
+        val png = out.toByteArray()
+        checkRule(png.size <= 12 * 1024 * 1024, "IMAGE_SIZE", "Working image exceeds byte bound")
+        val selected = Image(UUID.randomUUID().toString(), bitmap, png, source)
+        return JSONObject().put("handle", selected.handle).put("url", "$origin/construct-images/${selected.handle}.png")
+            .put("width", bitmap.width).put("height", bitmap.height).put("mime", "image/png") to selected
+    }
+    fun openPhoto(read: () -> ByteArray, done: (JSONObject?, ConstructError?) -> Unit) {
+        check("photos.library")
+        checkRule(pending == null, "IMAGE_BUSY", "An image request is already running")
+        val token = generation.incrementAndGet(); pending = done; current = null
+        work(token, "photos.library") { decode(read(), 1024, "photos.library") }
+    }
+    fun clearPhoto() { cancel(); current = null }
+    fun authorizeCurrent(handle: String) { image(handle) }
     fun request(method: String, args: JSONObject, done: (JSONObject?, ConstructError?) -> Unit) {
         check(method)
         val op = args.optString("op")
@@ -113,6 +145,10 @@ internal class ModuleImageSession(
         }
         if (method == "image.read") {
             params(args, setOf("op")); checkRule(op == "pick", "IMAGE_PARAMS", "Expected op:pick or op:release")
+        } else if (method == "image.analyze") {
+            params(args, setOf("op", "handle", "kind"))
+            checkRule(op == "detect" && args.optString("kind") in setOf("faces", "objects"), "IMAGE_PARAMS", "Expected detect with faces or objects")
+            image(args.getString("handle"))
         } else {
             params(args, setOf("op", "handle", "dictionary"))
             checkRule(method == "image.markers" && op == "detect" && args.optString("dictionary") == "DICT_4X4_50",
@@ -134,24 +170,27 @@ internal class ModuleImageSession(
                     else work(token, method) {
                         val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytesBounded(20 * 1024 * 1024) }
                             ?: throw ConstructError("IMAGE_INVALID", "Could not read selected image")
-                        val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, info, _ ->
-                            checkRule(info.size.width in 1..12000 && info.size.height in 1..12000,
-                                "IMAGE_SIZE", "Source image dimensions exceed bounds")
-                            val scale = minOf(1.0, 1600.0 / maxOf(info.size.width, info.size.height))
-                            decoder.setTargetSize(maxOf(1, (info.size.width * scale).toInt()), maxOf(1, (info.size.height * scale).toInt()))
-                            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                            decoder.setOnPartialImageListener { false }
-                        }
-                        val out = ByteArrayOutputStream()
-                        checkRule(bitmap.compress(Bitmap.CompressFormat.PNG, 100, out), "IMAGE_INVALID", "Could not prepare image")
-                        val png = out.toByteArray()
-                        checkRule(png.size <= 12 * 1024 * 1024, "IMAGE_SIZE", "Working image exceeds byte bound")
-                        val selected = Image(UUID.randomUUID().toString(), bitmap, png)
-                        JSONObject().put("handle", selected.handle).put("url", "$origin/construct-images/${selected.handle}.png")
-                            .put("width", bitmap.width).put("height", bitmap.height).put("mime", "image/png") to selected
+                        decode(bytes, 1600)
                     }
                 }
             } catch (e: Exception) { deliver(token, null, e as? ConstructError ?: ConstructError("IMAGE_UNAVAILABLE", "Could not open image picker")) }
+        } else if (method == "image.analyze") {
+            val selected = image(args.getString("handle"))
+            work(token, method) {
+                selected.source?.let(authorize)
+                val original = selected.bitmap
+                val scale = minOf(1.0, 1024.0 / maxOf(original.width, original.height))
+                val raster = if (scale < 1) Bitmap.createScaledBitmap(original,
+                    maxOf(1, (original.width * scale).toInt()), maxOf(1, (original.height * scale).toInt()), true) else original
+                val start = android.os.SystemClock.elapsedRealtime()
+                val result = try { PhotoAnalyzer.detect(context, raster, if (args.getString("kind") == "faces") AnalysisKind.FACES else AnalysisKind.OBJECTS) }
+                    finally { if (raster !== original) raster.recycle() }
+                val boxes = JSONArray()
+                result.boxes.forEach { box -> boxes.put(JSONObject().put("left", box.left.toDouble()).put("top", box.top.toDouble())
+                    .put("right", box.right.toDouble()).put("bottom", box.bottom.toDouble()).put("label", box.label).put("score", box.score.toDouble())) }
+                JSONObject().put("kind", args.getString("kind")).put("boxes", boxes)
+                    .put("processingMs", android.os.SystemClock.elapsedRealtime() - start) to null
+            }
         } else {
             val selected = image(args.getString("handle"))
             work(token, method) {
