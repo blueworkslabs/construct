@@ -75,3 +75,13 @@ User explicitly accepts a demonstrated hybrid limitation as a valid learning.
 A failed probe or incomplete scope stays a failure/incomplete, never acceptance.
 
 Material agent assistance: Astra/Codex implementation and verification.
+
+## Prototype instrumentation
+
+The debug-only runner can read `window.cameraMetrics` through the local WebView
+debugger to capture native inference time, bridge turnaround, animation-frame
+count and the largest frame gap while waiting. This requires `websocket-client`
+in the runner environment. The measured image content is never logged. Debug
+probes are separate from optimized APK acceptance; debugger access is not enabled
+in a pilot build. Report actual samples rather than assuming 60 fps from the use
+of requestAnimationFrame.

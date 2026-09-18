@@ -68,13 +68,28 @@ def unroot():
  global rooted
  restore_shell_identity(adb);rooted=False
 
+def prototype_metrics():
+ if not a.prototype:return None
+ import urllib.request,websocket
+ pid=adb('shell','pidof','dev.construct.runtime').strip();assert pid.isdigit(),'Expected one app process'
+ adb('forward','tcp:9224','localabstract:webview_devtools_remote_'+pid)
+ try:
+  with urllib.request.urlopen('http://127.0.0.1:9224/json',timeout=5) as response:pages=json.load(response)
+  page=next(p for p in pages if p.get('url','').startswith('https://dev.construct.camera.construct.invalid/'))
+  with websocket.create_connection(page['webSocketDebuggerUrl'],timeout=5,suppress_origin=True) as ws:
+   ws.send(json.dumps({'id':1,'method':'Runtime.evaluate','params':{'expression':'JSON.stringify(window.cameraMetrics)','returnByValue':True}}))
+   while True:
+    result=json.loads(ws.recv())
+    if result.get('id')==1:return json.loads(result['result']['result']['value'])
+ finally:adb('forward','--remove','tcp:9224')
+
 def measure(kind,expected,index):
  action('Find '+kind);expect('Analysis complete. Original unchanged.',60)
  text=expect(kind.title()+' found:')
  if kind=='faces':assert expected in text,(kind,text)
  else:assert any(expected in item for item in labels()),(kind,labels())
  timing=expect('Local processing:');match=re.fullmatch(r'Local processing: (\d+) ms · Ready in (\d+) ms',timing)
- assert match,'Missing measured timing';receipt['timings'].append({'kind':kind,'case':index,'nativeMs':int(match[1]),'turnaroundMs':int(match[2])})
+ assert match,'Missing measured timing';receipt['timings'].append({'kind':kind,'case':index,'nativeMs':int(match[1]),'turnaroundMs':int(match[2]),'prototypeFrameProbe':prototype_metrics()})
  display('analysis-'+index+'-'+kind)
 
 try:
