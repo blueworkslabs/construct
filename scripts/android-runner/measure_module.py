@@ -221,6 +221,15 @@ def control(text):
     for direction in (1,-1):
         for _ in range(12):
             ns=nodes();box=panel_rect(ns)
+            # Rotation/text zoom can settle after the initial query. Expand
+            # only a stable, fully visible toggle; never swipe hidden controls.
+            show=[n for n in ns if n.get('text')=='Show controls' and in_panel(n,box)]
+            if len(show)==1:
+                prior=show[0].get('bounds');time.sleep(.4)
+                now=nodes();visible_box=panel_rect(now)
+                stable=[n for n in now if n.get('text')=='Show controls' and n.get('bounds')==prior and in_panel(n,visible_box)]
+                if len(stable)==1:tap_node(stable[0]);time.sleep(.5)
+                continue
             matches=[n for n in ns if matches_control(n,text) and n.get('enabled')!='false' and in_panel(n,box)]
             if len(matches)==1:
                 prior=matches[0].get('bounds');time.sleep(.5)
