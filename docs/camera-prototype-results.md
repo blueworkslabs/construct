@@ -72,3 +72,19 @@ It does **not** demonstrate realtime video analysis in a WebView, nor prove that
 such a design is impossible. Full-canvas stress is a concrete limitation here;
 physical GPU-backed devices and a purpose-built stream path would need a separate
 experiment. The current extraction must not be marketed as that experiment.
+
+## First optimized-candidate visual rejection
+
+Source `e153819` passed the alpha30-to-alpha31 migration scope (6/6), but its
+expanded functional run exposed a separate native acquisition bug: the default
+CameraX SurfaceView preview drew outside its Compose bounds in landscape,
+covering the heading and reducing control contrast. That APK is not accepted.
+The run was stopped after reviewing the actual emulator display; functional
+button assertions alone would not have caught the visual defect.
+
+The old native camera explicitly used `PreviewView.ImplementationMode.COMPATIBLE`
+(TextureView). Restoring that setting is an acquisition-layout correction, not a
+change to module inference or evidence of a WebView video limitation. A corrected
+optimized build requires fresh exact-artifact scopes. The debug measurements
+above ran on the separate, saved-photo module screen with the native preview
+closed; they remain debug measurements, not replacement-APK acceptance.
