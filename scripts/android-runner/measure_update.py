@@ -20,7 +20,8 @@ p.add_argument('--sha', required=True)
 p.add_argument('--catalog', required=True)
 p.add_argument('--module-sha', required=True)
 p.add_argument('--after-sha', required=True)
-p.add_argument('--loupe-update', action='store_true', help='Compare published Measure 0.2.2 with loupe-enabled 0.2.3 and roll back, retaining held-drag captures')
+p.add_argument('--after-version', default='0.2.4', help='Immutable loupe version for --loupe-update')
+p.add_argument('--loupe-update', action='store_true', help='Compare published Measure 0.2.2 with loupe-enabled module and roll back, retaining held-drag captures')
 p.add_argument('--module-name', default='Pocket Measure')
 p.add_argument('--module-version', default='0.2.0')
 a = p.parse_args()
@@ -204,6 +205,15 @@ def control(text):
     for direction in (1,-1):
         for _ in range(12):
             ns=nodes();box=panel_rect(ns)
+            # Rotation/text zoom can settle after the initial query. Expand
+            # only a stable, fully visible toggle; never swipe hidden controls.
+            show=[n for n in ns if n.get('text')=='Show controls' and in_panel(n,box)]
+            if len(show)==1:
+                prior=show[0].get('bounds');time.sleep(.4)
+                now=nodes();visible_box=panel_rect(now)
+                stable=[n for n in now if n.get('text')=='Show controls' and n.get('bounds')==prior and in_panel(n,visible_box)]
+                if len(stable)==1:tap_node(stable[0]);time.sleep(.5)
+                continue
             matches=[n for n in ns if matches_control(n,text) and n.get('enabled')!='false' and in_panel(n,box)]
             if len(matches)==1:
                 prior=matches[0].get('bounds');time.sleep(.5)
@@ -327,7 +337,7 @@ try:
     replace_text(nodes,lambda value:ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(value),a.catalog)
     apply_catalog();find('Catalog refreshed.')
     before_sha=a.sha
-    before_version,after_version=('0.2.2','0.2.3') if a.loupe_update else ('0.1.0','0.2.0')
+    before_version,after_version=('0.2.2',a.after_version) if a.loupe_update else ('0.1.0','0.2.0')
     module_name='Pocket Measure' if a.loupe_update else 'Measure Preview'
     for version,digest in [(before_version,a.module_sha),(after_version,a.after_sha)]:
         heading=module_name+' · '+version
