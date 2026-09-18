@@ -452,7 +452,10 @@ try:
         for rotation in ('0','1'):
             adb('shell','settings','put','system','font_scale','2.0')
             adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2)
-            expect('Length: 22.8 cm');action('Choose photo')
+            # Integer touchscreen coordinates round differently after text zoom
+            # changes the fitted photo size. Keep the existing calibration tolerance.
+            if abs(length()-228)>3:raise RuntimeError('Large-text calibrated length outside tolerance')
+            action('Choose photo')
             find('Photos');adb('shell','input','keyevent','4');expect('No photo selected')
             # Cancellation intentionally clears the previous selection; load again to
             # inspect both the large-text controls and a completed measurement.
