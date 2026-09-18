@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "dev.construct.measure",
   "name": "Pocket Measure",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Estimate a tabletop length using a printed reference marker and two endpoint taps.",
   "constructApi": {
     "min": "0.10.0",
