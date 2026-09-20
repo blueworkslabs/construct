@@ -1,9 +1,17 @@
 # Camera extraction — alpha31 candidate verification
 
-Candidate only: PR #30 is unmerged, alpha31 is not publicly released, and default
-catalog behavior is unchanged until merge. The PR prepares only the verified Camera
-0.2.1 catalog entry; existing versions and other modules remain unchanged.
-Exact optimized-APK scopes are recorded below.
+The [alpha31 pilot](https://github.com/blueworkslabs/construct/releases/tag/v0.1.0-alpha31)
+was published on 2026-09-20 with the unchanged APK/module bytes documented below.
+PR #30 adds only the verified Camera 0.2.1 catalog entry; existing versions and
+other modules remain unchanged. Exact optimized-APK scopes are recorded below.
+
+## Physical-phone feedback — 2026-09-20
+
+The pilot tester confirmed on a Pixel that it "works as expected" and approved
+merging PR #30. This is a positive user-reported functional result, separate from
+the synthetic emulator receipts. The Pixel model, Android version, individual
+checklist results, timing, accuracy, thermal and battery measurements were not
+provided; no quantitative phone-performance claim is inferred.
 
 ## Ownership and compatibility
 

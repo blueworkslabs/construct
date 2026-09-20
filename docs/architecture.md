@@ -79,7 +79,8 @@ The broad Camera workspace was host-owned through alpha30. Alpha31 retires
 update and fresh authority. See the [photo contracts](module-photos.md),
 [retirement handling](shell-retirement.md) and
 [exact-artifact acceptance and limits](camera-alpha31-acceptance.md). The tested
-candidate remains unmerged and unreleased; physical-phone acceptance is separate.
+alpha31 pilot is published; user-reported Pixel testing passed. The acceptance
+report separates that feedback from measured emulator evidence.
 
 ## Module contract
 

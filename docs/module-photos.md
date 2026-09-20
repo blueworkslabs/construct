@@ -1,8 +1,8 @@
 # Private photo capabilities — API 0.11 candidate
 
-This describes the unmerged, unreleased alpha31 candidate. Its emulator
-replacement/migration scopes have passed; physical-phone acceptance remains
-outstanding. See [the experiment contract](camera-module-plan.md) and
+This describes the published alpha31 pilot. Its emulator replacement/migration
+scopes have passed, and the pilot tester reports that it works as expected on a
+Pixel. That feedback is not a quantitative phone-performance benchmark. See [the experiment contract](camera-module-plan.md) and
 [exact-artifact evidence and limits](camera-alpha31-acceptance.md).
 
 The native live CameraX viewfinder is acquisition infrastructure. The module owns

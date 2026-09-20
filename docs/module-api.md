@@ -113,7 +113,8 @@ and dispatch. Required callers show **Update required**; new installation and
 rollback into that old workflow are blocked, without deleting private originals.
 See [retirement](shell-retirement.md) and the completed
 [exact-artifact migration and functional scopes](camera-alpha31-acceptance.md).
-The candidate remains unmerged and unreleased; physical-phone testing is outstanding.
+The alpha31 pilot is published, with positive user-reported Pixel testing; see
+the acceptance report for the scope and limits of that feedback.
 
 ### Historical native workspace (through alpha30)
 
