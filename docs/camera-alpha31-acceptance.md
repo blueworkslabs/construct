@@ -120,6 +120,32 @@ Measure regression uses its separately pinned 0.2.5 catalog. Do not describe a
 catalog switch as a Measure upgrade or combine unrelated catalog promotions.
 No alpha31 public APK release or production deployment is implied by this report.
 
+## Physical-phone pilot check
+
+Use the exact alpha31 ARM64 APK and signed Camera 0.2.1 above; installing only
+the new module on alpha30 does not provide API 0.11. Install the APK in place,
+then update Camera using the review/test catalog and review the fresh grants.
+Do not uninstall if checking retention of existing private photos.
+
+1. Check old private photos remain available after granting library/pixel access.
+   Take a disposable photo with each camera, switch cameras, and cancel a capture.
+2. Run face/object detection on a few ordinary photos, including a blank scene.
+   Compare the first run with repeat runs; note total wait, touch responsiveness
+   and any noticeable warmth. A missed detection is not proof of a runtime failure;
+   report an error or timeout separately from an inaccurate model estimate.
+3. Check portrait, landscape and large text on the analysis screen. On the native
+   viewfinder, rotation/backgrounding intentionally cancels capture and closes
+   the transient run; it must release the camera and keep saved originals.
+4. Using a disposable photo, cancel and then confirm gallery export/deletion.
+   A phone-picked image must not enable deletion/export of an unrelated private photo.
+5. Background/reopen the module: selection/results should clear, the private album
+   should remain. Revoke a grant in Module access and confirm the relevant action
+   is denied until explicitly re-enabled.
+
+Report phone model, Android version, approximate first/repeat analysis waits and
+any reproduction steps for a stall or layout issue. Sharing personal photos is
+not necessary. Record these as phone observations, separate from emulator receipts.
+
 ## Reviewed visual evidence
 
 [Sanitized receipts, exact hashes and all selected capture hashes](evidence/camera-module-alpha31-2026-09-18.json).

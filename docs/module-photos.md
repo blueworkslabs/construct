@@ -1,15 +1,18 @@
 # Private photo capabilities — API 0.11 candidate
 
-This describes the alpha31 implementation under evaluation, not a released or
-accepted camera migration. See [the experiment contract](camera-module-plan.md).
+This describes the unmerged, unreleased alpha31 candidate. Its emulator
+replacement/migration scopes have passed; physical-phone acceptance remains
+outstanding. See [the experiment contract](camera-module-plan.md) and
+[exact-artifact evidence and limits](camera-alpha31-acceptance.md).
 
 The native live CameraX viewfinder is acquisition infrastructure. The module owns
 the album, selected photo, analysis commands, detection list, overlays and ordinary
 application UI. Analysis operates on an explicitly selected **still photo**, not
 on a video stream. This does not establish feasibility of high-frame-rate web
-video processing. The alpha31 source candidate retires the older workspace, but it must not be
-promoted without complete replacement and migration verification. Alpha30 remains
-the available native baseline.
+video processing. The alpha31 source candidate retires the older workspace. Its
+completed replacement and migration verification is tied to the artifacts in the
+acceptance report; changed artifacts need their own applicable verification.
+Alpha30 remains the released native baseline.
 
 ## Authority and data
 
