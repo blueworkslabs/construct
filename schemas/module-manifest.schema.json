@@ -135,6 +135,58 @@
               ]
             }
           }
+        },
+        {
+          "if": {
+            "contains": {
+              "properties": {
+                "id": {
+                  "const": "photos.library"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            }
+          },
+          "then": {
+            "contains": {
+              "properties": {
+                "id": {
+                  "const": "image.read"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "contains": {
+              "properties": {
+                "id": {
+                  "const": "image.analyze"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            }
+          },
+          "then": {
+            "contains": {
+              "properties": {
+                "id": {
+                  "const": "image.read"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            }
+          }
         }
       ]
     },

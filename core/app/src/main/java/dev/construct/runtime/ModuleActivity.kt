@@ -34,6 +34,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,6 +62,44 @@ class ModuleActivity : ComponentActivity() {
     private var pickerReturned = false
     private var pickedUri: Uri? = null
     private var imageCompletion: ((Uri?) -> Unit)? = null
+    private var capturingPhoto = false
+    private var captureReturned = false
+    private var captureSaved = false
+    private var captureClosed = false
+    private var captureCompletion: ((Boolean) -> Unit)? = null
+    private data class PhotoConfirmation(val op: String, val image: android.graphics.Bitmap, val done: (Boolean) -> Unit)
+    private var photoConfirmation by mutableStateOf<PhotoConfirmation?>(null)
+    private val photoCapture = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        captureSaved = result.resultCode == RESULT_OK && result.data?.getBooleanExtra("saved", false) == true
+        captureClosed = result.data?.getBooleanExtra("closed", false) == true
+        captureReturned = true
+    }
+    private fun capturePhoto(done: (Boolean) -> Unit) {
+        checkRule(!ending && !pickingImage && !capturingPhoto && !menu && !diagnosticsOpen && photoConfirmation == null,
+            "CAMERA_BUSY", "Capture is unavailable")
+        val module = selected ?: throw ConstructError("RUN_STALE", "Module closed")
+        store.withCapability(module, "camera.photo") { }
+        checkRule(PhotoCaptureActivity.hasPermission(this), "ANDROID_PERMISSION_DENIED", "Allow Android camera access in Module access first")
+        capturingPhoto = true; captureCompletion = done
+        webView?.pauseForPicker()
+        try { photoCapture.launch(PhotoCaptureActivity.intent(this, module)) }
+        catch (e: Exception) {
+            capturingPhoto = false; captureCompletion = null; webView?.setMenuPaused(false)
+            throw ConstructError("CAMERA_UNAVAILABLE", "Could not open camera capture")
+        }
+    }
+    private fun confirmPhoto(op: String, image: android.graphics.Bitmap, done: (Boolean) -> Unit) {
+        checkRule(!ending && !menu && !diagnosticsOpen && !pickingImage && !capturingPhoto && photoConfirmation == null,
+            "PHOTO_BUSY", "Photo confirmation unavailable")
+        webView?.pauseForPicker()
+        photoConfirmation = PhotoConfirmation(op, image, done)
+    }
+    private fun finishPhotoConfirmation(accepted: Boolean) {
+        val current = photoConfirmation ?: return
+        photoConfirmation = null
+        webView?.setMenuPaused(false)
+        current.done(accepted)
+    }
     private val imagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         pickedUri = uri; pickerReturned = true
     }
@@ -77,6 +116,13 @@ class ModuleActivity : ComponentActivity() {
     }
     override fun onPostResume() {
         super.onPostResume()
+        if (captureReturned && !ending) {
+            captureReturned = false; capturingPhoto = false
+            val done = captureCompletion; captureCompletion = null
+            if (captureClosed) { finishSession(); return }
+            webView?.setMenuPaused(false)
+            done?.invoke(captureSaved)
+        }
         if (pickerReturned && !ending) {
             pickerReturned = false; pickingImage = false
             val uri = pickedUri; pickedUri = null
@@ -119,7 +165,7 @@ class ModuleActivity : ComponentActivity() {
     private fun finishSession(action: String = "close", error: String? = null) {
         if (ending) return
         ending = true
-        imageCompletion = null; pickedUri = null
+        imageCompletion = null; pickedUri = null; captureCompletion = null; photoConfirmation = null
         webView?.destroy(); webView = null
         setResult(RESULT_OK, Intent().putExtra("action", action)
             .putExtra("module", intent.getStringExtra("module"))
@@ -129,11 +175,11 @@ class ModuleActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        if (selected?.manifest?.api in setOf("0.9.0", "0.10.0"))
+        if (selected?.manifest?.api in setOf("0.9.0", "0.10.0", "0.11.0"))
             webView?.settings?.textZoom = (newConfig.fontScale * 100).toInt().coerceIn(50, 300)
     }
 
-    override fun onStop() { if (!pickingImage) finishSession(); super.onStop() }
+    override fun onStop() { if (!pickingImage && !capturingPhoto) finishSession(); super.onStop() }
     override fun onDestroy() {
         webView?.destroy(); webView = null
         worker.shutdown()
@@ -168,7 +214,7 @@ class ModuleActivity : ComponentActivity() {
                     right = if (legacy && landscape) ModuleLayout.MENU_RECT.dp else 0.dp),
                     factory = { context ->
                         try {
-                            moduleWebView(context, store, active, pickImage = ::pickImage) { failedView, code ->
+                            moduleWebView(context, store, active, pickImage = ::pickImage, capturePhoto = ::capturePhoto, confirmPhoto = ::confirmPhoto) { failedView, code ->
                                 if (webView === failedView) finishSession(error = code)
                             }.also { webView = it }
                         } catch (error: Exception) {
@@ -213,6 +259,19 @@ class ModuleActivity : ComponentActivity() {
                 }
             }
         }
+        photoConfirmation?.let { confirmation -> AlertDialog(
+            onDismissRequest = { finishPhotoConfirmation(false) },
+            title = { Text(if (confirmation.op == "delete") "Delete this private photo?" else "Save this photo to phone gallery?") },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Construct confirmation · ${active?.manifest?.name ?: "Module"}")
+                androidx.compose.foundation.Image(confirmation.image.asImageBitmap(), "Selected private photo",
+                    Modifier.fillMaxWidth().heightIn(max = 220.dp), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+                Text(if (confirmation.op == "delete") "This removes the private original. Existing gallery copies are not deleted."
+                    else "Other gallery apps can access the exported copy. The private original is kept.")
+            } },
+            confirmButton = { TextButton(onClick = { finishPhotoConfirmation(true) }) { Text(if (confirmation.op == "delete") "Delete photo" else "Save copy") } },
+            dismissButton = { TextButton(onClick = { finishPhotoConfirmation(false) }) { Text("Cancel") } }
+        ) }
         if (diagnosticsOpen) AlertDialog(onDismissRequest = { closeDiagnostics() },
             title = { Text("Diagnostics") },
             text = { Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {

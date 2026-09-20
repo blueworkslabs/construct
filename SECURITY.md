@@ -77,5 +77,30 @@ at alpha28 and is retired in alpha29.
 Network, storage or diagnostic grants may let a module send or retain data it has
 received. Revocation cannot erase copies already delivered. Pocket Measure's lack
 of those capabilities is a module choice, not a universal host promise. Native
-picker handoff is the only background exception; all other background exits end
-the run. See [bounds, lifecycle and compatibility](docs/module-images.md).
+picker handoff (API 0.10+) and tracked native capture handoff (API 0.11) are
+explicit exceptions; unrelated background exits end the run. See [bounds, lifecycle and compatibility](docs/module-images.md).
+
+
+### Private photos and local inference (API 0.11 / alpha31 candidate)
+
+The former `camera.capture` workspace ends at alpha30. Alpha31 retains only its
+historical identifier and update-required recovery, not execution or authority.
+Existing per-module private originals are retained. The old grant cannot authorize
+pixels, an album listing, capture through the new API or analysis results.
+
+Fresh `photos.library` plus `image.read` grants expose bounded copies of this
+module's existing private photos through opaque run refs. `camera.photo` allows
+only a visible native human shutter (also requiring Android CAMERA). Separate
+`image.analyze` plus image/source authority allows bounded still-photo inference.
+No live frames, filesystem paths, general gallery permission or new models are
+exposed. Human deletion/export needs trusted confirmation showing the selected
+photo, with current session/digest/grants rechecked at final publication. A late
+confirmation after close or revocation cannot mutate the original.
+
+The acquired raster retains source authority for later stream reads and inference
+delivery. Analysis and displayed pixels are transient; original files survive
+updates and supported rollback. Native host deletion remains available when
+access is off or the installed module needs an update. Network/storage grants can
+permit a module to transmit/retain delivered pixels; Camera itself requests none.
+See [full bounds and lifecycle](docs/module-photos.md). Emulator/debug timing is
+not a physical-phone smoothness or continuous-video guarantee.

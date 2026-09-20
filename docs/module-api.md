@@ -2,14 +2,15 @@
 
 This reference describes implemented contracts, not the target architecture.
 Read the [modular design contract](modular-design.md) when proposing capabilities.
-The broad native-workspace launch operations below are compatibility exceptions;
-new modules should own their feature logic and UI through reusable capabilities.
+The former broad native-workspace launch operations are retired;
+modules own their feature logic and UI through reusable capabilities.
 API 0.9 adds bounded transport and one-shot location. API 0.10 adds
-[bounded image selection and marker detection](module-images.md).
+[bounded image selection and marker detection](module-images.md). API 0.11 adds
+[bounded capture, private-photo access and still-image inference](module-photos.md).
 Unrestricted WebView networking/geolocation and general native rendering remain unavailable.
 
 The current host accepts exact `constructApi.min == constructApi.target` versions
-0.1.0 through 0.10.0. Module versions are three numeric components. See the
+0.1.0 through 0.11.0. Module versions are three numeric components. See the
 [manifest schema](../schemas/module-manifest.schema.json) and runnable
 [examples](../examples); the native validator is authoritative.
 
@@ -69,7 +70,9 @@ a granted module can retain data it has read; revocation is not retroactive eras
   session loses authority. Silent/vibrate/DND policy can return `AUDIO_MUTED`.
   This capability does not grant arbitrary audio streaming or microphone access.
 - **`contacts.read` (0.3+):** bounded native provider search/details, below.
-- **`camera.capture` (0.4+):** native human-operated workspace, below.
+- **`camera.photo`, `photos.library`, `image.analyze` (0.11):** bounded acquisition,
+  private-photo access and reusable inference; [contracts](module-photos.md).
+- **`camera.capture` (historical 0.4+):** retired in the alpha31 candidate; below.
 
 Denials are structured errors, not permission prompts initiated by JavaScript.
 Android permission is requested only from native Module access UI. Malformed,
@@ -100,7 +103,22 @@ provider. Module and Android permission are checked before delivering data.
 
 ## Camera
 
-Only `{op:'open'}` is supported. `{opened:true}` acknowledges a native workspace,
+API 0.11 candidate adds fresh `camera.photo`, `photos.library` and
+`image.analyze` capabilities for module-owned saved-photo workflows. See
+[the bounded photo contracts](module-photos.md) and
+[the experiment/acceptance boundary](camera-module-plan.md). They do not expose
+a continuous camera frame stream. The following documents the historical
+workspace through alpha30. Alpha31 retains its identifier but removes its Activity
+and dispatch. Required callers show **Update required**; new installation and
+rollback into that old workflow are blocked, without deleting private originals.
+See [retirement](shell-retirement.md) and the completed
+[exact-artifact migration and functional scopes](camera-alpha31-acceptance.md).
+The alpha31 pilot is published, with positive user-reported Pixel testing; see
+the acceptance report for the scope and limits of that feedback.
+
+### Historical native workspace (through alpha30)
+
+Only `{op:'open'}` was supported. `{opened:true}` acknowledges a native workspace,
 **not** a captured image. Both module grant and Android CAMERA are required.
 Opening closes the WebView. Capture and confirmed deletion are native human
 controls. Backgrounding or rotation closes the camera; saved photos remain.
@@ -164,9 +182,13 @@ visible without hunting through a menu. Mark working is a human checkpoint, not
 an automatic health certificate; rollback restores code, not historical data.
 
 See [architecture](architecture.md), [security](../SECURITY.md) and
-[evidence limits](evidence.md), including the known camera direct-Reopen
-accessibility issue. There is no background alarm/service, contacts write, module
-gallery-export API, face analysis or unrestricted network API in this release.
+[evidence limits](evidence.md), including the historical native-camera direct-Reopen
+accessibility issue. There is no background alarm/service, contacts write or
+unrestricted network API. The API 0.11 candidate does provide native-confirmed
+private-photo gallery export through `photos.library` (Android 10+) and bounded
+face/common-object detection through `image.analyze`; both require fresh grants
+and `image.read`. These are selected-still-image operations, not live video or
+face identification. See [photo contracts](module-photos.md).
 
 ## Retired photo-measurement launcher
 

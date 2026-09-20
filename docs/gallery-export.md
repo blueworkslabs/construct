@@ -1,5 +1,11 @@
 # Native gallery export — alpha 12
 
+Historical native-workspace behavior through alpha30. The alpha31 candidate
+reuses the bounded native engine/storage but retires that workspace: modern
+Camera owns the saved-photo UI and receives pixels/results under fresh grants.
+See [the new API and consent boundary](module-photos.md). Statements below about
+no JavaScript image/result/export access describe the old workspace only.
+
 This is a host change developed in the public repository. Private deployment
 configuration and signing identities remain operator-owned; the historical private
 workbench is not a second development upstream.

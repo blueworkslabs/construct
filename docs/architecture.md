@@ -59,19 +59,28 @@ objects from the host. `ModuleHttp`/`HttpPolicy` supply bounded approved-origin 
 `ModuleLocation` supplies one explicitly granted foreground fix. Native consent,
 Android permission UI and session authorization remain outside module control.
 
-### Current native-workspace exceptions
+### Module-owned image workflows (API 0.10–0.11)
 
-Only the camera workspace still contains application-specific album/analysis
-flows alongside native acquisition. Pocket Measure 0.2.x owns its workflow in
-module code; API 0.10 supplies image selection/decoding and generic marker corners.
-`ModuleImageSession` owns only run-private image authority and bounded processing;
-no marker size, endpoint, measurement or unit policy reaches the native API.
+The alpha31 candidate has no remaining native application-workspace exceptions.
+Pocket Measure 0.2.x owns calibration, geometry, endpoints, units and rendering;
+API 0.10 supplies bounded image selection/decoding and generic marker corners.
+`ModuleImageSession` owns run-private image authority and bounded processing,
+not measurement policy.
 
-The remaining native Camera workflow is a working prototype but **not the desired module ownership boundary**.
-Preserve existing callers during migration; do not treat full native workspaces
-behind an `open` call as the pattern for new tools. Future reusable capabilities
-and their consent/data contracts must be implemented before moving dependent
-features into modules. See the design contract's migration and acceptance criteria.
+Pocket Camera 0.2.x owns the album, photo selection, analysis workflow, result
+presentation, overlays and score filtering. API 0.11 implements reusable
+`camera.photo`, `photos.library` and `image.analyze` capabilities with fresh grants.
+The native capture surface provides only visible acquisition controls, not album
+or analysis screens; native inference returns bounded results for a selected
+still image. No continuous camera-frame stream crosses the bridge.
+
+The broad Camera workspace was host-owned through alpha30. Alpha31 retires
+`camera.capture`, preserves private originals and requires an explicit module
+update and fresh authority. See the [photo contracts](module-photos.md),
+[retirement handling](shell-retirement.md) and
+[exact-artifact acceptance and limits](camera-alpha31-acceptance.md). The tested
+alpha31 pilot is published; user-reported Pixel testing passed. The acceptance
+report separates that feedback from measured emulator evidence.
 
 ## Module contract
 
@@ -92,8 +101,9 @@ This is not a claim that every possible JavaScript timer or WebView audio path s
 Web modules retain their live session through orientation changes. Snake explicitly
 pauses rather than catching up after rotation. Leaving the app ends the session;
 reopening uses each module's saved state. Process death is not silently treated as
-an in-memory resume. The native camera workspace has a separate policy: rotation
-or backgrounding closes/releases it; previously saved photos remain.
+an in-memory resume. The bounded native capture surface has a separate policy: rotation
+or backgrounding closes/releases it and ends its parent image run; previously
+saved photos remain. An explicit shutter/cancel returns to the same module run.
 
 ## Deployment boundaries
 
@@ -109,4 +119,8 @@ The alpha28 candidate removes native Sky implementation code. Old `sky.watch`
 packages remain readable for management but require a module update; they cannot
 execute or be restored through rollback. See the [compatibility boundary](shell-retirement.md).
 Alpha29 also retires `photo.measure`; see [the image/migration contract](module-images.md).
-Camera remains the single inventoried native-workflow exception.
+The alpha31 candidate also retires `camera.capture`: no native application
+workspaces remain in its source. Generic visible acquisition and bounded local
+inference remain host capabilities; the module owns the album and analysis UI.
+See [photo contracts](module-photos.md) and [measured prototype limits](camera-prototype-results.md).
+This source boundary does not substitute for exact-artifact migration acceptance.

@@ -138,3 +138,29 @@ holds a real endpoint drag, updates only the signed module to 0.2.5, repeats the
 interaction, then rolls back to 0.2.2. APK hashes are checked throughout; photos
 and calibration are intentionally recreated between module sessions. Review the
 three held-drag captures to confirm the loupe appears only in the new module.
+
+### Camera extraction candidate
+
+On the configured disposable synthetic-camera runner, use these task-scoped
+scripts (they refuse an occupied emulator and preserve incomplete receipts):
+
+- `camera_module.py --apk APK --sha APK_SHA --catalog HTTPS_INDEX_URL
+  --module-sha CAMERA_SHA --module-version 0.2.1`: capture, album, offline analysis,
+  consent, trusted confirmation, actual layouts, lifecycle and original hashes.
+  `--prototype` is only for a debug APK; it adds controlled local-CDP timing
+  samples and explicitly marks the receipt as debug evidence. Omit it for pilot
+  acceptance. See [measured limits](camera-prototype-results.md).
+- `camera_retirement.py --old ALPHA30_APK --old-sha OLD_SHA --new ALPHA31_APK
+  --new-sha NEW_SHA --catalog HTTPS_INDEX_URL --candidates CANDIDATES_JSON`:
+  real legacy shutter, in-place upgrade, preserved originals and unrelated saved
+  data, fresh authority, rejected native rollback/reinstallation. Metadata is
+  `{"camera":{"version":"0.2.1","sha256":"EXPECTED_MODULE_SHA"}}`.
+- `camera_update.py --apk APK --sha APK_SHA --catalog HTTPS_INDEX_URL
+  --old-module-sha CAMERA_0_2_0_SHA --module-sha CAMERA_0_2_1_SHA
+  --module-version 0.2.1`: signed score-filter workflow update and rollback,
+  checking the same installed APK and original photos before/after. Both immutable
+  modules must be in the catalog; neither version restores native application UI.
+
+The synthetic runner injects licensed fixtures only into an asserted empty
+per-module directory on the disposable userdebug emulator. It restores unprivileged
+ADB identity. Never run that fixture setup on a personal phone or existing album.

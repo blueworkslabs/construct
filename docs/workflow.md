@@ -17,8 +17,9 @@ performed by humans. A hosted LLM connection is not needed by an installed modul
 1. **Define a small acceptance contract.** Specify capability requests, persistence,
    interruption behavior and what the emulator can—and cannot—prove.
 2. **Implement the smallest useful slice.** Keep game/timer rules separate from the
-   UI for deterministic tests. Adding contacts or camera requires a new native API
-   and APK; adding Snake using existing storage does not.
+   UI for deterministic tests. Introducing a previously unavailable phone capability
+   requires a native API and APK; adding a workflow using existing contacts,
+   camera or storage APIs does not.
 3. **Run local checks.** Module JS tests, package/registry tests, JVM/Robolectric
    tests and Android lint catch different classes of error.
 4. **Build and identify candidates.** Build the optimized pilot APK; check its

@@ -52,12 +52,12 @@ The store enforces install, run, grant, confirmation and rollback boundaries, an
 the Activity/WebView check the runtime boundary again. Library provides a recovery
 path even when an old trial cannot run.
 
-Run `python scripts/check_architecture.py`. CI rejects known native Sky and Measure domain
+Run `python scripts/check_architecture.py`. CI rejects known native Sky, Measure and Camera domain
 classes/provider dependencies, new native workspace dispatches, unreviewed Activity
 registrations and DEX loader introduction. This small source ratchet is a backstop,
 not a semantic proof or a reason to evade ownership review by renaming code.
-Camera is the remaining exception in the alpha29 candidate; Measure retirement
-is described below.
+Camera was the remaining exception through alpha30. The alpha31 candidate
+removes that exception; its distinct acceptance remains required.
 
 Required candidate acceptance: JVM retirement/consent/rollback tests, lint, shipped
 module tests and the architecture ratchet; exact-APK Android upgrade from alpha27
@@ -80,7 +80,7 @@ landscape and large text. Do not attach alpha27 evidence to alpha28.
    Do not invent a large map/rendering API or downloadable DEX runtime for this proof.
 
 Each extraction needs its own exact-artifact evidence. Alpha28 Sky evidence does
-not establish alpha29 Measure acceptance, and Camera remains unfinished. The
+not establish alpha29 Measure acceptance, and the alpha31 Camera candidate needs its own evidence. The
 Checklist proof recorded with alpha28 demonstrates an unrelated independent
 consumer; it is not a substitute for Measure-specific update/rollback checks.
 
@@ -101,4 +101,35 @@ measurement consent must not be inherited. Alpha28 is the final native Measure
 host. [Optimized-candidate acceptance](measure-module-alpha29-acceptance.md) covers
 functional/lifecycle checks, this in-place transition and independent module
 updating; the earlier debug prototype remains separate. See [the image contract](module-images.md) and
-[the modern user flow](pocket-measure.md). Camera is the remaining native exception.
+[the modern user flow](pocket-measure.md). Camera remained the native exception through alpha30.
+
+
+## Camera retirement (alpha31 candidate)
+
+The replacement module owns album navigation, selected-photo interpretation,
+detection lists/Canvas overlays, score filtering and ordinary feature controls.
+The candidate removes `CameraActivity`, its manifest/dispatch entry and obsolete
+native album-overlay state. Native code retains reusable capture, bounded private
+storage, trusted deletion/export confirmation and local inference. There is no
+continuous frame/video stream into JavaScript; this migration tests the existing
+saved-photo behavior, not a newly invented live-vision application.
+
+`camera.capture` is historical API 0.4+ metadata only. Alpha30 is its last native
+host. Existing required callers show Update required / Find update, including
+unconfirmed trials. Old manifests/data remain manageable; new installation,
+execution, regrant and rollback into the retired workspace fail explicitly.
+`camera-photos/<module-id>` originals and unrelated saved data remain untouched.
+Native Module access still offers confirmed **Delete all saved photos** when
+private originals exist, even for an update-required module with no active grants.
+
+Modern Camera 0.2.x requires API 0.11. The old workspace grant cannot authorize
+`camera.photo`, `photos.library`, `image.read` or `image.analyze`; all need fresh
+independent consent. Android camera permission is still separate. Private-library
+consent expressly includes older captures. Supported module updates/rollback
+preserve originals and do not reverse grant revocation. See [photo contracts](module-photos.md).
+
+This is a retirement **candidate**, not final device acceptance. Before promotion,
+require an in-place alpha30 upgrade with a real synthetic native-shutter photo,
+byte preservation, fresh consent, rejected native rollback/reinstall, functional
+capture/inference/export/lifecycle checks and a supported signed module update
+and rollback on unchanged APK bytes. Retain failed/incomplete attempts separately.

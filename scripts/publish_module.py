@@ -22,7 +22,7 @@ ID = re.compile(r'[a-z][a-z0-9]*(\.[a-z][a-z0-9-]*)+')
 VERSION = re.compile(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)')
 PATH = re.compile(r'[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*(?:/[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)*')
 EXTENSIONS = {'html', 'js', 'css', 'json', 'png', 'jpg', 'jpeg', 'webp', 'txt', 'woff2'}
-CAPS = {'storage.kv', 'log.write', 'device.toast', 'device.tone', 'contacts.read', 'camera.capture', 'photo.measure', 'sky.watch', 'net.http', 'location.read', 'image.read', 'image.markers'}
+CAPS = {'storage.kv', 'log.write', 'device.toast', 'device.tone', 'contacts.read', 'camera.capture', 'photo.measure', 'sky.watch', 'net.http', 'location.read', 'image.read', 'image.markers', 'camera.photo', 'photos.library', 'image.analyze'}
 
 
 def require(ok, message):
@@ -37,10 +37,10 @@ def validate_manifest(m):
     for field, maxlen in [('id', 120), ('version', 50), ('name', 80), ('entry', 180)]:
         require(isinstance(m[field], str) and m[field].strip() and len(m[field]) <= maxlen, field)
     require(ID.fullmatch(m['id']) and VERSION.fullmatch(m['version']), 'Identity/version')
-    require(m['constructApi'] in ({'min': '0.1.0', 'target': '0.1.0'}, {'min': '0.2.0', 'target': '0.2.0'}, {'min': '0.3.0', 'target': '0.3.0'}, {'min': '0.4.0', 'target': '0.4.0'}, {'min': '0.5.0', 'target': '0.5.0'}, {'min': '0.6.0', 'target': '0.6.0'}, {'min': '0.7.0', 'target': '0.7.0'}, {'min': '0.8.0', 'target': '0.8.0'}, {'min': '0.9.0', 'target': '0.9.0'}, {'min': '0.10.0', 'target': '0.10.0'}), 'API compatibility')
+    require(m['constructApi'] in ({'min': '0.1.0', 'target': '0.1.0'}, {'min': '0.2.0', 'target': '0.2.0'}, {'min': '0.3.0', 'target': '0.3.0'}, {'min': '0.4.0', 'target': '0.4.0'}, {'min': '0.5.0', 'target': '0.5.0'}, {'min': '0.6.0', 'target': '0.6.0'}, {'min': '0.7.0', 'target': '0.7.0'}, {'min': '0.8.0', 'target': '0.8.0'}, {'min': '0.9.0', 'target': '0.9.0'}, {'min': '0.10.0', 'target': '0.10.0'}, {'min': '0.11.0', 'target': '0.11.0'}), 'API compatibility')
     if 'themeColor' in m:
         require(isinstance(m['themeColor'], str) and re.fullmatch(r'#[0-9a-fA-F]{6}', m['themeColor']), 'Theme colour must be #RRGGBB')
-        require(m['constructApi']['min'] in ('0.6.0', '0.7.0', '0.8.0', '0.9.0', '0.10.0'), 'Theme colour requires API 0.6.0')
+        require(m['constructApi']['min'] in ('0.6.0', '0.7.0', '0.8.0', '0.9.0', '0.10.0', '0.11.0'), 'Theme colour requires API 0.6.0')
     require(m['runtime'] == {'kind': 'webview-js'}, 'Runtime')
     require(PATH.fullmatch(m['entry']) and m['entry'].endswith('.html'), 'Entry path')
     caps = m['capabilities']
@@ -49,7 +49,7 @@ def validate_manifest(m):
         require({'id', 'reason'} <= cap.keys() <= {'id', 'reason', 'optional', 'origins'}, 'Capability fields')
         require(cap['id'] in CAPS, 'Unknown capability')
         if cap['id'] == 'net.http':
-            require(m['constructApi']['min'] in ('0.9.0', '0.10.0'), 'HTTP requires API 0.9.0')
+            require(m['constructApi']['min'] in ('0.9.0', '0.10.0', '0.11.0'), 'HTTP requires API 0.9.0')
             origins = cap.get('origins')
             require(isinstance(origins, list) and 1 <= len(origins) <= 8, 'Declare 1–8 HTTP sources')
             for origin in origins:
@@ -60,18 +60,20 @@ def validate_manifest(m):
             require(len(set(origins)) == len(origins), 'Duplicate HTTP source')
         else:
             require('origins' not in cap, 'Sources apply only to HTTP')
-        require(cap['id'] not in ('image.read', 'image.markers') or m['constructApi']['min'] == '0.10.0', 'Images require API 0.10.0')
-        require(cap['id'] != 'location.read' or m['constructApi']['min'] in ('0.9.0', '0.10.0'), 'Location requires API 0.9.0')
-        require(cap['id'] != 'device.tone' or m['constructApi']['min'] in ('0.2.0', '0.3.0', '0.4.0', '0.5.0', '0.6.0', '0.7.0', '0.8.0', '0.9.0', '0.10.0'), 'Tone requires API 0.2.0')
-        require(cap['id'] != 'contacts.read' or m['constructApi']['min'] in ('0.3.0', '0.4.0', '0.5.0', '0.6.0', '0.7.0', '0.8.0', '0.9.0', '0.10.0'), 'Contacts require API 0.3.0')
-        require(cap['id'] != 'sky.watch' or m['constructApi']['min'] in ('0.8.0', '0.9.0', '0.10.0'), 'Sky Watch requires API 0.8.0')
-        require(cap['id'] != 'photo.measure' or m['constructApi']['min'] in ('0.7.0', '0.8.0', '0.9.0', '0.10.0'), 'Photo measurement requires API 0.7.0')
-        require(cap['id'] != 'camera.capture' or m['constructApi']['min'] in ('0.4.0', '0.5.0', '0.6.0', '0.7.0', '0.8.0', '0.9.0', '0.10.0'), 'Camera requires API 0.4.0')
+        require(cap['id'] not in ('image.read', 'image.markers') or m['constructApi']['min'] in ('0.10.0', '0.11.0'), 'Images require API 0.10.0')
+        require(cap['id'] != 'location.read' or m['constructApi']['min'] in ('0.9.0', '0.10.0', '0.11.0'), 'Location requires API 0.9.0')
+        require(cap['id'] != 'device.tone' or m['constructApi']['min'] in ('0.2.0', '0.3.0', '0.4.0', '0.5.0', '0.6.0', '0.7.0', '0.8.0', '0.9.0', '0.10.0', '0.11.0'), 'Tone requires API 0.2.0')
+        require(cap['id'] != 'contacts.read' or m['constructApi']['min'] in ('0.3.0', '0.4.0', '0.5.0', '0.6.0', '0.7.0', '0.8.0', '0.9.0', '0.10.0', '0.11.0'), 'Contacts require API 0.3.0')
+        require(cap['id'] != 'sky.watch' or m['constructApi']['min'] in ('0.8.0', '0.9.0', '0.10.0', '0.11.0'), 'Sky Watch requires API 0.8.0')
+        require(cap['id'] != 'photo.measure' or m['constructApi']['min'] in ('0.7.0', '0.8.0', '0.9.0', '0.10.0', '0.11.0'), 'Photo measurement requires API 0.7.0')
+        require(cap['id'] != 'camera.capture' or m['constructApi']['min'] in ('0.4.0', '0.5.0', '0.6.0', '0.7.0', '0.8.0', '0.9.0', '0.10.0', '0.11.0'), 'Camera requires API 0.4.0')
+        require(cap['id'] not in ('camera.photo', 'photos.library', 'image.analyze') or m['constructApi']['min'] == '0.11.0', 'Photo APIs require API 0.11.0')
         require(isinstance(cap['reason'], str) and 0 < len(cap['reason'].strip()) <= 240, 'Capability reason')
         require('optional' not in cap or type(cap['optional']) is bool, 'Optional flag')
     require(len({c['id'] for c in caps}) == len(caps), 'Duplicate capability')
     declared = {c['id'] for c in caps}
     require('image.markers' not in declared or 'image.read' in declared, 'image.markers requires image.read')
+    require(not declared & {'photos.library', 'image.analyze'} or 'image.read' in declared, 'Photo library and analysis require image.read')
     for field, maxlen in [('description', 500), ('author', 120), ('homepage', 500)]:
         require(field not in m or isinstance(m[field], str) and len(m[field]) <= maxlen, field)
 
