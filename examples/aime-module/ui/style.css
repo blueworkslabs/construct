@@ -1,0 +1,243 @@
+/* Aimé: module-specific rules on top of construct-ui.css tokens (Sky Watch 0.3 patterns). */
+.construct-head {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.construct-head > div {
+  min-width: 0;
+}
+#back {
+  flex: none;
+}
+h2 {
+  font-size: 17px;
+  margin: 12px 0 6px;
+}
+.note {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.wide {
+  width: 100%;
+}
+label {
+  display: block;
+}
+select,
+input[type="search"] {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  font: inherit;
+  padding: 8px 12px;
+  margin: 4px 0 8px;
+  border-radius: var(--r-btn);
+  border: 1px solid var(--control-border);
+  background: var(--surface2);
+  color: var(--text);
+}
+select:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+}
+.toolbar label {
+  flex: 1;
+  min-width: 0;
+}
+/* Library grid */
+#grid {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+#grid button {
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  font-weight: 400;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-color: var(--border);
+}
+#grid .thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--surface2);
+  display: block;
+}
+#grid .caption {
+  padding: 6px 8px 8px;
+  font-size: 13px;
+  line-height: 1.3;
+}
+#grid .caption strong {
+  display: block;
+  font-size: 14px;
+}
+/* Photo view */
+.modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0;
+}
+.modes button {
+  flex: 1 1 auto;
+  padding: 8px 10px;
+}
+.modes button[aria-pressed="true"] {
+  background: var(--jade);
+  color: var(--jade-ink);
+  border-color: var(--jade);
+}
+#ruler {
+  position: relative;
+  height: 30px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: var(--r-card) var(--r-card) 0 0;
+  overflow: hidden;
+}
+#ruler canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+#ruler-label {
+  margin: 4px 0 2px;
+}
+#ruler,
+#stage {
+  margin-left: auto;
+  margin-right: auto;
+}
+#stage {
+  position: relative;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--r-card) var(--r-card);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#frame {
+  position: absolute;
+  inset: 0 auto auto 0;
+  transform-origin: 0 0;
+}
+#picture,
+#overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+#overlay {
+  overflow: visible;
+  pointer-events: none;
+}
+.zoom {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  gap: 4px;
+}
+.zoom button {
+  min-width: 44px;
+  padding: 4px 8px;
+  background: #0b1410cc;
+}
+.chip {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  margin: 2px 5px 2px 0;
+  color: var(--muted);
+}
+.chip.live {
+  border-color: var(--jade);
+  color: var(--jade);
+}
+.chip.attention {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+#viewpoint.attention {
+  color: var(--amber);
+}
+.construct-list li small {
+  display: block;
+  color: var(--muted);
+}
+/* Dialogs */
+dialog {
+  background: var(--surface);
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 18px;
+  width: min(94vw, 620px);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+dialog::backdrop {
+  background: #0009;
+}
+dialog h2 {
+  margin: 0 0 12px;
+  font-size: 1.2rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+dialog .actions {
+  position: sticky;
+  bottom: -18px;
+  background: var(--surface);
+  padding: 12px 0 6px;
+}
+#results li button {
+  flex: 1;
+  text-align: left;
+  font-weight: 400;
+  background: none;
+  border-color: transparent;
+  padding: 6px 4px;
+}
+#candidates {
+  padding-left: 1.4em;
+}
+#candidates li {
+  margin: 8px 0;
+}
+#candidates li.greyed {
+  color: var(--muted);
+}
+#candidates li small {
+  display: block;
+  color: var(--muted);
+}

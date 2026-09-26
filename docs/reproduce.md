@@ -163,6 +163,12 @@ scripts (they refuse an occupied emulator and preserve incomplete receipts):
   --module-version 0.2.1`: signed score-filter workflow update and rollback,
   checking the same installed APK and original photos before/after. Both immutable
   modules must be in the catalog; neither version restores native application UI.
+- Aimé (slice 1b, module only): `python scripts/prepare_aime_fixture.py --output DIR`
+  signs `dev.construct.aime` and the **Synthetic Aimé** fixture
+  (`dev.construct.aime-fixture`: fixed viewpoint, Overpass features and rendered
+  scene from `scripts/aime-fixture/synthetic-aime.js`; capture, list, delete,
+  storage and grants stay real). The fixture's library screen prints the
+  normalised tap targets. Module logic checks: `node scripts/test_aime.cjs`.
 - `photo_identity.py --apk APK --sha APK_SHA --catalog HTTPS_FIXTURE_INDEX_URL
   --legacy-sha PHOTO_IDENTITY_0_1_0_SHA --module-sha PHOTO_IDENTITY_0_2_0_SHA
   --update-sha PHOTO_IDENTITY_0_3_0_SHA`: API 0.12 stable photo IDs using the

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="/construct-host.css" />
+    <link rel="stylesheet" href="construct-ui.css" />
+    <link rel="stylesheet" href="style.css" />
+    <title>Aimé</title>
+  </head>
+  <body>
+    <main>
+      <header class="construct-head">
+        <div>
+          <h1>Aimé</h1>
+          <p class="purpose">What’s that on the horizon?</p>
+        </div>
+        <button id="back" hidden>Photos</button>
+      </header>
+      <section id="library">
+        <p class="note" id="capture-note">
+          Use the main rear camera, not ultrawide or zoom. Aimé saves an
+          estimated viewpoint with each photo; direction comes from the
+          landmarks you mark afterwards.
+        </p>
+        <button id="take" class="primary wide">Take photo</button>
+        <p id="status" role="status"></p>
+        <ul id="grid" aria-label="Your Aimé photos"></ul>
+        <p id="empty" hidden>No photos yet. Take one from a viewpoint where you can see a landmark you know.</p>
+      </section>
+      <section id="photo" hidden>
+        <p id="viewpoint"></p>
+        <div class="row" id="viewpoint-actions">
+          <button id="confirm-viewpoint" hidden>Use this viewpoint</button>
+        </div>
+        <div id="chips"></div>
+        <div class="toolbar">
+          <label>Radius<select id="radius">
+              <option value="10">10 km</option>
+              <option value="30" selected>30 km</option>
+              <option value="60">60 km</option>
+            </select></label>
+        </div>
+        <div class="modes" role="group" aria-label="What a tap on the photo does">
+          <button id="mode-mark" aria-pressed="true">Mark landmark</button
+          ><button id="mode-horizon" aria-pressed="false">Level horizon</button
+          ><button id="mode-what" aria-pressed="false">What’s that?</button>
+        </div>
+        <p id="hint" class="note"></p>
+        <p id="ruler-label" class="note">Mark a landmark you know to calibrate</p>
+        <div id="ruler"><canvas id="ruler-canvas" aria-hidden="true"></canvas></div>
+        <div id="stage" role="img" aria-label="Selected photo. Tap to mark, level or ask what something is. Pinch to zoom.">
+          <div id="frame"><img id="picture" alt="" draggable="false" /><svg id="overlay" aria-hidden="true"></svg></div>
+          <div class="zoom">
+            <button id="zoom-in" aria-label="Zoom in">+</button
+            ><button id="zoom-out" aria-label="Zoom out">−</button
+            ><button id="zoom-reset" aria-label="Fit photo">⤢</button>
+          </div>
+        </div>
+        <p id="photo-status" role="status"></p>
+        <h2>Landmarks you marked</h2>
+        <ul id="marks" class="construct-list"></ul>
+        <h2>Horizon points</h2>
+        <ul id="horizon-points" class="construct-list"></ul>
+        <div class="actions">
+          <button id="delete" class="danger">Delete photo</button>
+        </div>
+      </section>
+      <details class="help">
+        <summary>Help and data sources</summary>
+        <h2>How it works</h2>
+        <p>
+          Aimé turns a tap into a compass bearing from where you stood and
+          ranks named map features along it. Mark a landmark you recognise to
+          calibrate the direction; a second mark also fits the lens. Tapping two
+          points on a true level horizon levels the picture. Results are a
+          shortlist that says “could be”, each with its offset from your tap,
+          its own ±σ and its distance. Nothing here is a guaranteed answer.
+        </p>
+        <h2>Viewpoint</h2>
+        <p>
+          Each photo keeps an estimated viewpoint: the later of two location
+          fixes taken around the shutter, with its age and accuracy. If the
+          fixes disagree, are old, or the viewfinder stayed open a long time,
+          confirm the viewpoint before looking up landmarks.
+        </p>
+        <h2>What leaves the phone</h2>
+        <p>
+          Only the confirmed viewpoint and the selected radius go to Overpass
+          (overpass-api.de) to fetch named peaks, towers, churches, castles,
+          viewpoints and airfields. Never the photo, your marks or your taps.
+          Viewpoints and marks are saved in this module’s storage; after a
+          photo is deleted, its data is cleaned up the next time Aimé can read
+          its library and storage.
+        </p>
+        <p>Map data © OpenStreetMap contributors, ODbL 1.0.</p>
+      </details>
+      <footer>Aimé · __VERSION__</footer>
+    </main>
+    <dialog id="mark-dialog">
+      <h2>Which landmark did you tap?</h2>
+      <p id="fetch-status" role="status"></p>
+      <button id="retry-fetch" hidden>Retry</button>
+      <p id="incomplete" class="note" hidden>
+        Incomplete: Overpass returned its 400-feature limit, so some landmarks
+        are missing. <button id="smaller-radius" class="quiet">Use a smaller radius</button>
+      </p>
+      <label>Search<input id="search" type="search" autocomplete="off" placeholder="Name or OSM id, e.g. node/123" /></label>
+      <ul id="results" class="construct-list" aria-label="Nearby landmarks, nearest first"></ul>
+      <div class="actions"><button id="cancel-mark">Cancel</button></div>
+    </dialog>
+    <dialog id="horizon-dialog">
+      <h2>Level the horizon</h2>
+      <p>
+        Tap two separated points on a known <strong>level</strong> horizon — not a
+        mountain ridge, roofline or treetops. Aimé assumes that line is at true
+        level. Even a sea horizon dips slightly below level when you stand high,
+        so it is approximate.
+      </p>
+      <p class="note">
+        Skip this when no true level line is visible; the result is simply less
+        certain for rows far from your marks.
+      </p>
+      <div class="actions">
+        <button id="skip-horizon">Skip</button
+        ><button id="start-horizon" class="primary">Tap two points</button>
+      </div>
+    </dialog>
+    <dialog id="candidates-dialog">
+      <h2 id="candidates-title">Could be</h2>
+      <p id="candidates-note" class="note"></p>
+      <ol id="candidates"></ol>
+      <p id="candidates-extra" class="note"></p>
+      <div class="actions"><button id="close-candidates" class="primary">Close</button></div>
+    </dialog>
+    <script src="bridge.js"></script>
+    <script src="resection.js"></script>
+    <script src="aime-core.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
