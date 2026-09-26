@@ -95,8 +95,10 @@ for slice 1. Orientation capture stays a later, optional aid.
    the tap and that candidate's comparison ±σ. When no result has `close:true`
    (within its own 2σ), the sheet says "no
    close match" and shows the nearest two greyed. Tapping a candidate opens the
-   **map view**: fitted viewer dot, tap ray as a wedge of total width 2×direction
-   σ (±1σ, not a 95% region), marks as solid pins, candidates as numbered pins.
+   **map view**: fitted viewer dot, tap ray as a wedge drawn from the fitted
+   viewpoint with an inner band at ±1 direction σ and a fainter outer band out
+   to ±2σ (matching the sheet's "could be" range; not a 95% region), marks as
+   solid pins, candidates as numbered pins.
    Keep the reported/confirmed viewpoint and its accuracy visible separately
    when the fit moves it. Preserve that input in storage; do not overwrite it
    with the fit or quietly centre later feature queries on a derived position.

@@ -1,7 +1,7 @@
 "use strict";
 // Aimé map: derived from Sky Watch's SkyMap (tiles, pan, pinch, wheel and
 // double-tap zoom, scale bar, tile cooldowns). Adds the viewer dot (reported and
-// fitted), the tap wedge (±1 direction σ), mark pins, numbered candidate pins,
+// fitted), the tap wedge (±1 direction σ, fainter band to ±2σ), mark pins, numbered candidate pins,
 // dragging the viewer dot to correct it and tapping to place an unlocated viewpoint.
 class AimeMap {
   static projection = {
@@ -296,24 +296,31 @@ class AimeMap {
     }
     this.pump();
   }
-  // Wedge of total width 2σ (±1σ) along the tap bearing.
-  wedgePoints(from, wedge) {
+  // Wedge spanning bearing ±k·σ along the tap bearing (k = 1: the inner band).
+  wedgePoints(from, wedge, k = 1) {
     const pts = [from],
-      steps = 16;
-    for (let i = 0; i <= steps; i++) pts.push(Resection.destination(from, wedge.bearing - wedge.sigma + (2 * wedge.sigma * i) / steps, wedge.lengthKm));
+      steps = 16,
+      half = k * wedge.sigma;
+    for (let i = 0; i <= steps; i++) pts.push(Resection.destination(from, wedge.bearing - half + (2 * half * i) / steps, wedge.lengthKm));
     return pts;
   }
+  // Inner band ±1σ, fainter outer band out to ±2σ: the list says "could be"
+  // out to 2σ, so an offered candidate never sits outside the drawn wedge.
   drawWedge(from, wedge) {
     const ctx = this.ctx,
-      pts = this.wedgePoints(from, wedge).map((p) => this.xy(p));
-    ctx.beginPath();
-    pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-    ctx.closePath();
-    ctx.fillStyle = "#e9c46a33";
-    ctx.fill();
-    ctx.strokeStyle = "#e9c46acc";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+      band = (k, fill, stroke) => {
+        const pts = this.wedgePoints(from, wedge, k).map((p) => this.xy(p));
+        ctx.beginPath();
+        pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.closePath();
+        ctx.fillStyle = fill;
+        ctx.fill();
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = k === 1 ? 1.5 : 1;
+        ctx.stroke();
+      };
+    band(2, "#e9c46a14", "#e9c46a55");
+    band(1, "#e9c46a33", "#e9c46acc");
     const end = this.xy(Resection.destination(from, wedge.bearing, wedge.lengthKm)),
       start = this.xy(from);
     ctx.beginPath();

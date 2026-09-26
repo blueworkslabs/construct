@@ -102,6 +102,14 @@ const ok = (name) => {
     assert.ok(Math.abs(R.diff(R.bearing(from, pts[17]), 47.8)) < 0.01);
     assert.ok(Math.abs(R.distance(from, pts[9]) - 30) < 0.01);
     ok("wedge spans bearing ±1σ out to the requested length");
+    const outer = map.wedgePoints(from, { bearing: 44, sigma: 3.8, lengthKm: 30 }, 2);
+    assert.ok(Math.abs(R.diff(R.bearing(from, outer[1]), 36.4)) < 0.01);
+    assert.ok(Math.abs(R.diff(R.bearing(from, outer[17]), 51.6)) < 0.01);
+    const fills = [];
+    map.ctx = new Proxy({}, { get: () => () => {}, set: (_, k, v) => (k === "fillStyle" && fills.push(v), true) });
+    map.drawWedge(from, { bearing: 44, sigma: 3.8, lengthKm: 30 });
+    assert.deepEqual(fills, ["#e9c46a14", "#e9c46a33"], "fainter outer band first, inner band on top");
+    ok("outer wedge band spans bearing ±2σ, the sheet's could-be range");
   }
   {
     const { map } = rig();

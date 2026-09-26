@@ -877,7 +877,7 @@ function renderMap(fit, focus = null) {
     ? "Set your viewpoint: tap the map where you stood when taking this photo. Pan and zoom first to place it precisely."
     : v.review
       ? "Drag the ring to where you stood, or confirm the estimated viewpoint above."
-      : "Drag the ring to correct where you stood. The wedge shows your last tap’s direction ±1σ.";
+      : "Drag the ring to correct where you stood. The wedge shows your last tap’s direction: ±1σ, fainter out to ±2σ.";
   $("locate-start").hidden = !!v;
   const legend = $("map-legend");
   legend.replaceChildren();
@@ -896,7 +896,7 @@ function renderMap(fit, focus = null) {
     item(`Ring: ${v.corrected ? "your corrected" : v.review ? "estimated (please confirm)" : "your estimated"} viewpoint`, `±${Math.round(v.accuracyM || 20)} m accuracy, shown as the shaded circle`);
     if (fitted) item("Dot: viewpoint fitted from your marks", `${Math.round(S.distance(v, fitted) * 1000)} m from the ring; your saved viewpoint is unchanged`);
   }
-  if (v && list) item(`Wedge: your tap points ${Math.round(list.bearing)}° (${C.compass(list.bearing)})`, `±${list.wedge.toFixed(1)}° (1σ); nearby candidates can have a wider ±σ of their own`);
+  if (v && list) item(`Wedge: your tap points ${Math.round(list.bearing)}° (${C.compass(list.bearing)})`, `±${list.wedge.toFixed(1)}° (1σ), fainter band to ±${(2 * list.wedge).toFixed(1)}° (2σ); nearby candidates can have a wider ±σ of their own`);
   s.marks.forEach((m) => item(`Green pin: ${m.name}`, v ? `landmark you marked · ${C.km(S.distance(v, m))} · ${Math.round(S.bearing(v, m))}°` : "landmark you marked"));
   candidates.forEach((c, i) => {
     const r = list.rows[i];
