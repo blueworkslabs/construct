@@ -134,11 +134,15 @@ const Resection = (() => {
         marks: list.length,
       };
     }
-    // Two marks that are too close in bearing cannot separate FOV from heading.
-    const spread = Math.abs(diff(list[0].bearing, list[1].bearing));
-    if (list.length === 2 && spread < 5) {
+    // Repeated/clustered marks do not become informative just by adding more.
+    // This is a basic degeneracy check, not a complete conditioning estimate.
+    const spread = Math.max(...list.flatMap((a) => list.map((b) => Math.abs(diff(a.bearing, b.bearing)))));
+    const columnSpread = columnAngle(Math.max(...list.map((m) => m.x)), guess) -
+      columnAngle(Math.min(...list.map((m) => m.x)), guess);
+    if (spread < 5 || columnSpread < 5) {
       const heading = fitHeading(list, guess);
-      return { heading, fov: guess, source: "one", residualDeg: rms(list, heading, guess), marks: 2 };
+      return { heading, fov: guess, source: "one", residualDeg: rms(list, heading, guess), marks: list.length,
+        reason: "insufficient-spread" };
     }
     const fov = fitFov(list),
       heading = fitHeading(list, fov);
@@ -159,7 +163,8 @@ const Resection = (() => {
   // rank(cal, x, viewer, candidates) → candidates sorted best first.
   //   candidates: [{point, weight?, maxKm?, ...}]   weight: visibility prior ≥ 0
   // Each result carries bearing, deltaDeg (signed, candidate − tap), distanceKm,
-  // sigmaDeg and score in (0, 1]. Candidates beyond maxKm (default 40 km) are
+  // sigmaDeg, nonnegative relative score and logScore (not a probability).
+  // Candidates beyond maxKm (default 40 km) are
   // kept but down-weighted; the caller decides how many to show.
   function rank(cal, x, viewer, candidates) {
     if (!point(viewer)) throw new Error("Viewer position required.");
@@ -172,17 +177,19 @@ const Resection = (() => {
           d = distance(viewer, c.point),
           delta = diff(cb, b),
           far = d > (num(c.maxKm) ? c.maxKm : 40) ? 0.5 : 1,
-          weight = num(c.weight) && c.weight >= 0 ? c.weight : 1;
+          weight = num(c.weight) && c.weight >= 0 ? c.weight : 1,
+          logScore = -0.5 * (delta / sigma) ** 2 + Math.log(far) + Math.log(weight);
         return {
           candidate: c,
           bearing: cb,
           deltaDeg: delta,
           distanceKm: d,
           sigmaDeg: sigma,
-          score: Math.exp(-0.5 * (delta / sigma) ** 2) * far * weight,
+          score: Math.exp(logScore),
+          logScore,
         };
       })
-      .sort((p, q) => q.score - p.score || p.distanceKm - q.distanceKm);
+      .sort((p, q) => q.logScore - p.logScore || p.distanceKm - q.distanceKm);
   }
   return {
     TAP_SIGMA,

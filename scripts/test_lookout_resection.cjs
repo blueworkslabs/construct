@@ -156,4 +156,27 @@ test("ranking: the tapped landmark comes first after one mark, mostly top-3 on c
   assert.ok(S.uncertainty(S.calibrate({ viewer, marks: [{ x: 0.5, point: S.destination(viewer, 0, 5) }] }), 0.5) < 3);
   assert.deepEqual(S.rank(cal, 0.5, viewer, [null, { point: { lat: 200, lon: 0 } }]), []);
 });
+test("three clustered or duplicate marks do not manufacture a fitted lens", () => {
+  for (const marks of [
+    [.499, .5, .501].map((x, i) => ({x, point: S.destination(viewer, 90 + i * .2, 5)})),
+    Array.from({length: 3}, () => ({x: .5, point: S.destination(viewer, 90, 5)})),
+    [80, 90, 100].map((b) => ({x: .5, point: S.destination(viewer, b, 5)})),
+  ]) {
+    const cal = S.calibrate({viewer, marks});
+    assert.equal(cal.source, "one");
+    assert.equal(cal.reason, "insufficient-spread");
+    assert.equal(cal.fov, 70);
+    assert.equal(cal.marks, 3);
+  }
+});
+test("ranking preserves angular order even when all displayed scores underflow", () => {
+  const cal = S.calibrate({viewer, marks: [{x: .5, point: S.destination(viewer, 0, 5)}]});
+  const behind = {name: "behind", point: S.destination(viewer, 160, 1)};
+  const closerRay = {name: "closer-ray", point: S.destination(viewer, 40, 10)};
+  const ranked = S.rank(cal, .5, viewer, [behind, closerRay]);
+  assert.equal(ranked[0].candidate, closerRay);
+  assert.equal(ranked[0].score, 0);
+  assert.equal(ranked[1].score, 0);
+  assert.ok(ranked[0].logScore > ranked[1].logScore);
+});
 console.log(`${count} Lookout resection checks passed.`);
