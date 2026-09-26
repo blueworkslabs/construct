@@ -18,7 +18,7 @@ assert not any(x.startswith(SERIAL+'\t') for x in subprocess.check_output([str(C
 run=CONFIG.root/'results'/(datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'-photo-identity-'+uuid.uuid4().hex[:8]);run.mkdir(parents=True)
 os.environ['CONSTRUCT_RESULTS']=str(run)
 import ui
-from ui import adb,nodes,labels,tap,tap_node,find,capture
+from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
 from adb_identity import restore_shell_identity
@@ -31,6 +31,20 @@ key=folder+'.identity-key'
 seen=set()
 def save():(run/'result.json').write_text(json.dumps(receipt,indent=2)+'\n')
 def done(text):receipt['checks'].append(text);save();print('PASS:',text,flush=True)
+def capture(name):
+ # FLAG_SECURE intentionally blacks out ADB screenshots. The emulator console
+ # captures the synthetic display without weakening the host's privacy policy.
+ adb_capture(name);target=run/(name+'-display');target.mkdir()
+ adb('emu','screenrecord','screenshot',str(target))
+ assert len(list(target.glob('*.png')))==1,'Missing synthetic console capture'
+def reach_native(label):
+ for attempt in range(24):
+  matches=[n for n in nodes() if label in (n.get('text'),n.get('content-desc')) and n.get('package')=='dev.construct.runtime']
+  if matches:return matches[0]
+  # Search towards the top first, then sweep down the entire native access page.
+  start,end=('450','1050') if attempt<8 else ('1000','500')
+  adb('shell','input','swipe','360',start,'360',end,'250');time.sleep(.3)
+ raise RuntimeError('Native control not reachable: '+label)
 def status():
  for text in labels():
   m=re.fullmatch(r'(.*) #(\d+)',text or '',re.S)
@@ -63,12 +77,7 @@ def launch():adb('shell','am','start','-n','dev.construct.runtime/.MainActivity'
 def opened():launch();library();select_after(heading,('Open',));find('List photos')
 def module_access():tap('Construct menu');tap('Module access');find('Module access')
 def reopen():
- n=next((n for n in nodes() if (n.get('text') or n.get('content-desc'))=='Reopen module'),None)
- for _ in range(12):
-  if n is not None:break
-  adb('shell','input','swipe','360','1000','360','500','250');time.sleep(.3)
-  n=next((n for n in nodes() if (n.get('text') or n.get('content-desc'))=='Reopen module'),None)
- assert n is not None,'Reopen module not reachable';tap_node(n);find('List photos')
+ tap_node(reach_native('Reopen module'));find('List photos')
 def switch(label,checked):
  for _ in range(12):
   matches=[n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true']
@@ -135,9 +144,12 @@ try:
  assert act('List photos').startswith('[CAPABILITY_DENIED]');assert not any(re.fullmatch(r'ID \d+: .*',t or '') for t in labels())
  module_access()
  for label in ['Allow taking private photos','Allow this module’s private photo library','Allow selected image pixels']:switch(label,True)
- n=next((n for n in nodes() if n.get('text')=='Allow Android camera access'),None)
- if n is not None:tap_node(n);find('While using the app');tap('While using the app');find('Android camera access: allowed')
  reopen();done('Denied listing publishes no IDs before grants')
+ assert act('Capture a photo').startswith('[ANDROID_PERMISSION_DENIED]')
+ done('Android camera permission remains independent of the module grant')
+ module_access();tap_node(reach_native('Allow Android camera access'))
+ find('While using the app');tap('While using the app');find('Android camera access: allowed')
+ reopen()
 
  # Legacy (API 0.11) photos: one real shutter capture plus two byte-identical synthetic originals.
  shoot();assert listed()==['not provided']
