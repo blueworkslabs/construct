@@ -16,9 +16,18 @@ const AimeCore = (() => {
     OLD_FIX_MS = 120000,
     LONG_WAIT_MS = 60000,
     LOCATION_SPACING_MS = 15000,
-    STORAGE_KEY = "photos";
+    // Persistence: one bounded record per photo in a fixed pool of slots plus a
+    // small index. Every storage.kv request must fit the host's 8,192-character
+    // bridge message; the host also keeps keys set to null, so keys are reused
+    // slots, never derived from ever-new photo ids.
+    MAX_SLOTS = 16,
+    INDEX_KEY = "photos.index",
+    MESSAGE_LIMIT = 8192,
+    MESSAGE_BUDGET = 7600;
   const num = (x) => typeof x === "number" && Number.isFinite(x);
-  const text = (s, max = NAME_MAX) => (typeof s === "string" ? s.trim().slice(0, max) : "");
+  // Control/format characters are dropped: they carry no name and would expand
+  // the storage request when escaped.
+  const text = (s, max = NAME_MAX) => (typeof s === "string" ? s.replace(/[\p{Cc}\p{Cf}\p{Cs}]/gu, "").trim().slice(0, max) : "");
   const inUnit = (v) => num(v) && v >= 0 && v <= 1;
   const latLon = (lat, lon) => num(lat) && num(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
   const OSM_TYPES = ["node", "way", "relation"];
@@ -67,15 +76,112 @@ const AimeCore = (() => {
     };
   }
   const validId = (id) => typeof id === "string" && /^[\x21-\x7e]{1,80}$/.test(id);
-  // Storage value → {id: sidecar}. Invalid entries are dropped, never guessed.
-  function loadStore(raw) {
-    const out = {};
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
-    for (const [id, value] of Object.entries(raw)) {
-      const s = validId(id) && cleanSidecar(value);
-      if (s) out[id] = s;
-    }
-    return out;
+  // ---- Persistence plan (pure; the controller performs the storage calls) ----
+  const recordKey = (slot) => "photo." + slot;
+  // Index value → slots array (id or null). Invalid or duplicate ids are dropped.
+  function loadIndex(raw) {
+    const slots = Array(MAX_SLOTS).fill(null),
+      seen = new Set();
+    const list = raw && typeof raw === "object" && raw.v === 1 && Array.isArray(raw.slots) ? raw.slots : [];
+    list.slice(0, MAX_SLOTS).forEach((id, i) => {
+      if (validId(id) && !seen.has(id)) {
+        seen.add(id);
+        slots[i] = id;
+      }
+    });
+    return slots;
+  }
+  const indexValue = (slots) => ({ v: 1, slots: slots.slice() });
+  // A record counts only when it names the id its slot is claimed for.
+  const recordValue = (id, sidecar) => ({ id, sidecar });
+  const recordFor = (raw, id) => (raw && typeof raw === "object" && raw.id === id ? cleanSidecar(raw.sidecar) : null);
+  // Where to write `id`: its slot, or the first free one (claim → index write).
+  function planPut(slots, id) {
+    const own = slots.indexOf(id);
+    if (own >= 0) return { slot: own, claim: false, slots };
+    const free = slots.indexOf(null);
+    if (free < 0) throw Object.assign(new Error("Aimé's photo records are full. Delete a photo, then reopen Aimé."), { code: "STORAGE_FULL" });
+    const next = slots.slice();
+    next[free] = id;
+    return { slot: free, claim: true, slots: next };
+  }
+  // Free every slot whose id is not in `keepIds` (one index write).
+  function planRelease(slots, keepIds) {
+    const keep = new Set(keepIds),
+      freed = [],
+      next = slots.map((id, i) => (id !== null && !keep.has(id) ? (freed.push({ slot: i, id }), null) : id));
+    return { slots: next, freed };
+  }
+  // Length of the bridge message a set request produces (ids up to 8 digits).
+  const envelopeLength = (key, value) => JSON.stringify({ id: "99999999", method: "storage.kv", params: { op: "set", key, value } }).length;
+  function checkEnvelope(key, value) {
+    if (envelopeLength(key, value) > MESSAGE_BUDGET)
+      throw Object.assign(new Error("This photo's data is too large to save. Remove a mark and try again."), { code: "STORAGE_SIZE" });
+  }
+  // Persistence over storage.kv-like {get(key), set(key, value)} promises. The
+  // in-memory copy changes only after the storage writes it depends on succeed.
+  function persistence(kv) {
+    let slots = null,
+      store = null;
+    const set = async (key, value) => {
+      checkEnvelope(key, value);
+      await kv.set(key, value);
+    };
+    const unavailable = () => Object.assign(new Error("Storage access is off, so viewpoints and marks cannot be saved."), { code: "STORAGE_UNAVAILABLE" });
+    return {
+      get store() {
+        return store;
+      },
+      get slots() {
+        return slots;
+      },
+      // Any failed read leaves storage unavailable: never an empty store that a
+      // later write could overwrite.
+      async load() {
+        try {
+          const nextSlots = loadIndex(await kv.get(INDEX_KEY)),
+            next = {};
+          for (let slot = 0; slot < nextSlots.length; slot++) {
+            if (!nextSlots[slot]) continue;
+            const sidecar = recordFor(await kv.get(recordKey(slot)), nextSlots[slot]);
+            if (sidecar) next[nextSlots[slot]] = sidecar;
+          }
+          slots = nextSlots;
+          store = next;
+          return null;
+        } catch (error) {
+          slots = null;
+          store = null;
+          return error;
+        }
+      },
+      // Record first, then claim the slot: an interrupted claim leaves the slot
+      // free and the next attempt rewrites it.
+      async put(id, sidecar) {
+        if (!store) throw unavailable();
+        const clean = cleanSidecar(sidecar),
+          plan = planPut(slots, id);
+        await set(recordKey(plan.slot), recordValue(id, clean));
+        if (plan.claim) await set(INDEX_KEY, indexValue(plan.slots));
+        slots = plan.slots;
+        store = { ...store, [id]: clean };
+      },
+      // Only after a successful complete list or a confirmed delete: free the
+      // slots of photos that are gone in one index write, then clear records.
+      async release(keepIds) {
+        if (!store) return [];
+        const plan = planRelease(slots, keepIds);
+        if (!plan.freed.length) return [];
+        await set(INDEX_KEY, indexValue(plan.slots));
+        slots = plan.slots;
+        const next = { ...store };
+        for (const { id } of plan.freed) delete next[id];
+        store = next;
+        // Unclaimed records are ignored on load; clearing them only returns bytes.
+        for (const { slot } of plan.freed) await set(recordKey(slot), null).catch(() => {});
+        return plan.freed.map((f) => f.id);
+      },
+    };
   }
   function newSidecar(viewer, radiusKm = DEFAULT_RADIUS) {
     return cleanSidecar({ viewer, radiusKm, marks: [], horizon: [] });
@@ -94,14 +200,6 @@ const AimeCore = (() => {
     const before = new Set(beforeIds),
       fresh = afterIds.filter((id) => !before.has(id));
     return fresh.length === 1 ? fresh[0] : null;
-  }
-  // Only after a successful complete list: drop sidecars whose photo is gone.
-  function reconcile(store, listedIds) {
-    const keep = new Set(listedIds),
-      next = {},
-      dropped = [];
-    for (const [id, s] of Object.entries(store)) (keep.has(id) ? (next[id] = s) : dropped.push(id));
-    return { store: next, dropped };
   }
 
   // ---- Viewpoint from before/after fixes ----------------------------------
@@ -193,6 +291,10 @@ const AimeCore = (() => {
       throw Object.assign(new Error("Overpass returned unreadable data."), { code: "OVERPASS_DATA" });
     }
     if (!data || !Array.isArray(data.elements)) throw Object.assign(new Error("Overpass returned unexpected data."), { code: "OVERPASS_DATA" });
+    // Runtime timeouts/resource failures can arrive as HTTP 200 with an empty
+    // or partial elements array. Never cache these as a complete feature list.
+    if (typeof data.remark === "string" && data.remark.trim())
+      throw Object.assign(new Error("Overpass could not complete the lookup. Retry, or pick a smaller radius."), { code: "OVERPASS_INCOMPLETE" });
     const seen = new Set(),
       features = [];
     for (const e of data.elements) {
@@ -314,13 +416,24 @@ const AimeCore = (() => {
     OLD_FIX_MS,
     LONG_WAIT_MS,
     LOCATION_SPACING_MS,
-    STORAGE_KEY,
+    MAX_SLOTS,
+    INDEX_KEY,
+    MESSAGE_LIMIT,
+    MESSAGE_BUDGET,
     cleanSidecar,
-    loadStore,
     newSidecar,
+    recordKey,
+    loadIndex,
+    indexValue,
+    recordValue,
+    recordFor,
+    planPut,
+    planRelease,
+    envelopeLength,
+    checkEnvelope,
+    persistence,
     listIds,
     associate,
-    reconcile,
     fixFrom,
     metres,
     chooseViewpoint,

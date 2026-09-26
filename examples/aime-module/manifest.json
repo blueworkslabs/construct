@@ -19,7 +19,7 @@
     },
     {
       "id": "photos.library",
-      "reason": "Browse this module’s private photos, including older captures, and request individually confirmed deletion or gallery copies."
+      "reason": "Browse this module’s private photos, including older captures, and request individually confirmed deletion."
     },
     {
       "id": "image.read",

@@ -146,8 +146,8 @@ const SyntheticAime = (() => {
       // Read-only view of the real module storage, so acceptance can see sidecar reconciliation.
       button("Fixture: count stored records", async () => {
         try {
-          const stored = await real("storage.kv", { op: "get", key: "photos" });
-          out.textContent = "Stored photo records: " + Object.keys(stored || {}).length;
+          const index = await real("storage.kv", { op: "get", key: "photos.index" });
+          out.textContent = "Stored photo records: " + ((index && index.slots) || []).filter(Boolean).length;
         } catch (error) {
           out.textContent = "Stored photo records unavailable: " + (error.code || "ERROR");
         }

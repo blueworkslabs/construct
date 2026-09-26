@@ -37,25 +37,6 @@ check("sidecars are bounded and invalid parts dropped, not guessed", () => {
   for (const r of C.RADII) assert.equal(C.cleanSidecar({ radiusKm: r }).radiusKm, r);
 });
 
-check("store loading drops invalid ids and entries; non-objects are empty", () => {
-  const store = C.loadStore({ pAbc: { radiusKm: 10 }, "bad id": { radiusKm: 10 }, ["x".repeat(81)]: {}, pNull: null });
-  assert.deepEqual(Object.keys(store), ["pAbc"]);
-  for (const raw of [null, [], "x", 3]) assert.deepEqual(C.loadStore(raw), {});
-});
-
-check("eight full sidecars fit the 64 KiB storage budget", () => {
-  const store = {};
-  for (let i = 0; i < 8; i++)
-    store["p" + "A".repeat(24) + i] = C.cleanSidecar({
-      viewer: { lat: -45.123456789, lon: 170.123456789, accuracyM: 1234.5678, timestamp: Date.now(), approximate: true, corrected: true, review: true },
-      radiusKm: 60,
-      marks: [...Array(6).keys()].map((j) => mark(j, { name: "é".repeat(80), osmType: "relation", osmId: 9007199254740991, lat: -45.123456789, lon: 170.123456789, positionM: 30.123456 })),
-      horizon: [{ x: 0.123456789, y: 0.987654321 }, { x: 0.87654321, y: 0.1234567 }],
-    });
-  const bytes = Buffer.byteLength(JSON.stringify({ [C.STORAGE_KEY]: store }));
-  assert.ok(bytes < 64 * 1024 * 0.6, "bytes " + bytes);
-});
-
 check("list ids require the API 0.12 shape and never become an empty library", () => {
   assert.deepEqual(C.listIds({ photos: [{ ref: "r1", id: "pA" }, { ref: "r2", id: "pB" }], limit: 8 }), ["pA", "pB"]);
   assert.deepEqual(C.listIds({ photos: [], limit: 8 }), []);
@@ -70,14 +51,6 @@ check("capture association needs exactly one new stable id", () => {
   assert.equal(C.associate(["a"], ["a"]), null, "nothing new");
   assert.equal(C.associate(["a"], ["a", "b", "c"]), null, "ambiguous: never assigned by position");
   assert.equal(C.associate([], ["x"]), "x");
-});
-
-check("reconciliation keeps listed sidecars and drops only missing ones", () => {
-  const store = { a: C.newSidecar(null), b: C.newSidecar(null), c: C.newSidecar(null) };
-  const { store: next, dropped } = C.reconcile(store, ["a", "c", "new"]);
-  assert.deepEqual(Object.keys(next), ["a", "c"]);
-  assert.deepEqual(dropped, ["b"]);
-  assert.deepEqual(Object.keys(store), ["a", "b", "c"], "input untouched");
 });
 
 const fix = (t, lat = 46.8, lon = 9.2, accuracyM = 10) => C.fixFrom({ latitude: lat, longitude: lon, accuracyM, timestamp: t, approximate: false });
@@ -159,6 +132,14 @@ check("Overpass parsing keeps type+id, kinds, placement and weights; drops the r
   assert.deepEqual(C.parseOverpass('{"elements":[]}'), { features: [], incomplete: false });
 });
 
+check("Overpass HTTP-200 runtime failures never become empty or partial success", () => {
+  for (const elements of [[], JSON.parse(F.overpass()).elements]) {
+    assert.throws(() => C.parseOverpass(JSON.stringify({ elements, remark: "runtime error: Query timed out" })),
+      (e) => e.code === "OVERPASS_INCOMPLETE");
+  }
+  assert.equal(C.parseOverpass(JSON.stringify({ elements: [], remark: "" })).features.length, 0);
+});
+
 check("transport failures name their gate and 429/504 offer a single retry", () => {
   assert.equal(C.httpProblem(null, 429).code, "OVERPASS_BUSY");
   assert.equal(C.httpProblem(null, 504).retry, true);
@@ -216,4 +197,184 @@ check("Synthetic Aimé: one mark plus horizon ranks the tapped landmarks first",
   assert.equal(F.at.F, null, "feature behind the camera is not drawn");
 });
 
-console.log(`${checks} Aimé module checks passed.`);
+// ---- Persistence: bounded per-photo records in a fixed slot pool ----------
+// A storage.kv double with the host's limits: 8,192-character bridge messages,
+// 100 keys and 64 KiB per module (keys set to null stay keys), plus failures.
+function host({ failGet = () => false, failSet = () => false } = {}) {
+  const data = {},
+    log = [];
+  let seq = 0;
+  const message = (params) => JSON.stringify({ id: String(++seq), method: "storage.kv", params });
+  return {
+    data,
+    log,
+    async get(key) {
+      assert.ok(message({ op: "get", key }).length <= C.MESSAGE_LIMIT);
+      if (failGet(key)) throw Object.assign(new Error("denied"), { code: "CAPABILITY_DENIED" });
+      return structuredClone(data[key] ?? null);
+    },
+    async set(key, value) {
+      const length = message({ op: "set", key, value }).length;
+      log.push({ key, length });
+      if (length > C.MESSAGE_LIMIT) throw Object.assign(new Error("Host did not respond"), { code: "TIMEOUT" });
+      assert.match(key, /^[A-Za-z0-9_.-]{1,80}$/);
+      if (failSet(key, value)) throw Object.assign(new Error("write failed"), { code: "STORAGE_QUOTA" });
+      const next = { ...data, [key]: structuredClone(value) };
+      if (Object.keys(next).length > 100 || Buffer.byteLength(JSON.stringify(next)) > 64 * 1024) throw Object.assign(new Error("quota"), { code: "STORAGE_QUOTA" });
+      data[key] = next[key];
+    },
+  };
+}
+const nasty = (n) => ('"\\').repeat(n).slice(0, n);
+const fullSidecar = (salt = 0) =>
+  C.cleanSidecar({
+    viewer: { lat: -45.123456789012345, lon: -170.12345678901234, accuracyM: 1234.567890123456, timestamp: 1790463000123 + salt, approximate: true, corrected: true, review: true },
+    radiusKm: 60,
+    marks: Array.from({ length: 9 }, (_, j) => ({
+      x: 0.12345678901234567,
+      y: 0.98765432109876543,
+      osmType: "relation",
+      osmId: Number.MAX_SAFE_INTEGER - j,
+      name: nasty(200),
+      lat: -89.12345678901234,
+      lon: -179.12345678901234,
+      positionM: 30.123456789012345,
+    })),
+    horizon: [{ x: 0.12345678901234567, y: 0.98765432109876543 }, { x: 0.87654321098765432, y: 0.12345678901234567 }, { x: 0.5, y: 0.5 }],
+  });
+const longId = (i) => ("p" + '"\\'.repeat(40)).slice(0, 78) + String(i).padStart(2, "0");
+
+check("control characters are dropped from names; worst-case record and index fit one bridge message", () => {
+  assert.equal(C.cleanSidecar({ marks: [mark(1, { name: "Tower\u0000\u202e A\u0007" })] }).marks[0].name, "Tower A");
+  const record = C.envelopeLength(C.recordKey(15), C.recordValue(longId(1), fullSidecar()));
+  const index = C.envelopeLength(C.INDEX_KEY, C.indexValue(Array.from({ length: C.MAX_SLOTS }, (_, i) => longId(i))));
+  assert.ok(record <= C.MESSAGE_BUDGET && record < C.MESSAGE_LIMIT, "record " + record);
+  assert.ok(index <= C.MESSAGE_BUDGET, "index " + index);
+  assert.ok(C.MESSAGE_BUDGET < C.MESSAGE_LIMIT);
+  assert.throws(() => C.checkEnvelope("photo.0", { blob: "x".repeat(C.MESSAGE_BUDGET) }), { code: "STORAGE_SIZE" });
+});
+
+check("slot index parsing, record ownership and put/release planning", () => {
+  assert.deepEqual(C.loadIndex(null), Array(C.MAX_SLOTS).fill(null));
+  assert.deepEqual(C.loadIndex({ v: 2, slots: ["a"] }).filter(Boolean), []);
+  const slots = C.loadIndex({ v: 1, slots: ["a", "a", "bad id", null, "b"] });
+  assert.deepEqual(slots.slice(0, 5), ["a", null, null, null, "b"]);
+  assert.equal(C.recordFor({ id: "b", sidecar: { radiusKm: 10 } }, "a"), null, "a record for another photo is ignored");
+  assert.equal(C.recordFor({ id: "a", sidecar: { radiusKm: 10 } }, "a").radiusKm, 10);
+  assert.deepEqual(C.planPut(slots, "b"), { slot: 4, claim: false, slots });
+  const put = C.planPut(slots, "c");
+  assert.equal(put.slot, 1);
+  assert.equal(put.claim, true);
+  assert.equal(slots[1], null, "planning never mutates");
+  assert.throws(() => C.planPut(Array.from({ length: C.MAX_SLOTS }, (_, i) => "p" + i), "new"), { code: "STORAGE_FULL" });
+  const rel = C.planRelease(slots, ["b", "z"]);
+  assert.deepEqual(rel.freed, [{ slot: 0, id: "a" }]);
+  assert.deepEqual(rel.slots.slice(0, 5), [null, null, null, null, "b"]);
+});
+
+const asyncChecks = [];
+const checkAsync = (name, fn) => asyncChecks.push([name, fn]);
+
+checkAsync("eight full photos persist with every request inside the bridge limit, survive reopen and reconcile", async () => {
+  const kv = host(),
+    db = C.persistence(kv);
+  assert.equal(await db.load(), null);
+  for (let i = 0; i < 8; i++) await db.put(longId(i), fullSidecar(i));
+  assert.ok(kv.log.every((w) => w.length <= C.MESSAGE_BUDGET), JSON.stringify(kv.log.map((w) => w.length)));
+  const reopened = C.persistence(kv);
+  assert.equal(await reopened.load(), null);
+  assert.equal(Object.keys(reopened.store).length, 8);
+  assert.deepEqual(reopened.store[longId(3)], fullSidecar(3));
+  // Two photos gone after a successful complete list: freed in one index write.
+  const writes = kv.log.length;
+  assert.deepEqual(await reopened.release([0, 1, 2, 4, 5, 7].map(longId)), [longId(3), longId(6)]);
+  assert.equal(kv.log[writes].key, C.INDEX_KEY);
+  const again = C.persistence(kv);
+  await again.load();
+  assert.deepEqual(Object.keys(again.store).sort(), [0, 1, 2, 4, 5, 7].map(longId).sort());
+  // Slots are reused: many capture/delete cycles never grow the key count.
+  for (let n = 0; n < 40; n++) {
+    await again.put("cycle" + n, fullSidecar(n));
+    await again.release(Object.keys(again.store).filter((id) => id !== "cycle" + n));
+  }
+  assert.ok(Object.keys(kv.data).length <= C.MAX_SLOTS + 1, "keys " + Object.keys(kv.data).length);
+});
+
+checkAsync("a failed record write changes nothing; an interrupted slot claim is retried in place", async () => {
+  let failRecord = true,
+    failIndex = false;
+  const kv = host({ failSet: (key) => (key === C.INDEX_KEY ? failIndex : key.startsWith("photo.") && failRecord) }),
+    db = C.persistence(kv);
+  await db.load();
+  await assert.rejects(db.put("pA", fullSidecar()), { code: "STORAGE_QUOTA" });
+  assert.deepEqual(db.store, {}, "memory does not claim a failed write");
+  failRecord = false;
+  failIndex = true;
+  await assert.rejects(db.put("pA", fullSidecar()), { code: "STORAGE_QUOTA" });
+  assert.deepEqual(db.store, {});
+  let reopened = C.persistence(kv);
+  await reopened.load();
+  assert.deepEqual(reopened.store, {}, "an unclaimed record is not a photo record");
+  failIndex = false;
+  await db.put("pA", fullSidecar());
+  assert.deepEqual(db.slots.filter(Boolean), ["pA"]);
+  reopened = C.persistence(kv);
+  await reopened.load();
+  assert.deepEqual(Object.keys(reopened.store), ["pA"]);
+  // Editing another photo while one record write fails keeps the others intact.
+  await db.put("pB", fullSidecar(1));
+  failRecord = true;
+  await assert.rejects(db.put("pB", { ...fullSidecar(1), radiusKm: 10 }));
+  assert.equal(db.store.pB.radiusKm, 60);
+  failRecord = false;
+  reopened = C.persistence(kv);
+  await reopened.load();
+  assert.deepEqual(Object.keys(reopened.store).sort(), ["pA", "pB"]);
+  assert.equal(reopened.store.pB.radiusKm, 60);
+});
+
+checkAsync("denied or failed reads leave storage unavailable and nothing is written", async () => {
+  const kv = host();
+  const seed = C.persistence(kv);
+  await seed.load();
+  await seed.put("pA", fullSidecar());
+  for (const failing of [C.INDEX_KEY, C.recordKey(0)]) {
+    const denied = host({ failGet: (key) => key === failing });
+    Object.assign(denied.data, structuredClone(kv.data));
+    const db = C.persistence(denied);
+    assert.equal((await db.load()).code, "CAPABILITY_DENIED");
+    assert.equal(db.store, null);
+    await assert.rejects(db.put("pB", fullSidecar()), { code: "STORAGE_UNAVAILABLE" });
+    assert.deepEqual(await db.release([]), [], "no reconciliation without readable storage");
+    assert.equal(denied.log.length, 0, "no write was attempted");
+  }
+});
+
+checkAsync("a failed release keeps the records and memory for the next successful list", async () => {
+  let failIndex = false;
+  const kv = host({ failSet: (key) => key === C.INDEX_KEY && failIndex }),
+    db = C.persistence(kv);
+  await db.load();
+  await db.put("pA", fullSidecar());
+  await db.put("pB", fullSidecar(1));
+  failIndex = true;
+  await assert.rejects(db.release(["pA"]));
+  assert.deepEqual(Object.keys(db.store).sort(), ["pA", "pB"]);
+  failIndex = false;
+  assert.deepEqual(await db.release(["pA"]), ["pB"]);
+  const reopened = C.persistence(kv);
+  await reopened.load();
+  assert.deepEqual(Object.keys(reopened.store), ["pA"]);
+});
+
+(async () => {
+  for (const [name, fn] of asyncChecks) {
+    await fn();
+    checks++;
+    console.log("ok -", name);
+  }
+  console.log(`${checks} Aimé module checks passed.`);
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

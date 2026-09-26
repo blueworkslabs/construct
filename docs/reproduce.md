@@ -171,6 +171,10 @@ scripts (they refuse an occupied emulator and preserve incomplete receipts):
   normalised tap targets and fixture-only buttons (next Overpass 429/offline,
   stored record count). Module logic checks: `node scripts/test_aime.cjs` and
   `node scripts/test_aime_map.cjs`.
+  Optional browser regressions: install `playwright` and its Chromium browser
+  in an isolated Python environment, then run `python scripts/check_aime_browser.py`.
+  This fake-bridge check exercises delayed lookup navigation and moving-midpoint
+  pinch anchoring; it does not replace exact-package Android acceptance.
 - `aime_module.py --apk APK --sha APK_SHA --catalog HTTPS_INDEX_URL --module-sha
   AIME_SHA --fixture-sha SYNTHETIC_AIME_SHA`: synthetic-camera runner covering
   grants, capture → viewpoint, Overpass offline/429 + retry, mark → calibrated

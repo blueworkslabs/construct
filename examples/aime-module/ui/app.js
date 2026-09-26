@@ -26,6 +26,8 @@ const state = {
   fetchProblem: null,
   lastLocationAt: -Infinity,
   busy: false,
+  photoGeneration: 0,
+  refreshPending: false,
   view: { scale: 1, x: 0, y: 0 },
 };
 
@@ -49,20 +51,23 @@ async function locate(respectSpacing) {
     return { fix: null, error };
   }
 }
+// Persistence: an index of up to 16 slots plus one bounded record per photo,
+// each written in its own request (aime-core.js `persistence`).
+const db = C.persistence({ get: (key) => call("storage.kv", { op: "get", key }), set: (key, value) => call("storage.kv", { op: "set", key, value }) });
 async function loadStore() {
-  try {
-    state.store = C.loadStore(await call("storage.kv", { op: "get", key: C.STORAGE_KEY }));
-    state.storeError = null;
-  } catch (error) {
-    // Unavailable storage is not an empty store: never write over it.
-    state.store = null;
-    state.storeError = error;
-  }
+  state.storeError = await db.load();
+  state.store = db.store;
 }
-async function saveStore(next) {
-  if (!state.store) throw Object.assign(new Error("Storage access is off, so viewpoints and marks cannot be saved."), { code: "STORAGE_UNAVAILABLE" });
-  await call("storage.kv", { op: "set", key: C.STORAGE_KEY, value: next });
-  state.store = next;
+async function putSidecar(id, sidecar) {
+  await db.put(id, sidecar);
+  state.store = db.store;
+}
+async function releaseExcept(keepIds) {
+  try {
+    await db.release(keepIds);
+  } finally {
+    state.store = db.store;
+  }
 }
 
 // ---- Messages ---------------------------------------------------------------
@@ -93,10 +98,7 @@ async function refresh() {
   state.items = result.photos.map((p) => ({ ref: p.ref, id: p.id }));
   for (const id of [...state.thumbs.keys()]) if (!ids.includes(id)) state.thumbs.delete(id);
   // Reconcile only after this successful complete list; the write must succeed too.
-  if (state.store) {
-    const { store, dropped } = C.reconcile(state.store, ids);
-    if (dropped.length) await saveStore(store).catch(() => {});
-  }
+  await releaseExcept(ids).catch(() => {});
   renderGrid();
   loadThumbs();
 }
@@ -180,6 +182,10 @@ async function task(fn) {
   } finally {
     state.busy = false;
     renderGrid();
+    if (state.refreshPending) {
+      state.refreshPending = false;
+      task(refresh);
+    }
   }
 }
 
@@ -225,9 +231,9 @@ async function takePhoto() {
   if (!id) note = "Photo saved, but it could not be matched to this capture, so it has no viewpoint.";
   else if (!state.store) note = "Photo saved. Storage access is off, so its viewpoint was not saved.";
   else {
-    const next = C.reconcile({ ...state.store, [id]: C.newSidecar(chosen ? chosen.viewer : null) }, after).store;
     try {
-      await saveStore(next);
+      await releaseExcept(after).catch(() => {});
+      await putSidecar(id, C.newSidecar(chosen ? chosen.viewer : null));
       if (!chosen) note = "Photo saved without a viewpoint: " + (second.error || first.error ? describe(second.error || first.error, "Location") : "no usable location fix.");
       else if (chosen.reasons.length) note = `Photo saved. Please confirm the viewpoint (${chosen.reasons.join(", ")}).`;
     } catch (error) {
@@ -245,6 +251,7 @@ async function takePhoto() {
 // ---- Photo view ---------------------------------------------------------------
 const current = () => (state.store && state.store[state.selectedId]) || C.newSidecar(null);
 async function openPhoto(id) {
+  const generation = ++state.photoGeneration;
   state.thumbGeneration++;
   let item = state.items.find((p) => p.id === id);
   if (!item) throw Object.assign(new Error("That photo is no longer in the library."), { code: "PHOTO_STALE" });
@@ -264,6 +271,7 @@ async function openPhoto(id) {
     img.onerror = () => reject(new Error("Photo could not be displayed."));
     img.src = data.url;
   });
+  if (generation !== state.photoGeneration) return;
   state.selectedId = id;
   state.image = { url: data.url, width: data.width, height: data.height };
   state.lastTap = null;
@@ -282,11 +290,13 @@ async function openPhoto(id) {
 }
 function showLibrary() {
   map.pause(true);
+  state.photoGeneration++;
   $("photo").hidden = true;
   $("library").hidden = false;
   $("back").hidden = true;
   state.selectedId = null;
-  task(refresh);
+  if (state.busy) state.refreshPending = true;
+  else task(refresh);
 }
 function recalibrate() {
   const s = current();
@@ -301,7 +311,7 @@ function recalibrate() {
 }
 async function update(change) {
   const next = C.cleanSidecar(change(structuredClone(current())));
-  await saveStore({ ...state.store, [state.selectedId]: next });
+  await putSidecar(state.selectedId, next);
   recalibrate();
   render();
   if (state.pane === "map") renderMap(false);
@@ -459,7 +469,9 @@ function normalised(clientX, clientY) {
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()],
         r = stage.getBoundingClientRect();
-      pinch = { distance: Math.hypot(a.x - b.x, a.y - b.y) || 1, scale: state.view.scale, cx: (a.x + b.x) / 2 - r.left, cy: (a.y + b.y) / 2 - r.top };
+      const cx = (a.x + b.x) / 2 - r.left, cy = (a.y + b.y) / 2 - r.top;
+      pinch = { distance: Math.hypot(a.x - b.x, a.y - b.y) || 1, scale: state.view.scale,
+        anchorX: (cx - state.view.x) / state.view.scale, anchorY: (cy - state.view.y) / state.view.scale };
       drag = null;
     } else if (pointers.size === 1) drag = { id: e.pointerId, x: e.clientX, y: e.clientY, vx: state.view.x, vy: state.view.y, moved: false };
   });
@@ -468,8 +480,13 @@ function normalised(clientX, clientY) {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pinch && pointers.size === 2) {
       const [a, b] = [...pointers.values()],
-        target = (pinch.scale * Math.hypot(a.x - b.x, a.y - b.y)) / pinch.distance;
-      zoomAt(target / state.view.scale, pinch.cx, pinch.cy);
+        target = (pinch.scale * Math.hypot(a.x - b.x, a.y - b.y)) / pinch.distance,
+        r = stage.getBoundingClientRect();
+      state.view.scale = Math.max(1, Math.min(8, target));
+      state.view.x = (a.x + b.x) / 2 - r.left - pinch.anchorX * state.view.scale;
+      state.view.y = (a.y + b.y) / 2 - r.top - pinch.anchorY * state.view.scale;
+      clampView();
+      applyView();
     } else if (drag && drag.id === e.pointerId) {
       const dx = e.clientX - drag.x,
         dy = e.clientY - drag.y;
@@ -518,6 +535,7 @@ function normalised(clientX, clientY) {
   };
 })();
 function onTap(x, y) {
+  if (state.busy) return;
   const s = current();
   if (!s.viewer) return say("photo-status", "Set this photo’s viewpoint on the map first.", "attention");
   if (s.viewer.review) return say("photo-status", "Confirm the estimated viewpoint first.", "attention");
@@ -656,7 +674,9 @@ async function features() {
   }
   return state.fetching.get(key);
 }
+let markRequest = 0;
 async function openMarkDialog() {
+  const request = ++markRequest, generation = state.photoGeneration;
   const dialog = $("mark-dialog");
   $("search").value = "";
   $("results").replaceChildren();
@@ -666,12 +686,13 @@ async function openMarkDialog() {
   say("fetch-status", `Looking up named landmarks within ${current().radiusKm} km…`);
   try {
     const data = await features();
-    if (!dialog.open) return;
+    if (!dialog.open || request !== markRequest || generation !== state.photoGeneration) return;
     say("fetch-status", data.features.length ? `${data.features.length} landmarks within ${current().radiusKm} km. Nearest first.` : `No named landmarks found within ${current().radiusKm} km. Try a larger radius.`);
     $("incomplete").hidden = !data.incomplete;
     $("smaller-radius").hidden = current().radiusKm === 10;
     renderResults();
   } catch (error) {
+    if (!dialog.open || request !== markRequest || generation !== state.photoGeneration) return;
     say("fetch-status", `[${(error.problem && error.problem.code) || error.code || "ERROR"}] ${error.message}`, "error");
     $("retry-fetch").hidden = !(error.problem ? error.problem.retry : true);
   }
@@ -718,13 +739,16 @@ function pick(feature) {
 
 // ---- What's that? --------------------------------------------------------------
 async function whatsThat(x, y) {
+  const generation = state.photoGeneration;
   let data;
   try {
     data = await features();
   } catch (error) {
+    if (generation !== state.photoGeneration) return;
     say("photo-status", `[${(error.problem && error.problem.code) || error.code || "ERROR"}] ${error.message}`, "error");
     return;
   }
+  if (generation !== state.photoGeneration) return;
   const ranked = S.rank(state.cal, x, y, C.candidatesOf(data.features)),
     list = C.shortlist(ranked),
     ol = $("candidates");
@@ -761,7 +785,7 @@ async function whatsThat(x, y) {
   if (data.incomplete) extra.push("Incomplete: the 400-feature limit was reached. A smaller radius may show more nearby landmarks.");
   $("candidates-extra").textContent = extra.join(" ");
   $("candidates-dialog").showModal();
-  say("photo-status", list.anyClose ? `Top match: ${list.rows[0].candidate.feature.name}.` : "No close match for that tap.");
+  say("photo-status", list.anyClose ? `Closest: ${list.rows[0].candidate.feature.name}, ±${list.rows[0].sigmaDeg.toFixed(1)}°.` : "No close match for that tap.");
 }
 
 // ---- Map view ------------------------------------------------------------------------
@@ -936,6 +960,7 @@ $("cancel-mark").onclick = () => {
   $("mark-dialog").close();
 };
 $("mark-dialog").addEventListener("close", () => {
+  markRequest++;
   state.pendingTap = null;
   drawOverlay();
 });
@@ -948,11 +973,7 @@ $("delete").onclick = () =>
     const r = await library({ op: "delete", ref: item.ref });
     if (!r.completed) return say("photo-status", "Delete canceled. Photo unchanged.");
     state.thumbs.delete(id);
-    if (state.store && state.store[id]) {
-      const next = { ...state.store };
-      delete next[id];
-      await saveStore(next).catch(() => {});
-    }
+    await releaseExcept(state.items.map((p) => p.id).filter((x) => x !== id)).catch(() => {});
     $("photo").hidden = true;
     $("library").hidden = false;
     $("back").hidden = true;

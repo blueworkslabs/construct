@@ -65,6 +65,9 @@ for slice 1. Orientation capture stays a later, optional aid.
    viewfinder wait requires viewpoint confirmation/correction before querying.
    A photo with no usable fix stays
    unlocated: no query, no ranking, a clear "set your viewpoint" prompt.
+   Implemented thresholds (`aime-core.js`): a kept fix older than 120 s at the
+   shutter (the host's cached-fix limit) or a viewfinder wait over 60 s sets
+   `viewer.review`; only an explicit confirm or a map correction clears it.
    Associate the sidecar only when a successful before/after `list` comparison
    yields exactly one new stable id. Ambiguous or interrupted captures remain
    unlocated, never assigned by list position; a fix without a photo is discarded.
