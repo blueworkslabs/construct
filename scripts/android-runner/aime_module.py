@@ -104,13 +104,10 @@ def reach_native(label):
   adb('shell','input','swipe','360',start,'360',end,'250');time.sleep(.3)
  raise RuntimeError('Native control not reachable: '+label)
 def switch(label,checked=True):
- for _ in range(14):
-  matches=[n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true']
-  if matches:break
-  adb('shell','input','swipe','360','1000','360','500','250');time.sleep(.3)
- assert len(matches)==1,'Missing switch: '+label
- if (matches[0].get('checked')=='true')==checked:return
- tap_node(matches[0])
+ node=reach_native(label)
+ assert node.get('checkable')=='true','Native grant must be a checkable control: '+label
+ if (node.get('checked')=='true')==checked:return
+ tap_node(node)
  if not checked:tap('Turn off')
  until=time.monotonic()+10
  while time.monotonic()<until:
