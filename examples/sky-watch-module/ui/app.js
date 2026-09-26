@@ -221,9 +221,7 @@
         retryAt = Math.max(retryAt, b.last + 15100);
         throw new Error(
           provider[source] +
-            ": refreshed under 15 s ago, retrying in " +
-            Math.ceil((b.last + 15000 - now) / 1000) +
-            " s.",
+            ": refreshed under 15 s ago; retry pending.",
         );
       }
       budgets[source] = { last: now, until: 0 };
@@ -288,9 +286,16 @@
       );
       if (e !== epoch || !active) return;
       for (const result of results) feeds = D.update(feeds, result);
+      // A Combined refresh may have fetched one source while the other hit its
+      // floor. Wait until all selected sources are eligible to avoid alternating
+      // cooldown failures indefinitely.
+      if (retryAt)
+        retryAt = Math.max(retryAt, ...D.sources(mode).map(s => (budgets[s]?.last || 0) + 15100));
       lastUpdated = Date.now();
       nextRefresh = lastUpdated + 30000;
       const errors = results.filter((x) => !x.ok).map((x) => x.message);
+      if (retryAt)
+        errors.push(`Retrying selected sources in ${Math.max(1, Math.ceil((retryAt - Date.now()) / 1000))} s.`);
       status(errors.join(" "), errors.length ? "attention" : "");
       render();
     } finally {

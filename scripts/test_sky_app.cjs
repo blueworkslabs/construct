@@ -76,8 +76,16 @@ function rig({saved = {}, pendingLocation = false, pendingHttp = false, pendingS
     assert.equal(r.el('retry-location').hidden, code !== 'LOCATION_TIMEOUT');
   }
   r = rig({saved: {'provider-cooldowns': {adsb: {last: Date.now(), until: 0}}}}); await flush();
-  assert.match(r.el('status').textContent, /retrying/); assert.equal(r.calls.filter(c => c.method === 'net.http').length, 0);
+  assert.match(r.el('status').textContent, /Retrying/); assert.equal(r.calls.filter(c => c.method === 'net.http').length, 0);
   r.advance(16000); await flush(); assert.equal(r.calls.filter(c => c.method === 'net.http').length, 1);
+  // Combined must not alternate provider-floor failures indefinitely when their
+  // previous refresh times differ. Wait until both sources can be retried.
+  r = rig({saved: {preferences: {mode: 'combined'}, 'provider-cooldowns': {adsb: {last: Date.now() - 10000, until: 0}}}}); await flush();
+  assert.equal(r.calls.filter(c => c.method === 'net.http').length, 1);
+  r.advance(6000); await flush(); assert.equal(r.calls.filter(c => c.method === 'net.http').length, 1, 'do not put the other provider back inside its floor');
+  r.advance(10000); await flush(); assert.equal(r.calls.filter(c => c.method === 'net.http').length, 3);
+  assert.equal(r.el('status').textContent, '');
+  r.advance(16000); await flush(); assert.equal(r.calls.filter(c => c.method === 'net.http').length, 3, 'no retry loop when Auto is off');
   // The picker remains authoritative while startup location is pending.
   r = rig({pendingLocation: true}); await flush(); r.el('start').click();
   assert(!r.el('show-aircraft').disabled); r.submit('51', '9'); await flush();

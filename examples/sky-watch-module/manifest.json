@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "dev.construct.sky-watch",
   "name": "Sky Watch",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "A module-owned aircraft map with ADSB.lol, OpenSky and selected-aircraft details. Opens on your location when allowed. Requires Construct alpha26 or later.",
   "constructApi": {
     "min": "0.9.0",
