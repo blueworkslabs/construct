@@ -384,4 +384,17 @@ test("ranking: tapped landmark first after one mark, top-3 with horizon, preserv
   assert.ok(ranked[0].logScore > ranked[1].logScore);
   assert.deepEqual(S.rank(cal, 0.5, 0.5, [null, { point: { lat: 200, lon: 0 } }]), []);
 });
+test("viewpoint offsets stay on the globe across the dateline and poles", () => {
+  for (const [at, east, north] of [
+    [{lat:50,lon:179.999},1000,0],
+    [{lat:50,lon:-179.999},-1000,0],
+    [{lat:89.999,lon:8},0,1000],
+    [{lat:-89.999,lon:8},0,-1000],
+  ]) {
+    const moved=S.shifted(at,east,north);
+    assert.ok(Math.abs(moved.lat)<=90 && Math.abs(moved.lon)<=180);
+    assert.ok(Math.abs(S.distance(at,moved)*1000-Math.hypot(east,north))<.02);
+    assert.ok(Math.abs(S.diff(S.bearing(at,moved),Math.atan2(east,north)*180/Math.PI))<.01);
+  }
+});
 console.log(`${count} Aimé resection checks passed.`);

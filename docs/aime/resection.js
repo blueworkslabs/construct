@@ -36,8 +36,7 @@ const Resection = (() => {
     ROLL_PRIOR_SIGMA = 5, // degrees: people hold phones roughly level
     HORIZON_SIGMA = 0.7, // degrees: tap on a true level horizon
     VIEWER_SIGMA_M = 20, // metres, when the fix has no accuracy
-    FEATURE_SIGMA_M = 8, // metres: OSM node placement
-    M_PER_DEG = 111320;
+    FEATURE_SIGMA_M = 8; // metres: OSM node placement
   const point = (p) =>
     p && num(p.lat) && num(p.lon) && Math.abs(p.lat) <= 90 && Math.abs(p.lon) <= 180;
   function distance(a, b) {
@@ -64,10 +63,8 @@ const Resection = (() => {
     return { lat: deg(lat), lon: ((deg(lon) + 540) % 360) - 180 };
   }
   // Reported fix shifted by (east, north) metres.
-  const shifted = (viewer, east, north) => ({
-    lat: viewer.lat + north / M_PER_DEG,
-    lon: viewer.lon + east / (M_PER_DEG * Math.max(0.05, Math.cos(rad(viewer.lat)))),
-  });
+  const shifted = (viewer, east, north) =>
+    destination(viewer, deg(Math.atan2(east, north)), Math.hypot(east, north) / 1000);
   const clampFov = (f) => Math.max(FOV_MIN, Math.min(FOV_MAX, f));
   // Level-camera column angle; kept for rulers and for the 1D checks.
   const columnAngle = (x, f) => deg(Math.atan((x - 0.5) * 2 * Math.tan(rad(clampFov(f)) / 2)));

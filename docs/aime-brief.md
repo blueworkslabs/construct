@@ -1,6 +1,6 @@
 # Aimé — landmark identification from a photo (module brief)
 
-Status: planning brief, slice 0, **revision 2** after Astra's Codex review of
+Status: planning brief, slice 0, **revision 3** after Astra's Codex review of
 the first draft. Nothing here is a shipped contract. Plan owner: Fable.
 Implementation: Clawd. Review and staging acceptance: Astra. Hardware test:
 the pilot tester. Name chosen by the project owner: **Aimé**
@@ -25,12 +25,13 @@ features along that bearing. Marking one landmark you already recognise in
 the photo (a church tower, a summit) calibrates the direction far better than
 the phone compass could; marking two also constrains the lens; tapping the
 horizon levels the picture. This is bearing calibration from a reported
-viewer position; the fit may refine that position within the fix accuracy when
-the geometry allows, never beyond it.
+viewer position; the fit may estimate an offset when the geometry allows, with
+the reported accuracy as a prior rather than a hard maximum error. The fitted
+viewpoint is an estimate, not a replacement location measurement.
 
 This is a spotting aid with an honest shortlist, not an oracle. Every answer
-shows the candidate's bearing, its signed offset from the tap, the tap's own
-±σ, and the distance.
+shows the candidate's bearing, its signed offset from the tap, its comparison
+±σ, and the distance. The map ray has a separate direction uncertainty.
 
 ## What exists today (API 0.11 candidate, alpha31)
 
@@ -88,10 +89,14 @@ for slice 1. Orientation capture stays a later, optional aid.
    skyline was physically horizontal. Skipping retains pose-prior uncertainty.
 6. **What's that?** → tap anywhere else → a **candidates sheet**: up to five
    features ranked by score, each with name, kind, distance, signed offset from
-   the tap and the tap's ±σ. When nothing lies within 2σ the sheet says "no
+   the tap and that candidate's comparison ±σ. When no result has `close:true`
+   (within its own 2σ), the sheet says "no
    close match" and shows the nearest two greyed. Tapping a candidate opens the
-   **map view**: viewer dot, tap ray as a wedge of width 2σ, marks as solid
-   pins, candidates as numbered pins.
+   **map view**: fitted viewer dot, tap ray as a wedge of total width 2×direction
+   σ (±1σ, not a 95% region), marks as solid pins, candidates as numbered pins.
+   Keep the reported/confirmed viewpoint and its accuracy visible separately
+   when the fit moves it. Preserve that input in storage; do not overwrite it
+   with the fit or quietly centre later feature queries on a derived position.
 7. **Delete photo** → native confirmation (existing `photos.library` op); only
    `{completed:true}` removes the sidecar. Native deletion and `storage.kv`
    cleanup are separate operations; after every **successful complete** `list`
@@ -138,12 +143,12 @@ reported fix whose prior is the fix accuracy, and every mark residual and every
 candidate bearing is evaluated from that shifted viewpoint. Adding marks can
 therefore never average a single GPS error away; the covariance keeps the
 ambiguity where the geometry cannot resolve it, and marks at different
-distances can tighten the viewpoint within its accuracy (ordinary resection).
+distances can constrain the viewpoint estimate (ordinary resection). This is a
+local Gaussian approximation with stated priors, not a guaranteed error bound.
 
 **Fit.** Levenberg–Marquardt over `(H, f, p, r, east, north)` with a numeric
 Jacobian, initialised from a level camera at the reported fix; six parameters,
-a few dozen iterations, under a millisecond in Node; phone performance is not
-measured here. Observations that disagree beyond their stated precision inflate
+a few dozen iterations; phone performance is not measured here. Observations that disagree beyond their stated precision inflate
 the covariance by χ²/dof (when dof > 0). The result carries the state, the
 fitted viewpoint, the 6×6 covariance and three flags: `lens: fitted|assumed`,
 `level: fitted|assumed` and `viewpoint: refined|reported`, meaning the data
@@ -173,9 +178,12 @@ viewpoint 0.8, other 1.0). Sort by log-score so underflow never reorders. Each
 result carries `close = |Δ| ≤ 2σ_c`. Up to five shown; "no close match" when
 none is close.
 
-**Out of scope for v1:** explicit position recovery beyond the fix accuracy
-(the offset is bounded by the reported accuracy on purpose); elevation angles
-from `ele` tags; lens distortion.
+The implementation's numerical search box is ±6 times the reported accuracy
+**per offset axis**, not a one-accuracy-radius guarantee. Position accuracy is a
+prior scale; a fitted shift is not proof that the reported fix was wrong.
+
+**Out of scope for v1:** recovering a position without any reported/confirmed
+viewpoint prior; elevation angles from `ele` tags; lens distortion.
 
 **Synthetic results** (`scripts/test_aime_resection.cjs`, seeded; scenes have
 lens 62–78° with 70° guessed, pitch −5…25° down, roll Gaussian σ=3° (not
@@ -217,9 +225,10 @@ candidate beside the mark has σ 1.0° (shared error cancels), a candidate at
 
 Ranking against eight decoys in one frame: tapped landmark first 74 %, top
 three 99 % after one mark (plus horizon when in frame); compass-only top three
-75 %. Coverage above 95 % means σ is slightly conservative, the right side for
-a wedge on a map. Synthetic forward truth reuses the camera model; the figures
-do not establish real-photo accuracy or validate arbitrary skylines.
+75 %. Coverage above 95 % is conservative for these seeded scene distributions,
+not a universal confidence guarantee. Synthetic forward truth reuses the camera
+model; the figures do not establish real-photo accuracy or validate arbitrary
+skylines. Different error distributions and difficult geometries can differ.
 
 ## Data: features, queries, storage, consent
 
@@ -369,5 +378,5 @@ out tags center 400;
    case is now `close` with σ 11°, and the wedge keeps its own direction σ.
 
 Astra re-reviews revision 3. On acceptance, slice 1a starts. No module, host
-release or emulator acceptance is implied by passing this planning slice's 18
-checks.
+release or emulator acceptance is implied by passing this planning slice's 19
+checks (18 revision-3 checks plus a dateline/pole offset regression).
