@@ -182,6 +182,34 @@ const SkyData = (() => {
   }
   const sources = (mode) =>
     mode === "combined" ? ["adsb", "opensky"] : [mode];
+  const MODES = ["adsb", "opensky", "combined"],
+    RADII = [10, 25, 50, 100],
+    DEFAULTS = { mode: "adsb", radius: 50, auto: false, startWithLocation: true };
+  // Saved settings never include coordinates or aircraft; unknown values fall back.
+  function preferences(raw) {
+    const p = { ...DEFAULTS };
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return p;
+    if (MODES.includes(raw.mode)) p.mode = raw.mode;
+    if (RADII.includes(raw.radius)) p.radius = raw.radius;
+    if (typeof raw.auto === "boolean") p.auto = raw.auto;
+    if (typeof raw.startWithLocation === "boolean")
+      p.startWithLocation = raw.startWithLocation;
+    return p;
+  }
+  // Round scale-bar length: metres per pixel in, {metres, pixels, text} out.
+  function scaleBar(mPerPx, maxPx) {
+    if (!(mPerPx > 0) || !(maxPx > 0)) return null;
+    const steps = [1, 2, 5],
+      target = mPerPx * maxPx;
+    let best = 1;
+    for (let e = 1; e <= 1e7; e *= 10)
+      for (const s of steps) if (s * e <= target) best = s * e;
+    return {
+      metres: best,
+      pixels: best / mPerPx,
+      text: best >= 1000 ? best / 1000 + " km" : best + " m",
+    };
+  }
   function merge(feeds, mode, center, radius, now) {
     const groups = new Map();
     for (const source of sources(mode))
@@ -371,6 +399,10 @@ const SkyData = (() => {
     boxes,
     urls,
     sources,
+    MODES,
+    RADII,
+    preferences,
+    scaleBar,
     model,
     name,
     label,

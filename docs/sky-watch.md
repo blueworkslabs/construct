@@ -1,8 +1,56 @@
 # Sky Watch — module-owned map
 
-Sky Watch **0.2.2** runs its aircraft logic and UI in the signed HTML/CSS/JavaScript
+Sky Watch **0.3.4** runs its aircraft logic and UI in the signed HTML/CSS/JavaScript
 module, using host **API 0.9 / alpha26**. The new package does not call `sky.watch`.
 Camera/AR remains deferred.
+
+## Module 0.3.4: opening straight onto the map
+
+When both location switches for Sky Watch are on in Module access, opening the
+module takes **one foreground fix and shows the map**: no welcome card, no area
+dialog, no confirmation tap. The header reads `Your location · lat, lon · about
+N m` (plus `approximate` under coarse-only permission). The fix is requested
+through `location.read` exactly as before: one request, no subscription, no
+background tracking; a menu pause cancels it.
+
+The reviewed source is 0.3.4. The earlier signed 0.3.0–0.3.3 previews are retained
+unchanged but are no longer offered by the candidate index. Review fixed pinch
+anchoring, pending-location cancellation/manual entry and interrupted refresh
+status before the final-candidate Android run. Version 0.3.2 also keeps the map
+scale above attribution text when Android large text wraps it. Version 0.3.3
+also preserves the picker if startup preference reads finish while the native
+menu is open, avoiding a locating spinner without an active request. Version
+0.3.4 aligns Combined retries with both providers’ refresh floors so staggered
+requests cannot alternate cooldown failures indefinitely.
+
+- Without the grants, the start request fails closed and the welcome card
+  offers **Choose area** as before, with a quiet note on how to skip the step.
+  A timeout or unavailable provider shows the reason and **Try location again**.
+  Manual coordinates remain usable while a fix is pending. Cancel or a submitted
+  manual area discards a later fix instead of unexpectedly replacing the view.
+- **Area → Use my location** now shows aircraft directly instead of filling the
+  coordinate fields and asking for **Show aircraft**. Manual coordinates still
+  need no location permission.
+- The dialog gains **Start with my location when opening** (default on). Turning
+  it off makes the module open on the area picker without touching location.
+- **Source, radius, Auto and that start choice are remembered** in module
+  storage under one `preferences` key, validated on load and reset to defaults
+  when unreadable. **Coordinates, fixes and aircraft are still never stored**;
+  the storage consent text says so. Real background exit still discards the
+  area and observations, and reopening takes a fresh fix.
+- Map: pinch and double-tap zoom (fractional, anchored on the fingers), mouse
+  wheel in previews, a scale bar, and **Show on map** on the details card.
+  Selecting a list row whose marker is off-screen recentres on it and offers
+  **Search here**. Zoom buttons and **Center map** are unchanged.
+- The status line no longer keeps saying "Refresh paused" after returning from
+  the Construct menu; the previous provider status comes back. Source chips are
+  coloured live/problem. The module now uses the shared `construct-ui.css`
+  tokens like the other first-party modules.
+
+Runner impact (`scripts/android-runner/sky_module.py`): with location granted,
+opening lands on the map, so the script asserts the `Your location` header and
+reads the coordinates back through **Area**; the synthetic fix is injected before
+the reopen. Background-exit discard is proven by choosing a manual area first.
 
 ## Module 0.2.x: installation and ownership
 
@@ -31,8 +79,9 @@ exit discards coordinates, observations and the in-memory metadata cache.
 Unlike 0.1.0, approved data now reaches module code. This module sends only the
 chosen area to aircraft feeds, viewed tile coordinates to OpenStreetMap, and the
 selected aircraft/callsign identifiers to ADSBdb after the explicit lookup button.
-Only provider cooldowns are persisted in module storage. The host may cache raster
-responses; it does not cache JSON. Data composition is explained in trusted consent.
+Only provider cooldowns and, from 0.3.0, the source/radius/Auto/start preferences
+are persisted in module storage. The host may cache raster responses; it does not
+cache JSON. Data composition is explained in trusted consent.
 
 Legacy 0.1.0 was supported by the native workspace through alpha27. In alpha28,
 `sky.watch` is a historical identifier only: installed callers require a module

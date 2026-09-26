@@ -20,10 +20,26 @@ class SkyMap {
     this.hits = [];
     this.visible = true;
     this.drag = null;
+    this.pinch = null;
+    this.pointers = new Map();
+    this.lastTap = null;
     this.observer = new ResizeObserver(() => this.draw());
     this.observer.observe(canvas);
     canvas.addEventListener("pointerdown", (e) => {
       canvas.setPointerCapture(e.pointerId);
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.pointers.size === 2) {
+        // Second finger: stop dragging, start a pinch anchored on the midpoint.
+        const [a, b] = [...this.pointers.values()],
+          r = canvas.getBoundingClientRect();
+        this.drag = null;
+        this.pinch = {
+          distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+          zoom: this.zoom,
+          anchor: this.geoAt((a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top),
+        };
+        return;
+      }
       this.drag = {
         id: e.pointerId,
         x: e.clientX,
@@ -34,6 +50,27 @@ class SkyMap {
       };
     });
     canvas.addEventListener("pointermove", (e) => {
+      const p = this.pointers.get(e.pointerId);
+      if (p) {
+        p.x = e.clientX;
+        p.y = e.clientY;
+      }
+      if (this.pinch && this.pointers.size === 2) {
+        const [a, b] = [...this.pointers.values()],
+          r = canvas.getBoundingClientRect(),
+          d = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+        this.zoom = SkyMap.clampZoom(
+          this.pinch.zoom + Math.log2(d / this.pinch.distance), this.zoom,
+        );
+        const p = SkyData.projection, s = this.scale();
+        this.center = p.point(
+          p.x(this.pinch.anchor.lon) - ((a.x + b.x) / 2 - r.left - this.width / 2) / s,
+          p.y(this.pinch.anchor.lat) - ((a.y + b.y) / 2 - r.top - this.height / 2) / s,
+        );
+        this.draw();
+        this.onPan();
+        return;
+      }
       const d = this.drag;
       if (!d || d.id !== e.pointerId) return;
       const dx = e.clientX - d.lastX,
@@ -52,24 +89,89 @@ class SkyMap {
       d.lastX = e.clientX;
       d.lastY = e.clientY;
     });
-    canvas.addEventListener("pointerup", (e) => {
+    const release = (e) => {
+      this.pointers.delete(e.pointerId);
+      if (this.pinch) {
+        if (this.pointers.size < 2) this.pinch = null;
+        this.drag = null;
+        this.lastTap = null;
+        return;
+      }
       const d = this.drag;
       this.drag = null;
-      if (!d || d.moved) return;
+      if (!d || d.moved || e.type !== "pointerup") return;
       const r = canvas.getBoundingClientRect(),
         x = e.clientX - r.left,
         y = e.clientY - r.top;
       const hit = this.hits
         .map((h) => ({ ...h, d: Math.hypot(h.x - x, h.y - y) }))
         .sort((a, b) => a.d - b.d)[0];
-      if (hit && hit.d < 30) this.onSelect(hit.key);
-    });
-    canvas.addEventListener("pointercancel", () => {
-      this.drag = null;
-    });
+      if (hit && hit.d < 30) {
+        this.lastTap = null;
+        this.onSelect(hit.key);
+        return;
+      }
+      const t = this.lastTap,
+        now = Date.now();
+      if (t && now - t.time < 320 && Math.hypot(t.x - x, t.y - y) < 40) {
+        // Double tap on open map: zoom one level in around the tapped point.
+        this.lastTap = null;
+        this.zoomTo(Math.round(this.zoom) + 1, x, y);
+        this.onPan();
+      } else this.lastTap = { x, y, time: now };
+    };
+    canvas.addEventListener("pointerup", release);
+    canvas.addEventListener("pointercancel", release);
+    canvas.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        const r = canvas.getBoundingClientRect();
+        this.zoomTo(
+          this.zoom - Math.sign(e.deltaY) * 0.5,
+          e.clientX - r.left,
+          e.clientY - r.top,
+        );
+        this.onPan();
+      },
+      { passive: false },
+    );
   }
   scale() {
     return 256 * 2 ** this.zoom;
+  }
+  static clampZoom(z, fallback = 8) {
+    return Math.max(2, Math.min(13, Number.isFinite(z) ? z : fallback));
+  }
+  // Geographic point under a canvas pixel.
+  geoAt(x, y) {
+    const p = SkyData.projection,
+      s = this.scale();
+    return p.point(
+      p.x(this.center.lon) + (x - this.width / 2) / s,
+      p.y(this.center.lat) + (y - this.height / 2) / s,
+    );
+  }
+  // Change zoom while keeping the geography under (x, y) fixed on screen.
+  zoomTo(zoom, x, y) {
+    const next = SkyMap.clampZoom(zoom, this.zoom);
+    if (next === this.zoom) return;
+    if (
+      Number.isFinite(x) &&
+      Number.isFinite(y) &&
+      this.width > 0 &&
+      this.height > 0
+    ) {
+      const anchor = this.geoAt(x, y),
+        p = SkyData.projection;
+      this.zoom = next;
+      const s = this.scale();
+      this.center = p.point(
+        p.x(anchor.lon) - (x - this.width / 2) / s,
+        p.y(anchor.lat) - (y - this.height / 2) / s,
+      );
+    } else this.zoom = next;
+    this.draw();
   }
   setArea(center, radius, fit = true) {
     this.area = { ...center };
@@ -78,15 +180,11 @@ class SkyMap {
       this.center = { ...center };
       const r = this.canvas.getBoundingClientRect(),
         span = Math.max(128, Math.min(r.width, r.height));
-      this.zoom = Math.max(
-        2,
-        Math.min(
-          13,
-          Math.floor(
-            Math.log2(
-              (40075 * Math.cos((center.lat * Math.PI) / 180) * span) /
-                (256 * radius * 2.2),
-            ),
+      this.zoom = SkyMap.clampZoom(
+        Math.floor(
+          Math.log2(
+            (40075 * Math.cos((center.lat * Math.PI) / 180) * span) /
+              (256 * radius * 2.2),
           ),
         ),
       );
@@ -98,7 +196,21 @@ class SkyMap {
     this.draw();
   }
   zoomBy(n) {
-    this.zoom = Math.max(2, Math.min(13, this.zoom + n));
+    this.zoomTo(Math.round(this.zoom) + n);
+  }
+  // Is this point drawn inside the viewport (with a small margin)?
+  shows(point) {
+    if (!this.width || !this.height) return true;
+    const q = this.xy(point);
+    return (
+      q.x >= 24 &&
+      q.y >= 24 &&
+      q.x <= this.width - 24 &&
+      q.y <= this.height - 24
+    );
+  }
+  centerOn(point) {
+    this.center = { ...point };
     this.draw();
   }
   update(rows, key) {
@@ -134,8 +246,11 @@ class SkyMap {
     ctx.clearRect(0, 0, r.width, r.height);
     ctx.fillStyle = "#15291e";
     ctx.fillRect(0, 0, r.width, r.height);
+    // Tiles come from the nearest integer zoom and are scaled for fractional zoom.
     const p = SkyData.projection,
-      n = 2 ** this.zoom,
+      tileZoom = Math.round(this.zoom),
+      n = 2 ** tileZoom,
+      tile = 256 * 2 ** (this.zoom - tileZoom),
       s = this.scale(),
       cx = p.x(this.center.lon) * s,
       cy = p.y(this.center.lat) * s,
@@ -143,22 +258,28 @@ class SkyMap {
       top = cy - r.height / 2;
     this.wanted = new Set();
     for (
-      let y = Math.floor(top / 256);
-      y <= Math.floor((top + r.height) / 256);
+      let y = Math.floor(top / tile);
+      y <= Math.floor((top + r.height) / tile);
       y++
     )
       for (
-        let x = Math.floor(left / 256);
-        x <= Math.floor((left + r.width) / 256);
+        let x = Math.floor(left / tile);
+        x <= Math.floor((left + r.width) / tile);
         x++
       ) {
         if (y < 0 || y >= n) continue;
         const xx = ((x % n) + n) % n,
-          key = `${this.zoom}/${xx}/${y}`;
+          key = `${tileZoom}/${xx}/${y}`;
         this.wanted.add(key);
         const image = this.cache.get(key);
         if (image)
-          ctx.drawImage(image, x * 256 - left, y * 256 - top, 256, 256);
+          ctx.drawImage(
+            image,
+            x * tile - left,
+            y * tile - top,
+            tile + 0.5,
+            tile + 0.5,
+          );
       }
     const center = this.xy(this.area),
       mPerPx = (40075016 * Math.cos((this.area.lat * Math.PI) / 180)) / s;
@@ -197,9 +318,9 @@ class SkyMap {
           y = Math.max(4, Math.min(r.height - 27, q.y - 43));
         ctx.fillStyle = "#102a1fe8";
         ctx.fillRect(x, y, w, 24);
-        ctx.strokeStyle = "#70d5ac";
+        ctx.strokeStyle = "#5fd3a0";
         ctx.strokeRect(x, y, w, 24);
-        ctx.fillStyle = "#e0ece4";
+        ctx.fillStyle = "#e6f0ea";
         ctx.fillText(label, x + 7, y + 16);
       }
     }
@@ -207,13 +328,46 @@ class SkyMap {
     ctx.arc(center.x, center.y, 8, 0, Math.PI * 2);
     ctx.fillStyle = "#11251a";
     ctx.fill();
-    ctx.strokeStyle = "#e0ece4";
+    ctx.strokeStyle = "#e6f0ea";
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.beginPath();
     ctx.arc(center.x, center.y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = "#70d5ac";
+    ctx.fillStyle = "#5fd3a0";
     ctx.fill();
+    const bar = SkyData.scaleBar(
+      (40075016 * Math.cos((this.center.lat * Math.PI) / 180)) / s,
+      Math.min(140, r.width / 3),
+    );
+    if (bar) {
+      // Sits above the attribution strip, bottom right.
+      // Android text zoom can wrap that HTML strip onto multiple lines.
+      const attribution = c.parentElement?.querySelector(".attribution"),
+        bottomInset = attribution
+          ? Math.max(34, r.top + r.height - attribution.getBoundingClientRect().top + 12)
+          : 34;
+      const x = r.width - bar.pixels - 10,
+        y = r.height - bottomInset;
+      ctx.font = "600 11px system-ui";
+      const tw = ctx.measureText(bar.text).width;
+      ctx.fillStyle = "#102a1fcc";
+      ctx.fillRect(
+        Math.min(x, r.width - tw - 18) - 6,
+        y - 18,
+        Math.max(bar.pixels, tw + 6) + 12,
+        26,
+      );
+      ctx.strokeStyle = "#e6f0ea";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x, y - 4);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x + bar.pixels, y);
+      ctx.lineTo(x + bar.pixels, y - 4);
+      ctx.stroke();
+      ctx.fillStyle = "#e6f0ea";
+      ctx.fillText(bar.text, Math.min(x, r.width - tw - 18), y - 7);
+    }
     this.pump();
   }
   marker(x, y, track, kind, selected, stale) {
@@ -223,7 +377,7 @@ class SkyMap {
     if (selected) {
       c.beginPath();
       c.arc(0, 0, 19, 0, Math.PI * 2);
-      c.strokeStyle = "#70d5ac";
+      c.strokeStyle = "#5fd3a0";
       c.lineWidth = 3;
       c.stroke();
     }

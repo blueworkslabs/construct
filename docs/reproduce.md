@@ -53,7 +53,10 @@ malicious modules. See [evidence](evidence.md) and [release provenance](public-r
 
 Run `node scripts/test_sky_map.cjs` for tile cancellation/retry behavior and
 `node scripts/test_sky.cjs` for the actual shipped module's parsers, identity
-merge, glossary and metadata contracts. `python scripts/prepare_fixtures.py` creates
+merge, glossary and metadata contracts. Run `node scripts/test_sky_app.cjs` for
+startup, saved preferences, manual-entry escape, cancellation and interrupted
+refresh behavior against a bounded host/DOM double. These are not layout or
+physical-location tests. `python scripts/prepare_fixtures.py` creates
 a separate signed legacy launcher for native compatibility tests and signed
 transport-scope versions for new-grant/update/rollback checks. Do not replace or
 re-sign published module versions in a production catalog.

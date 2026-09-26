@@ -309,6 +309,54 @@ test("actual module has no native Sky launcher or direct network/geolocation", (
   assert.match(app, /call\(['"]location\.read['"]/);
   assert.match(app, /call\(['"]net\.http['"]/);
 });
+test("saved preferences validate and never carry coordinates", () => {
+  const d = D.preferences(null);
+  assert.deepEqual(d, { mode: "adsb", radius: 50, auto: false, startWithLocation: true });
+  assert.deepEqual(D.preferences("junk"), d);
+  assert.deepEqual(D.preferences([1, 2]), d);
+  assert.deepEqual(
+    D.preferences({ mode: "combined", radius: 25, auto: true, startWithLocation: false, lat: 50, lon: 8 }),
+    { mode: "combined", radius: 25, auto: true, startWithLocation: false },
+  );
+  assert.deepEqual(D.preferences({ mode: "evil", radius: 7, auto: "yes", startWithLocation: 1 }), d);
+  assert.deepEqual(D.MODES, ["adsb", "opensky", "combined"]);
+  assert.deepEqual(D.RADII, [10, 25, 50, 100]);
+});
+test("scale bar picks a round length that fits", () => {
+  assert.deepEqual(D.scaleBar(10, 140), { metres: 1000, pixels: 100, text: "1 km" });
+  assert.deepEqual(D.scaleBar(0.5, 140), { metres: 50, pixels: 100, text: "50 m" });
+  assert.equal(D.scaleBar(2000, 140).text, "200 km");
+  assert.equal(D.scaleBar(0, 140), null);
+  assert.equal(D.scaleBar(10, NaN), null);
+});
+test("module start flow, storage keys and shared stylesheet", () => {
+  const root = "examples/sky-watch-module/";
+  const app = fs.readFileSync(root + "ui/app.js", "utf8"),
+    html = fs.readFileSync(root + "ui/index.html", "utf8"),
+    m = JSON.parse(fs.readFileSync(root + "manifest.json"));
+  // Only these two keys may ever be written; neither holds an area or aircraft.
+  const keys = [...app.matchAll(/key:\s*"([^"]+)"/g)].map((x) => x[1]);
+  assert.ok(keys.length >= 2);
+  for (const k of keys) assert.ok(["provider-cooldowns", "preferences"].includes(k), k);
+  assert.match(app, /prefs\.startWithLocation/);
+  assert.match(app, /D\.preferences\(/);
+  assert.doesNotMatch(app, /key:\s*"(area|location|coordinates|fix)"/);
+  assert.match(html, /href="construct-ui\.css"/);
+  for (const label of [
+    "Choose area",
+    "Use my location",
+    "Show aircraft",
+    "Start with my location when opening",
+    "Try location again",
+    "Finding your location…",
+    "What’s flying nearby?",
+  ])
+    assert.ok(html.includes(label), label);
+  assert.equal(m.version, "0.3.4");
+  assert.match(m.capabilities.find((c) => c.id === "storage.kv").reason, /not your location/);
+  assert.equal(m.capabilities.find((c) => c.id === "location.read").optional, true);
+  assert.match(fs.readFileSync("docs/sky-watch.md", "utf8"), /Sky Watch \*\*0\.3\.4\*\*/);
+});
 test("malformed categories and identity fields remain unknown", () => {
   for (const value of ["constructor", "__proto__", ["A7"], {}, 7, null]) assert.equal(D.category(value), null);
   const now = Date.now() / 1000;

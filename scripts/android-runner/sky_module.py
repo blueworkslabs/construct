@@ -86,9 +86,14 @@ def exact_install(name,version,sha,from_versions=False):
     if not matches:raise RuntimeError('Installed signed digest not found in native diagnostics')
     library()
 
-def open_module(name='Sky Watch',version=None):
+def open_module(name='Sky Watch',version=None,expect='picker'):
+    if expect=='map':inject_fix() # location.read accepts a cached fix at most 120 s old
     restart();library();select_after(name+' · '+(version or C['sky']['version']),('Open',))
-    find('Choose area');contains('What’s flying nearby?')
+    if expect=='map':
+        # Both location gates granted: 0.3.0 opens straight onto the map from one fix.
+        contains('Your location · ',45)
+    else:
+        find('Choose area');contains('What’s flying nearby?')
 
 def close_module():tap('Construct menu');tap('Close module');library()
 
@@ -121,18 +126,59 @@ def fields(lat='50.0379',lon='8.5622'):
         previous=state;time.sleep(.3)
     else:raise RuntimeError('Expected the two stable visible coordinate fields')
     for identifier,value in [('latitude',lat),('longitude',lon)]:
-        ui._device(className='android.widget.EditText',packageName='dev.construct.runtime',resourceId=identifier).set_text(value)
-    # Accessibility set_text does not open the IME. Escape would cancel the HTML dialog.
+        if not re.fullmatch(r'[+\-0-9.]+',value):raise RuntimeError('Coordinate fixture must be numeric text')
+        # UIAutomator's programmatic setText intermittently dismissed the HTML
+        # dialog on this provider. Exercise ordinary focused keyboard input instead.
+        matches=[n for n in nodes() if n.get('resource-id')==identifier and visible(n)]
+        if len(matches)!=1:raise RuntimeError('Coordinate field disappeared: '+identifier)
+        tap_node(matches[0]);time.sleep(.4)
+        adb('shell','input','keycombination','113','29') # Ctrl+A
+        adb('shell','input','text',value)
+        deadline=time.monotonic()+5
+        while time.monotonic()<deadline:
+            if any(n.get('resource-id')==identifier and n.get('text')==value for n in nodes()):break
+            time.sleep(.2)
+        else:raise RuntimeError('Typed coordinate did not match: '+identifier)
+    # Back dismisses a shown IME; Escape would cancel the HTML dialog itself.
+    if 'mInputShown=true' in adb('shell','dumpsys','input_method'):
+        adb('shell','input','keyevent','4');time.sleep(.4)
 
-def area():
+def area(lat='50.0379',lon='8.5622'):
     time.sleep(16) # Respect module-persisted provider floor across reopen/update.
-    click('Choose area');fields();tap('Show aircraft')
+    # Welcome card offers "Choose area"; the map header offers "Area". Both open the same dialog.
+    click('Choose area' if any(n.get('text')=='Choose area' and visible(n) for n in nodes()) else 'Area')
+    fields(lat,lon);tap('Show aircraft')
+
+def coordinates():
+    return [n.get('text') for n in nodes() if n.get('class')=='android.widget.EditText' and n.get('resource-id') in ('latitude','longitude')]
+
+def inject_fix():
+    adb('shell','cmd','location','set-location-enabled','true')
+    for _ in range(3):adb('emu','geo','fix','8.5622','50.0379');time.sleep(1)
 
 def ready(source):
     contains(source+' · live',60)
     count=contains(' aircraft')
     if not any(re.fullmatch(r'[1-9]\d* aircraft',x) for x in labels()):raise RuntimeError('No live aircraft in public reference area')
     find('Zoom in');find('Zoom out')
+
+def auto_switch():
+    for _ in range(8):
+        matches=[n for n in nodes() if n.get('resource-id')=='auto' and visible(n)]
+        if len(matches)==1:return matches[0]
+        scroll()
+    raise RuntimeError('Auto switch is not reachable')
+
+def toggle_start_location():
+    # This WebView exposes role=switch by DOM id but omits its label and checked
+    # state. Tap the actual control, then verify persistence through reopen below.
+    deadline=time.monotonic()+20
+    while time.monotonic()<deadline:
+        matches=[n for n in nodes() if n.get('resource-id')=='start-with-location' and visible(n)]
+        if len(matches)==1:
+            tap_node(matches[0]);return
+        time.sleep(.3)
+    raise RuntimeError('Start-with-location switch is not visible')
 
 def select_source(old,new):click(old);tap(new)
 
@@ -157,13 +203,36 @@ def choose_permission(options):
         time.sleep(.3)
     raise RuntimeError('Android permission choices missing')
 
+def settled_map_layout(rotation):
+    # Android can expose the new rotation before WebView has resized. Do not
+    # certify a screenshot whose controls still sit outside the portrait viewport.
+    end=time.monotonic()+30;previous=None;stable=0
+    while time.monotonic()<end:
+        current=nodes()
+        web=next((n for n in current if n.get('class')=='android.webkit.WebView' and visible(n)),None)
+        if web is None:time.sleep(1);continue
+        viewport=bounds(web);state=[]
+        for label in ['Area','Refresh aircraft','Zoom in','Zoom out','Center map']:
+            matches=[n for n in current if label in (n.get('text'),n.get('content-desc')) and visible(n)]
+            if len(matches)!=1:break
+            b=bounds(matches[0])
+            if not (viewport[0]<=b[0]<b[2]<=viewport[2] and viewport[1]<=b[1]<b[3]<=viewport[3]):break
+            state.append((label,b))
+        valid=len(state)==5 and ((viewport[2]-viewport[0]>viewport[3]-viewport[1])==bool(int(rotation)))
+        stable=stable+1 if valid and state==previous else 0
+        if stable>=3:return
+        previous=state;time.sleep(1)
+    raise RuntimeError('Map controls did not settle inside the requested viewport')
+
 def screenshot_layouts(prefix,expected):
     field_target=None
     for scale,rotation,suffix in [('1.0','0','portrait'),('1.0','1','landscape'),('2.0','0','font2'),('2.0','1','font2-landscape')]:
         adb('shell','settings','put','system','accelerometer_rotation','0')
         adb('shell','settings','put','system','font_scale',scale)
         adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2)
-        reveal_fragment(expected);capture(prefix+'-'+suffix)
+        reveal_fragment(expected)
+        if prefix=='modular-map':settled_map_layout(rotation)
+        capture(prefix+'-'+suffix)
         if prefix=='modular-metadata':
             field_target=field_target or next((x for x in ('Registry owner','Callsign airline') if x in labels()),None)
             reveal_fragment(field_target or 'Aircraft retrieved:');capture(prefix+'-'+suffix+'-fields')
@@ -183,6 +252,12 @@ try:
     fields();tap('Show aircraft');ready('ADSB.lol')
     if app_permission('android.permission.ACCESS_FINE_LOCATION') or app_permission('android.permission.ACCESS_COARSE_LOCATION'):raise RuntimeError('Manual area unexpectedly granted location')
     capture('modular-adsb-map');done('Module-owned parser/map loads live ADSB.lol after manual coordinate validation without location permission')
+    map_label='Aircraft map. Select aircraft in the nearby list for accessible details.'
+    b=bounds(find(map_label));cx=(b[0]+b[2])//2;cy=(b[1]+b[3])//2
+    ui._device(description=map_label).gesture((cx-80,cy),(cx+80,cy),(cx-130,cy),(cx+130,cy),steps=25)
+    contains('Search here');capture('modular-pinch-after')
+    click('Zoom out');click('Center map')
+    done('Real two-pointer WebView pinch exposes Search here; before/after map captures retained for zoom review')
     select_source('ADSB.lol','OpenSky');ready('OpenSky');capture('modular-opensky-map');done('Module-owned OpenSky adapter loads live data')
     time.sleep(16);select_source('OpenSky','Combined');ready('ADSB.lol');contains('OpenSky · live');capture('modular-combined-map');done('Combined receives both live feeds; deterministic identity/merge rules tested separately')
     time.sleep(16);click('50 km');tap('100 km');ready('ADSB.lol');click('Zoom in');click('Zoom out');click('Center map')
@@ -197,28 +272,48 @@ try:
     if any('HTTP ' in x or 'Unexpected ' in x or 'Request unavailable' in x for x in labels()):raise RuntimeError('Metadata lookup failed')
     screenshot_layouts('modular-metadata','ADSBdb record');tap('Close aircraft info');done('Selected-aircraft metadata requires explicit lookup and returns attributed results; layout screenshots retained')
     click('Area');fields();tap('Show aircraft');ready('ADSB.lol');click('Center map');screenshot_layouts('modular-map','100 km');done('Map, radius and controls survive both orientations and Android 2x text')
-    tap('Construct menu');tap('Return to module');reveal_fragment('Refresh paused while');capture('modular-menu-resume');done('Native menu pauses privileged work and returns to module state')
+    tap('Construct menu');tap('Return to module');reveal_fragment('Auto is off')
+    if any('Refresh paused while' in x for x in labels()):raise RuntimeError('Pause notice survived return to the module')
+    capture('modular-menu-resume');done('Native menu returns to module state without a stale pause notice')
     click('Area');tap('Use my location');contains('Enable the requested capability');tap('Cancel')
     access();switch('Allow reading phone location');native_status('Allow reading phone location: on.')
     reveal_host_control('Allow Android location access');tap('Allow Android location access');choose_permission(["Don’t allow","Don't allow"])
     native_status('Android location access denied');leave_access();open_module();click('Choose area');tap('Use my location');contains('Enable Allow reading phone location');tap('Cancel')
     done('Location module grant and Android denial remain separate; module cannot launch OS prompt')
     access();reveal_host_control('Allow Android location access');tap('Allow Android location access');choose_permission(['While using the app','Only this time'])
-    native_status('Android location access allowed');leave_access();open_module()
-    adb('shell','cmd','location','set-location-enabled','true')
-    for _ in range(3):adb('emu','geo','fix','8.5622','50.0379');time.sleep(1)
-    click('Choose area');tap('Use my location');contains('Location ready',25)
-    values=[n.get('text') for n in nodes() if n.get('class')=='android.widget.EditText']
-    if values!=['50.037900','8.562200']:raise RuntimeError('Module did not receive the injected location')
-    capture('modular-synthetic-location');tap('Show aircraft');done('Granted location.read returns synthetic foreground coordinates to module code')
-    adb('shell','input','keyevent','3');time.sleep(2);open_module();find('Choose area')
-    done('Real background exit discards module area and requires a new selection')
+    native_status('Android location access allowed');leave_access()
+    # The synthetic fix must exist before the reopen: 0.3.0 requests it at start.
+    open_module(expect='map');contains('Your location · 50.038, 8.562')
+    if any(x in ('Choose your viewing area','Finding your location…') for x in labels()):raise RuntimeError('Welcome card still shown after an auto-start fix')
+    click('Area')
+    if coordinates()!=['50.037900','8.562200']:raise RuntimeError('Module did not receive the injected location')
+    capture('modular-synthetic-location');tap('Cancel');ready('ADSB.lol')
+    done('Granted location.read opens straight onto the map from one synthetic foreground fix; no confirmation step')
+    if not all(x in labels() for x in ('Combined','100 km')):raise RuntimeError('Source/radius preferences were not restored')
+    tap_node(auto_switch());contains('next in');close_module();open_module(expect='map')
+    # WebView exposes role=switch as non-checkable on this provider; assert its
+    # actual visible behavior instead of the always-false accessibility attribute.
+    contains('next in');capture('modular-preferences-restored')
+    tap_node(auto_switch());contains('Auto is off')
+    done('Source, radius and Auto preferences persist across close/reopen')
+    time.sleep(16);area('51','9');contains('Chosen area · 51.000, 9.000')
+    time.sleep(16);click('Area');tap('Use my location');contains('Your location · 50.038, 8.562',25)
+    if 'Chosen area · 51.000, 9.000' in labels():raise RuntimeError('Use my location did not replace the manual area directly')
+    done('Use my location shows aircraft directly without Show aircraft')
+    time.sleep(16);area('51','9');contains('Chosen area · 51.000, 9.000')
+    adb('shell','input','keyevent','3');time.sleep(2);open_module(expect='map')
+    if any('51.000, 9.000' in x for x in labels()):raise RuntimeError('Manual area survived a real background exit')
+    done('Real background exit discards the module area; reopening takes a fresh fix, not the old coordinates')
+    click('Area');toggle_start_location();tap('Cancel');close_module();open_module()
+    contains('Choose your viewing area');capture('modular-start-picker')
+    click('Choose area');toggle_start_location();tap('Cancel');close_module();open_module(expect='map')
+    done('Start-with-location preference persists across close/reopen and restores auto-start when re-enabled')
     adb('shell','svc','wifi','disable');adb('shell','svc','data','disable');area();contains('unavailable',40);capture('modular-offline')
     adb('shell','svc','wifi','enable');adb('shell','svc','data','enable');done('Offline transport failure is visible without crashing module')
     access();switch('Allow approved internet sources')
     if 'Turn off' in labels():tap('Turn off')
-    native_status('Allow approved internet sources: off.');leave_access();open_module();area();contains('Enable the requested capability');close_module()
-    done('Revoked internet grant remains denied after reopen')
+    native_status('Allow approved internet sources: off.');leave_access();open_module(expect='map');contains('Enable the requested capability');close_module()
+    done('Revoked internet grant remains denied after reopen while location auto-start still works')
     # Separate fixtures: same actual Sky parser/UI with synthetic feed and only glossary/version differences.
     use_catalog(C['updateCatalog']);v1,v2=C['updates']
     exact_install('Synthetic Sky',v1['version'],v1['sha256'],from_versions=True)

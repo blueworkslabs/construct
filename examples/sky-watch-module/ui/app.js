@@ -20,12 +20,17 @@
     rows = [],
     selected = null,
     busy = false,
+    locating = false,
+    locationRequest = 0,
     active = true,
     epoch = 0,
     lastUpdated = 0,
     nextRefresh = 0,
     auto = false,
+    retryAt = 0,
     budgets = {},
+    prefs = D.preferences(null),
+    lastStatus = { text: "", tone: "" },
     infoTarget = null,
     infoBusy = false;
   const metadata = new Map(),
@@ -35,15 +40,30 @@
     el.textContent = text;
     el.className = tone;
   };
+  // The aside status line survives a menu pause; the pause notice does not.
+  const status = (text, tone = "") => {
+    lastStatus = { text, tone };
+    message($("status"), text, tone);
+  };
+  const denied = (e) =>
+    e.code === "CAPABILITY_DENIED" || e.code === "LOCATION_PERMISSION";
   const describe = (e) =>
     ({
       CAPABILITY_DENIED:
         "Enable the requested capability in Construct’s Module access, then reopen.",
       LOCATION_PERMISSION:
         "Enable Allow reading phone location and Android location access in Module access, then reopen.",
+      LOCATION_TIMEOUT:
+        "No location fix within 12 seconds. Move nearer a window, try again or enter coordinates.",
+      LOCATION_UNAVAILABLE:
+        "No location provider is available for the granted accuracy. Check the phone’s location setting or enter coordinates.",
+      LOCATION_BUSY: "A location request is already running.",
+      LOCATION_RATE: "Wait 15 seconds between location requests.",
+      LOCATION_CANCELLED: "Location request cancelled.",
       RUN_PAUSED: "Return to the module and retry.",
       HTTP_BUSY: "Requests are busy; retry shortly.",
       HTTP_RATE: "Internet request budget reached; wait a minute.",
+      TIMEOUT: "Construct did not answer in time. Retry.",
     })[e.code] ||
     e.message ||
     "Request unavailable.";
@@ -138,6 +158,12 @@
       /* No coordinates or aircraft history are stored here. */
     }
   }
+  async function savePrefs() {
+    try {
+      // Source, radius, Auto and the start choice only; never coordinates.
+      await call("storage.kv", { op: "set", key: "preferences", value: prefs });
+    } catch (_) {}
+  }
   async function initBudgets() {
     try {
       const b = await call("storage.kv", {
@@ -155,7 +181,23 @@
         }
     } catch (_) {}
   }
-  const ready = initBudgets();
+  async function initPrefs() {
+    try {
+      prefs = D.preferences(
+        await call("storage.kv", { op: "get", key: "preferences" }),
+      );
+    } catch (_) {
+      prefs = D.preferences(null);
+    }
+    mode = prefs.mode;
+    radius = prefs.radius;
+    auto = prefs.auto;
+    $("source").value = mode;
+    $("radius").value = String(radius);
+    $("auto").checked = auto;
+    $("start-with-location").checked = prefs.startWithLocation;
+  }
+  const ready = Promise.all([initBudgets(), initPrefs()]);
   async function fetchSource(source, c, r, e) {
     const now = Date.now(),
       b = budgets[source] || { last: 0, until: 0 };
@@ -174,10 +216,14 @@
             Math.ceil((b.until - now) / 60000) +
             " min.",
         );
-      if (now - b.last < 15000)
+      if (now - b.last < 15000) {
+        // Persisted floor: retry once by itself when it lapses instead of nagging.
+        retryAt = Math.max(retryAt, b.last + 15100);
         throw new Error(
-          provider[source] + ": wait 15 seconds between refreshes.",
+          provider[source] +
+            ": refreshed under 15 s ago; retry pending.",
         );
+      }
       budgets[source] = { last: now, until: 0 };
       await saveBudgets();
       if (e !== epoch || !active) throw Object.assign(new Error("Request interrupted."), {code: "RUN_PAUSED"});
@@ -216,8 +262,10 @@
       "show-aircraft",
       "use-location",
       "search-here",
+      "retry-location",
     ])
       $(id).disabled = value;
+    // "Choose area" stays usable while a start fix is pending; it is the way out.
     $("progress").hidden = !value;
     $("refresh").textContent = value ? "…" : "↻";
   }
@@ -229,36 +277,126 @@
     const e = epoch,
       c = { ...area },
       r = radius;
+    // Only completed provider statuses survive a menu interruption.
     message($("status"), "Refreshing aircraft…");
+    retryAt = 0;
     try {
       const results = await Promise.all(
         D.sources(mode).map((s) => fetchSource(s, c, r, e)),
       );
       if (e !== epoch || !active) return;
       for (const result of results) feeds = D.update(feeds, result);
+      // A Combined refresh may have fetched one source while the other hit its
+      // floor. Wait until all selected sources are eligible to avoid alternating
+      // cooldown failures indefinitely.
+      if (retryAt)
+        retryAt = Math.max(retryAt, ...D.sources(mode).map(s => (budgets[s]?.last || 0) + 15100));
       lastUpdated = Date.now();
       nextRefresh = lastUpdated + 30000;
       const errors = results.filter((x) => !x.ok).map((x) => x.message);
-      message($("status"), errors.join(" "), errors.length ? "attention" : "");
+      if (retryAt)
+        errors.push(`Retrying selected sources in ${Math.max(1, Math.ceil((retryAt - Date.now()) / 1000))} s.`);
+      status(errors.join(" "), errors.length ? "attention" : "");
       render();
     } finally {
       if (e === epoch) setBusy(false);
     }
   }
-  function selectArea(c, fit = true) {
+  const coords = (c) => `${c.lat.toFixed(3)}, ${c.lon.toFixed(3)}`;
+  function selectArea(c, from = "manual", fix = null, fit = true) {
     if (busy || !active) return;
     area = c;
     feeds = {};
     selected = null;
     lastUpdated = 0;
+    status("");
     $("welcome").hidden = true;
     $("workspace").hidden = false;
+    $("area").hidden = false;
     $("search-here").hidden = true;
     $("area-label").textContent =
-      `Chosen area · ${c.lat.toFixed(3)}, ${c.lon.toFixed(3)}`;
+      from === "location"
+        ? `Your location · ${coords(c)}` +
+          (fix && Number.isFinite(fix.accuracyM)
+            ? ` · about ${Math.round(fix.accuracyM)} m` +
+              (fix.approximate ? ", approximate" : "")
+            : "")
+        : from === "map"
+          ? `Map centre · ${coords(c)}`
+          : `Chosen area · ${coords(c)}`;
     map.setArea(c, radius, fit);
     render();
     refresh();
+  }
+  // Welcome card: "locating" while a start fix is pending, else "choose".
+  function welcome(state, text = "", tone = "", retry = false) {
+    const locating = state === "locating";
+    $("welcome-title").textContent = locating
+      ? "Finding your location…"
+      : "Choose your viewing area";
+    $("welcome-progress").hidden = !locating;
+    $("welcome-text").hidden = locating;
+    $("retry-location").hidden = !retry;
+    message($("welcome-status"), text, tone);
+  }
+  // One foreground fix. At start, a missing grant is a quiet fallback, not an error.
+  async function locate(from) {
+    if (busy || !active) return false;
+    const e = epoch, request = ++locationRequest;
+    let handed = false;
+    locating = true;
+    setBusy(true);
+    // Manual entry remains a real escape from a pending foreground fix.
+    $("show-aircraft").disabled = false;
+    if (from === "dialog")
+      message($("area-status"), "Getting one location fix…");
+    try {
+      const l = await call("location.read", { op: "get" });
+      if (e !== epoch || request !== locationRequest || !active) return false;
+      const c = D.point(l.latitude, l.longitude);
+      if (!c)
+        throw new Error("This map supports latitudes between −85 and 85.");
+      // Hand the busy flag to the refresh that selectArea starts.
+      handed = true;
+      locating = false;
+      setBusy(false);
+      if (from !== "dialog" && $("area-dialog").open) {
+        // The user opened the picker meanwhile: offer the fix, do not override.
+        $("latitude").value = c.lat.toFixed(6);
+        $("longitude").value = c.lon.toFixed(6);
+        message(
+          $("area-status"),
+          `Location ready · about ${Math.round(l.accuracyM)} m. Tap Show aircraft.`,
+        );
+        welcome("choose");
+        return false;
+      }
+      if ($("area-dialog").open) $("area-dialog").close();
+      selectArea(c, "location", l);
+      return true;
+    } catch (error) {
+      if (e !== epoch || request !== locationRequest) return false;
+      if (from === "dialog")
+        message($("area-status"), describe(error), "attention");
+      else if (denied(error))
+        welcome(
+          "choose",
+          "Phone location isn’t enabled for this module, so pick an area below. Allow both location switches in Construct’s Module access to skip this step next time.",
+        );
+      else welcome("choose", describe(error), "attention", true);
+      return false;
+    } finally {
+      if (e === epoch && request === locationRequest && !handed) {
+        locating = false;
+        setBusy(false);
+      }
+    }
+  }
+  function discardLocation() {
+    if (!locating) return;
+    locationRequest++;
+    locating = false;
+    setBusy(false);
   }
   function showArea() {
     if (!active) return;
@@ -266,15 +404,28 @@
       $("latitude").value = area.lat.toFixed(6);
       $("longitude").value = area.lon.toFixed(6);
     }
+    $("start-with-location").checked = prefs.startWithLocation;
     message($("area-status"), "");
     $("area-dialog").showModal();
   }
   $("start").onclick = showArea;
   $("area").onclick = showArea;
-  $("cancel-area").onclick = () => $("area-dialog").close();
+  $("retry-location").onclick = () => {
+    welcome("locating");
+    locate("retry");
+  };
+  $("cancel-area").onclick = () => {
+    discardLocation();
+    $("area-dialog").close();
+    if (!area && !busy) welcome("choose");
+  };
+  $("area-dialog").addEventListener("cancel", () => {
+    discardLocation();
+    if (!area && !busy) welcome("choose");
+  });
   $("area-form").onsubmit = (e) => {
     e.preventDefault();
-    if (busy) {
+    if (busy && !locating) {
       message(
         $("area-status"),
         "Wait for the current refresh to finish.",
@@ -296,43 +447,34 @@
       );
       return;
     }
+    discardLocation();
     $("area-dialog").close();
-    selectArea(c);
+    selectArea(c, "manual");
   };
-  $("use-location").onclick = async () => {
-    if (busy || !active) return;
-    const e = epoch;
-    setBusy(true);
-    message($("area-status"), "Getting one location fix…");
-    try {
-      const l = await call("location.read", { op: "get" });
-      if (e !== epoch || !active) return;
-      const c = D.point(l.latitude, l.longitude);
-      if (!c)
-        throw new Error("This map supports latitudes between −85 and 85.");
-      $("latitude").value = c.lat.toFixed(6);
-      $("longitude").value = c.lon.toFixed(6);
-      message(
-        $("area-status"),
-        `Location ready · accuracy about ${Math.round(l.accuracyM)} m${l.approximate ? " · approximate" : ""}. Tap Show aircraft.`,
-      );
-    } catch (error) {
-      if (e === epoch) message($("area-status"), describe(error), "attention");
-    } finally {
-      if (e === epoch) setBusy(false);
-    }
+  $("use-location").onclick = () => locate("dialog");
+  $("start-with-location").onchange = () => {
+    prefs.startWithLocation = $("start-with-location").checked;
+    savePrefs();
   };
   $("refresh").onclick = refresh;
   $("source").onchange = () => {
-    if (busy) return;
-    mode = $("source").value;
+    if (busy) {
+      $("source").value = mode;
+      return;
+    }
+    mode = prefs.mode = $("source").value;
+    savePrefs();
     selected = null;
     render();
     refresh();
   };
   $("radius").onchange = () => {
-    if (busy) return;
-    radius = Number($("radius").value);
+    if (busy) {
+      $("radius").value = String(radius);
+      return;
+    }
+    radius = prefs.radius = Number($("radius").value);
+    savePrefs();
     if (area) {
       map.setArea(area, radius);
       render();
@@ -340,8 +482,10 @@
     }
   };
   $("auto").onchange = () => {
-    auto = $("auto").checked;
+    auto = prefs.auto = $("auto").checked;
+    savePrefs();
     nextRefresh = Date.now() + 30000;
+    tickStatus();
   };
   $("zoom-in").onclick = () => map.zoomBy(1);
   $("zoom-out").onclick = () => map.zoomBy(-1);
@@ -350,7 +494,7 @@
     $("search-here").hidden = true;
   };
   $("search-here").onclick = () => {
-    if (!busy) selectArea({ ...map.center }, false);
+    if (!busy) selectArea({ ...map.center }, "map", null, false);
   };
   const altitude = (a) =>
     a.altitudeM === null
@@ -370,6 +514,12 @@
     pair.append(element("dt", label), element("dd", value));
     parent.append(pair);
   }
+  function reveal(a) {
+    if (!map.shows(a.point)) {
+      map.centerOn(a.point);
+      $("search-here").hidden = false;
+    }
+  }
   function render() {
     if (!area) return;
     rows = D.merge(feeds, mode, area, radius, Date.now() / 1000);
@@ -381,7 +531,7 @@
         element(
           "span",
           provider[s] + " · " + (f ? (f.ok ? "live" : "problem") : "waiting"),
-          "chip",
+          "chip" + (f ? (f.ok ? " live" : " attention") : ""),
         ),
       );
     }
@@ -409,6 +559,7 @@
       button.onclick = () => {
         selected = a.key;
         render();
+        reveal(a);
         $("selected").scrollIntoView({ block: "nearest" });
       };
       list.append(button);
@@ -418,8 +569,10 @@
         element(
           "p",
           lastUpdated
-            ? "No recent airborne aircraft in this area."
-            : "Choose an area and refresh.",
+            ? `No airborne aircraft reported within ${radius} km right now.` +
+                (radius < 100 ? " Try a larger radius." : "") +
+                (mode !== "combined" ? " Combined asks both sources." : "")
+            : "Waiting for the first refresh…",
           "note",
         ),
       );
@@ -478,13 +631,19 @@
       card.append(dl);
       const actions = element("div", null, "selected-actions"),
         more = element("button", "More aircraft info"),
-        dismiss = element("button", "Dismiss details");
+        show = element("button", "Show on map"),
+        dismiss = element("button", "Dismiss details", "quiet");
       more.onclick = () => showInfo(a);
+      show.onclick = () => {
+        map.centerOn(a.point);
+        $("search-here").hidden = false;
+        $("map-wrap").scrollIntoView({ block: "nearest" });
+      };
       dismiss.onclick = () => {
         selected = null;
         render();
       };
-      actions.append(more, dismiss);
+      actions.append(more, show, dismiss);
       card.append(actions);
     }
     map.update(rows, selected);
@@ -496,7 +655,7 @@
         `Updated ${Math.max(0, Math.round((Date.now() - lastUpdated) / 1000))} s ago` +
         (auto
           ? ` · next in ${Math.max(0, Math.ceil((nextRefresh - Date.now()) / 1000))} s`
-          : "");
+          : " · Auto is off");
   }
   function localInfo(a) {
     const body = $("info-body");
@@ -694,6 +853,7 @@
     active = event.detail?.visible !== false;
     epoch++;
     if (!active) {
+      discardLocation();
       while (queue.length) queue.shift().reject(new Error("Request paused."));
       setBusy(false);
       infoBusy = false;
@@ -702,10 +862,12 @@
         infoTarget = null;
       }
       message($("status"), "Refresh paused while Construct’s menu is open.");
+      if (!area) welcome("choose");
     }
     map.pause(!active);
     if (active) {
       nextRefresh = Date.now() + 30000;
+      message($("status"), lastStatus.text, lastStatus.tone);
       render();
       pump();
     }
@@ -714,7 +876,10 @@
     if (!active || !area) return;
     tickStatus();
     if (auto && !busy && Date.now() >= nextRefresh) refresh();
-    else if (!busy) {
+    else if (retryAt && !busy && Date.now() >= retryAt) {
+      retryAt = 0;
+      refresh();
+    } else if (!busy) {
       const next = D.merge(feeds, mode, area, radius, Date.now() / 1000);
       if (next.map((a) => a.key).join() !== rows.map((a) => a.key).join())
         render();
@@ -727,4 +892,18 @@
       }
     }
   }, 1000);
+  // Start: saved settings first, then straight to the map when location is allowed.
+  (async () => {
+    await ready;
+    // A menu pause may have completed before these asynchronous storage reads.
+    // Preserve its picker state; do not advertise a fix that cannot start.
+    if (!active) return;
+    if (prefs.startWithLocation && !area) {
+      welcome(
+        "locating",
+        "One foreground fix, then the map. Choose area to enter coordinates instead.",
+      );
+      await locate("start");
+    } else welcome("choose");
+  })();
 })();

@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "dev.construct.sky-watch",
   "name": "Sky Watch",
-  "version": "0.2.2",
-  "description": "A module-owned aircraft map with ADSB.lol, OpenSky and selected-aircraft details. Requires Construct alpha26 or later.",
+  "version": "0.3.4",
+  "description": "A module-owned aircraft map with ADSB.lol, OpenSky and selected-aircraft details. Opens on your location when allowed. Requires Construct alpha26 or later.",
   "constructApi": {
     "min": "0.9.0",
     "target": "0.9.0"
@@ -25,12 +25,12 @@
     },
     {
       "id": "location.read",
-      "reason": "Optionally use a foreground location fix to choose the search area. The module can send that area to its approved internet sources.",
+      "reason": "Optionally take one foreground location fix when the module opens or when you tap Use my location, to choose the search area. The module can send that area to its approved internet sources.",
       "optional": true
     },
     {
       "id": "storage.kv",
-      "reason": "Save provider cooldowns, not your location or aircraft history."
+      "reason": "Save your source, radius, Auto and start choices plus provider cooldowns, not your location or aircraft history."
     }
   ],
   "themeColor": "#0B1410"
