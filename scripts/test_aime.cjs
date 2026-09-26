@@ -159,6 +159,14 @@ check("Overpass parsing keeps type+id, kinds, placement and weights; drops the r
   assert.deepEqual(C.parseOverpass('{"elements":[]}'), { features: [], incomplete: false });
 });
 
+check("Overpass HTTP-200 runtime failures never become empty or partial success", () => {
+  for (const elements of [[], JSON.parse(F.overpass()).elements]) {
+    assert.throws(() => C.parseOverpass(JSON.stringify({ elements, remark: "runtime error: Query timed out" })),
+      (e) => e.code === "OVERPASS_INCOMPLETE");
+  }
+  assert.equal(C.parseOverpass(JSON.stringify({ elements: [], remark: "" })).features.length, 0);
+});
+
 check("transport failures name their gate and 429/504 offer a single retry", () => {
   assert.equal(C.httpProblem(null, 429).code, "OVERPASS_BUSY");
   assert.equal(C.httpProblem(null, 504).retry, true);

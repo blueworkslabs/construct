@@ -193,6 +193,10 @@ const AimeCore = (() => {
       throw Object.assign(new Error("Overpass returned unreadable data."), { code: "OVERPASS_DATA" });
     }
     if (!data || !Array.isArray(data.elements)) throw Object.assign(new Error("Overpass returned unexpected data."), { code: "OVERPASS_DATA" });
+    // Runtime timeouts/resource failures can arrive as HTTP 200 with an empty
+    // or partial elements array. Never cache these as a complete feature list.
+    if (typeof data.remark === "string" && data.remark.trim())
+      throw Object.assign(new Error("Overpass could not complete the lookup. Retry, or pick a smaller radius."), { code: "OVERPASS_INCOMPLETE" });
     const seen = new Set(),
       features = [];
     for (const e of data.elements) {

@@ -24,6 +24,8 @@ const state = {
   fetchProblem: null,
   lastLocationAt: -Infinity,
   busy: false,
+  photoGeneration: 0,
+  refreshPending: false,
   view: { scale: 1, x: 0, y: 0 },
 };
 
@@ -178,6 +180,10 @@ async function task(fn) {
   } finally {
     state.busy = false;
     renderGrid();
+    if (state.refreshPending) {
+      state.refreshPending = false;
+      task(refresh);
+    }
   }
 }
 
@@ -243,6 +249,7 @@ async function takePhoto() {
 // ---- Photo view ---------------------------------------------------------------
 const current = () => (state.store && state.store[state.selectedId]) || C.newSidecar(null);
 async function openPhoto(id) {
+  const generation = ++state.photoGeneration;
   state.thumbGeneration++;
   let item = state.items.find((p) => p.id === id);
   if (!item) throw Object.assign(new Error("That photo is no longer in the library."), { code: "PHOTO_STALE" });
@@ -262,6 +269,7 @@ async function openPhoto(id) {
     img.onerror = () => reject(new Error("Photo could not be displayed."));
     img.src = data.url;
   });
+  if (generation !== state.photoGeneration) return;
   state.selectedId = id;
   state.image = { url: data.url, width: data.width, height: data.height };
   state.lastTap = null;
@@ -279,11 +287,13 @@ async function openPhoto(id) {
   render();
 }
 function showLibrary() {
+  state.photoGeneration++;
   $("photo").hidden = true;
   $("library").hidden = false;
   $("back").hidden = true;
   state.selectedId = null;
-  task(refresh);
+  if (state.busy) state.refreshPending = true;
+  else task(refresh);
 }
 function recalibrate() {
   const s = current();
@@ -454,7 +464,9 @@ function normalised(clientX, clientY) {
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()],
         r = stage.getBoundingClientRect();
-      pinch = { distance: Math.hypot(a.x - b.x, a.y - b.y) || 1, scale: state.view.scale, cx: (a.x + b.x) / 2 - r.left, cy: (a.y + b.y) / 2 - r.top };
+      const cx = (a.x + b.x) / 2 - r.left, cy = (a.y + b.y) / 2 - r.top;
+      pinch = { distance: Math.hypot(a.x - b.x, a.y - b.y) || 1, scale: state.view.scale,
+        anchorX: (cx - state.view.x) / state.view.scale, anchorY: (cy - state.view.y) / state.view.scale };
       drag = null;
     } else if (pointers.size === 1) drag = { id: e.pointerId, x: e.clientX, y: e.clientY, vx: state.view.x, vy: state.view.y, moved: false };
   });
@@ -463,8 +475,13 @@ function normalised(clientX, clientY) {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pinch && pointers.size === 2) {
       const [a, b] = [...pointers.values()],
-        target = (pinch.scale * Math.hypot(a.x - b.x, a.y - b.y)) / pinch.distance;
-      zoomAt(target / state.view.scale, pinch.cx, pinch.cy);
+        target = (pinch.scale * Math.hypot(a.x - b.x, a.y - b.y)) / pinch.distance,
+        r = stage.getBoundingClientRect();
+      state.view.scale = Math.max(1, Math.min(8, target));
+      state.view.x = (a.x + b.x) / 2 - r.left - pinch.anchorX * state.view.scale;
+      state.view.y = (a.y + b.y) / 2 - r.top - pinch.anchorY * state.view.scale;
+      clampView();
+      applyView();
     } else if (drag && drag.id === e.pointerId) {
       const dx = e.clientX - drag.x,
         dy = e.clientY - drag.y;
@@ -513,6 +530,7 @@ function normalised(clientX, clientY) {
   };
 })();
 function onTap(x, y) {
+  if (state.busy) return;
   const s = current();
   if (!s.viewer) return say("photo-status", "This photo has no usable viewpoint yet.", "attention");
   if (s.viewer.review) return say("photo-status", "Confirm the estimated viewpoint first.", "attention");
@@ -651,7 +669,9 @@ async function features() {
   }
   return state.fetching.get(key);
 }
+let markRequest = 0;
 async function openMarkDialog() {
+  const request = ++markRequest, generation = state.photoGeneration;
   const dialog = $("mark-dialog");
   $("search").value = "";
   $("results").replaceChildren();
@@ -661,12 +681,13 @@ async function openMarkDialog() {
   say("fetch-status", `Looking up named landmarks within ${current().radiusKm} km…`);
   try {
     const data = await features();
-    if (!dialog.open) return;
+    if (!dialog.open || request !== markRequest || generation !== state.photoGeneration) return;
     say("fetch-status", data.features.length ? `${data.features.length} landmarks within ${current().radiusKm} km. Nearest first.` : `No named landmarks found within ${current().radiusKm} km. Try a larger radius.`);
     $("incomplete").hidden = !data.incomplete;
     $("smaller-radius").hidden = current().radiusKm === 10;
     renderResults();
   } catch (error) {
+    if (!dialog.open || request !== markRequest || generation !== state.photoGeneration) return;
     say("fetch-status", `[${(error.problem && error.problem.code) || error.code || "ERROR"}] ${error.message}`, "error");
     $("retry-fetch").hidden = !(error.problem ? error.problem.retry : true);
   }
@@ -713,13 +734,16 @@ function pick(feature) {
 
 // ---- What's that? --------------------------------------------------------------
 async function whatsThat(x, y) {
+  const generation = state.photoGeneration;
   let data;
   try {
     data = await features();
   } catch (error) {
+    if (generation !== state.photoGeneration) return;
     say("photo-status", `[${(error.problem && error.problem.code) || error.code || "ERROR"}] ${error.message}`, "error");
     return;
   }
+  if (generation !== state.photoGeneration) return;
   const ranked = S.rank(state.cal, x, y, C.candidatesOf(data.features)),
     list = C.shortlist(ranked),
     ol = $("candidates");
@@ -793,6 +817,7 @@ $("cancel-mark").onclick = () => {
   $("mark-dialog").close();
 };
 $("mark-dialog").addEventListener("close", () => {
+  markRequest++;
   state.pendingTap = null;
   drawOverlay();
 });

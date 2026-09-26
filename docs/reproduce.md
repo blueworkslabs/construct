@@ -169,6 +169,10 @@ scripts (they refuse an occupied emulator and preserve incomplete receipts):
   scene from `scripts/aime-fixture/synthetic-aime.js`; capture, list, delete,
   storage and grants stay real). The fixture's library screen prints the
   normalised tap targets. Module logic checks: `node scripts/test_aime.cjs`.
+  Optional browser regressions: install `playwright` and its Chromium browser
+  in an isolated Python environment, then run `python scripts/check_aime_browser.py`.
+  This fake-bridge check exercises delayed lookup navigation and moving-midpoint
+  pinch anchoring; it does not replace exact-package Android acceptance.
 - `photo_identity.py --apk APK --sha APK_SHA --catalog HTTPS_FIXTURE_INDEX_URL
   --legacy-sha PHOTO_IDENTITY_0_1_0_SHA --module-sha PHOTO_IDENTITY_0_2_0_SHA
   --update-sha PHOTO_IDENTITY_0_3_0_SHA`: API 0.12 stable photo IDs using the
