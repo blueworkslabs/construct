@@ -71,6 +71,7 @@ def reveal(match):
    scroll(direction)
  raise RuntimeError('Module control not reachable: '+str(match))
 def click(match):tap_node(reveal(match))
+def reach_text(fragment):return text_of(reveal(lambda t:fragment in t))
 def stage():
  """Bounds of the photo stage (role=img), scrolled fully into the WebView viewport."""
  label='Selected photo. Tap to mark'
@@ -207,21 +208,27 @@ try:
  done('Offline and 429 are shown as such with a single retry, never as an empty result')
 
  # 4. Mark → calibrated ruler.
- click(lambda t:t.startswith('Synthetic Tower A'));contains('Calibrated · 1 mark');contains('Bearings along the middle row')
+ click(lambda t:t.startswith('Synthetic Tower A'));reach_text('Calibrated · 1 mark');reach_text('Bearings along the middle row')
  capture('aime-calibrated');done('Marking a known landmark calibrates the bearing ruler')
 
  # 5. Horizon → level line.
  click('Level horizon');find('Tap two points');tap('Tap two points')
- tap_photo(F['horizon'][0]);contains('Horizon point saved');tap_photo(F['horizon'][1]);contains('Level estimated')
+ tap_photo(F['horizon'][0]);reach_text('Horizon point saved');tap_photo(F['horizon'][1]);reach_text('Level estimated')
  capture('aime-levelled');done('Two true-level horizon taps level the picture (Level estimated)')
 
  # 6. What's that? → candidates with own ±σ → map.
  click('What’s that?');rows=what(F['whatB'],'Synthetic Peak B','B')
  assert any('±' in r and 'from your tap' in r for r in labels() if r),'Candidates need offset and ±σ'
  capture('aime-candidates');click(lambda t:t.startswith('Could be Synthetic Peak B'))
- contains('Pin 1: Synthetic Peak B (selected)');contains('Wedge: your tap points');contains('Green pin: Synthetic Tower A')
- time.sleep(3);capture('aime-map');done('Tap ranks the known landmark first; a candidate opens the map with wedge, pins and viewer')
+ reach_text('Pin 1: Synthetic Peak B (selected)');reach_text('Wedge: your tap points');reach_text('Green pin: Synthetic Tower A')
+ reveal('Map of your viewpoint');time.sleep(3);capture('aime-map');done('Tap ranks the known landmark first; a candidate opens the map with wedge, pins and viewer')
  click(lambda t:t=='Photo')
+
+ # Persisted calibration must survive a real process restart on this exact host.
+ adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);open_first_photo()
+ reach_text('Calibrated · 1 mark');reach_text('Level estimated');click('What’s that?')
+ what(F['whatB'],'Synthetic Peak B','B-restart');click(lambda t:t=='Close')
+ done('Photo viewpoint, landmark and horizon calibration survive process restart with the same ranking')
 
  # 7. Rotation and 2× text keep the flow usable.
  settle('1');capture('aime-landscape');click('What’s that?');what(F['whatB'],'Synthetic Peak B','B-landscape');click(lambda t:t=='Close')
@@ -242,8 +249,8 @@ try:
  tap('Construct menu');tap('Mark working');install(REAL,a.module_sha)
  open_module(REAL);module_access()
  for label in ['Allow taking private photos','Allow this module’s private photo library','Allow selected image pixels']:switch(label,True)
- reopen();shoot();contains('No usable viewpoint for this photo',60);contains('Set your viewpoint: tap the map')
- contains('Map tiles need internet access');capture('aime-real-unlocated')
+ reopen();shoot();contains('No usable viewpoint for this photo',60);reach_text('Set your viewpoint: tap the map')
+ reach_text('Map tiles need internet access');capture('aime-real-unlocated')
  done('Real module with location off: the photo stays unlocated and opens on the map; the internet gate is named')
  lat,lon=a.real_fix.split(',')
  module_access()
