@@ -86,9 +86,14 @@ def exact_install(name,version,sha,from_versions=False):
     if not matches:raise RuntimeError('Installed signed digest not found in native diagnostics')
     library()
 
-def open_module(name='Sky Watch',version=None):
+def open_module(name='Sky Watch',version=None,expect='picker'):
+    if expect=='map':inject_fix() # location.read accepts a cached fix at most 120 s old
     restart();library();select_after(name+' · '+(version or C['sky']['version']),('Open',))
-    find('Choose area');contains('What’s flying nearby?')
+    if expect=='map':
+        # Both location gates granted: 0.3.0 opens straight onto the map from one fix.
+        contains('Your location · ',45)
+    else:
+        find('Choose area');contains('What’s flying nearby?')
 
 def close_module():tap('Construct menu');tap('Close module');library()
 
@@ -124,9 +129,18 @@ def fields(lat='50.0379',lon='8.5622'):
         ui._device(className='android.widget.EditText',packageName='dev.construct.runtime',resourceId=identifier).set_text(value)
     # Accessibility set_text does not open the IME. Escape would cancel the HTML dialog.
 
-def area():
+def area(lat='50.0379',lon='8.5622'):
     time.sleep(16) # Respect module-persisted provider floor across reopen/update.
-    click('Choose area');fields();tap('Show aircraft')
+    # Welcome card offers "Choose area"; the map header offers "Area". Both open the same dialog.
+    click('Choose area' if any(n.get('text')=='Choose area' and visible(n) for n in nodes()) else 'Area')
+    fields(lat,lon);tap('Show aircraft')
+
+def coordinates():
+    return [n.get('text') for n in nodes() if n.get('class')=='android.widget.EditText' and n.get('resource-id') in ('latitude','longitude')]
+
+def inject_fix():
+    adb('shell','cmd','location','set-location-enabled','true')
+    for _ in range(3):adb('emu','geo','fix','8.5622','50.0379');time.sleep(1)
 
 def ready(source):
     contains(source+' · live',60)
@@ -204,21 +218,32 @@ try:
     native_status('Android location access denied');leave_access();open_module();click('Choose area');tap('Use my location');contains('Enable Allow reading phone location');tap('Cancel')
     done('Location module grant and Android denial remain separate; module cannot launch OS prompt')
     access();reveal_host_control('Allow Android location access');tap('Allow Android location access');choose_permission(['While using the app','Only this time'])
-    native_status('Android location access allowed');leave_access();open_module()
-    adb('shell','cmd','location','set-location-enabled','true')
-    for _ in range(3):adb('emu','geo','fix','8.5622','50.0379');time.sleep(1)
-    click('Choose area');tap('Use my location');contains('Location ready',25)
-    values=[n.get('text') for n in nodes() if n.get('class')=='android.widget.EditText']
-    if values!=['50.037900','8.562200']:raise RuntimeError('Module did not receive the injected location')
-    capture('modular-synthetic-location');tap('Show aircraft');done('Granted location.read returns synthetic foreground coordinates to module code')
-    adb('shell','input','keyevent','3');time.sleep(2);open_module();find('Choose area')
-    done('Real background exit discards module area and requires a new selection')
+    native_status('Android location access allowed');leave_access()
+    # The synthetic fix must exist before the reopen: 0.3.0 requests it at start.
+    open_module(expect='map');contains('Your location · 50.038, 8.562')
+    if any(x in ('Choose your viewing area','Finding your location…') for x in labels()):raise RuntimeError('Welcome card still shown after an auto-start fix')
+    click('Area')
+    if coordinates()!=['50.037900','8.562200']:raise RuntimeError('Module did not receive the injected location')
+    capture('modular-synthetic-location');tap('Cancel');ready('ADSB.lol')
+    done('Granted location.read opens straight onto the map from one synthetic foreground fix; no confirmation step')
+    time.sleep(16);area('51','9');contains('Chosen area · 51.000, 9.000')
+    time.sleep(16);click('Area');tap('Use my location');contains('Your location · 50.038, 8.562',25)
+    if 'Chosen area · 51.000, 9.000' in labels():raise RuntimeError('Use my location did not replace the manual area directly')
+    done('Use my location shows aircraft directly without Show aircraft')
+    time.sleep(16);area('51','9');contains('Chosen area · 51.000, 9.000')
+    adb('shell','input','keyevent','3');time.sleep(2);open_module(expect='map')
+    if any('51.000, 9.000' in x for x in labels()):raise RuntimeError('Manual area survived a real background exit')
+    done('Real background exit discards the module area; reopening takes a fresh fix, not the old coordinates')
+    click('Area');tap('Start with my location when opening');tap('Cancel');close_module();open_module()
+    contains('Choose your viewing area');capture('modular-start-picker')
+    click('Choose area');tap('Start with my location when opening');tap('Cancel');close_module();open_module(expect='map')
+    done('Start-with-location preference persists across close/reopen and restores auto-start when re-enabled')
     adb('shell','svc','wifi','disable');adb('shell','svc','data','disable');area();contains('unavailable',40);capture('modular-offline')
     adb('shell','svc','wifi','enable');adb('shell','svc','data','enable');done('Offline transport failure is visible without crashing module')
     access();switch('Allow approved internet sources')
     if 'Turn off' in labels():tap('Turn off')
-    native_status('Allow approved internet sources: off.');leave_access();open_module();area();contains('Enable the requested capability');close_module()
-    done('Revoked internet grant remains denied after reopen')
+    native_status('Allow approved internet sources: off.');leave_access();open_module(expect='map');contains('Enable the requested capability');close_module()
+    done('Revoked internet grant remains denied after reopen while location auto-start still works')
     # Separate fixtures: same actual Sky parser/UI with synthetic feed and only glossary/version differences.
     use_catalog(C['updateCatalog']);v1,v2=C['updates']
     exact_install('Synthetic Sky',v1['version'],v1['sha256'],from_versions=True)

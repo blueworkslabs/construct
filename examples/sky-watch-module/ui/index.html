@@ -4,30 +4,31 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <link rel="stylesheet" href="/construct-host.css" />
+    <link rel="stylesheet" href="construct-ui.css" />
     <link rel="stylesheet" href="style.css" />
     <title>Sky Watch</title>
   </head>
   <body>
-    <header>
-      <div>
-        <h1>Sky Watch</h1>
-        <p id="area-label">What’s flying nearby?</p>
-      </div>
-      <button id="area">Area</button>
-    </header>
     <main>
+      <header class="construct-head">
+        <div>
+          <h1>Sky Watch</h1>
+          <p id="area-label" class="purpose">What’s flying nearby?</p>
+        </div>
+        <button id="area" hidden>Area</button>
+      </header>
       <section id="welcome">
-        <h2>Choose your viewing area</h2>
-        <p>
-          Use a phone location fix or enter coordinates. Your chosen area goes
-          to the selected aircraft providers; map tiles come from OpenStreetMap.
+        <h2 id="welcome-title">Finding your location…</h2>
+        <progress id="welcome-progress" aria-label="Finding your location"></progress>
+        <p id="welcome-status" role="status"></p>
+        <p id="welcome-text" hidden>
+          Pick where to look. Your chosen area goes to the selected aircraft
+          providers; map tiles come from OpenStreetMap.
         </p>
-        <p>
-          Enable <strong>Allow approved internet sources</strong> in Construct’s
-          Module access. Phone location is optional and needs both the module
-          grant and Android location access there.
-        </p>
-        <button id="start" class="primary">Choose area</button>
+        <div class="actions start">
+          <button id="start" class="primary">Choose area</button
+          ><button id="retry-location" hidden>Try location again</button>
+        </div>
       </section>
       <section id="workspace" hidden>
         <div class="toolbar">
@@ -62,7 +63,9 @@
             <div class="map-controls">
               <button id="zoom-in" aria-label="Zoom in">+</button
               ><button id="zoom-out" aria-label="Zoom out">−</button
-              ><button id="center" aria-label="Center map">⌖</button>
+              ><button id="center" aria-label="Center map">
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
             </div>
             <button id="search-here" hidden>Search here</button
             ><span class="attribution"
@@ -88,10 +91,17 @@
       <details class="help">
         <summary>Help and data sources</summary>
         <p>
+          Sky Watch opens on a fresh location fix when phone location is allowed
+          for this module in Construct’s Module access. Turn that off under
+          <strong>Area</strong> to start with the area picker instead. Source,
+          radius and Auto are remembered; coordinates never are.
+        </p>
+        <p>
           Radius: 10–100 km. Combined merges matching aircraft using the newest
           complete position report and retains known identity from active feeds.
-          Amber means stale data. The map is north-up; symbols follow ground
-          track, not necessarily the aircraft’s nose direction.
+          Amber means stale data. Pinch or double-tap to zoom. The map is
+          north-up; symbols follow ground track, not necessarily the aircraft’s
+          nose direction.
         </p>
         <p>
           Altitude is barometric, not height above you or terrain. Public feeds
@@ -118,13 +128,15 @@
     <dialog id="area-dialog">
       <form id="area-form">
         <h2>Choose area</h2>
-        <p>
-          Coordinates stay in this session. To use phone location, enable both
-          location permissions in Construct’s Module access, then reopen this
-          module.
+        <button type="button" id="use-location" class="primary wide">
+          Use my location
+        </button>
+        <p class="note">
+          One foreground fix, shown straight away. Needs both location switches
+          in Construct’s Module access.
         </p>
-        <button type="button" id="use-location">Use my location</button
-        ><label
+        <p class="divider">or enter coordinates</p>
+        <label
           >Latitude<input
             id="latitude"
             type="text"
@@ -141,6 +153,10 @@
             autocomplete="off"
             placeholder="−180 to 180"
         /></label>
+        <label class="switch"
+          ><input id="start-with-location" type="checkbox" role="switch" />
+          Start with my location when opening</label
+        >
         <p id="area-status" role="status"></p>
         <div class="actions">
           <button type="button" id="cancel-area">Cancel</button
