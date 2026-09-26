@@ -7,16 +7,14 @@ the pilot tester. Name chosen by the project owner: **Aimé**
 (`dev.construct.aime`), after Aimé Laussedat, who surveyed from photographs
 in the 1850s ([background](https://en.wikipedia.org/wiki/Aim%C3%A9_Laussedat)).
 
-Revision 2 proposes resolutions to the three review decisions: a full camera pose model with
-optional horizon levelling, uncertainty propagated from the fit, and a stable
-photo id as a small versioned host addition. Details in
-[Review decisions](#review-decisions-revision-2).
-
-**Re-review status: not yet cleared for unchanged implementation or merge.**
-The previous tilt/FOV examples pass, but shared viewpoint error is treated as
-independent between marks and nearby candidate position error is omitted from
-ranking. See the remaining review findings below. The proposed photo-ID contract
-is documented separately; no API 0.12 host has been implemented by this PR.
+Revision 2 resolved the first review's three decisions: a full camera pose
+model with optional horizon levelling, uncertainty propagated from the fit, and
+a stable photo id as a small versioned host addition. **Revision 3** answers
+the re-review: the viewer position error is now one shared, fitted offset
+rather than independent per-mark noise, and each candidate gets its own
+comparison σ. Details in [Review decisions](#review-decisions-revisions-2-and-3).
+The proposed photo-ID contract is documented separately; no API 0.12 host has
+been implemented by this PR.
 
 ## Purpose
 
@@ -26,8 +24,9 @@ tap into a **compass bearing from where you stood** and ranks named map
 features along that bearing. Marking one landmark you already recognise in
 the photo (a church tower, a summit) calibrates the direction far better than
 the phone compass could; marking two also constrains the lens; tapping the
-horizon levels the picture. This is bearing calibration from an already-known
-viewer position, not recovery of that position.
+horizon levels the picture. This is bearing calibration from a reported
+viewer position; the fit may refine that position within the fix accuracy when
+the geometry allows, never beyond it.
 
 This is a spotting aid with an honest shortlist, not an oracle. Every answer
 shows the candidate's bearing, its signed offset from the tap, the tap's own
@@ -125,41 +124,58 @@ horizon above the centre at `v = −tan p`; roll tilts it.
 
 | Input | Residual | σ |
 | --- | --- | --- |
-| Mark k at `(xₖ, yₖ)` with known position | bearing of the pixel − true bearing | `√(tap² + atan((viewer accuracy ⊕ 8 m OSM) / distance)²)` |
+| Mark k at `(xₖ, yₖ)` with known position | bearing of the pixel − bearing from the **fitted** viewpoint to the mark | `√(tap² + atan(feature placement / distance)²)`, placement 8 m for nodes, 30 m for way/relation centres |
 | Horizon tap at `(x, y)` | elevation of the pixel − 0 | 0.7° |
 | Compass heading (optional) | `H − Hc` | 12° |
 | Lens prior | `f − 70°` (or the portrait default) | 8° (1° when the FOV is known) |
 | Pitch prior | `p − 0` | 15° |
 | Roll prior | `r − 0` | 5° |
+| Viewpoint offset priors | `east − 0`, `north − 0` (metres from the reported fix) | the fix accuracy, each axis |
 
-Tap σ is 0.7° (≈1 % of frame width). Viewer accuracy comes from the fix; a
-2 km coarse fix or a mark 60 m away makes σ tens of degrees, as it should.
+Tap σ is 0.7° (≈1 % of frame width). The viewer's position error is **one
+shared unknown**: the fitted state includes an (east, north) offset from the
+reported fix whose prior is the fix accuracy, and every mark residual and every
+candidate bearing is evaluated from that shifted viewpoint. Adding marks can
+therefore never average a single GPS error away; the covariance keeps the
+ambiguity where the geometry cannot resolve it, and marks at different
+distances can tighten the viewpoint within its accuracy (ordinary resection).
 
-**Fit.** Levenberg–Marquardt over `(H, f, p, r)` with a numeric Jacobian,
-initialised from a level camera; four parameters, a few dozen iterations,
-small enough for a prototype; phone performance is not measured here. Marks that disagree beyond their stated precision inflate
-the covariance by χ²/dof (when dof > 0). The result carries the pose, the 4×4
-covariance and two flags: `lens: fitted|assumed` and `level: fitted|assumed`,
-meaning the data narrowed that parameter well below its prior or did not.
-Clustered, duplicate or near-collinear marks therefore never manufacture a
-lens: the prior holds `f` and the flag says "assumed".
+**Fit.** Levenberg–Marquardt over `(H, f, p, r, east, north)` with a numeric
+Jacobian, initialised from a level camera at the reported fix; six parameters,
+a few dozen iterations, under a millisecond in Node; phone performance is not
+measured here. Observations that disagree beyond their stated precision inflate
+the covariance by χ²/dof (when dof > 0). The result carries the state, the
+fitted viewpoint, the 6×6 covariance and three flags: `lens: fitted|assumed`,
+`level: fitted|assumed` and `viewpoint: refined|reported`, meaning the data
+narrowed that parameter well below its prior or did not. Clustered, duplicate
+or near-collinear marks therefore never manufacture a lens, and marks fanned at
+one distance never manufacture a viewpoint: the priors hold and the flags say
+"assumed"/"reported".
 
-**Uncertainty per tap.** `σ² = tap² + gᵀ Σ g`, where `g` is the gradient of
-the tap's bearing with respect to the pose and `Σ` the covariance. It is
-smallest at the marks, grows towards the edges when the lens is assumed, and
-grows for rows far from the marks when the picture is not levelled. This σ
-sizes the wedge and the score.
+**Two uncertainties per tap.** Both are `√(tap² + gᵀ Σ g)` with `g` the
+gradient of an angle with respect to the fitted state and `Σ` the covariance:
 
-**Ranking.** `logScore = −½(Δ/σ)² + ln(far) + ln(weight)`; Δ is the signed
-bearing difference, `far` halves candidates beyond 40 km (peaks may set a
-larger `maxKm`), `weight` is a visibility prior from tags (peak with `ele`
-1.5, tower/mast/cathedral 1.3, castle/monument 1.1, viewpoint 0.8, other 1.0).
-Sort by log-score so underflow never reorders. Up to five shown; "no close
-match" when none is within 2σ.
+- **Direction σ** (the wedge on the map): the angle is the tap's bearing. It is
+  smallest at the marks, grows towards the edges when the lens is assumed, and
+  grows for rows far from the marks when the picture is not levelled.
+- **Comparison σ** (per candidate): the angle is tap bearing − candidate bearing
+  from the fitted viewpoint, plus the candidate's own placement over its
+  distance. Because the candidate bearing shares the viewpoint offset with the
+  marks, a candidate beside a mark inherits almost none of the position error
+  (it cancels), while a candidate much nearer than the marks gets a wide σ.
+  The sheet shows this σ; the map shows the direction σ.
 
-**Out of scope for v1:** recovering the viewer position from three marks
-(same maths, different unknowns, needs good geometry); elevation angles from
-`ele` tags; lens distortion.
+**Ranking.** `logScore = −½(Δ/σ_c)² + ln(far) + ln(weight)`; Δ is the signed
+bearing difference, `σ_c` the candidate's comparison σ, `far` halves candidates
+beyond 40 km (peaks may set a larger `maxKm`), `weight` is a visibility prior
+from tags (peak with `ele` 1.5, tower/mast/cathedral 1.3, castle/monument 1.1,
+viewpoint 0.8, other 1.0). Sort by log-score so underflow never reorders. Each
+result carries `close = |Δ| ≤ 2σ_c`. Up to five shown; "no close match" when
+none is close.
+
+**Out of scope for v1:** explicit position recovery beyond the fix accuracy
+(the offset is bounded by the reported accuracy on purpose); elevation angles
+from `ele` tags; lens distortion.
 
 **Synthetic results** (`scripts/test_aime_resection.cjs`, seeded; scenes have
 lens 62–78° with 70° guessed, pitch −5…25° down, roll Gaussian σ=3° (not
@@ -176,20 +192,34 @@ while ranking also perturbs the target tap):
 | Two marks, lens assumed (close pairs) | median 1.2°, p90 3.7° | median 3.0° | 99 % |
 | Two marks + horizon (the viewpoint case) | median 0.4°, p90 1.9°; pitch/roll p90 1.2° | median 1.3° | 100 % |
 | Three or more marks, no horizon | median 0.5°, p90 2.1° | median 1.5° | 100 % |
+| **Shared viewpoint error**, marks 0.1–2 km, fix 15 m, 1–6 marks: directions | median 0.9°, p90 3.0° | median 2.3° | 99.7 % |
+| same scenes, candidate comparison 0.1–2 km | median 0.9°, p90 3.3° | median 2.4° | 99.7 % |
+| Coarse fix 300–2000 m, marks 1–10 km: directions | median 2.8°, p90 11.4° | median 7.9° | 97.9 % |
+| same scenes, candidate comparison 0.5–10 km | median 2.2°, p90 11.3° | median 6.4° | 98.3 % |
 
-Review reproductions: 25° pitch with two centre-row marks, tap at (0.8, 0.9):
-error 5.1° with σ 3.4° (inside 2σ, previously reported as 1°); with two horizon
-taps: error 0.04°, pitch recovered to 0.04°. Roll 10°: error 3.7°, σ 3.0°;
-levelled: roll within 1.5°, error under 0.7°. One mark at the right edge with a
-78° lens guessed at 70°: centre error 4.0°, σ 4.1°, σ at the mark 1.0°. Two
-marks at x = 0.10/0.18 with a 0.7° perturbation: lens stays 72° "assumed",
-far-edge error 2.2° with σ 6.8°. Ranking against eight decoys in one frame:
-tapped landmark first 73 %, top three 98 % after one mark (plus horizon when
-in frame); compass-only top three 75 %. These coverage results are conservative
-for the stated seeded distant-landmark distribution, not a general uncertainty
-guarantee. Near/coarse-position scenes and correlated viewpoint errors require
-their own coverage checks. Synthetic forward truth reuses the camera model;
-the figures do not establish real-photo accuracy or validate arbitrary skylines.
+Review reproductions, revision 2: 25° pitch with two centre-row marks, tap at
+(0.8, 0.9): error 5.1° with σ 3.4° (inside 2σ, previously reported as 1°); with
+two horizon taps: error 0.04°, pitch recovered to 0.04°. Roll 10°: error 3.7°,
+σ 3.0°; levelled: roll within 1.5°, error under 0.7°. One mark at the right
+edge with a 78° lens guessed at 70°: centre error 4.0°, σ 4.1°, σ at the mark
+1.0°. Two marks at x = 0.10/0.18 with a 0.7° perturbation: lens stays 72°
+"assumed", far-edge error 2.2° with σ 6.8°.
+
+Review reproductions, revision 3: six marks 100 m away with a 15 m eastward fix
+error (reported accuracy 15 m): centre error 8.0° with σ **8.4°** (was 4.0°),
+χ² 0.03, viewpoint flagged "reported" because marks fanned at one distance
+cannot separate a sideways shift from a heading rotation. One mark at 10 km,
+same fix error, genuine target 100 m away: Δ −7.9° against its own σ 11.0°
+(was 1.0°), so it is `close`; the direction wedge stays at 3.8°; a target 8 km
+away on the same ray gets σ under 4°. Coarse 300 m fix, one mark at 5 km: a
+candidate beside the mark has σ 1.0° (shared error cancels), a candidate at
+600 m has σ 36°.
+
+Ranking against eight decoys in one frame: tapped landmark first 74 %, top
+three 99 % after one mark (plus horizon when in frame); compass-only top three
+75 %. Coverage above 95 % means σ is slightly conservative, the right side for
+a wedge on a map. Synthetic forward truth reuses the camera model; the figures
+do not establish real-photo accuracy or validate arbitrary skylines.
 
 ## Data: features, queries, storage, consent
 
@@ -270,7 +300,8 @@ out tags center 400;
   capture + sidecar keyed by id with orphan reconciliation; photo view with
   taps, bearing ruler and level line; Overpass fetch, 10/30/60 km picker and
   local name search; marks and horizon taps feeding the reference solver
-  **after the remaining review findings are corrected**; candidates sheet with σ; map view built from the Sky Watch
+  **unchanged**; candidates sheet with per-candidate σ and the "no close
+  match" state; map view built from the Sky Watch
   map class (tiles, pan/zoom, wedge, pins, draggable viewer dot). Shared
   `construct-ui.css`. Unit tests for sidecar bookkeeping, Overpass parsing,
   radius changes and the "no close match" state. A deterministic fixture
@@ -293,8 +324,11 @@ out tags center 400;
 
 ## Copy and UX rules
 
-- Ranked results say "could be", show the signed offset, the tap's ±σ and the
-  distance, and keep the runner-up visible. No single-answer wording.
+- Ranked results say "could be", show the signed offset, that candidate's own
+  ±σ and the distance, and keep the runner-up visible. No single-answer
+  wording. The map wedge uses the direction σ, which can be narrower than a
+  nearby candidate's comparison σ; the sheet explains "close by, so your
+  position matters more" when they differ a lot.
 - The capture screen says main rear camera only and distinguishes the
   estimated viewpoint saved with the photo from the direction derived by
   marking.
@@ -311,37 +345,29 @@ out tags center 400;
   no repeated per-photo save prompt; no fabricated direction.
 - 10/30/60 km radius picker, default 30 km.
 
-## Review decisions (revision 2)
+## Review decisions (revisions 2 and 3)
 
-1. **Geometry:** the elevated-viewpoint goal is kept. The solver models the
-   full pose; horizon taps level the picture; without them the pitch/roll
+1. **Geometry (rev 2):** the elevated-viewpoint goal is kept. The solver models
+   the full pose; horizon taps level the picture; without them the pitch/roll
    priors widen σ for rows away from the marks instead of hiding the error.
-2. **Uncertainty and conditioning:** σ is propagated from the fit covariance
-   with position accuracy and distance in the mark weights, χ² inflation for
-   inconsistent marks, and priors that stop clustered or near-collinear marks
-   from manufacturing a lens. The suite measures 2σ coverage on random 2D
-   scenes and reproduces the four review cases. This is not yet sufficient for
-   shared position error or candidate-bearing uncertainty (below).
-3. **Identity:** stable photo id as an API 0.12 host addition, required by the
-   module; no digest or capture-order prototype. Reconciliation on every list.
+2. **Uncertainty and conditioning (rev 2):** σ is propagated from the fit
+   covariance, with χ² inflation for inconsistent marks and priors that stop
+   clustered or near-collinear marks from manufacturing a lens. The suite
+   measures 2σ coverage on random 2D scenes and reproduces the four review cases.
+3. **Identity (rev 2):** stable photo id as an API 0.12 host addition, required
+   by the module; no digest or capture-order prototype. Reconciliation after
+   every successful complete list.
+4. **Shared viewpoint error (rev 3):** the viewer offset is a fitted state with
+   the fix accuracy as its prior, common to all marks and all candidate
+   bearings. The six-marks-at-100 m case now reports σ 8.4° for its 8.0° error
+   and flags the viewpoint "reported"; nearby (0.1–2 km) and coarse-fix
+   (300–2000 m) families are covered at 98–100 %. No distance restriction was
+   added; the 50 m minimum from revision 1 stands.
+5. **Candidate comparison σ (rev 3):** ranking uses a per-candidate σ that
+   includes the correlated viewpoint term and the candidate's placement over
+   its distance; `close` is decided against it. The 10 km-mark / 100 m-target
+   case is now `close` with σ 11°, and the wedge keeps its own direction σ.
 
-### Remaining findings from revision 2 re-review
-
-- A single uncertain viewer position is shared by every mark, not independently
-  re-measured for each one. Weighting each residual with that error and summing
-  independent information can shrink the reported uncertainty while leaving the
-  same systematic heading bias. With six marks 100 m away and a 15 m eastward
-  fix error (reported accuracy 15 m), the fitted centre is wrong by **8.21°**,
-  σ **3.97°**, despite tiny χ². Fit a shared position nuisance/covariance or
-  derive a documented conservative treatment; test near and coarse fixes rather
-  than only distant landmarks. Do not silently impose a new distance restriction.
-- Candidate coordinates/viewpoint uncertainty must also enter candidate matching.
-  With one distant calibration mark and the same 15 m fix error, a true target
-  100 m north is 8.45° off the computed ray while tap σ is only about 1°. It must
-  not be confidently excluded as a mismatch. Account for the dependence between
-  calibrated bearing and candidate bearing caused by their common viewpoint;
-  distinguish candidate-comparison uncertainty from the map ray's uncertainty.
-
-Fable revises this shared-position treatment and its coverage evidence; Astra
-re-reviews it. On acceptance, slice 1a starts. No module, host release or emulator
-acceptance is implied by passing this planning slice's existing 13 checks.
+Astra re-reviews revision 3. On acceptance, slice 1a starts. No module, host
+release or emulator acceptance is implied by passing this planning slice's 18
+checks.

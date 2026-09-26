@@ -8,12 +8,17 @@
 // and aspect a = height / width the camera-frame ray is
 //   u = (x − ½)·2·tan(f/2),   v = (y − ½)·2·tan(f/2)·a,   d = (u right, v down, 1 forward)
 // The pose is heading H (azimuth of the optical axis, clockwise from north),
-// pitch p (positive = looking down) and roll r. Marks of known position give
+// pitch p (positive = looking down) and roll r. The viewpoint is the reported
+// fix plus one SHARED offset (east, north metres) whose prior is the fix
+// accuracy: every mark and every candidate bearing sees the same offset, so
+// many marks cannot average a single GPS error away, and nearby marks can
+// actually tighten the viewpoint (resection). Marks of known position give
 // azimuth observations; horizon points give elevation-zero observations; a
 // compass gives a heading observation. Everything is fitted together by
 // weighted least squares with priors on the unobserved parameters, so the
-// covariance says honestly what is and is not known. Bearing uncertainty at
-// any pixel is propagated from that covariance.
+// covariance says honestly what is and is not known. Uncertainty for a tap
+// direction, and for the comparison with a specific candidate, is propagated
+// from that covariance.
 const Resection = (() => {
   const R = 6371.0088,
     rad = (x) => (x * Math.PI) / 180,
@@ -29,9 +34,10 @@ const Resection = (() => {
     FOV_PRIOR_SIGMA = 8, // degrees: main lens unknown, 70° assumed
     PITCH_PRIOR_SIGMA = 15, // degrees: hand-held viewpoint photos tilt this much
     ROLL_PRIOR_SIGMA = 5, // degrees: people hold phones roughly level
-    HORIZON_SIGMA = 0.7, // degrees: tap on the horizon line
+    HORIZON_SIGMA = 0.7, // degrees: tap on a true level horizon
     VIEWER_SIGMA_M = 20, // metres, when the fix has no accuracy
-    FEATURE_SIGMA_M = 8; // metres: OSM node placement
+    FEATURE_SIGMA_M = 8, // metres: OSM node placement
+    M_PER_DEG = 111320;
   const point = (p) =>
     p && num(p.lat) && num(p.lon) && Math.abs(p.lat) <= 90 && Math.abs(p.lon) <= 180;
   function distance(a, b) {
@@ -57,6 +63,11 @@ const Resection = (() => {
       lon = lo + Math.atan2(Math.sin(br) * Math.sin(d) * Math.cos(la), Math.cos(d) - Math.sin(la) * Math.sin(lat));
     return { lat: deg(lat), lon: ((deg(lon) + 540) % 360) - 180 };
   }
+  // Reported fix shifted by (east, north) metres.
+  const shifted = (viewer, east, north) => ({
+    lat: viewer.lat + north / M_PER_DEG,
+    lon: viewer.lon + east / (M_PER_DEG * Math.max(0.05, Math.cos(rad(viewer.lat)))),
+  });
   const clampFov = (f) => Math.max(FOV_MIN, Math.min(FOV_MAX, f));
   // Level-camera column angle; kept for rulers and for the 1D checks.
   const columnAngle = (x, f) => deg(Math.atan((x - 0.5) * 2 * Math.tan(rad(clampFov(f)) / 2)));
@@ -101,14 +112,14 @@ const Resection = (() => {
     const w = ray(P, aspect, x, y);
     return deg(Math.atan2(w[2], Math.hypot(w[0], w[1])));
   };
-  // Small dense linear algebra for the 4×4 normal equations.
+  // Small dense linear algebra for the normal equations.
   function solveLinear(A, b) {
     const n = b.length,
       M = A.map((row, i) => [...row, b[i]]);
     for (let c = 0; c < n; c++) {
       let piv = c;
       for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
-      if (Math.abs(M[piv][c]) < 1e-12) return null;
+      if (Math.abs(M[piv][c]) < 1e-14) return null;
       [M[c], M[piv]] = [M[piv], M[c]];
       for (let r = 0; r < n; r++) {
         if (r === c) continue;
@@ -130,31 +141,34 @@ const Resection = (() => {
     }
     return A.map((_, i) => cols.map((c) => c[i]));
   }
-  const KEYS = ["heading", "fov", "pitch", "roll"];
+  const KEYS = ["heading", "fov", "pitch", "roll", "east", "north"],
+    N = KEYS.length,
+    STEP = { heading: 1e-3, fov: 1e-3, pitch: 1e-3, roll: 1e-3, east: 0.5, north: 0.5 };
   // calibrate(input):
-  //   viewer:  {lat, lon, accuracyM?}        estimated viewpoint
+  //   viewer:  {lat, lon, accuracyM?}        reported fix; accuracy is the shared-offset prior
   //   marks:   [{x, y, point, positionM?}]    known landmarks tapped in the photo
-  //   horizon: [{x, y}]                       optional taps on the horizon line
-  //   heading: compass azimuth (optional)     used as a weak observation
-  //   fov:     known lens FOV (optional)      used as a tight prior
+  //   horizon: [{x, y}]                       optional taps on a true level horizon
+  //   heading: compass azimuth (optional)     weak observation
+  //   fov:     known lens FOV (optional)      tight prior
   //   width, height                           photo size for aspect and default FOV
-  // Returns a calibration with the fitted pose, its covariance and honest flags.
+  // Returns the fitted state, its covariance and honest flags.
   function calibrate(input) {
     const { viewer, marks = [], horizon = [], width, height } = input;
     if (!point(viewer)) throw new Error("Viewer position required.");
     const aspect = aspectOf(width, height),
-      viewerSigma = num(viewer.accuracyM) && viewer.accuracyM > 0 ? viewer.accuracyM : VIEWER_SIGMA_M;
-    const obs = [];
+      accuracyM = num(viewer.accuracyM) && viewer.accuracyM > 0 ? viewer.accuracyM : VIEWER_SIGMA_M;
     const list = marks.map((m) => {
       if (!m || !num(m.x) || !num(m.y) || m.x < 0 || m.x > 1 || m.y < 0 || m.y > 1 || !point(m.point))
         throw new Error("Each mark needs x and y in [0, 1] and a position.");
       const d = distance(viewer, m.point);
       if (d < 0.05) throw new Error("A mark must be at least 50 m from the viewer.");
-      const posM = Math.hypot(viewerSigma, num(m.positionM) ? m.positionM : FEATURE_SIGMA_M),
-        sigma = Math.hypot(TAP_SIGMA, deg(Math.atan(posM / (d * 1000))));
-      return { x: m.x, y: m.y, bearing: bearing(viewer, m.point), distanceKm: d, sigma };
+      // Per-mark noise: tap and the feature's own placement. The viewer error is
+      // shared and lives in the (east, north) parameters, not here.
+      const featureM = num(m.positionM) && m.positionM > 0 ? m.positionM : FEATURE_SIGMA_M,
+        sigma = Math.hypot(TAP_SIGMA, deg(Math.atan(featureM / (d * 1000))));
+      return { x: m.x, y: m.y, point: m.point, distanceKm: d, sigma };
     });
-    for (const m of list) obs.push({ kind: "mark", m, sigma: m.sigma });
+    const obs = list.map((m) => ({ kind: "mark", m, sigma: m.sigma }));
     for (const h of horizon) {
       if (!h || !num(h.x) || !num(h.y) || h.x < 0 || h.x > 1 || h.y < 0 || h.y > 1)
         throw new Error("Each horizon point needs x and y in [0, 1].");
@@ -171,14 +185,17 @@ const Resection = (() => {
       fov: { mu: fovGuess, sigma: num(input.fov) ? 1 : FOV_PRIOR_SIGMA },
       pitch: { mu: 0, sigma: PITCH_PRIOR_SIGMA },
       roll: { mu: 0, sigma: ROLL_PRIOR_SIGMA },
+      east: { mu: 0, sigma: accuracyM },
+      north: { mu: 0, sigma: accuracyM },
     };
-    // Start: level camera, heading from the marks (circular mean) or compass.
-    let P = { heading: 0, fov: fovGuess, pitch: 0, roll: 0 };
+    const PRIOR_KEYS = Object.keys(prior);
+    // Start: level camera at the reported fix, heading from the marks or compass.
+    let P = { heading: 0, fov: fovGuess, pitch: 0, roll: 0, east: 0, north: 0 };
     if (list.length) {
       let sx = 0,
         sy = 0;
       for (const m of list) {
-        const a = rad(m.bearing - columnAngle(m.x, fovGuess));
+        const a = rad(bearing(viewer, m.point) - columnAngle(m.x, fovGuess));
         sx += Math.cos(a);
         sy += Math.sin(a);
       }
@@ -190,45 +207,48 @@ const Resection = (() => {
       P.pitch = deg(Math.atan(-v));
     }
     const residuals = (Q) => {
-      const r = [];
+      const r = [],
+        at = shifted(viewer, Q.east, Q.north);
       for (const o of obs) {
-        if (o.kind === "mark") r.push(diff(azimuthOf(Q, aspect, o.m.x, o.m.y), o.m.bearing) / o.sigma);
+        if (o.kind === "mark") r.push(diff(azimuthOf(Q, aspect, o.m.x, o.m.y), bearing(at, o.m.point)) / o.sigma);
         else if (o.kind === "horizon") r.push(elevationOf(Q, aspect, o.h.x, o.h.y) / o.sigma);
         else r.push(diff(Q.heading, o.value) / o.sigma);
       }
-      for (const k of ["fov", "pitch", "roll"]) r.push((Q[k] - prior[k].mu) / prior[k].sigma);
+      for (const k of PRIOR_KEYS) r.push((Q[k] - prior[k].mu) / prior[k].sigma);
       return r;
     };
     const jacobian = (Q) => {
       const base = residuals(Q),
-        J = base.map(() => Array(4).fill(0)),
-        step = { heading: 1e-3, fov: 1e-3, pitch: 1e-3, roll: 1e-3 };
-      for (let j = 0; j < 4; j++) {
+        J = base.map(() => Array(N).fill(0));
+      for (let j = 0; j < N; j++) {
         const k = KEYS[j],
-          plus = { ...Q, [k]: Q[k] + step[k] },
-          minus = { ...Q, [k]: Q[k] - step[k] },
-          rp = residuals(plus),
-          rm = residuals(minus);
-        for (let i = 0; i < base.length; i++) J[i][j] = (rp[i] - rm[i]) / (2 * step[k]);
+          rp = residuals({ ...Q, [k]: Q[k] + STEP[k] }),
+          rm = residuals({ ...Q, [k]: Q[k] - STEP[k] });
+        for (let i = 0; i < base.length; i++) J[i][j] = (rp[i] - rm[i]) / (2 * STEP[k]);
       }
       return { base, J };
     };
     const sumsq = (r) => r.reduce((s, v) => s + v * v, 0);
-    // Levenberg–Marquardt, 4 parameters, numeric Jacobian.
+    const normal = (base, J) => {
+      const A = Array.from({ length: N }, () => Array(N).fill(0)),
+        g = Array(N).fill(0);
+      for (let i = 0; i < base.length; i++)
+        for (let a = 0; a < N; a++) {
+          g[a] += J[i][a] * base[i];
+          for (let b = 0; b < N; b++) A[a][b] += J[i][a] * J[i][b];
+        }
+      return { A, g };
+    };
+    const bound = accuracyM * 6;
+    // Levenberg–Marquardt, six parameters, numeric Jacobian.
     let lambda = 1e-2,
       cost = sumsq(residuals(P));
-    for (let iter = 0; iter < 60; iter++) {
+    for (let iter = 0; iter < 80; iter++) {
       const { base, J } = jacobian(P),
-        A = Array.from({ length: 4 }, () => Array(4).fill(0)),
-        g = Array(4).fill(0);
-      for (let i = 0; i < base.length; i++)
-        for (let a = 0; a < 4; a++) {
-          g[a] += J[i][a] * base[i];
-          for (let b = 0; b < 4; b++) A[a][b] += J[i][a] * J[i][b];
-        }
+        { A, g } = normal(base, J);
       let improved = false;
-      for (let tries = 0; tries < 8 && !improved; tries++) {
-        const M = A.map((row, i) => row.map((v, j) => (i === j ? v * (1 + lambda) + 1e-9 : v))),
+      for (let tries = 0; tries < 10 && !improved; tries++) {
+        const M = A.map((row, i) => row.map((v, j) => (i === j ? v * (1 + lambda) + 1e-12 : v))),
           delta = solveLinear(M, g.map((v) => -v));
         if (!delta) break;
         const Q = {
@@ -236,29 +256,30 @@ const Resection = (() => {
           fov: clampFov(P.fov + delta[1]),
           pitch: Math.max(-89, Math.min(89, P.pitch + delta[2])),
           roll: Math.max(-89, Math.min(89, P.roll + delta[3])),
+          east: Math.max(-bound, Math.min(bound, P.east + delta[4])),
+          north: Math.max(-bound, Math.min(bound, P.north + delta[5])),
         };
         const c = sumsq(residuals(Q));
         if (c < cost) {
           const done = cost - c < 1e-10;
           P = Q;
           cost = c;
-          lambda = Math.max(1e-6, lambda / 3);
+          lambda = Math.max(1e-7, lambda / 3);
           improved = true;
-          if (done) iter = 60;
+          if (done) iter = 80;
         } else lambda *= 4;
       }
       if (!improved) break;
     }
-    // Covariance from the final Jacobian; inflate when marks disagree beyond
-    // their stated precision (dof > 0 only).
+    // Covariance from the final Jacobian; inflate when observations disagree
+    // beyond their stated precision (dof > 0 only).
     const { base, J } = jacobian(P),
-      A = Array.from({ length: 4 }, () => Array(4).fill(0));
-    for (let i = 0; i < base.length; i++)
-      for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) A[a][b] += J[i][a] * J[i][b];
+      { A } = normal(base, J);
     let cov = invert(A);
     if (!cov) throw new Error("Calibration is singular.");
-    const markRes = list.map((m) => diff(azimuthOf(P, aspect, m.x, m.y), m.bearing)),
-      dof = obs.length - 4 + 3, // priors count as observations
+    const at = shifted(viewer, P.east, P.north),
+      markRes = list.map((m) => diff(azimuthOf(P, aspect, m.x, m.y), bearing(at, m.point))),
+      dof = obs.length + PRIOR_KEYS.length - N,
       chi2 = sumsq(base),
       inflate = dof > 0 ? Math.max(1, chi2 / dof) : 1;
     cov = cov.map((row) => row.map((v) => v * inflate));
@@ -268,6 +289,9 @@ const Resection = (() => {
       fov: P.fov,
       pitch: P.pitch,
       roll: P.roll,
+      east: P.east,
+      north: P.north,
+      viewer: { lat: at.lat, lon: at.lon, reported: { lat: viewer.lat, lon: viewer.lon }, accuracyM },
       aspect,
       cov,
       sigma,
@@ -277,6 +301,7 @@ const Resection = (() => {
       // "assumed" means the data left the parameter near its prior width.
       lens: sigma.fov < 0.7 * FOV_PRIOR_SIGMA ? "fitted" : "assumed",
       level: sigma.pitch < 0.7 * PITCH_PRIOR_SIGMA && sigma.roll < 0.7 * ROLL_PRIOR_SIGMA ? "fitted" : "assumed",
+      viewpoint: Math.hypot(sigma.east, sigma.north) < 0.7 * Math.SQRT2 * accuracyM ? "refined" : "reported",
       residualDeg: list.length ? Math.sqrt(markRes.reduce((s, v) => s + v * v, 0) / list.length) : 0,
       chi2,
     };
@@ -286,19 +311,34 @@ const Resection = (() => {
   // the image centre row for callers that only have a column.
   const bearingAt = (cal, x, y = 0.5) => azimuthOf(pose(cal), cal.aspect, x, y);
   const elevationAt = (cal, x, y = 0.5) => elevationOf(pose(cal), cal.aspect, x, y);
-  // 1-σ bearing uncertainty of pixel (x, y): propagated pose covariance plus
-  // tap precision. Grows away from the marks, with pitch/roll ignorance for
-  // rows far from the marks' rows, and with lens ignorance towards the edges.
-  function uncertainty(cal, x, y = 0.5) {
-    const P = pose(cal),
-      g = KEYS.map((k) => {
-        const step = 1e-3,
-          plus = azimuthOf({ ...P, [k]: P[k] + step }, cal.aspect, x, y),
-          minus = azimuthOf({ ...P, [k]: P[k] - step }, cal.aspect, x, y);
-        return diff(plus, minus) / (2 * step);
-      });
+  // Gradient of an angle with respect to the fitted state (numeric).
+  function gradient(cal, fn) {
+    const S = { ...pose(cal), east: cal.east, north: cal.north };
+    return KEYS.map((k) => {
+      const plus = fn({ ...S, [k]: S[k] + STEP[k] }),
+        minus = fn({ ...S, [k]: S[k] - STEP[k] });
+      return diff(plus, minus) / (2 * STEP[k]);
+    });
+  }
+  const viewerOf = (cal, s) => shifted(cal.viewer.reported, s.east, s.north);
+  // 1-σ uncertainty in degrees.
+  //   uncertainty(cal, x, y)          the tap DIRECTION (wedge on the map): pose covariance + tap.
+  //   uncertainty(cal, x, y, target)  the COMPARISON with a candidate at `target`: the same,
+  //                                   plus how the shared viewpoint error moves the candidate's
+  //                                   bearing (correlated through the fit) and the candidate's
+  //                                   own placement over its distance.
+  function uncertainty(cal, x, y = 0.5, target = null) {
+    const g = gradient(cal, (s) => {
+      const az = azimuthOf(s, cal.aspect, x, y);
+      return target ? az - bearing(viewerOf(cal, s), target.point) : az;
+    });
     let s = TAP_SIGMA ** 2;
-    for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) s += g[a] * cal.cov[a][b] * g[b];
+    for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) s += g[a] * cal.cov[a][b] * g[b];
+    if (target) {
+      const d = distance(cal.viewer, target.point),
+        featureM = num(target.positionM) && target.positionM > 0 ? target.positionM : FEATURE_SIGMA_M;
+      s += deg(Math.atan(featureM / Math.max(1, d * 1000))) ** 2;
+    }
     return Math.sqrt(Math.max(0, s));
   }
   // Row of the horizon at column x, for drawing the level line (may be off-image).
@@ -312,26 +352,29 @@ const Resection = (() => {
     }
     return (lo + hi) / 2;
   }
-  // rank(cal, x, y, viewer, candidates) → candidates sorted best first.
-  //   candidates: [{point, weight?, maxKm?, ...}]   weight: visibility prior ≥ 0
-  // Each result carries bearing, deltaDeg (signed, candidate − tap), distanceKm,
-  // sigmaDeg, a nonnegative relative score and logScore (not a probability).
-  // Candidates beyond maxKm (default 40 km) are kept but down-weighted; the
-  // caller decides how many to show and when to say "no close matches".
-  function rank(cal, x, y, viewer, candidates) {
-    if (!point(viewer)) throw new Error("Viewer position required.");
+  // rank(cal, x, y, candidates) → candidates sorted best first.
+  //   candidates: [{point, weight?, maxKm?, positionM?, ...}]   weight: visibility prior ≥ 0
+  // Bearings are taken from the fitted viewpoint. Each result carries the
+  // candidate's bearing, deltaDeg (signed, candidate − tap), distanceKm, its
+  // own sigmaDeg (comparison uncertainty), wedgeSigmaDeg (direction only), a
+  // `close` flag (|delta| ≤ 2σ), a nonnegative relative score and logScore
+  // (not a probability). Candidates beyond maxKm (default 40 km) are kept but
+  // down-weighted; the caller decides how many to show and says "no close
+  // match" when nothing is close.
+  function rank(cal, x, y, candidates) {
     const b = bearingAt(cal, x, y),
-      sigma = uncertainty(cal, x, y);
+      wedge = uncertainty(cal, x, y);
     return candidates
       .filter((c) => c && point(c.point))
       .map((c) => {
-        const cb = bearing(viewer, c.point),
-          d = distance(viewer, c.point),
+        const cb = bearing(cal.viewer, c.point),
+          d = distance(cal.viewer, c.point),
           delta = diff(cb, b),
+          sigma = uncertainty(cal, x, y, c),
           far = d > (num(c.maxKm) ? c.maxKm : 40) ? 0.5 : 1,
           weight = num(c.weight) && c.weight >= 0 ? c.weight : 1,
           logScore = -0.5 * (delta / sigma) ** 2 + Math.log(far) + Math.log(weight);
-        return { candidate: c, bearing: cb, deltaDeg: delta, distanceKm: d, sigmaDeg: sigma, score: Math.exp(logScore), logScore };
+        return { candidate: c, bearing: cb, deltaDeg: delta, distanceKm: d, sigmaDeg: sigma, wedgeSigmaDeg: wedge, close: Math.abs(delta) <= 2 * sigma, score: Math.exp(logScore), logScore };
       })
       .sort((p, q) => q.logScore - p.logScore || p.distanceKm - q.distanceKm);
   }
@@ -341,6 +384,7 @@ const Resection = (() => {
     FOV_PRIOR_SIGMA,
     PITCH_PRIOR_SIGMA,
     ROLL_PRIOR_SIGMA,
+    FEATURE_SIGMA_M,
     FOV_MIN,
     FOV_MAX,
     wrap,
@@ -348,6 +392,7 @@ const Resection = (() => {
     distance,
     bearing,
     destination,
+    shifted,
     columnAngle,
     angleColumn,
     defaultFov,

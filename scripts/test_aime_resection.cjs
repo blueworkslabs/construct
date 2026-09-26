@@ -243,6 +243,112 @@ test("coarse or nearby: position accuracy flows into σ", () => {
   assert.ok(S.uncertainty(close, 0.5, 0.5) > 10);
   assert.ok(S.uncertainty(fine, 0.5, 0.5) < 1.5);
 });
+// Scenes with the viewer error as ONE shared offset and marks/targets close by.
+function nearScene(n, opts = {}) {
+  const P = { heading: rnd() * 360, fov: 62 + rnd() * 16, pitch: -5 + rnd() * 30, roll: gauss(3) };
+  const accuracyM = opts.accuracyM ?? 15,
+    truthViewer = viewer,
+    seen = { ...S.destination(truthViewer, rnd() * 360, Math.abs(gauss(accuracyM)) / 1000), accuracyM };
+  const marks = [];
+  for (let i = 0; i < n; i++) {
+    const x = 0.08 + rnd() * 0.84,
+      y = 0.15 + rnd() * 0.7,
+      km = opts.minKm + rnd() * (opts.maxKm - opts.minKm),
+      truth = S.destination(truthViewer, truthBearing(P, x, y), km);
+    marks.push({ x: clamp01(x + gauss(TAP)), y: clamp01(y + gauss(TAP)), point: jitter(truth, OSM_M) });
+  }
+  return { P, marks, seen, truthViewer };
+}
+// Candidate-comparison coverage: is the true target's |delta| within 2σ of ITS σ?
+function evaluateTargets(cal, s, minKm, maxKm, taps = 4) {
+  const out = [];
+  for (let i = 0; i < taps; i++) {
+    const x = rnd(),
+      y = rnd(),
+      km = minKm + rnd() * (maxKm - minKm),
+      target = { point: jitter(S.destination(s.truthViewer, truthBearing(s.P, x, y), km), OSM_M) };
+    const r = S.rank(cal, clamp01(x + gauss(TAP)), clamp01(y + gauss(TAP)), [target])[0];
+    out.push({ err: Math.abs(r.deltaDeg), sigma: r.sigmaDeg, covered: r.close });
+  }
+  return out;
+}
+test("review case: six marks 100 m away with a 15 m shared fix error do not average it away", () => {
+  const truth = { lat: 50, lon: 8 },
+    seen = { ...S.destination(truth, 90, 0.015), accuracyM: 15 };
+  const marks = Array.from({ length: 6 }, (_, i) => {
+    const x = 0.2 + (0.6 * i) / 5;
+    return { x, y: 0.5, point: S.destination(truth, S.columnAngle(x, 70), 0.1) };
+  });
+  const c = S.calibrate({ viewer: seen, marks, horizon: [{ x: 0.2, y: 0.5 }, { x: 0.8, y: 0.5 }], width: W, height: H });
+  const err = Math.abs(S.diff(S.bearingAt(c, 0.5, 0.5), 0)),
+    sigma = S.uncertainty(c, 0.5, 0.5),
+    moved = S.distance(seen, c.viewer) * 1000;
+  console.log(`  centre error ${fmt(err)}, σ ${fmt(sigma)}, χ² ${c.chi2.toFixed(3)}, viewpoint moved ${moved.toFixed(1)} m (${c.viewpoint}), true offset 15 m`);
+  // Marks fanned along one row at one distance cannot separate a sideways
+  // viewpoint shift from a heading rotation; the honest answer is a wide σ
+  // (15 m over 100 m ≈ 8.5°), not a confident wrong heading.
+  assert.ok(err <= 2 * sigma, "error inside 2σ");
+  assert.ok(sigma > 5, "σ carries the 15 m / 100 m ambiguity");
+  assert.equal(c.viewpoint, "reported");
+  // A genuine target 100 m away at bearing 30°, tap on the optical axis: delta must read ≈30° within its σ.
+  const r = S.rank(c, 0.5, 0.5, [{ point: S.destination(truth, 30, 0.1) }])[0];
+  assert.ok(Math.abs(Math.abs(r.deltaDeg) - 30) <= 2 * r.sigmaDeg, `delta ${r.deltaDeg} σ ${r.sigmaDeg}`);
+});
+test("review case: 10 km mark, 15 m fix error, genuine target 100 m away is not rejected", () => {
+  const truth = { lat: 50, lon: 8 },
+    seen = { ...S.destination(truth, 90, 0.015), accuracyM: 15 };
+  const mark = { x: 0.5, y: 0.5, point: S.destination(truth, 0, 10) },
+    cal = S.calibrate({ viewer: seen, marks: [mark], width: W, height: H });
+  const tx = S.angleColumn(30, 70),
+    r = S.rank(cal, tx, 0.5, [{ point: S.destination(truth, 30, 0.1) }])[0];
+  console.log(`  100 m target: delta ${fmt(r.deltaDeg)}, σ ${fmt(r.sigmaDeg)} (wedge σ ${fmt(r.wedgeSigmaDeg)}), close ${r.close}`);
+  assert.ok(r.close, "nearby target inside its own 2σ");
+  assert.ok(r.sigmaDeg > 4 && r.sigmaDeg < 20, "σ reflects 15 m over 100 m");
+  assert.ok(r.wedgeSigmaDeg < 5, "the wedge itself stays narrow (lens assumed, 30° off-centre)");
+  const rf = S.rank(cal, tx, 0.5, [{ point: S.destination(truth, 30, 8) }])[0];
+  assert.ok(rf.sigmaDeg < 5 && rf.sigmaDeg < r.sigmaDeg / 2, `far target σ ${rf.sigmaDeg} vs near ${r.sigmaDeg}`);
+  assert.ok(rf.close);
+});
+test("shared error cancels for a candidate beside a mark, grows for a candidate much nearer", () => {
+  const truth = { lat: 50, lon: 8 },
+    seen = { ...S.destination(truth, 45, 0.3), accuracyM: 300 };
+  const mark = { x: 0.5, y: 0.5, point: S.destination(truth, 0, 5) },
+    cal = S.calibrate({ viewer: seen, marks: [mark], width: W, height: H });
+  const beside = S.rank(cal, 0.5, 0.5, [{ point: S.destination(truth, 0, 5.2) }])[0],
+    nearer = S.rank(cal, 0.5, 0.5, [{ point: S.destination(truth, 0, 0.6) }])[0];
+  console.log(`  coarse 300 m fix: σ beside the mark ${fmt(beside.sigmaDeg)}, σ for a target at 600 m ${fmt(nearer.sigmaDeg)}, wedge ${fmt(beside.wedgeSigmaDeg)}`);
+  assert.ok(beside.sigmaDeg < 2, "a candidate next to the mark shares its error");
+  assert.ok(nearer.sigmaDeg > 10, "a much nearer candidate does not");
+  assert.ok(beside.close && nearer.close);
+});
+test("nearby marks (0.1–2 km), 15 m fix: 2σ coverage for directions and for candidates", () => {
+  const dirs = [],
+    tg = [];
+  for (let i = 0; i < 300; i++) {
+    const s = nearScene(1 + Math.floor(rnd() * 6), { minKm: 0.1, maxKm: 2 });
+    const cal = S.calibrate({ viewer: s.seen, marks: s.marks, width: W, height: H });
+    dirs.push(...evaluate(cal, s.P));
+    tg.push(...evaluateTargets(cal, s, 0.1, 2));
+  }
+  report("nearby, directions", dirs, 0.9);
+  report("nearby, candidate comparison", tg, 0.9);
+});
+test("coarse fix (300–2000 m), marks 1–10 km: coverage holds and σ is wide", () => {
+  const dirs = [],
+    tg = [],
+    sig = [];
+  for (let i = 0; i < 300; i++) {
+    const s = nearScene(1 + Math.floor(rnd() * 3), { minKm: 1, maxKm: 10, accuracyM: 300 + rnd() * 1700 });
+    const cal = S.calibrate({ viewer: s.seen, marks: s.marks, width: W, height: H });
+    dirs.push(...evaluate(cal, s.P));
+    const t = evaluateTargets(cal, s, 0.5, 10);
+    tg.push(...t);
+    sig.push(...t.map((r) => r.sigma));
+  }
+  report("coarse fix, directions", dirs, 0.9);
+  report("coarse fix, candidate comparison", tg, 0.9);
+  assert.ok(percentile(sig, 0.5) > 3, "coarse fixes must widen candidate σ");
+});
 test("ranking: tapped landmark first after one mark, top-3 with horizon, preserved order on underflow", () => {
   let firstMarked = 0,
     top3Marked = 0,
@@ -259,11 +365,11 @@ test("ranking: tapped landmark first after one mark, top-3 with horizon, preserv
     const tx = clamp01(xt + gauss(TAP)),
       ty = clamp01(yt + gauss(TAP));
     const marked = S.calibrate({ viewer: s.seen, marks: s.marks, horizon: s.horizon, width: W, height: H });
-    const rm = S.rank(marked, tx, ty, s.seen, [target, ...others]);
+    const rm = S.rank(marked, tx, ty, [target, ...others]);
     if (rm[0].candidate === target) firstMarked++;
     if (rm.slice(0, 3).some((e) => e.candidate === target)) top3Marked++;
     const compass = S.calibrate({ viewer: s.seen, marks: [], heading: s.P.heading + gauss(S.COMPASS_SIGMA), width: W, height: H });
-    if (S.rank(compass, tx, ty, s.seen, [target, ...others]).slice(0, 3).some((e) => e.candidate === target)) top3Compass++;
+    if (S.rank(compass, tx, ty, [target, ...others]).slice(0, 3).some((e) => e.candidate === target)) top3Compass++;
   }
   console.log(`  one mark (+horizon when in frame) vs 8 decoys: first ${((firstMarked / trials) * 100).toFixed(1)} %, top 3 ${((top3Marked / trials) * 100).toFixed(1)} %; compass only top 3 ${((top3Compass / trials) * 100).toFixed(1)} %`);
   assert.ok(firstMarked / trials > 0.6);
@@ -272,10 +378,10 @@ test("ranking: tapped landmark first after one mark, top-3 with horizon, preserv
   const cal = S.calibrate({ viewer, marks: [{ x: 0.5, y: 0.5, point: S.destination(viewer, 0, 5) }], width: W, height: H });
   const behind = { name: "behind", point: S.destination(viewer, 160, 1) },
     closerRay = { name: "closer-ray", point: S.destination(viewer, 40, 10) };
-  const ranked = S.rank(cal, 0.5, 0.5, viewer, [behind, closerRay]);
+  const ranked = S.rank(cal, 0.5, 0.5, [behind, closerRay]);
   assert.equal(ranked[0].candidate, closerRay);
   assert.equal(ranked[0].score, 0);
   assert.ok(ranked[0].logScore > ranked[1].logScore);
-  assert.deepEqual(S.rank(cal, 0.5, 0.5, viewer, [null, { point: { lat: 200, lon: 0 } }]), []);
+  assert.deepEqual(S.rank(cal, 0.5, 0.5, [null, { point: { lat: 200, lon: 0 } }]), []);
 });
 console.log(`${count} Aimé resection checks passed.`);
