@@ -47,15 +47,37 @@
           ><button id="mode-what" aria-pressed="false">What’s that?</button>
         </div>
         <p id="hint" class="note"></p>
-        <p id="ruler-label" class="note">Mark a landmark you know to calibrate</p>
-        <div id="ruler"><canvas id="ruler-canvas" aria-hidden="true"></canvas></div>
-        <div id="stage" role="img" aria-label="Selected photo. Tap to mark, level or ask what something is. Pinch to zoom.">
-          <div id="frame"><img id="picture" alt="" draggable="false" /><svg id="overlay" aria-hidden="true"></svg></div>
-          <div class="zoom">
-            <button id="zoom-in" aria-label="Zoom in">+</button
-            ><button id="zoom-out" aria-label="Zoom out">−</button
-            ><button id="zoom-reset" aria-label="Fit photo">⤢</button>
+        <div class="panes" role="group" aria-label="Show photo or map">
+          <button id="show-photo" aria-pressed="true">Photo</button
+          ><button id="show-map" aria-pressed="false">Map</button>
+        </div>
+        <div id="photo-pane">
+          <p id="ruler-label" class="note">Mark a landmark you know to calibrate</p>
+          <div id="ruler"><canvas id="ruler-canvas" aria-hidden="true"></canvas></div>
+          <div id="stage" role="img" aria-label="Selected photo. Tap to mark, level or ask what something is. Pinch to zoom.">
+            <div id="frame"><img id="picture" alt="" draggable="false" /><svg id="overlay" aria-hidden="true"></svg></div>
+            <div class="zoom">
+              <button id="zoom-in" aria-label="Zoom in">+</button
+              ><button id="zoom-out" aria-label="Zoom out">−</button
+              ><button id="zoom-reset" aria-label="Fit photo">⤢</button>
+            </div>
           </div>
+        </div>
+        <div id="map-pane" hidden>
+          <p id="map-hint" class="note"></p>
+          <button id="locate-start" hidden>Centre on my current location</button>
+          <div id="map-wrap">
+            <canvas id="map" role="img" aria-label="Map of your viewpoint, the direction of your tap and the candidates. The list below describes it."></canvas
+            ><span class="north">N ↑</span>
+            <div class="zoom">
+              <button id="map-zoom-in" aria-label="Zoom map in">+</button
+              ><button id="map-zoom-out" aria-label="Zoom map out">−</button
+              ><button id="map-fit" aria-label="Fit map">⤢</button>
+            </div>
+            <span class="attribution">© OpenStreetMap contributors · openstreetmap.org/copyright</span>
+          </div>
+          <p id="map-status" role="status"></p>
+          <ul id="map-legend" class="construct-list" aria-label="What the map shows"></ul>
         </div>
         <p id="photo-status" role="status"></p>
         <h2>Landmarks you marked</h2>
@@ -63,7 +85,7 @@
         <h2>Horizon points</h2>
         <ul id="horizon-points" class="construct-list"></ul>
         <div class="actions">
-          <button id="delete" class="danger">Delete photo</button>
+          <button id="delete" class="danger">Delete this photo</button>
         </div>
       </section>
       <details class="help">
@@ -130,12 +152,14 @@
       <h2 id="candidates-title">Could be</h2>
       <p id="candidates-note" class="note"></p>
       <ol id="candidates"></ol>
+      <p class="note">Tap a candidate to see it on the map.</p>
       <p id="candidates-extra" class="note"></p>
       <div class="actions"><button id="close-candidates" class="primary">Close</button></div>
     </dialog>
     <script src="bridge.js"></script>
     <script src="resection.js"></script>
     <script src="aime-core.js"></script>
+    <script src="aime-map.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

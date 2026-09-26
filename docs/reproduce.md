@@ -168,7 +168,15 @@ scripts (they refuse an occupied emulator and preserve incomplete receipts):
   (`dev.construct.aime-fixture`: fixed viewpoint, Overpass features and rendered
   scene from `scripts/aime-fixture/synthetic-aime.js`; capture, list, delete,
   storage and grants stay real). The fixture's library screen prints the
-  normalised tap targets. Module logic checks: `node scripts/test_aime.cjs`.
+  normalised tap targets and fixture-only buttons (next Overpass 429/offline,
+  stored record count). Module logic checks: `node scripts/test_aime.cjs` and
+  `node scripts/test_aime_map.cjs`.
+- `aime_module.py --apk APK --sha APK_SHA --catalog HTTPS_INDEX_URL --module-sha
+  AIME_SHA --fixture-sha SYNTHETIC_AIME_SHA`: synthetic-camera runner covering
+  grants, capture → viewpoint, Overpass offline/429 + retry, mark → calibrated
+  ruler, horizon → level line, tap → candidates → map, rotation, 2× text and
+  delete → stored record reconciled on Synthetic Aimé; then the real module's
+  location/internet gates and one real Overpass request around `--real-fix`.
 - `photo_identity.py --apk APK --sha APK_SHA --catalog HTTPS_FIXTURE_INDEX_URL
   --legacy-sha PHOTO_IDENTITY_0_1_0_SHA --module-sha PHOTO_IDENTITY_0_2_0_SHA
   --update-sha PHOTO_IDENTITY_0_3_0_SHA`: API 0.12 stable photo IDs using the

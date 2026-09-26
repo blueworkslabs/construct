@@ -6,7 +6,9 @@
 //   net.http        → a fixed Overpass feature set (tile requests pass through)
 //   photos.library open → the real host open (ref/grant checks unchanged), with
 //                   the pixels replaced by a rendered view of the scene
-// Capture, list, delete, storage and grants are the real host.
+// Capture, list, delete, storage and grants are the real host. Fixture-only
+// buttons inject one Overpass 429 or offline answer and read the stored record
+// count, so acceptance can see error handling and sidecar reconciliation.
 const SyntheticAime = (() => {
   const R = typeof Resection !== "undefined" ? Resection : require("../../examples/aime-module/ui/resection.js");
   const viewer = { lat: 46.8, lon: 9.2 },
@@ -105,9 +107,17 @@ const SyntheticAime = (() => {
   }
   function install() {
     const real = call;
+    // Fixture-only failure injection for the next Overpass answer: "429" or "offline".
+    let inject = null;
     call = async function (method, params) {
       if (method === "location.read") return { latitude: viewer.lat, longitude: viewer.lon, accuracyM: 10, timestamp: Date.now() - 1500, approximate: false };
-      if (method === "net.http" && typeof params.url === "string" && params.url.startsWith("https://overpass-api.de/")) return { status: 200, headers: {}, text: overpass() };
+      if (method === "net.http" && typeof params.url === "string" && params.url.startsWith("https://overpass-api.de/")) {
+        const once = inject;
+        inject = null;
+        if (once === "429") return { status: 429, headers: { "retry-after": "60" } };
+        if (once === "offline") throw Object.assign(new Error("Synthetic offline"), { code: "HTTP_UNAVAILABLE" });
+        return { status: 200, headers: {}, text: overpass() };
+      }
       const result = await real(method, params);
       if (method === "photos.library" && params.op === "open") return { ...result, url: render(), width, height };
       return result;
@@ -118,7 +128,31 @@ const SyntheticAime = (() => {
       note.className = "note";
       note.id = "fixture-note";
       note.textContent = `Synthetic fixture. Mark Synthetic Tower A at ${pct(taps.markA)}; horizon at ${pct(taps.horizon[0])} and ${pct(taps.horizon[1])}; B at ${pct(taps.whatB)}.`;
-      document.getElementById("capture-note").after(note);
+      const tools = document.createElement("div");
+      tools.className = "row";
+      tools.id = "fixture-tools";
+      const out = document.createElement("p");
+      out.className = "note";
+      out.id = "fixture-output";
+      out.setAttribute("role", "status");
+      const button = (label, fn) => {
+        const b = document.createElement("button");
+        b.textContent = label;
+        b.onclick = fn;
+        tools.append(b);
+      };
+      button("Fixture: next Overpass 429", () => ((inject = "429"), (out.textContent = "Next Overpass answer: 429.")));
+      button("Fixture: next Overpass offline", () => ((inject = "offline"), (out.textContent = "Next Overpass answer: offline.")));
+      // Read-only view of the real module storage, so acceptance can see sidecar reconciliation.
+      button("Fixture: count stored records", async () => {
+        try {
+          const stored = await real("storage.kv", { op: "get", key: "photos" });
+          out.textContent = "Stored photo records: " + Object.keys(stored || {}).length;
+        } catch (error) {
+          out.textContent = "Stored photo records unavailable: " + (error.code || "ERROR");
+        }
+      });
+      document.getElementById("capture-note").after(note, tools, out);
     });
   }
   return { viewer, width, height, pose, features, at, taps, overpass, install };
