@@ -352,10 +352,10 @@ test("module start flow, storage keys and shared stylesheet", () => {
     "What’s flying nearby?",
   ])
     assert.ok(html.includes(label), label);
-  assert.equal(m.version, "0.3.0");
+  assert.equal(m.version, "0.3.1");
   assert.match(m.capabilities.find((c) => c.id === "storage.kv").reason, /not your location/);
   assert.equal(m.capabilities.find((c) => c.id === "location.read").optional, true);
-  assert.match(fs.readFileSync("docs/sky-watch.md", "utf8"), /Sky Watch \*\*0\.3\.0\*\*/);
+  assert.match(fs.readFileSync("docs/sky-watch.md", "utf8"), /Sky Watch \*\*0\.3\.1\*\*/);
 });
 test("malformed categories and identity fields remain unknown", () => {
   for (const value of ["constructor", "__proto__", ["A7"], {}, 7, null]) assert.equal(D.category(value), null);

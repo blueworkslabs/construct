@@ -148,6 +148,13 @@ def ready(source):
     if not any(re.fullmatch(r'[1-9]\d* aircraft',x) for x in labels()):raise RuntimeError('No live aircraft in public reference area')
     find('Zoom in');find('Zoom out')
 
+def auto_switch():
+    for _ in range(8):
+        matches=[n for n in nodes() if n.get('resource-id')=='auto' and visible(n)]
+        if len(matches)==1:return matches[0]
+        scroll()
+    raise RuntimeError('Auto switch is not reachable')
+
 def select_source(old,new):click(old);tap(new)
 
 def app_permission(name):return re.search(re.escape(name)+r': granted=true',adb('shell','dumpsys','package','dev.construct.runtime')) is not None
@@ -197,6 +204,12 @@ try:
     fields();tap('Show aircraft');ready('ADSB.lol')
     if app_permission('android.permission.ACCESS_FINE_LOCATION') or app_permission('android.permission.ACCESS_COARSE_LOCATION'):raise RuntimeError('Manual area unexpectedly granted location')
     capture('modular-adsb-map');done('Module-owned parser/map loads live ADSB.lol after manual coordinate validation without location permission')
+    map_label='Aircraft map. Select aircraft in the nearby list for accessible details.'
+    b=bounds(find(map_label));cx=(b[0]+b[2])//2;cy=(b[1]+b[3])//2
+    ui._device(description=map_label).gesture((cx-80,cy),(cx+80,cy),(cx-130,cy),(cx+130,cy),steps=25)
+    contains('Search here');capture('modular-pinch-after')
+    click('Zoom out');click('Center map')
+    done('Real two-pointer WebView pinch exposes Search here; before/after map captures retained for zoom review')
     select_source('ADSB.lol','OpenSky');ready('OpenSky');capture('modular-opensky-map');done('Module-owned OpenSky adapter loads live data')
     time.sleep(16);select_source('OpenSky','Combined');ready('ADSB.lol');contains('OpenSky · live');capture('modular-combined-map');done('Combined receives both live feeds; deterministic identity/merge rules tested separately')
     time.sleep(16);click('50 km');tap('100 km');ready('ADSB.lol');click('Zoom in');click('Zoom out');click('Center map')
@@ -228,6 +241,11 @@ try:
     if coordinates()!=['50.037900','8.562200']:raise RuntimeError('Module did not receive the injected location')
     capture('modular-synthetic-location');tap('Cancel');ready('ADSB.lol')
     done('Granted location.read opens straight onto the map from one synthetic foreground fix; no confirmation step')
+    if not all(x in labels() for x in ('Combined','100 km')):raise RuntimeError('Source/radius preferences were not restored')
+    tap_node(auto_switch());time.sleep(.5);close_module();open_module(expect='map')
+    if auto_switch().get('checked')!='true':raise RuntimeError('Auto preference was not restored')
+    tap_node(auto_switch());time.sleep(.5)
+    done('Source, radius and Auto preferences persist across close/reopen')
     time.sleep(16);area('51','9');contains('Chosen area · 51.000, 9.000')
     time.sleep(16);click('Area');tap('Use my location');contains('Your location · 50.038, 8.562',25)
     if 'Chosen area · 51.000, 9.000' in labels():raise RuntimeError('Use my location did not replace the manual area directly')

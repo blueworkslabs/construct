@@ -14,13 +14,14 @@
       unknown: "Aircraft",
     };
   let area = null,
-    origin = null,
     radius = 50,
     mode = "adsb",
     feeds = {},
     rows = [],
     selected = null,
     busy = false,
+    locating = false,
+    locationRequest = 0,
     active = true,
     epoch = 0,
     lastUpdated = 0,
@@ -278,7 +279,8 @@
     const e = epoch,
       c = { ...area },
       r = radius;
-    status("Refreshing aircraft…");
+    // Only completed provider statuses survive a menu interruption.
+    message($("status"), "Refreshing aircraft…");
     retryAt = 0;
     try {
       const results = await Promise.all(
@@ -299,10 +301,10 @@
   function selectArea(c, from = "manual", fix = null, fit = true) {
     if (busy || !active) return;
     area = c;
-    origin = from;
     feeds = {};
     selected = null;
     lastUpdated = 0;
+    status("");
     $("welcome").hidden = true;
     $("workspace").hidden = false;
     $("area").hidden = false;
@@ -335,19 +337,23 @@
   // One foreground fix. At start, a missing grant is a quiet fallback, not an error.
   async function locate(from) {
     if (busy || !active) return false;
-    const e = epoch;
+    const e = epoch, request = ++locationRequest;
     let handed = false;
+    locating = true;
     setBusy(true);
+    // Manual entry remains a real escape from a pending foreground fix.
+    $("show-aircraft").disabled = false;
     if (from === "dialog")
       message($("area-status"), "Getting one location fix…");
     try {
       const l = await call("location.read", { op: "get" });
-      if (e !== epoch || !active) return false;
+      if (e !== epoch || request !== locationRequest || !active) return false;
       const c = D.point(l.latitude, l.longitude);
       if (!c)
         throw new Error("This map supports latitudes between −85 and 85.");
       // Hand the busy flag to the refresh that selectArea starts.
       handed = true;
+      locating = false;
       setBusy(false);
       if (from !== "dialog" && $("area-dialog").open) {
         // The user opened the picker meanwhile: offer the fix, do not override.
@@ -364,7 +370,7 @@
       selectArea(c, "location", l);
       return true;
     } catch (error) {
-      if (e !== epoch) return false;
+      if (e !== epoch || request !== locationRequest) return false;
       if (from === "dialog")
         message($("area-status"), describe(error), "attention");
       else if (denied(error))
@@ -375,8 +381,17 @@
       else welcome("choose", describe(error), "attention", true);
       return false;
     } finally {
-      if (e === epoch && !handed) setBusy(false);
+      if (e === epoch && request === locationRequest && !handed) {
+        locating = false;
+        setBusy(false);
+      }
     }
+  }
+  function discardLocation() {
+    if (!locating) return;
+    locationRequest++;
+    locating = false;
+    setBusy(false);
   }
   function showArea() {
     if (!active) return;
@@ -395,15 +410,17 @@
     locate("retry");
   };
   $("cancel-area").onclick = () => {
+    discardLocation();
     $("area-dialog").close();
     if (!area && !busy) welcome("choose");
   };
   $("area-dialog").addEventListener("cancel", () => {
+    discardLocation();
     if (!area && !busy) welcome("choose");
   });
   $("area-form").onsubmit = (e) => {
     e.preventDefault();
-    if (busy) {
+    if (busy && !locating) {
       message(
         $("area-status"),
         "Wait for the current refresh to finish.",
@@ -425,6 +442,7 @@
       );
       return;
     }
+    discardLocation();
     $("area-dialog").close();
     selectArea(c, "manual");
   };
@@ -830,6 +848,7 @@
     active = event.detail?.visible !== false;
     epoch++;
     if (!active) {
+      discardLocation();
       while (queue.length) queue.shift().reject(new Error("Request paused."));
       setBusy(false);
       infoBusy = false;
@@ -871,7 +890,7 @@
   // Start: saved settings first, then straight to the map when location is allowed.
   (async () => {
     await ready;
-    if (prefs.startWithLocation) {
+    if (prefs.startWithLocation && !area) {
       welcome(
         "locating",
         "One foreground fix, then the map. Choose area to enter coordinates instead.",
