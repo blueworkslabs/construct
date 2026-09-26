@@ -21,7 +21,7 @@ import ui
 from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
-from adb_identity import restore_shell_identity
+from adb_identity import acquire_root_identity,restore_shell_identity
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':{'0.1.0':a.legacy_sha,'0.2.0':a.module_sha,'0.3.0':a.update_sha},
  'crossModule':'JVM only (PhotoIdentityTest)','checks':[],'idsObserved':[]}
 started=False;rooted=False
@@ -100,7 +100,8 @@ def shoot():
 def root():
  global rooted
  assert adb('shell','getprop','ro.kernel.qemu').strip()=='1' and adb('shell','getprop','ro.build.type').strip()=='userdebug','Disposable image required'
- adb('root');adb('wait-for-device');rooted=True;assert adb('shell','id','-u').strip()=='0'
+ rooted=True # Cleanup is required even if a root transition only partly succeeds.
+ acquire_root_identity(adb)
 def unroot():
  global rooted
  restore_shell_identity(adb);rooted=False
