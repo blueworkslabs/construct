@@ -71,7 +71,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
     if (module.capabilities.any { it.id == "photos.library" }) library = ModulePhotoLibrary(context, module.id, images!!, ::authorizeCapability,
         { action -> store.withCapability(installed, "photos.library") {
             authorizeCapability("image.read"); view.gate.authorize("photos.library"); action()
-        } }, confirmPhoto)
+        } }, confirmPhoto, stableIds = module.api == "0.12.0")
     view.stopImageEffects = { images?.cancel(); library?.cancel() }
     view.stopEffects = { tone.pause(); http?.cancel(); location?.cancel() }
     val reportedBlocks = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
@@ -92,7 +92,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             store.log("runtime", code, module, "Blocked category=$category; URL/payload omitted")
     }
     with(view.settings) {
-        if (module.api in setOf("0.9.0", "0.10.0", "0.11.0")) textZoom = (context.resources.configuration.fontScale * 100).toInt().coerceIn(50, 300)
+        if (module.api in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0")) textZoom = (context.resources.configuration.fontScale * 100).toInt().coerceIn(50, 300)
         javaScriptEnabled = true
         domStorageEnabled = false
         allowFileAccess = false
@@ -123,7 +123,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             // Android intercepts data: resources too. Keep this local raster path
             // bounded; returning null here would bypass our byte/format policy.
             if (request.url.scheme == "data") {
-                if (module.api !in setOf("0.9.0", "0.10.0", "0.11.0") || request.isForMainFrame || request.method != "GET") return reject("inline-image-context")
+                if (module.api !in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0") || request.isForMainFrame || request.method != "GET") return reject("inline-image-context")
                 val raster = runCatching { ModuleImages.dataUrl(request.url.toString()) }.getOrNull()
                     ?: return reject("inline-image-format")
                 return WebResourceResponse(raster.first, null, 200, "OK",
@@ -149,7 +149,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                     "X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-store"), stream)
             }
             if (!Packages.safePath(path)) return reject("path")
-            if (module.api in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0") && path == "construct-host.css") {
+            if (module.api in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0") && path == "construct-host.css") {
                 return WebResourceResponse("text/css", "UTF-8", 200, "OK",
                     mapOf("X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-store"),
                     ByteArrayInputStream(ModuleLayout.css.toByteArray()))

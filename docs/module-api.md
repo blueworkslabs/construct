@@ -7,10 +7,11 @@ modules own their feature logic and UI through reusable capabilities.
 API 0.9 adds bounded transport and one-shot location. API 0.10 adds
 [bounded image selection and marker detection](module-images.md). API 0.11 adds
 [bounded capture, private-photo access and still-image inference](module-photos.md).
+API 0.12 (source candidate, unreleased) adds a [stable private-photo `id`](module-photos.md#stable-photo-identity--api-012-source-candidate) to library listings.
 Unrestricted WebView networking/geolocation and general native rendering remain unavailable.
 
 The current host accepts exact `constructApi.min == constructApi.target` versions
-0.1.0 through 0.11.0. Module versions are three numeric components. See the
+0.1.0 through 0.12.0. Module versions are three numeric components. See the
 [manifest schema](../schemas/module-manifest.schema.json) and runnable
 [examples](../examples); the native validator is authoritative.
 

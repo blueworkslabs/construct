@@ -163,6 +163,14 @@ scripts (they refuse an occupied emulator and preserve incomplete receipts):
   --module-version 0.2.1`: signed score-filter workflow update and rollback,
   checking the same installed APK and original photos before/after. Both immutable
   modules must be in the catalog; neither version restores native application UI.
+- `photo_identity.py --apk APK --sha APK_SHA --catalog HTTPS_FIXTURE_INDEX_URL
+  --legacy-sha PHOTO_IDENTITY_0_1_0_SHA --module-sha PHOTO_IDENTITY_0_2_0_SHA
+  --update-sha PHOTO_IDENTITY_0_3_0_SHA`: API 0.12 stable photo IDs using the
+  `photo-identity-registry` fixtures (0.1.0 on API 0.11, 0.2.0/0.3.0 on API 0.12).
+  Covers legacy backfill of byte-identical originals, repeated list and process
+  restart, ID rejected as ref, signed update/rollback, grant revocation, damaged
+  identity storage, deletion/recapture and native clear-all. Cross-module
+  non-correlation is a JVM check only (`PhotoIdentityTest`).
 
 The synthetic runner injects licensed fixtures only into an asserted empty
 per-module directory on the disposable userdebug emulator. It restores unprivileged
