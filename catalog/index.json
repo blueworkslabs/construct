@@ -296,13 +296,13 @@
         {
           "id": "dev.construct.sky-watch",
           "name": "Sky Watch",
-          "version": "0.3.1",
-          "artifact": "dev.construct.sky-watch-0.3.1.zip",
-          "sha256": "5411aea891a7a86d602cabe5c6bd34de2b6dc45801f464738dc686bbf3f9b60f",
-          "signature": "je0YG1K3AcwubiYK2Jb8X5mBcWyhkNYobEampucOVLO6AJOAWLrdpt4kco0SBTNjRtpwu8ZQUWVuXYLGTWbPFbZJMaHAmO3XGQ8a/UehfTTz8XxXz7SkAW5PII/5eLpaqCtxsQSJeO5bOPCVKSUAxmMgjBgZ9QRZ3MXDXMmo5fpD06ZH3ArzXJUeonEXkQbu6nfVLvoZO/teSP4VRdSJWESV4erQ1pLT16ISZ+dP7khD754b77pAEP23sF3R+3TjtLfWvfZwRX02CJfZL9+LOjBB1Qt2JRP9LkP/UQ/1LXpe9VgJdkY7n4u5d6oO2CzCMMWIyLMlvq97oeolmUJUDQ=="
+          "version": "0.3.2",
+          "artifact": "dev.construct.sky-watch-0.3.2.zip",
+          "sha256": "08cf52b1f51b2a4a80421a208eb23e5b47d3839b7cb6f60cf151fcf7b29ef0a7",
+          "signature": "CY4ML2kFF1phL86DQUukTsmZUtYBOYdQHRkIhos+MZtQ0YbtI7in3MD4hvClH0KZUYPcfQojFC5InZ/iJa3aHjOIb5vCIo+u1XpTuFuEumMZIVpd7lF8x5XxJZysA6qC4brwRw6TnV5KLvqqwfeHCX0+q2J5EUFhj31z1++w8To4dcSQiTsNPXUCYNCM16KCra+fd/R/fjSa9b2tvtybHJocdPUT0qWfL8hQZbbfFrpBYg41TCbDoVtA6TII301S57XRBISbR+5sLdkyBPLUJqBwYl2lBqaApporJHBmcx2IWyjM2cy7VvsxtpZ4fTk/gqYacip/SSm+Z5P6zC7f/g=="
         }
       ],
-      "latest": "0.3.1"
+      "latest": "0.3.2"
     }
   ]
 }

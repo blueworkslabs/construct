@@ -1,10 +1,10 @@
 # Sky Watch — module-owned map
 
-Sky Watch **0.3.1** runs its aircraft logic and UI in the signed HTML/CSS/JavaScript
+Sky Watch **0.3.2** runs its aircraft logic and UI in the signed HTML/CSS/JavaScript
 module, using host **API 0.9 / alpha26**. The new package does not call `sky.watch`.
 Camera/AR remains deferred.
 
-## Module 0.3.1: opening straight onto the map
+## Module 0.3.2: opening straight onto the map
 
 When both location switches for Sky Watch are on in Module access, opening the
 module takes **one foreground fix and shows the map**: no welcome card, no area
@@ -13,10 +13,11 @@ N m` (plus `approximate` under coarse-only permission). The fix is requested
 through `location.read` exactly as before: one request, no subscription, no
 background tracking; a menu pause cancels it.
 
-The reviewed package is 0.3.1. The earlier signed 0.3.0 preview is retained
-unchanged but is no longer offered by the candidate index. Review fixed pinch
+The reviewed package is 0.3.2. The earlier signed 0.3.0/0.3.1 previews are retained
+unchanged but are no longer offered by the candidate index. Review fixed pinch
 anchoring, pending-location cancellation/manual entry and interrupted refresh
-status before the final-candidate Android run.
+status before the final-candidate Android run. Version 0.3.2 also keeps the map
+scale above attribution text when Android large text wraps it.
 
 - Without the grants, the start request fails closed and the welcome card
   offers **Choose area** as before, with a quiet note on how to skip the step.

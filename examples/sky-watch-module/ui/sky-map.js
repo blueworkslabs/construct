@@ -341,8 +341,13 @@ class SkyMap {
     );
     if (bar) {
       // Sits above the attribution strip, bottom right.
+      // Android text zoom can wrap that HTML strip onto multiple lines.
+      const attribution = c.parentElement?.querySelector(".attribution"),
+        bottomInset = attribution
+          ? Math.max(34, r.top + r.height - attribution.getBoundingClientRect().top + 12)
+          : 34;
       const x = r.width - bar.pixels - 10,
-        y = r.height - 34;
+        y = r.height - bottomInset;
       ctx.font = "600 11px system-ui";
       const tw = ctx.measureText(bar.text).width;
       ctx.fillStyle = "#102a1fcc";
