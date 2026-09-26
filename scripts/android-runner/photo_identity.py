@@ -175,17 +175,29 @@ try:
  done('Revoked library grant lists nothing; restored grant returns the same IDs')
 
  adb('shell','am','force-stop','dev.construct.runtime');root()
- saved=adb('exec-out','cat',key,binary=True);assert len(saved)==32
- adb('shell','truncate','-s','12',key);unroot()
- opened();assert act('List photos').startswith('[PHOTO_FAILED]'),'Damaged identity must fail, not list'
- assert not any(re.fullmatch(r'Photo count: \d+',t or '') for t in labels())
- adb('shell','am','force-stop','dev.construct.runtime');root()
- assert adb('shell','stat','-c','%s',key).strip()=='12','Host re-keyed silently'
- restore=run/'identity-key.bin';restore.write_bytes(saved);adb('push',str(restore),key)
- for c in (['chown',owner],['chmod','600'],['restorecon']):adb('shell',*c,key)
- restore.unlink();unroot()
- opened();assert list_ids()==first
- done('Damaged identity storage fails the list without re-keying; restored key returns the same IDs')
+ saved=adb('exec-out','cat',key,binary=True);assert len(saved)==68
+ def write_key(data):
+  restore=run/'identity-key.bin'
+  try:
+   restore.write_bytes(data);adb('push',str(restore),key)
+   for c in (['chown',owner],['chmod','600'],['restorecon']):adb('shell',*c,key)
+  finally:restore.unlink(missing_ok=True)
+ for fault in ('truncated','same-size corruption','missing established key'):
+  if fault=='truncated':adb('shell','truncate','-s','12',key)
+  elif fault=='same-size corruption':
+   changed=bytearray(saved);changed[10]^=1;write_key(bytes(changed))
+  else:adb('shell','rm',key) # Synthetic identity metadata only; originals and marker stay.
+  unroot();opened()
+  assert act('List photos').startswith('[PHOTO_FAILED]'),'Damaged identity must fail, not list'
+  assert not any(re.fullmatch(r'Photo count: \d+',t or '') for t in labels())
+  adb('shell','am','force-stop','dev.construct.runtime');root()
+  if fault=='missing established key':assert not has_key(),'Host re-keyed silently'
+  else:assert len(adb('exec-out','cat',key,binary=True))==(12 if fault=='truncated' else 68)
+  write_key(saved);unroot();opened();assert list_ids()==first
+  capture('recovered-'+fault.replace(' ','-'))
+  done('Identity '+fault+' fails closed; restoring metadata returns the same IDs')
+  adb('shell','am','force-stop','dev.construct.runtime');root()
+ unroot();opened();assert list_ids()==first
 
  before=act('Delete first photo',wait=False);find('Delete this private photo?');capture('trusted-delete');tap('Delete photo')
  assert result(before,30)=='Deleted and listed.';after=listed();assert after==first[1:],(first,after)
