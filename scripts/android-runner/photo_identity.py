@@ -226,7 +226,7 @@ try:
  for _ in range(12):
   if 'Delete all saved photos' in labels():break
   adb('shell','input','swipe','360','1000','360','500','250');time.sleep(.3)
- tap('Delete all saved photos');find('Delete all saved photos?');tap('Delete permanently');find('Saved photos deleted.')
+ tap('Delete all saved photos');find('Delete all saved photos?');tap('Delete permanently');reach_native('Saved photos deleted.')
  reopen();assert list_ids()==[]
  shoot();shoot();now=stable(listed());assert len(now)==2 and not set(now)&seen,'Clear-all and recapture reused an ID'
  capture('new-ids-after-clear-all')
