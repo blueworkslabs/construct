@@ -169,6 +169,17 @@ def auto_switch():
         scroll()
     raise RuntimeError('Auto switch is not reachable')
 
+def toggle_start_location():
+    # This WebView exposes role=switch by DOM id but omits its label and checked
+    # state. Tap the actual control, then verify persistence through reopen below.
+    deadline=time.monotonic()+20
+    while time.monotonic()<deadline:
+        matches=[n for n in nodes() if n.get('resource-id')=='start-with-location' and visible(n)]
+        if len(matches)==1:
+            tap_node(matches[0]);return
+        time.sleep(.3)
+    raise RuntimeError('Start-with-location switch is not visible')
+
 def select_source(old,new):click(old);tap(new)
 
 def app_permission(name):return re.search(re.escape(name)+r': granted=true',adb('shell','dumpsys','package','dev.construct.runtime')) is not None
@@ -293,9 +304,9 @@ try:
     adb('shell','input','keyevent','3');time.sleep(2);open_module(expect='map')
     if any('51.000, 9.000' in x for x in labels()):raise RuntimeError('Manual area survived a real background exit')
     done('Real background exit discards the module area; reopening takes a fresh fix, not the old coordinates')
-    click('Area');tap('Start with my location when opening');tap('Cancel');close_module();open_module()
+    click('Area');toggle_start_location();tap('Cancel');close_module();open_module()
     contains('Choose your viewing area');capture('modular-start-picker')
-    click('Choose area');tap('Start with my location when opening');tap('Cancel');close_module();open_module(expect='map')
+    click('Choose area');toggle_start_location();tap('Cancel');close_module();open_module(expect='map')
     done('Start-with-location preference persists across close/reopen and restores auto-start when re-enabled')
     adb('shell','svc','wifi','disable');adb('shell','svc','data','disable');area();contains('unavailable',40);capture('modular-offline')
     adb('shell','svc','wifi','enable');adb('shell','svc','data','enable');done('Offline transport failure is visible without crashing module')
