@@ -45,9 +45,12 @@ const near=(a,b,eps=1e-6)=>Math.abs(a-b)<eps;
   assert.ok(near(before.lat,after.lat,1e-9)&&near(before.lon,after.lon,1e-9),'anchor stays under the finger');
   assert.ok(!near(z.map.center.lat,50,1e-6)||!near(z.map.center.lon,8,1e-6),'centre moved to keep the anchor');
   // Pinch: two pointers spread ×1.5 → +log2(1.5) zoom, no selection, tap state cleared.
-  const p=rig();const z0=p.map.zoom;
+  const p=rig();const z0=p.map.zoom, pinchAnchor=p.map.geoAt(150,150);
   p.fire('pointerdown',100,150,1);p.fire('pointerdown',200,150,2);assert.equal(p.map.drag,null);assert.ok(p.map.pinch);
   p.fire('pointermove',250,150,2);assert.ok(near(p.map.zoom,z0+Math.log2(1.5),1e-9));
+  const pinchAfter=p.map.geoAt(175,150);
+  assert.ok(near(pinchAnchor.lat,pinchAfter.lat,1e-9)&&near(pinchAnchor.lon,pinchAfter.lon,1e-9),'initial geography follows moving pinch midpoint');
+  assert.equal(p.pans.length,1,'pinch exposes Search here after moving the centre');
   p.fire('pointerup',250,150,2);assert.equal(p.map.pinch,null);p.fire('pointerup',100,150,1);
   assert.deepEqual(p.selected,[]);assert.ok(near(p.map.zoom,z0+Math.log2(1.5),1e-9));
   // Double tap on empty map zooms one level; a tap near a marker selects instead.

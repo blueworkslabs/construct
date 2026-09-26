@@ -30,12 +30,13 @@ class SkyMap {
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.pointers.size === 2) {
         // Second finger: stop dragging, start a pinch anchored on the midpoint.
-        const [a, b] = [...this.pointers.values()];
+        const [a, b] = [...this.pointers.values()],
+          r = canvas.getBoundingClientRect();
         this.drag = null;
         this.pinch = {
           distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
           zoom: this.zoom,
-          moved: true,
+          anchor: this.geoAt((a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top),
         };
         return;
       }
@@ -58,11 +59,16 @@ class SkyMap {
         const [a, b] = [...this.pointers.values()],
           r = canvas.getBoundingClientRect(),
           d = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
-        this.zoomTo(
-          this.pinch.zoom + Math.log2(d / this.pinch.distance),
-          (a.x + b.x) / 2 - r.left,
-          (a.y + b.y) / 2 - r.top,
+        this.zoom = SkyMap.clampZoom(
+          this.pinch.zoom + Math.log2(d / this.pinch.distance), this.zoom,
         );
+        const p = SkyData.projection, s = this.scale();
+        this.center = p.point(
+          p.x(this.pinch.anchor.lon) - ((a.x + b.x) / 2 - r.left - this.width / 2) / s,
+          p.y(this.pinch.anchor.lat) - ((a.y + b.y) / 2 - r.top - this.height / 2) / s,
+        );
+        this.draw();
+        this.onPan();
         return;
       }
       const d = this.drag;
