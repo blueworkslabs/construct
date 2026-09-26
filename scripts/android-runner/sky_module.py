@@ -126,8 +126,22 @@ def fields(lat='50.0379',lon='8.5622'):
         previous=state;time.sleep(.3)
     else:raise RuntimeError('Expected the two stable visible coordinate fields')
     for identifier,value in [('latitude',lat),('longitude',lon)]:
-        ui._device(className='android.widget.EditText',packageName='dev.construct.runtime',resourceId=identifier).set_text(value)
-    # Accessibility set_text does not open the IME. Escape would cancel the HTML dialog.
+        if not re.fullmatch(r'[+\-0-9.]+',value):raise RuntimeError('Coordinate fixture must be numeric text')
+        # UIAutomator's programmatic setText intermittently dismissed the HTML
+        # dialog on this provider. Exercise ordinary focused keyboard input instead.
+        matches=[n for n in nodes() if n.get('resource-id')==identifier and visible(n)]
+        if len(matches)!=1:raise RuntimeError('Coordinate field disappeared: '+identifier)
+        tap_node(matches[0]);time.sleep(.4)
+        adb('shell','input','keycombination','113','29') # Ctrl+A
+        adb('shell','input','text',value)
+        deadline=time.monotonic()+5
+        while time.monotonic()<deadline:
+            if any(n.get('resource-id')==identifier and n.get('text')==value for n in nodes()):break
+            time.sleep(.2)
+        else:raise RuntimeError('Typed coordinate did not match: '+identifier)
+    # Back dismisses a shown IME; Escape would cancel the HTML dialog itself.
+    if 'mInputShown=true' in adb('shell','dumpsys','input_method'):
+        adb('shell','input','keyevent','4');time.sleep(.4)
 
 def area(lat='50.0379',lon='8.5622'):
     time.sleep(16) # Respect module-persisted provider floor across reopen/update.
