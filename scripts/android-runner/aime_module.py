@@ -135,7 +135,7 @@ def capture_native_shutter():
  # The native viewfinder's shutter; the module WebView is behind the capture activity.
  tap('Take photo')
 def to_library():
- if any(x=='Photos' for x in labels()):click(lambda t:t=='Photos')
+ if not any(x=='Take photo' for x in labels()):click(lambda t:t=='Photos')
  contains('Take photo')
 def open_first_photo():click(lambda t:t.startswith('Photo 1.'));contains('viewpoint',20)
 def fixture(action):click('Fixture: '+action)
