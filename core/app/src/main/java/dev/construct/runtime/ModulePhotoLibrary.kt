@@ -32,6 +32,8 @@ internal class ModulePhotoLibrary(
     private val authorize: (String) -> Unit,
     private val commit: ((() -> Unit) -> Unit),
     private val confirm: (String, Bitmap, (Boolean) -> Unit) -> Unit,
+    /** API 0.12: list adds a stable host-allocated `id`; identity only, never accepted as a ref. */
+    private val stableIds: Boolean = false,
 ) {
     private val photos = CameraPhotos(context, moduleId)
     private val refs = PhotoReferences()
@@ -96,9 +98,12 @@ internal class ModulePhotoLibrary(
             }
             work(token) {
                 if (op == "list") {
-                    val files = photos.list()
+                    val files: List<Pair<File, String?>> = if (stableIds) photos.listIdentified() else photos.list().map { it to null }
                     val next: () -> Unit = {
-                        val list = JSONArray(); refs.replace(files).forEach { list.put(JSONObject().put("ref", it)) }
+                        val list = JSONArray()
+                        refs.replace(files.map { it.first }).zip(files) { ref, (_, id) ->
+                            list.put(JSONObject().put("ref", ref).also { entry -> id?.let { entry.put("id", it) } })
+                        }
                         deliver(token, JSONObject().put("photos", list).put("limit", CameraPhotos.MAX_PHOTOS), null)
                     }
                     next

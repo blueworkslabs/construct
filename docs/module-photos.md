@@ -84,9 +84,11 @@ them. A library task has one process-wide worker slot and a 15-second processing
 deadline, with no unbounded queue. The separate human confirmation wait has no
 artificial deadline. Stale work cannot publish after cancellation or timeout.
 
-## Proposed stable photo identity — API 0.12, not implemented in alpha31
+## Stable photo identity — API 0.12 source candidate
 
-Slice 1a for [Aimé](aime-brief.md) will add `id` beside `ref` in the successful
+Implemented in source for slice 1a of [Aimé](aime-brief.md); not in any released
+host APK, and not accepted until the staging check below has run on exact bytes.
+It adds `id` beside `ref` in the successful
 `photos.library {op:"list"}` result: `{photos:[{ref,id}],limit:8}`. `id` is an
 opaque ASCII identifier of 1–80 characters, allocated and persisted by the host
 for one original in one module's library. It is not a filename, path, EXIF value,
@@ -120,6 +122,16 @@ recapture, native clear-all, interrupted persistence, cross-module isolation,
 grant denial/revocation and rejection of an ID used as authority. A staging check
 must tie these observations to the exact APK; this specification is not evidence
 that those checks have run.
+
+Source implementation: the host derives `id` as a truncated HMAC-SHA256 of the
+original's host-allocated random filename under a 32-byte per-module key
+(`.identity-key` beside the originals, written via fsynced stage+rename before the
+first ID is returned). Filenames are never renamed or reused, so IDs are stable
+while the original exists and retired with it; a missing key is created only when
+originals exist and an API 0.12 caller lists, and a damaged key fails the list
+(`PHOTO_FAILED`) instead of re-keying. JVM coverage is `PhotoIdentityTest`; the
+exact-APK staging check is `scripts/android-runner/photo_identity.py`
+([reproduce](reproduce.md)).
 
 ## `image.analyze`
 

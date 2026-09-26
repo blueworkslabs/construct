@@ -175,7 +175,7 @@ class ModuleActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        if (selected?.manifest?.api in setOf("0.9.0", "0.10.0", "0.11.0"))
+        if (selected?.manifest?.api in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0"))
             webView?.settings?.textZoom = (newConfig.fontScale * 100).toInt().coerceIn(50, 300)
     }
 

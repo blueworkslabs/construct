@@ -15,6 +15,7 @@ internal class CameraPhotos(context: Context, moduleId: String) {
         const val MAX_TOTAL = 64L * 1024 * 1024
         private val lock = Any()
         private val name = Regex("[a-f0-9-]{36}\\.jpg")
+        private const val IDENTITY_KEY = ".identity-key"
     }
     // Android may expose filesDir through its /data/user/0 -> /data/data alias.
     // Trust the platform-provided base, then reject symlinks beneath our own root.
@@ -37,6 +38,38 @@ internal class CameraPhotos(context: Context, moduleId: String) {
         it.isFile && name.matches(it.name) && it.canonicalFile == it.absoluteFile
     }?.sortedWith(compareBy<File> { it.lastModified() }.thenBy { it.name }) ?: emptyList()
     fun list(): List<File> = synchronized(lock) { entries() }
+    /**
+     * API 0.12 stable identities: HMAC of the host-allocated random filename under a
+     * durable per-module key. Filenames are never renamed or reused, so an ID survives
+     * refresh/restart/module update and retires with its original. The key is written
+     * atomically before any ID is returned; a damaged key fails instead of re-keying.
+     */
+    fun listIdentified(): List<Pair<File, String>> = synchronized(lock) {
+        val all = entries()
+        if (all.isEmpty()) return@synchronized emptyList()
+        val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+        mac.init(javax.crypto.spec.SecretKeySpec(identityKey(), "HmacSHA256"))
+        val encoder = java.util.Base64.getUrlEncoder().withoutPadding()
+        all.map { it to "p" + encoder.encodeToString(mac.doFinal(it.name.toByteArray(Charsets.US_ASCII)).copyOf(18)) }
+    }
+    private fun identityKey(): ByteArray {
+        val key = File(folder, IDENTITY_KEY)
+        if (key.exists()) {
+            checkRule(key.isFile && key.canonicalFile == key.absoluteFile && key.length() == 32L,
+                "PHOTO_FAILED", "Private photo identities are unavailable")
+            return key.readBytes().also { checkRule(it.size == 32, "PHOTO_FAILED", "Private photo identities are unavailable") }
+        }
+        val bytes = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+        val stage = File(folder, ".pending-${UUID.randomUUID()}")
+        try {
+            FileOutputStream(stage).use { it.write(bytes); it.fd.sync() }
+            checkRule(stage.renameTo(key), "PHOTO_FAILED", "Could not keep private photo identities")
+            sync(folder)
+        } catch (error: ConstructError) { throw error }
+        catch (error: Exception) { throw ConstructError("PHOTO_FAILED", "Could not keep private photo identities") }
+        finally { stage.delete() }
+        return bytes
+    }
     fun <T> readSelected(photo: File, read: (java.io.InputStream, Long) -> T): T = synchronized(lock) {
         checkRule(photo.parentFile == folder && name.matches(photo.name) && photo.canonicalFile == photo.absoluteFile && photo.isFile,
             "CAMERA_STORAGE", "Invalid saved photo")

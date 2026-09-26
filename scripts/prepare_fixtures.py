@@ -2,6 +2,7 @@
 """Bootstrap signed local fixtures and example catalogs from this checkout, not private history."""
 import argparse
 import json
+import shutil
 import tempfile
 from pathlib import Path
 import build_demo
@@ -34,6 +35,7 @@ def prepare(output):
         add(source,[None],'home-registry','test-registry')
     prepare_transport(output, key)
     prepare_sensitive(output, key)
+    prepare_photo_identity(output, key)
     print('Prepared complete JVM fixtures plus home/test catalogs under the selected output.')
 
 def prepare_sensitive(output, key):
@@ -49,6 +51,16 @@ def prepare_sensitive(output, key):
                 constructApi=dict(min='0.11.0',target='0.11.0'),runtime=dict(kind='webview-js'),entry='index.html',capabilities=caps)
             (probe/'manifest.json').write_text(json.dumps(manifest))
             publish(output/'sensitive-registry',*build(probe,key),fixture=True)
+
+def prepare_photo_identity(output, key):
+    # 0.1.0 is the same UI on API 0.11 (legacy photos, no IDs); 0.2.0/0.3.0 are API 0.12
+    # so the runner can prove backfill, then update and rollback between 0.12 versions.
+    with tempfile.TemporaryDirectory() as tmp:
+        probe=Path(tmp)/'photo-identity'; shutil.copytree(ROOT/'examples/fixtures/photo-identity',probe)
+        manifest=json.loads((probe/'manifest.json').read_text())
+        for version,api in [('0.1.0','0.11.0'),('0.2.0','0.12.0'),('0.3.0','0.12.0')]:
+            (probe/'manifest.json').write_text(json.dumps({**manifest,'version':version,'constructApi':dict(min=api,target=api)}))
+            publish(output/'photo-identity-registry',*build(probe,key),fixture=True)
 
 def prepare_transport(output, key):
     # Signed scopes exercise expansion, removal/reintroduction and rollback.
