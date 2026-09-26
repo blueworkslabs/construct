@@ -178,13 +178,36 @@ def choose_permission(options):
         time.sleep(.3)
     raise RuntimeError('Android permission choices missing')
 
+def settled_map_layout(rotation):
+    # Android can expose the new rotation before WebView has resized. Do not
+    # certify a screenshot whose controls still sit outside the portrait viewport.
+    end=time.monotonic()+30;previous=None;stable=0
+    while time.monotonic()<end:
+        current=nodes()
+        web=next((n for n in current if n.get('class')=='android.webkit.WebView' and visible(n)),None)
+        if web is None:time.sleep(1);continue
+        viewport=bounds(web);state=[]
+        for label in ['Area','Refresh aircraft','Zoom in','Zoom out','Center map']:
+            matches=[n for n in current if label in (n.get('text'),n.get('content-desc')) and visible(n)]
+            if len(matches)!=1:break
+            b=bounds(matches[0])
+            if not (viewport[0]<=b[0]<b[2]<=viewport[2] and viewport[1]<=b[1]<b[3]<=viewport[3]):break
+            state.append((label,b))
+        valid=len(state)==5 and ((viewport[2]-viewport[0]>viewport[3]-viewport[1])==bool(int(rotation)))
+        stable=stable+1 if valid and state==previous else 0
+        if stable>=3:return
+        previous=state;time.sleep(1)
+    raise RuntimeError('Map controls did not settle inside the requested viewport')
+
 def screenshot_layouts(prefix,expected):
     field_target=None
     for scale,rotation,suffix in [('1.0','0','portrait'),('1.0','1','landscape'),('2.0','0','font2'),('2.0','1','font2-landscape')]:
         adb('shell','settings','put','system','accelerometer_rotation','0')
         adb('shell','settings','put','system','font_scale',scale)
         adb('shell','settings','put','system','user_rotation',rotation);time.sleep(2)
-        reveal_fragment(expected);capture(prefix+'-'+suffix)
+        reveal_fragment(expected)
+        if prefix=='modular-map':settled_map_layout(rotation)
+        capture(prefix+'-'+suffix)
         if prefix=='modular-metadata':
             field_target=field_target or next((x for x in ('Registry owner','Callsign airline') if x in labels()),None)
             reveal_fragment(field_target or 'Aircraft retrieved:');capture(prefix+'-'+suffix+'-fields')
@@ -242,9 +265,11 @@ try:
     capture('modular-synthetic-location');tap('Cancel');ready('ADSB.lol')
     done('Granted location.read opens straight onto the map from one synthetic foreground fix; no confirmation step')
     if not all(x in labels() for x in ('Combined','100 km')):raise RuntimeError('Source/radius preferences were not restored')
-    tap_node(auto_switch());time.sleep(.5);close_module();open_module(expect='map')
-    if auto_switch().get('checked')!='true':raise RuntimeError('Auto preference was not restored')
-    tap_node(auto_switch());time.sleep(.5)
+    tap_node(auto_switch());contains('next in');close_module();open_module(expect='map')
+    # WebView exposes role=switch as non-checkable on this provider; assert its
+    # actual visible behavior instead of the always-false accessibility attribute.
+    contains('next in');capture('modular-preferences-restored')
+    tap_node(auto_switch());contains('Auto is off')
     done('Source, radius and Auto preferences persist across close/reopen')
     time.sleep(16);area('51','9');contains('Chosen area · 51.000, 9.000')
     time.sleep(16);click('Area');tap('Use my location');contains('Your location · 50.038, 8.562',25)

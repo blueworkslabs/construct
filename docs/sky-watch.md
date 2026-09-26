@@ -13,9 +13,16 @@ N m` (plus `approximate` under coarse-only permission). The fix is requested
 through `location.read` exactly as before: one request, no subscription, no
 background tracking; a menu pause cancels it.
 
+The reviewed package is 0.3.1. The earlier signed 0.3.0 preview is retained
+unchanged but is no longer offered by the candidate index. Review fixed pinch
+anchoring, pending-location cancellation/manual entry and interrupted refresh
+status before the final-candidate Android run.
+
 - Without the grants, the start request fails closed and the welcome card
   offers **Choose area** as before, with a quiet note on how to skip the step.
   A timeout or unavailable provider shows the reason and **Try location again**.
+  Manual coordinates remain usable while a fix is pending. Cancel or a submitted
+  manual area discards a later fix instead of unexpectedly replacing the view.
 - **Area → Use my location** now shows aircraft directly instead of filling the
   coordinate fields and asking for **Show aircraft**. Manual coordinates still
   need no location permission.
