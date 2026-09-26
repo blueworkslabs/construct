@@ -5,8 +5,8 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const root = 'examples/sky-watch-module/ui/';
 const flush = () => new Promise(resolve => setImmediate(resolve));
-function rig({saved = {}, pendingLocation = false, pendingHttp = false, error = null} = {}) {
-  const elements = new Map(), events = {}, timers = [], calls = [], locations = [], requests = [];
+function rig({saved = {}, pendingLocation = false, pendingHttp = false, pendingStorage = false, error = null} = {}) {
+  const elements = new Map(), events = {}, timers = [], calls = [], locations = [], requests = [], reads = [];
   const storage = structuredClone(saved);
   let now = Date.now();
   class Element {
@@ -33,6 +33,7 @@ function rig({saved = {}, pendingLocation = false, pendingHttp = false, error = 
       calls.push({method, params: JSON.parse(JSON.stringify(params))});
       if (method === 'storage.kv') {
         if (params.op === 'set') storage[params.key] = JSON.parse(JSON.stringify(params.value));
+        if (pendingStorage && params.op === 'get') return new Promise(resolve => reads.push(() => resolve(structuredClone(storage[params.key] ?? null))));
         return structuredClone(storage[params.key] ?? null);
       }
       if (method === 'location.read') {
@@ -49,6 +50,7 @@ function rig({saved = {}, pendingLocation = false, pendingHttp = false, error = 
   vm.runInContext(['models.js', 'sky-data.js', 'app.js'].map(f => fs.readFileSync(root + f, 'utf8')).join('\n'), context);
   return {el, calls, storage, fix: () => locations.shift()({latitude: 50.0379, longitude: 8.5622, accuracyM: 12}),
     finishHttp: () => requests.splice(0).forEach(f => f()),
+    finishStorage: () => reads.splice(0).forEach(f => f()),
     advance: ms => { now += ms; timers.forEach(f => f()); },
     visibility: visible => events.constructvisibilitychange({detail: {visible}}),
     submit: (lat, lon) => { el('latitude').value = lat; el('longitude').value = lon; el('area-form').onsubmit({preventDefault() {}}); }};
@@ -93,5 +95,10 @@ function rig({saved = {}, pendingLocation = false, pendingHttp = false, error = 
   r = rig({pendingHttp: true}); await flush(); assert.match(r.el('status').textContent, /Refreshing/);
   r.visibility(false); r.finishHttp(); await flush(); r.visibility(true);
   assert(!/Refreshing|Refresh paused/.test(r.el('status').textContent)); assert(!r.el('refresh').disabled);
+  // Storage can finish after the user opens the native menu during startup.
+  r = rig({pendingStorage: true}); r.visibility(false); r.finishStorage(); await flush();
+  assert(r.el('welcome-progress').hidden, 'paused initialization must not restore a phantom locating spinner');
+  assert.equal(r.calls.filter(c => c.method === 'location.read').length, 0);
+  r.visibility(true); assert(r.el('welcome-progress').hidden);
   console.log('Sky app lifecycle checks passed: startup, settings/storage, gates, timeout, cooldown, manual escape, both cancel paths, stale location and interrupted refresh.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

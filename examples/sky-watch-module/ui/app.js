@@ -890,6 +890,9 @@
   // Start: saved settings first, then straight to the map when location is allowed.
   (async () => {
     await ready;
+    // A menu pause may have completed before these asynchronous storage reads.
+    // Preserve its picker state; do not advertise a fix that cannot start.
+    if (!active) return;
     if (prefs.startWithLocation && !area) {
       welcome(
         "locating",
