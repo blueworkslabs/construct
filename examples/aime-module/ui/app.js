@@ -28,6 +28,7 @@ const state = {
   busy: false,
   photoGeneration: 0,
   refreshPending: false,
+  visible: true,
   view: { scale: 1, x: 0, y: 0 },
 };
 
@@ -312,6 +313,9 @@ function recalibrate() {
 async function update(change) {
   const next = C.cleanSidecar(change(structuredClone(current())));
   await putSidecar(state.selectedId, next);
+  // A changed calibration/radius invalidates every previously ranked result.
+  state.lastList = null;
+  state.lastTap = null;
   recalibrate();
   render();
   if (state.pane === "map") renderMap(false);
@@ -796,11 +800,21 @@ async function tileImage(url) {
 }
 const map = new AimeMap($("map"), {
   getImage: tileImage,
-  onViewer: (point) => task(() => setViewpoint(point)),
+  onViewer: (point) => {
+    if (state.busy) return renderMap(false);
+    task(async () => {
+      try { await setViewpoint(point); }
+      finally { renderMap(false); } // Restore the saved ring if persistence failed.
+    });
+  },
   onError: (error) =>
     say("map-status", !error ? "" : error.code === "CAPABILITY_DENIED" ? "Map tiles need internet access for Aimé (Construct menu → Module access)." : "Map tiles unavailable. The list below still describes the map.", error ? "attention" : ""),
 });
 map.pause(true);
+window.addEventListener("constructvisibilitychange", (event) => {
+  state.visible = event.detail?.visible !== false;
+  map.pause(!state.visible || $("photo").hidden || state.pane !== "map");
+});
 // A dragged or placed viewpoint is the user's input: corrected, confirmed, with
 // the placement precision of the current map scale as its accuracy.
 async function setViewpoint(point) {
@@ -828,7 +842,7 @@ function showPane(pane, fit = false, focus = null) {
   $("map-pane").hidden = pane !== "map";
   $("show-photo").setAttribute("aria-pressed", String(pane === "photo"));
   $("show-map").setAttribute("aria-pressed", String(pane === "map"));
-  map.pause(pane !== "map");
+  map.pause(!state.visible || pane !== "map");
   if (pane === "photo") {
     layout();
     render();

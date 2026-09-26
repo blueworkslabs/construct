@@ -135,6 +135,32 @@ const ok = (name) => {
     assert.equal(events.errors.filter(Boolean).length, 1);
     ok("tile cancellation is not a failure; real failures cool down and report");
   }
+  {
+    const { map, fire, events } = rig();
+    map.editable = true;
+    const before = JSON.stringify(map.scene);
+    fire("pointerdown", 150, 150);
+    fire("pointermove", 190, 150);
+    fire("pointercancel", 190, 150);
+    assert.equal(JSON.stringify(map.scene), before);
+    assert.equal(events.viewer.length, 0);
+    fire("pointerdown", 150, 150);
+    fire("pointermove", 190, 150);
+    map.pause(true);
+    assert.equal(JSON.stringify(map.scene), before);
+    assert.equal(map.pointers.size, 0);
+    ok("cancelled or paused viewer drags restore the saved scene");
+  }
+  {
+    const { map } = rig();
+    map.setScene({viewer: {lat: 0, lon: 179.99}, candidates: [{lat: 0, lon: -179.99}], focus: 0});
+    assert.ok(map.zoom > 10, "nearby points across dateline must not fit the whole world");
+    for (const p of [map.scene.viewer, map.scene.candidates[0]]) {
+      const q = map.xy(p);
+      assert.ok(q.x > 0 && q.x < 300);
+    }
+    ok("fit frames nearby viewer/candidate across the dateline");
+  }
   console.log(`${checks} Aimé map checks passed.`);
 })().catch((e) => {
   console.error(e);

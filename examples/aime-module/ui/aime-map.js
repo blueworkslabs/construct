@@ -83,7 +83,8 @@ class AimeMap {
     const at = this.local(e),
       v = this.scene.viewer && this.xy(this.scene.viewer),
       onViewer = this.editable && v && Math.hypot(v.x - at.x, v.y - at.y) < 32;
-    this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, moved: false, viewer: onViewer };
+    this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, moved: false, viewer: onViewer,
+      original: onViewer ? { viewer: { ...this.scene.viewer }, fitted: this.scene.fitted, wedge: this.scene.wedge } : null };
   }
   move(e) {
     const p = this.pointers.get(e.pointerId);
@@ -132,7 +133,12 @@ class AimeMap {
     }
     const d = this.drag;
     this.drag = null;
-    if (!d || e.type !== "pointerup") return;
+    if (!d) return;
+    if (e.type !== "pointerup") {
+      if (d.original) Object.assign(this.scene, d.original);
+      this.draw();
+      return;
+    }
     if (d.moved) {
       if (d.viewer) this.cb.onViewer?.({ lat: this.scene.viewer.lat, lon: this.scene.viewer.lon, mPerPx: this.metresPerPixel() });
       return;
@@ -201,7 +207,8 @@ class AimeMap {
     else pts.push(...s.candidates, ...s.marks);
     if (!pts.length) return;
     const m = AimeMap.projection,
-      xs = pts.map((p) => m.x(p.lon)),
+      anchor = m.x(pts[0].lon),
+      xs = pts.map((p) => anchor + m.dx(m.x(p.lon), anchor)),
       ys = pts.map((p) => m.y(p.lat)),
       cx = (Math.min(...xs) + Math.max(...xs)) / 2,
       cy = (Math.min(...ys) + Math.max(...ys)) / 2,
@@ -213,6 +220,11 @@ class AimeMap {
   }
   pause(value) {
     this.visible = !value;
+    if (value) {
+      if (this.drag?.original) Object.assign(this.scene, this.drag.original);
+      this.drag = this.pinch = null;
+      this.pointers.clear();
+    }
     if (!value) this.draw();
   }
   draw() {
@@ -304,8 +316,8 @@ class AimeMap {
     for (let i = 0; i <= steps; i++) pts.push(Resection.destination(from, wedge.bearing - half + (2 * half * i) / steps, wedge.lengthKm));
     return pts;
   }
-  // Inner band ±1σ, fainter outer band out to ±2σ: the list says "could be"
-  // out to 2σ, so an offered candidate never sits outside the drawn wedge.
+  // Bands use direction σ. Candidate comparison σ can be wider due to position
+  // uncertainty, so an offered nearby candidate can still lie outside the bands.
   drawWedge(from, wedge) {
     const ctx = this.ctx,
       band = (k, fill, stroke) => {

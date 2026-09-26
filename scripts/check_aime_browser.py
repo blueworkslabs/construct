@@ -54,7 +54,7 @@ def main():
         )
         # A delayed feature response while the visible Photos control leaves the photo.
         page.evaluate(
-            """()=>{const old=call;call=(m,p)=>m==='net.http'?new Promise(r=>window.releaseFetch=()=>r({status:200,text:SyntheticAime.overpass()})):old(m,p);state.features.clear();window.pendingWhat=task(()=>whatsThat(.7,.4));}"""
+            """()=>{const old=call;window.originalCall=call;call=(m,p)=>m==='net.http'?new Promise(r=>window.releaseFetch=()=>r({status:200,text:SyntheticAime.overpass()})):old(m,p);state.features.clear();window.pendingWhat=task(()=>whatsThat(.7,.4));}"""
         )
         page.click("#back")
         page.evaluate("releaseFetch()")
@@ -111,6 +111,34 @@ def main():
             new,
         )
         print("PASS navigation cancellation and moving-pinch anchor")
+        if page.evaluate("typeof AimeMap !== 'undefined'"):
+            page.evaluate("call=window.originalCall")
+            page.evaluate(
+                "whatsThat(SyntheticAime.taps.whatB.x,SyntheticAime.taps.whatB.y)"
+            )
+            page.locator("#close-candidates").click()
+            assert page.evaluate("state.lastList.rows.length > 0")
+            page.evaluate("update(s=>({...s, marks: []}))")
+            page.evaluate("showPane('map',true)")
+            assert page.evaluate(
+                "state.lastList === null && map.scene.wedge === null && map.scene.candidates.length === 0"
+            ), "Old ranking survived calibration change"
+            page.evaluate(
+                "window.dispatchEvent(new CustomEvent('constructvisibilitychange',{detail:{visible:false}}))"
+            )
+            assert page.evaluate("!map.visible"), "Host menu did not pause map tiles"
+            page.evaluate(
+                "window.dispatchEvent(new CustomEvent('constructvisibilitychange',{detail:{visible:true}}))"
+            )
+            assert page.evaluate("map.visible"), "Map failed to resume after host menu"
+            page.evaluate(
+                "db.put=async()=>{throw new Error('Synthetic storage failure')};map.scene.viewer={lat:0,lon:0};map.cb.onViewer({lat:0,lon:0,mPerPx:1})"
+            )
+            page.wait_for_function("!state.busy")
+            assert page.evaluate(
+                "map.scene.viewer.lat === current().viewer.lat && map.scene.viewer.lon === current().viewer.lon"
+            ), "Failed write left an unsaved viewer ring"
+            print("PASS map invalidation, menu pause/resume and failed correction")
         assert not errors, errors
         b.close()
 
