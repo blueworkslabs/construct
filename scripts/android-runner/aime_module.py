@@ -66,7 +66,8 @@ def reveal(match):
  test=match if callable(match) else (lambda t:t.startswith(match))
  for direction in ('up','down'):
   for _ in range(10):
-   hits=[n for n in nodes() if test(text_of(n)) and visible(n) and n.get('package')=='dev.construct.runtime']
+   viewport=web()
+   hits=[n for n in nodes() if test(text_of(n)) and visible(n) and n.get('package')=='dev.construct.runtime' and bounds(n)[1]>=viewport[1] and bounds(n)[3]<=viewport[3]]
    if hits:
     # WebView's accessibility bounds can lag the end of a scroll/text-size reflow.
     before=bounds(hits[0]);time.sleep(.5)
@@ -91,10 +92,13 @@ def stage():
     direction='down' if b[3]>w[3] else 'up'
    scroll(direction)
  raise RuntimeError('Photo stage not fully visible')
-def tap_photo(point):
+def tap_photo(point,checkpoint=None):
  x1,y1,x2,y2=stage()
  # The stage has a 1 px border around the photo frame.
  x=round(x1+1+point['x']*(x2-x1-2));y=round(y1+1+point['y']*(y2-y1-2))
+ if checkpoint:
+  capture('before-tap-'+checkpoint)
+  (run/('before-tap-'+checkpoint+'-bounds.json')).write_text(json.dumps({'stage':[x1,y1,x2,y2],'tap':[x,y],'nodes':[dict(n.attrib) for n in nodes()]},indent=2))
  adb('shell','input','tap',str(x),str(y));time.sleep(.6)
 def reach_native(label,checkable=False):
  for attempt in range(24):
@@ -146,7 +150,8 @@ def fixture(action):click('Fixture: '+action)
 def candidates():
  return [t for t in labels() if t and (t.startswith('Could be ') or re.match(r'^Synthetic .+ (peak|tower|mast|castle|church|chapel|airfield|viewpoint) · ',t))]
 def what(point,expected,key):
- tap_photo(point);contains('Your tap points',20)
+ click(lambda t:t=='What’s that?');reach_text('Tap anything to see what it could be.')
+ tap_photo(point,checkpoint=key);contains('Your tap points',20)
  rows=candidates();receipt['candidates'][key]=rows;save()
  first=next((r for r in labels() if r and r.startswith('Could be ')),None)
  assert first and first.startswith('Could be '+expected),('Ranking',key,rows)
