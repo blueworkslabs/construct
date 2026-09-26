@@ -135,7 +135,9 @@ select:focus-visible {
   color: var(--muted);
 }
 #map-wrap .zoom {
-  bottom: 28px;
+  left: 6px;
+  right: auto;
+  bottom: var(--map-bottom-inset, 34px);
 }
 #candidates li button {
   width: 100%;

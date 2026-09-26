@@ -290,8 +290,11 @@ class AimeMap {
     }
     const bar = AimeMap.scaleBar(mpp, Math.min(140, r.width / 3));
     if (bar) {
+      const attribution = c.parentElement?.querySelector(".attribution"),
+        bottomInset = attribution ? Math.max(34, r.top + r.height - attribution.getBoundingClientRect().top + 12) : 34;
+      c.parentElement?.style.setProperty("--map-bottom-inset", bottomInset + "px");
       const x = r.width - bar.pixels - 10,
-        y = r.height - 34;
+        y = r.height - bottomInset;
       ctx.font = "600 11px system-ui";
       ctx.fillStyle = "#102a1fcc";
       ctx.fillRect(x - 6, y - 18, bar.pixels + 12, 26);

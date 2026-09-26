@@ -17,7 +17,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_aime_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.aime package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.aime-fixture package digest')
-p.add_argument('--version',default='0.1.0')
+p.add_argument('--version',default='0.1.1')
 p.add_argument('--real-fix',default='47.34953,8.49154',help='lat,lon injected for the real-module Overpass check (public viewpoint)')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
@@ -67,7 +67,11 @@ def reveal(match):
  for direction in ('up','down'):
   for _ in range(10):
    hits=[n for n in nodes() if test(text_of(n)) and visible(n) and n.get('package')=='dev.construct.runtime']
-   if hits:return hits[0]
+   if hits:
+    # WebView's accessibility bounds can lag the end of a scroll/text-size reflow.
+    before=bounds(hits[0]);time.sleep(.5)
+    settled=[n for n in nodes() if test(text_of(n)) and visible(n) and bounds(n)==before]
+    if settled:return settled[0]
    scroll(direction)
  raise RuntimeError('Module control not reachable: '+str(match))
 def click(match):tap_node(reveal(match))
@@ -80,7 +84,10 @@ def stage():
    s=next((n for n in nodes() if text_of(n).startswith(label) and visible(n)),None)
    if s is not None:
     b=bounds(s);w=web()
-    if b[1]>=w[1] and b[3]<=w[3]:return b
+    if b[1]>=w[1] and b[3]<=w[3]:
+     time.sleep(.5)
+     settled=next((n for n in nodes() if text_of(n).startswith(label) and bounds(n)==b),None)
+     if settled is not None:return b
     direction='down' if b[3]>w[3] else 'up'
    scroll(direction)
  raise RuntimeError('Photo stage not fully visible')
@@ -217,7 +224,7 @@ try:
  capture('aime-levelled');done('Two true-level horizon taps level the picture (Level estimated)')
 
  # 6. What's that? → candidates with own ±σ → map.
- click('What’s that?');rows=what(F['whatB'],'Synthetic Peak B','B')
+ reveal('What’s that?');rows=what(F['whatB'],'Synthetic Peak B','B')
  assert any('±' in r and 'from your tap' in r for r in labels() if r),'Candidates need offset and ±σ'
  capture('aime-candidates');click(lambda t:t.startswith('Could be Synthetic Peak B'))
  reach_text('Pin 1: Synthetic Peak B (selected)');reach_text('Wedge: your tap points');reach_text('Green pin: Synthetic Tower A')
@@ -226,15 +233,15 @@ try:
 
  # Persisted calibration must survive a real process restart on this exact host.
  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);open_first_photo()
- reach_text('Calibrated · 1 mark');reach_text('Level estimated');click('What’s that?')
+ reach_text('Calibrated · 1 mark');reach_text('Level estimated');reveal('What’s that?')
  what(F['whatB'],'Synthetic Peak B','B-restart');click(lambda t:t=='Close')
  done('Photo viewpoint, landmark and horizon calibration survive process restart with the same ranking')
 
  # 7. Rotation and 2× text keep the flow usable.
- settle('1');capture('aime-landscape');click('What’s that?');what(F['whatB'],'Synthetic Peak B','B-landscape');click(lambda t:t=='Close')
+ settle('1');capture('aime-landscape');reveal('What’s that?');what(F['whatB'],'Synthetic Peak B','B-landscape');click(lambda t:t=='Close')
  settle('0');done('Landscape keeps the photo tappable and the ranking unchanged')
  adb('shell','settings','put','system','font_scale','2.0');time.sleep(3)
- reveal('Mark landmark');reveal('Delete this photo');capture('aime-large-text');click('What’s that?');what(F['whatB'],'Synthetic Peak B','B-large-text');click(lambda t:t=='Close')
+ reveal('Mark landmark');reveal('Delete this photo');capture('aime-large-text');reveal('What’s that?');what(F['whatB'],'Synthetic Peak B','B-large-text');click(lambda t:t=='Close')
  adb('shell','settings','put','system','font_scale','1.0');time.sleep(2);done('Two-times text keeps controls reachable and the ranking unchanged')
 
  # 8. Delete → stored record reconciled.
