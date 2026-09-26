@@ -125,11 +125,15 @@ that those checks have run.
 
 Source implementation: the host derives `id` as a truncated HMAC-SHA256 of the
 original's host-allocated random filename under a 32-byte per-module key
-(`.identity-key` beside the originals, written via fsynced stage+rename before the
-first ID is returned). Filenames are never renamed or reused, so IDs are stable
-while the original exists and retired with it; a missing key is created only when
-originals exist and an API 0.12 caller lists, and a damaged key fails the list
-(`PHOTO_FAILED`) instead of re-keying. JVM coverage is `PhotoIdentityTest`; the
+(`.identity-key`, a versioned checksummed record beside the originals, and a
+durable `.identity-initialized` fingerprint marker). Both are written via fsynced
+stage+rename before the first ID is returned; retries repeat the directory
+durability barrier. Filenames are never renamed or reused, so IDs are stable
+while the original exists and retired with it. Legacy backfill creates a key
+only when originals exist and no initialization marker exists. A missing
+established key or damaged record fails the list (`PHOTO_FAILED`) instead of
+re-keying. These checks detect accidental metadata damage, not hostile root
+rewriting or simultaneous loss of all identity metadata. JVM coverage is `PhotoIdentityTest`; the
 exact-APK staging check is `scripts/android-runner/photo_identity.py`
 ([reproduce](reproduce.md)).
 

@@ -52,7 +52,7 @@ def result(before,timeout=40):
 def listed():
  texts=labels();count=next((int(t.split(': ')[1]) for t in texts if re.fullmatch(r'Photo count: \d+',t or '')),None)
  assert count is not None,'Missing photo count'
- ids=[m[2] for m in (re.fullmatch(r'ID (\d+): (\S+)',t or '') for t in texts) if m]
+ ids=[m[2] for m in (re.fullmatch(r'ID (\d+): (not provided|[\x21-\x7e]+)',t or '') for t in texts) if m]
  assert len(ids)==count,('Every listed photo must be rendered',count,ids)
  receipt['idsObserved'].append(ids);save();return ids
 def list_ids():
@@ -106,7 +106,8 @@ def installed_apk():
 
 try:
  print('RESULTS:',run,flush=True);save();(CONFIG.root/'camera-emulated.flag').write_text('emulated\n')
- avd,snapshot,_=CONFIG.profile(True);subprocess.run([str(CONFIG.root/'runner.sh'),'start'],check=True);started=True
+ avd,snapshot,_=CONFIG.profile(True);started=True
+ subprocess.run([str(CONFIG.root/'runner.sh'),'start'],check=True)
  deadline=time.monotonic()+180
  while time.monotonic()<deadline:
   try:
@@ -211,9 +212,14 @@ except Exception as e:
  except Exception:pass
  raise
 finally:
- if started:
-  if rooted:unroot()
-  try:(run/'runtime.log').write_text(adb('logcat','-d','-t','6000'));(run/'crash-buffer.txt').write_text(adb('logcat','-b','crash','-d'))
-  except Exception:pass
-  subprocess.run([str(CONFIG.root/'runner.sh'),'stop'],check=True);receipt['stopped']=subprocess.run(['systemctl','--user','is-active','--quiet',CONFIG.service]).returncode!=0
- (CONFIG.root/'camera-emulated.flag').unlink(missing_ok=True);save();print(json.dumps(receipt,indent=2),flush=True)
+ try:
+  if started:
+   try:
+    if rooted:unroot()
+    try:(run/'runtime.log').write_text(adb('logcat','-d','-t','6000'));(run/'crash-buffer.txt').write_text(adb('logcat','-b','crash','-d'))
+    except Exception:pass
+   finally:
+    subprocess.run([str(CONFIG.root/'runner.sh'),'stop'],check=True)
+    receipt['stopped']=subprocess.run(['systemctl','--user','is-active','--quiet',CONFIG.service]).returncode!=0
+ finally:
+  (CONFIG.root/'camera-emulated.flag').unlink(missing_ok=True);save();print(json.dumps(receipt,indent=2),flush=True)

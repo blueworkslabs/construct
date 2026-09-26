@@ -139,6 +139,46 @@ class PhotoIdentityTest {
         assertFalse(File(app.filesDir, "camera-photos/dev.construct.empty/.identity-key").exists())
     }
 
+    @Test fun sameSizeCorruptionAndMissingEstablishedKeyFailWithoutLosingOriginals() {
+        capture()
+        val published = ids()
+        val saved = key.readBytes()
+        key.writeBytes(saved.clone().also { it[10] = (it[10].toInt() xor 1).toByte() })
+        denied("PHOTO_FAILED") { CameraPhotos(app, module).listIdentified() }
+        assertEquals(saved.size.toLong(), key.length())
+        key.delete()
+        denied("PHOTO_FAILED") { CameraPhotos(app, module).listIdentified() }
+        assertFalse(key.exists())
+        // Identity damage must not disable the old ref-only API or remove an original.
+        library(stableIds = false).let { assertEquals(1, list(it).length()); it.close() }
+        CameraPhotos(app, module).list().forEach { assertArrayEquals(bytes, it.readBytes()) }
+        key.writeBytes(saved)
+        assertEquals(published, ids())
+    }
+
+    @Test fun failedDirectoryBarriersAreRetriedBeforePublishingIdentities() {
+        // Fail immediately after either the key rename or the initialized-marker rename.
+        for (failedBarrier in listOf(1, 3)) {
+            setup(); capture()
+            var calls = 0
+            denied("PHOTO_FAILED") {
+                CameraPhotos(app, module) {
+                    calls++
+                    if (calls == failedBarrier) throw java.io.IOException("Injected directory sync failure")
+                }.listIdentified()
+            }
+            val saved = key.readBytes()
+            // Existence alone must not let a retry bypass a still-failing barrier.
+            denied("PHOTO_FAILED") {
+                CameraPhotos(app, module) { throw java.io.IOException("Still unavailable") }.listIdentified()
+            }
+            assertArrayEquals(saved, key.readBytes())
+            val published = ids()
+            assertEquals(published, ids())
+            assertArrayEquals(saved, key.readBytes())
+        }
+    }
+
     @Test fun deniedOrRevokedListingAllocatesAndPublishesNothing() {
         capture()
         allowed = false
