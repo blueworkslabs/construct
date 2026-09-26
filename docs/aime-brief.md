@@ -7,10 +7,16 @@ the pilot tester. Name chosen by the project owner: **Aimé**
 (`dev.construct.aime`), after Aimé Laussedat, who surveyed from photographs
 in the 1850s ([background](https://en.wikipedia.org/wiki/Aim%C3%A9_Laussedat)).
 
-Revision 2 resolves the three review decisions: a full camera pose model with
+Revision 2 proposes resolutions to the three review decisions: a full camera pose model with
 optional horizon levelling, uncertainty propagated from the fit, and a stable
 photo id as a small versioned host addition. Details in
-[Review decisions](#review-decisions-resolved-in-revision-2).
+[Review decisions](#review-decisions-revision-2).
+
+**Re-review status: not yet cleared for unchanged implementation or merge.**
+The previous tilt/FOV examples pass, but shared viewpoint error is treated as
+independent between marks and nearby candidate position error is omitted from
+ranking. See the remaining review findings below. The proposed photo-ID contract
+is documented separately; no API 0.12 host has been implemented by this PR.
 
 ## Purpose
 
@@ -52,15 +58,20 @@ for slice 1. Orientation capture stays a later, optional aid.
 2. **Take photo** → native viewfinder. Before opening it the module takes a
    `location.read` fix; after `{saved:true}` it takes another (respecting the
    15 s floor) and keeps the later one with its timestamp, accuracy and
-   `approximate` flag. The user may have waited or walked in the viewfinder,
+   `approximate` flag (compare fix timestamps, not request order). The user may have waited or walked in the viewfinder,
    so the fix is labelled **estimated viewpoint** with its age and can be
-   corrected by dragging the dot on the map. A photo with no usable fix stays
+   corrected by dragging the dot on the map. Compare available before/after
+   fixes: disagreement beyond their combined accuracy, an old fix or a long
+   viewfinder wait requires viewpoint confirmation/correction before querying.
+   A photo with no usable fix stays
    unlocated: no query, no ranking, a clear "set your viewpoint" prompt.
-   The sidecar is written only once the new photo's stable id appears in
-   `list`; a fix without a photo is discarded.
+   Associate the sidecar only when a successful before/after `list` comparison
+   yields exactly one new stable id. Ambiguous or interrupted captures remain
+   unlocated, never assigned by list position; a fix without a photo is discarded.
 3. **Photo view** → the photo, fit to the viewport, pinch-zoomable (reuse the
    Sky Watch map gesture code). A thin **bearing ruler** along the top shows
-   compass degrees once calibrated; before that it reads "Mark a landmark you
+   compass degrees for the active tap's row once calibrated (label that row;
+   with tilt, a column does not have a single bearing); before that it reads "Mark a landmark you
    know to calibrate".
 4. **Mark a landmark** → tap the tower/summit → a name search over the features
    already fetched for this viewpoint and radius (typed filter, nearest first)
@@ -68,9 +79,14 @@ for slice 1. Orientation capture stays a later, optional aid.
    offered ("Mark another to fit the lens"), never required. Marks store the
    tapped `x, y`.
 5. **Level the horizon** (optional, recommended for tilted photos) → "Tap two
-   points on the horizon" → the module draws the fitted level line across the
-   photo and states "levelled" with the pitch. Skipping it keeps a wider σ for
-   rows far from the marks; the wedge on the map shows that honestly.
+   separated points on a known level horizon—not a mountain ridge, roofline or
+   treetops" → the module draws the fitted level line across the photo. This
+   solver assumes zero elevation, not an arbitrary skyline. Even a sea horizon
+   dips below true level at an elevated viewpoint; without height/dip correction
+   that input is approximate. Explain this before accepting taps and let users
+   skip/remove them when no suitable level reference is visible. Show "level
+   estimated" only when the fit supports it, not a guarantee that the chosen
+   skyline was physically horizontal. Skipping retains pose-prior uncertainty.
 6. **What's that?** → tap anywhere else → a **candidates sheet**: up to five
    features ranked by score, each with name, kind, distance, signed offset from
    the tap and the tap's ±σ. When nothing lies within 2σ the sheet says "no
@@ -79,9 +95,11 @@ for slice 1. Orientation capture stays a later, optional aid.
    pins, candidates as numbered pins.
 7. **Delete photo** → native confirmation (existing `photos.library` op); only
    `{completed:true}` removes the sidecar. Native deletion and `storage.kv`
-   cleanup are separate operations; on every `list` the module drops sidecars
+   cleanup are separate operations; after every **successful complete** `list`
+   the module drops sidecars
    whose id no longer exists, so an interrupted delete is reconciled on the
-   next open.
+   next open when library and storage access succeed. A denied/failed list is
+   not an empty library and must never erase sidecars.
 
 Compass-only mode (when an orientation API exists): steps 4–6 work without a
 mark, with a wide wedge (σ ≈ 12°) and "could be" wording.
@@ -119,7 +137,7 @@ Tap σ is 0.7° (≈1 % of frame width). Viewer accuracy comes from the fix; a
 
 **Fit.** Levenberg–Marquardt over `(H, f, p, r)` with a numeric Jacobian,
 initialised from a level camera; four parameters, a few dozen iterations,
-under a millisecond. Marks that disagree beyond their stated precision inflate
+small enough for a prototype; phone performance is not measured here. Marks that disagree beyond their stated precision inflate
 the covariance by χ²/dof (when dof > 0). The result carries the pose, the 4×4
 covariance and two flags: `lens: fitted|assumed` and `level: fitted|assumed`,
 meaning the data narrowed that parameter well below its prior or did not.
@@ -144,9 +162,11 @@ match" when none is within 2σ.
 `ele` tags; lens distortion.
 
 **Synthetic results** (`scripts/test_aime_resection.cjs`, seeded; scenes have
-lens 62–78° with 70° guessed, pitch −5…25° down, roll ±5°, tap noise 0.5 % of
+lens 62–78° with 70° guessed, pitch −5…25° down, roll Gaussian σ=3° (not
+clamped at ±5°), calibration-mark/horizon tap noise 0.5 % of
 frame, GPS 15 m, OSM 5 m, landmarks 2–25 km; taps at random pixels; the test
-prints the measured numbers):
+prints the measured numbers; the bearing-coverage cases use exact query pixels,
+while ranking also perturbs the target tap):
 
 | Calibration | Bearing error | σ reported | 2σ coverage |
 | --- | --- | --- | --- |
@@ -165,8 +185,11 @@ levelled: roll within 1.5°, error under 0.7°. One mark at the right edge with 
 marks at x = 0.10/0.18 with a 0.7° perturbation: lens stays 72° "assumed",
 far-edge error 2.2° with σ 6.8°. Ranking against eight decoys in one frame:
 tapped landmark first 73 %, top three 98 % after one mark (plus horizon when
-in frame); compass-only top three 75 %. Coverage above 95 % means σ is slightly
-conservative, which is the right side to err on for a wedge on a map.
+in frame); compass-only top three 75 %. These coverage results are conservative
+for the stated seeded distant-landmark distribution, not a general uncertainty
+guarantee. Near/coarse-position scenes and correlated viewpoint errors require
+their own coverage checks. Synthetic forward truth reuses the camera model;
+the figures do not establish real-photo accuracy or validate arbitrary skylines.
 
 ## Data: features, queries, storage, consent
 
@@ -205,15 +228,18 @@ out tags center 400;
   marks, never the taps.
 - **Sidecar per photo** (`storage.kv`, key `photos`, a map from stable photo
   id): `{ viewer: {lat, lon, accuracyM, timestamp, approximate, corrected},
-  radiusKm, marks: [{x, y, osmType, osmId, name, lat, lon}], horizon: [{x, y}],
+  radiusKm, marks: [{x, y, osmType, osmId, name, lat, lon, positionM}], horizon: [{x, y}],
   pose?: {heading, fov, pitch, roll, sigma} }`. Position and radius saved
   automatically after capture; marks and horizon as the user adds them; the
   pose is derived and re-fitted on load, stored only as a display cache. Names
-  are bounded (80 chars) and marks to 6 per photo so eight sidecars fit 64 KiB.
-- **Consent text** (manifest reasons): `location.read` "Record where you stood
-  when you take a photo, so taps can be turned into compass bearings."
-  `storage.kv` "Save, per photo, where you stood, the landmarks and horizon you
-  marked and the fitted direction. Cleaned up after the photo is deleted."
+  are bounded (80 chars), marks to 6 and horizon taps to 2 per photo so eight
+  sidecars fit 64 KiB. Retain each mark's positional estimate on reopen, rather
+  than accidentally replacing a way/relation's estimate with the node default.
+- **Consent text** (manifest reasons): `location.read` "Read an estimated viewpoint for your photo, shown with fix age
+  and accuracy for you to confirm or correct before looking up landmarks."
+  `storage.kv` "Save each photo's estimated viewpoint, the landmarks and horizon
+  you marked, and the fitted direction. After photo deletion, metadata is cleaned
+  up when this module can next access its library and storage."
   `net.http` "Fetch named map features around your photo position and map
   tiles." `photos.library` / `camera.photo` / `image.read` as the Camera module.
 - Module storage never holds the photo pixels; originals stay in the host's
@@ -226,7 +252,7 @@ out tags center 400;
    persistent identifier: survives reopen, update and rollback; distinct for
    identical captures; not accepted by open/delete/export (the short-lived
    `ref` stays the only authority); exposes no filename, path or EXIF. Astra
-   writes the contract lines in `docs/module-photos.md`; Clawd implements it in
+   specifies the [proposed contract](module-photos.md#proposed-stable-photo-identity--api-012-not-implemented-in-alpha31); Clawd implements it in
    the host and the runner check; the Aimé manifest declares
    `constructApi.min 0.12`. No digest or capture-order workaround is built.
 2. **One-shot orientation read** `orientation.read {op:"get"}` →
@@ -244,7 +270,7 @@ out tags center 400;
   capture + sidecar keyed by id with orphan reconciliation; photo view with
   taps, bearing ruler and level line; Overpass fetch, 10/30/60 km picker and
   local name search; marks and horizon taps feeding the reference solver
-  **unchanged**; candidates sheet with σ; map view built from the Sky Watch
+  **after the remaining review findings are corrected**; candidates sheet with σ; map view built from the Sky Watch
   map class (tiles, pan/zoom, wedge, pins, draggable viewer dot). Shared
   `construct-ui.css`. Unit tests for sidecar bookkeeping, Overpass parsing,
   radius changes and the "no close match" state. A deterministic fixture
@@ -272,7 +298,7 @@ out tags center 400;
 - The capture screen says main rear camera only and distinguishes the
   estimated viewpoint saved with the photo from the direction derived by
   marking.
-- "Levelled" appears only when `level` is fitted; "lens fitted" only when
+- "Level estimated" appears only when `level` is fitted; "lens fitted" only when
   `lens` is fitted. Otherwise the wedge is simply wider.
 - Errors name the gate: location denied, internet denied, Overpass busy,
   library unavailable.
@@ -285,7 +311,7 @@ out tags center 400;
   no repeated per-photo save prompt; no fabricated direction.
 - 10/30/60 km radius picker, default 30 km.
 
-## Review decisions (resolved in revision 2)
+## Review decisions (revision 2)
 
 1. **Geometry:** the elevated-viewpoint goal is kept. The solver models the
    full pose; horizon taps level the picture; without them the pitch/roll
@@ -294,8 +320,28 @@ out tags center 400;
    with position accuracy and distance in the mark weights, χ² inflation for
    inconsistent marks, and priors that stop clustered or near-collinear marks
    from manufacturing a lens. The suite measures 2σ coverage on random 2D
-   scenes and reproduces the four review cases.
+   scenes and reproduces the four review cases. This is not yet sufficient for
+   shared position error or candidate-bearing uncertainty (below).
 3. **Identity:** stable photo id as an API 0.12 host addition, required by the
    module; no digest or capture-order prototype. Reconciliation on every list.
 
-Astra re-reviews this revision. On acceptance, slice 1a starts.
+### Remaining findings from revision 2 re-review
+
+- A single uncertain viewer position is shared by every mark, not independently
+  re-measured for each one. Weighting each residual with that error and summing
+  independent information can shrink the reported uncertainty while leaving the
+  same systematic heading bias. With six marks 100 m away and a 15 m eastward
+  fix error (reported accuracy 15 m), the fitted centre is wrong by **8.21°**,
+  σ **3.97°**, despite tiny χ². Fit a shared position nuisance/covariance or
+  derive a documented conservative treatment; test near and coarse fixes rather
+  than only distant landmarks. Do not silently impose a new distance restriction.
+- Candidate coordinates/viewpoint uncertainty must also enter candidate matching.
+  With one distant calibration mark and the same 15 m fix error, a true target
+  100 m north is 8.45° off the computed ray while tap σ is only about 1°. It must
+  not be confidently excluded as a mismatch. Account for the dependence between
+  calibrated bearing and candidate bearing caused by their common viewpoint;
+  distinguish candidate-comparison uncertainty from the map ray's uncertainty.
+
+Fable revises this shared-position treatment and its coverage evidence; Astra
+re-reviews it. On acceptance, slice 1a starts. No module, host release or emulator
+acceptance is implied by passing this planning slice's existing 13 checks.

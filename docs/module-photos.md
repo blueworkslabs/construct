@@ -84,7 +84,45 @@ them. A library task has one process-wide worker slot and a 15-second processing
 deadline, with no unbounded queue. The separate human confirmation wait has no
 artificial deadline. Stale work cannot publish after cancellation or timeout.
 
+## Proposed stable photo identity — API 0.12, not implemented in alpha31
+
+Slice 1a for [Aimé](aime-brief.md) will add `id` beside `ref` in the successful
+`photos.library {op:"list"}` result: `{photos:[{ref,id}],limit:8}`. `id` is an
+opaque ASCII identifier of 1–80 characters, allocated and persisted by the host
+for one original in one module's library. It is not a filename, path, EXIF value,
+content hash or cross-module correlation handle. Identical captures get distinct
+IDs; deletion retires an ID permanently. Refresh, run/process restart and module
+update/rollback preserve it while that original is retained. This is a module
+rollback guarantee, not a promise that an older host APK implements API 0.12.
+
+`id` is **identity, never authority**. All current declaration, opt-in, run and
+image-grant checks still apply to listing. Open/delete/export continue to accept
+only the current unpredictable `ref`; stable IDs are not accepted in its place,
+nor as additional request fields. Listing remains complete and bounded to eight
+photos in capture order. A list failure must not become an empty/partial success.
+Existing originals receive IDs durably before their first successful 0.12 list;
+interruption/retry must not change IDs already published, rewrite originals or
+silently pair a different original. Fail with the existing structured photo
+error family if identity cannot be safely persisted. Native deletion/clear-all
+retires the corresponding identity but does not atomically delete module KV data.
+
+Modules requiring IDs declare API `min` and `target` `0.12.0`; API 0.11 callers
+retain their existing response shape and behavior. Neither the 0.12 negotiation
+nor this result field exists in the released alpha31 host. Capture still returns
+only `{saved:true|false}`: a module may associate a capture by comparing successful
+before/after ID lists, but must leave it unassociated if no unique new ID can be
+established. Deletion reconciliation must run only after a successful complete
+list and a successful storage write, never on denied/failed access.
+
+Acceptance for the new host must cover legacy-photo backfill, repeated list and
+process restart, identical-content captures, module update/rollback, deletion and
+recapture, native clear-all, interrupted persistence, cross-module isolation,
+grant denial/revocation and rejection of an ID used as authority. A staging check
+must tie these observations to the exact APK; this specification is not evidence
+that those checks have run.
+
 ## `image.analyze`
+
 
 Request: `{ "op": "detect", "handle": "…", "kind": "faces" }` or kind
 `objects`. The handle must be the calling run's current selected image. No model
