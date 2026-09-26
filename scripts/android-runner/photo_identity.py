@@ -125,7 +125,10 @@ try:
  assert 'uid=2000(shell)' in adb('shell','id'),'Expected unprivileged ADB'
  receipt['snapshot']={'avd':avd,'name':snapshot,'loaded':True};receipt['apiLevel']=adb('shell','getprop','ro.build.version.sdk').strip()
  adb('shell','settings','put','system','accelerometer_rotation','0')
- adb('logcat','-c');adb('install',str(a.apk.resolve()),timeout=120);launch();catalog_settings()
+ adb('logcat','-c');adb('install',str(a.apk.resolve()),timeout=120)
+ receipt['hostVersion']=[line.strip() for line in adb('shell','dumpsys','package','dev.construct.runtime').splitlines() if 'versionCode=' in line or 'versionName=' in line]
+ receipt['webView']=adb('shell','dumpsys','webviewupdate').strip()
+ launch();catalog_settings()
  replace_text(nodes,lambda v:ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(v),a.catalog)
  apply_catalog();find('Catalog refreshed.');install('0.1.0',a.legacy_sha)
  library();select_after(heading,('Open',));find('List photos')
@@ -158,6 +161,7 @@ try:
  done('Update to API 0.12 backfills distinct IDs for legacy and byte-identical originals')
  opened();assert list_ids()==first and list_ids()==first
  adb('shell','am','force-stop','dev.construct.runtime');opened();assert list_ids()==first
+ capture('stable-ids-after-restart')
  done('IDs are unchanged across repeated list and process restart')
 
  assert act('Use first ID as ref').startswith('[PHOTO_STALE]');assert list_ids()==first
@@ -189,6 +193,7 @@ try:
   else:adb('shell','rm',key) # Synthetic identity metadata only; originals and marker stay.
   unroot();opened()
   assert act('List photos').startswith('[PHOTO_FAILED]'),'Damaged identity must fail, not list'
+  capture('failed-closed-'+fault.replace(' ','-'))
   assert not any(re.fullmatch(r'Photo count: \d+',t or '') for t in labels())
   adb('shell','am','force-stop','dev.construct.runtime');root()
   if fault=='missing established key':assert not has_key(),'Host re-keyed silently'
@@ -211,6 +216,7 @@ try:
  tap('Delete all saved photos');find('Delete all saved photos?');tap('Delete permanently');find('Saved photos deleted.')
  reopen();assert list_ids()==[]
  shoot();shoot();now=stable(listed());assert len(now)==2 and not set(now)&seen,'Clear-all and recapture reused an ID'
+ capture('new-ids-after-clear-all')
  done('Native clear-all retires IDs; new captures never reuse them')
 
  adb('shell','am','force-stop','dev.construct.runtime');root()
