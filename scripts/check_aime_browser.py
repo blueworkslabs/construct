@@ -45,7 +45,7 @@ def main():
 
         page.route("http://aime.test/**", route)
         page.add_init_script(
-            """window.mock={store:null,photos:[{id:'photo1',ref:'ref1'}]};window.construct={postMessage(raw){let q=JSON.parse(raw),result=null;if(q.method==='storage.kv'){if(q.params.op==='get')result=mock.store;else mock.store=q.params.value;}else if(q.method==='photos.library'){if(q.params.op==='list')result={photos:mock.photos,limit:8};else if(q.params.op==='open')result={url:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',width:1,height:1};}queueMicrotask(()=>construct.onmessage({data:JSON.stringify({id:q.id,result})}));}};"""
+            """window.mock={store:{},photos:[{id:'photo1',ref:'ref1'}]};window.construct={postMessage(raw){let q=JSON.parse(raw),result=null;if(q.method==='storage.kv'){if(q.params.op==='get')result=mock.store[q.params.key]??null;else mock.store[q.params.key]=q.params.value;}else if(q.method==='photos.library'){if(q.params.op==='list')result={photos:mock.photos,limit:8};else if(q.params.op==='open')result={url:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',width:1,height:1};}queueMicrotask(()=>construct.onmessage({data:JSON.stringify({id:q.id,result})}));}};"""
         )
         page.goto("http://aime.test/index.html")
         page.wait_for_function("!state.busy && state.items.length===1")

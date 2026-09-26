@@ -49,20 +49,23 @@ async function locate(respectSpacing) {
     return { fix: null, error };
   }
 }
+// Persistence: an index of up to 16 slots plus one bounded record per photo,
+// each written in its own request (aime-core.js `persistence`).
+const db = C.persistence({ get: (key) => call("storage.kv", { op: "get", key }), set: (key, value) => call("storage.kv", { op: "set", key, value }) });
 async function loadStore() {
-  try {
-    state.store = C.loadStore(await call("storage.kv", { op: "get", key: C.STORAGE_KEY }));
-    state.storeError = null;
-  } catch (error) {
-    // Unavailable storage is not an empty store: never write over it.
-    state.store = null;
-    state.storeError = error;
-  }
+  state.storeError = await db.load();
+  state.store = db.store;
 }
-async function saveStore(next) {
-  if (!state.store) throw Object.assign(new Error("Storage access is off, so viewpoints and marks cannot be saved."), { code: "STORAGE_UNAVAILABLE" });
-  await call("storage.kv", { op: "set", key: C.STORAGE_KEY, value: next });
-  state.store = next;
+async function putSidecar(id, sidecar) {
+  await db.put(id, sidecar);
+  state.store = db.store;
+}
+async function releaseExcept(keepIds) {
+  try {
+    await db.release(keepIds);
+  } finally {
+    state.store = db.store;
+  }
 }
 
 // ---- Messages ---------------------------------------------------------------
@@ -93,10 +96,7 @@ async function refresh() {
   state.items = result.photos.map((p) => ({ ref: p.ref, id: p.id }));
   for (const id of [...state.thumbs.keys()]) if (!ids.includes(id)) state.thumbs.delete(id);
   // Reconcile only after this successful complete list; the write must succeed too.
-  if (state.store) {
-    const { store, dropped } = C.reconcile(state.store, ids);
-    if (dropped.length) await saveStore(store).catch(() => {});
-  }
+  await releaseExcept(ids).catch(() => {});
   renderGrid();
   loadThumbs();
 }
@@ -229,9 +229,9 @@ async function takePhoto() {
   if (!id) note = "Photo saved, but it could not be matched to this capture, so it has no viewpoint.";
   else if (!state.store) note = "Photo saved. Storage access is off, so its viewpoint was not saved.";
   else {
-    const next = C.reconcile({ ...state.store, [id]: C.newSidecar(chosen ? chosen.viewer : null) }, after).store;
     try {
-      await saveStore(next);
+      await releaseExcept(after).catch(() => {});
+      await putSidecar(id, C.newSidecar(chosen ? chosen.viewer : null));
       if (!chosen) note = "Photo saved without a viewpoint: " + (second.error || first.error ? describe(second.error || first.error, "Location") : "no usable location fix.");
       else if (chosen.reasons.length) note = `Photo saved. Please confirm the viewpoint (${chosen.reasons.join(", ")}).`;
     } catch (error) {
@@ -308,7 +308,7 @@ function recalibrate() {
 }
 async function update(change) {
   const next = C.cleanSidecar(change(structuredClone(current())));
-  await saveStore({ ...state.store, [state.selectedId]: next });
+  await putSidecar(state.selectedId, next);
   recalibrate();
   render();
 }
@@ -773,7 +773,7 @@ async function whatsThat(x, y) {
   if (data.incomplete) extra.push("Incomplete: the 400-feature limit was reached. A smaller radius may show more nearby landmarks.");
   $("candidates-extra").textContent = extra.join(" ");
   $("candidates-dialog").showModal();
-  say("photo-status", list.anyClose ? `Top match: ${list.rows[0].candidate.feature.name}.` : "No close match for that tap.");
+  say("photo-status", list.anyClose ? `Closest: ${list.rows[0].candidate.feature.name}, ±${list.rows[0].sigmaDeg.toFixed(1)}°.` : "No close match for that tap.");
 }
 
 // ---- Wiring ---------------------------------------------------------------------
@@ -830,11 +830,7 @@ $("delete").onclick = () =>
     const r = await library({ op: "delete", ref: item.ref });
     if (!r.completed) return say("photo-status", "Delete canceled. Photo unchanged.");
     state.thumbs.delete(id);
-    if (state.store && state.store[id]) {
-      const next = { ...state.store };
-      delete next[id];
-      await saveStore(next).catch(() => {});
-    }
+    await releaseExcept(state.items.map((p) => p.id).filter((x) => x !== id)).catch(() => {});
     $("photo").hidden = true;
     $("library").hidden = false;
     $("back").hidden = true;
