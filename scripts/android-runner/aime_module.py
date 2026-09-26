@@ -96,15 +96,15 @@ def tap_photo(point):
  # The stage has a 1 px border around the photo frame.
  x=round(x1+1+point['x']*(x2-x1-2));y=round(y1+1+point['y']*(y2-y1-2))
  adb('shell','input','tap',str(x),str(y));time.sleep(.6)
-def reach_native(label):
+def reach_native(label,checkable=False):
  for attempt in range(24):
-  matches=[n for n in nodes() if label in (n.get('text'),n.get('content-desc')) and n.get('package')=='dev.construct.runtime']
+  matches=[n for n in nodes() if label in (n.get('text'),n.get('content-desc')) and n.get('package')=='dev.construct.runtime' and (not checkable or n.get('checkable')=='true')]
   if matches:return matches[0]
   start,end=('450','1050') if attempt<8 else ('1000','500')
   adb('shell','input','swipe','360',start,'360',end,'250');time.sleep(.3)
  raise RuntimeError('Native control not reachable: '+label)
 def switch(label,checked=True):
- node=reach_native(label)
+ node=reach_native(label,checkable=True)
  assert node.get('checkable')=='true','Native grant must be a checkable control: '+label
  if (node.get('checked')=='true')==checked:return
  tap_node(node)
@@ -118,8 +118,7 @@ def permission(button):
  tap_node(reach_native(button))
  end=time.monotonic()+20
  while time.monotonic()<end:
-  for choice in ('While using the app','Only this time'):
-   if choice in labels():tap(choice);return
+  if 'While using the app' in labels():tap('While using the app');return
   time.sleep(.3)
  raise RuntimeError('Android permission choices missing for '+button)
 def launch():adb('shell','am','start','-n','dev.construct.runtime/.MainActivity');host_ready()
