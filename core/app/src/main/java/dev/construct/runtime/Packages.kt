@@ -69,7 +69,7 @@ object Packages {
         checkRule(idPattern.matches(id) && versionPattern.matches(version), "MANIFEST_SCHEMA", "Invalid module identity or version")
         val api = m.getJSONObject("constructApi")
         keys(api, setOf("min", "target"), setOf("min", "target"))
-        checkRule(api.get("min") in setOf("0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0") && api.get("target") == api.get("min"), "API_INCOMPATIBLE", "This module needs a different Construct API")
+        checkRule(api.get("min") in setOf("0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0") && api.get("target") == api.get("min"), "API_INCOMPATIBLE", "This module needs a different Construct API")
         val runtime = m.getJSONObject("runtime")
         keys(runtime, setOf("kind"), setOf("kind"))
         checkRule(runtime.get("kind") == "webview-js", "RUNTIME_UNSUPPORTED", "Only WebView modules are supported")
@@ -84,7 +84,7 @@ object Packages {
             val capId = string(cap, "id", 80)
             checkRule(capId in recognized, "CAPABILITY_DENIED", "Unsupported capability: $capId")
             val origins = if (capId == "net.http") {
-                checkRule(api.get("min") in setOf("0.9.0", "0.10.0", "0.11.0"), "API_INCOMPATIBLE", "HTTP requires Construct API 0.9.0")
+                checkRule(api.get("min") in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0"), "API_INCOMPATIBLE", "HTTP requires Construct API 0.9.0")
                 val list = cap.optJSONArray("origins") ?: throw ConstructError("MANIFEST_SCHEMA", "HTTP sources are required")
                 checkRule(list.length() in 1..8, "MANIFEST_SCHEMA", "Declare 1–8 HTTP sources")
                 (0 until list.length()).map { n -> HttpPolicy.origin(list.opt(n)) }.also {
@@ -94,13 +94,13 @@ object Packages {
                 checkRule(!cap.has("origins"), "MANIFEST_SCHEMA", "Sources apply only to HTTP")
                 emptyList()
             }
-            checkRule(capId != "location.read" || api.get("min") in setOf("0.9.0", "0.10.0", "0.11.0"), "API_INCOMPATIBLE", "Location requires Construct API 0.9.0")
-            checkRule(capId !in setOf("image.read", "image.markers") || api.get("min") in setOf("0.10.0", "0.11.0"), "API_INCOMPATIBLE", "Images require Construct API 0.10.0")
-            checkRule(capId !in setOf("camera.photo", "photos.library", "image.analyze") || api.get("min") == "0.11.0", "API_INCOMPATIBLE", "Photo APIs require Construct API 0.11.0")
+            checkRule(capId != "location.read" || api.get("min") in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0"), "API_INCOMPATIBLE", "Location requires Construct API 0.9.0")
+            checkRule(capId !in setOf("image.read", "image.markers") || api.get("min") in setOf("0.10.0", "0.11.0", "0.12.0"), "API_INCOMPATIBLE", "Images require Construct API 0.10.0")
+            checkRule(capId !in setOf("camera.photo", "photos.library", "image.analyze") || api.get("min") in setOf("0.11.0", "0.12.0"), "API_INCOMPATIBLE", "Photo APIs require Construct API 0.11.0")
             Capability(capId, string(cap, "reason", 240), cap.optBoolean("optional", false), origins)
         }
-        checkRule(caps.none { it.id == "device.tone" } || api.get("min") in setOf("0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"), "API_INCOMPATIBLE", "Tone requires Construct API 0.2.0")
-        checkRule(caps.none { it.id == "contacts.read" } || api.get("min") in setOf("0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"), "API_INCOMPATIBLE", "Contacts require Construct API 0.3.0")
+        checkRule(caps.none { it.id == "device.tone" } || api.get("min") in setOf("0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0"), "API_INCOMPATIBLE", "Tone requires Construct API 0.2.0")
+        checkRule(caps.none { it.id == "contacts.read" } || api.get("min") in setOf("0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0"), "API_INCOMPATIBLE", "Contacts require Construct API 0.3.0")
         CapabilityLifecycle.validateHistoricalApi(caps, api.getString("min"))
         checkRule(caps.map { it.id }.distinct().size == caps.size, "MANIFEST_SCHEMA", "Duplicate capabilities")
         checkRule(caps.none { it.id == "image.markers" } || caps.any { it.id == "image.read" },
@@ -112,7 +112,7 @@ object Packages {
         }
         val themeColor = if (m.has("themeColor")) string(m, "themeColor", 7) else null
         checkRule(themeColor == null || Regex("#[0-9a-fA-F]{6}").matches(themeColor), "MANIFEST_SCHEMA", "themeColor must be #RRGGBB")
-        checkRule(themeColor == null || api.get("min") in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"), "API_INCOMPATIBLE", "Theme colour requires Construct API 0.6.0")
+        checkRule(themeColor == null || api.get("min") in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0"), "API_INCOMPATIBLE", "Theme colour requires Construct API 0.6.0")
         return ModuleManifest(id, string(m, "name", 80), version, entry, caps, api.getString("min"), themeColor)
     }
 

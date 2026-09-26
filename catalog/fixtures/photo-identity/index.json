@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.photo-identity",
+      "name": "Photo identity probe",
+      "versions": [
+        {
+          "id": "dev.construct.photo-identity",
+          "name": "Photo identity probe",
+          "version": "0.1.0",
+          "artifact": "dev.construct.photo-identity-0.1.0.zip",
+          "sha256": "d0b91bb50e30ee80172cb6bbde98d75381c392abaa95bbca7dc9d9d12255bc50",
+          "signature": "auTrwHw7IAG/owS0XZe4h2v0kmAhsPARJbjT3CLnl08j6gwMdhda7gKFAfgj05nCZgiTmXDt8BXfOcJwvt28h1JCR+pGfaJ/nTuzzo3seC1Hgk3U5W2UleaBHad7yPT/P4SEAwCGA80/jwIouV/pfsU7/vCLHu+VGaN+D+F0odZ5EH8HDAxXiUlkTnRilY/JMnTcF8cpWfNC1fdU3DSyVo4Ty8qQsZDMZx1oI6iFvcQXKS3WzMaOefqsUgTjquQDT2aAVFyjMlSf1USdCgoBAE9qwz1Yb3FF+x/xSypg0x/wtb3rpkYO17he/Wqqqq7nBFKNXiEjCZ09i+FE745Z6A==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.photo-identity",
+          "name": "Photo identity probe",
+          "version": "0.2.0",
+          "artifact": "dev.construct.photo-identity-0.2.0.zip",
+          "sha256": "4c84877285070304bce628dd7ee3a55c858198d96ba57b548d603aa30cb6879c",
+          "signature": "e7rDpkTDqD8Osg9BLJ+GjJixK/q7hCENmDXCqERYpBza42dSaKBUboe1sCLEOzaBX4rYoEd192RUPKeEP7n2sxO3vxNOHGZDM+aduzW4s6l2A8o0OR6ehupjTtqQM4GkpQPm7db9UvwyqXvK80zE7THU62eD8ebxB1jThoTc8KXeX3rJqMG8u/JGBTGTjTt386TU8wxSQ6YZNfdMNIgSq8pvbgiDreosx39d58yk9Ni5R+fACBdRrlJ7Zwc9VuWJ9bZ2GXli8RcU5EUSEouso9zbejbU4tt7PAus4UY7LJXWKeP3OYbeXBmufH4E6U1DQdrr1Cen52tXvt8ipxV40g==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.photo-identity",
+          "name": "Photo identity probe",
+          "version": "0.3.0",
+          "artifact": "dev.construct.photo-identity-0.3.0.zip",
+          "sha256": "382eaf5048e370f74e1745346480bb8939011c08f9af3e0ce87bd8507aa7fce6",
+          "signature": "UfxTAc+vxOq7cVPrE3dLDekYeEQsFu+MNU3uMoGeslAP4qNHsLr1TVLwF4oArBFtrv06vwPSuXJg8hC8z41LTTn2FdsyC3Ss1uViYjGzerLHpXuJvKGasBLTHnIvFrFv6eRT/QdEqNQs0Z9kxn/bWqOwvBSxOuoOosH5a/SHAMukvDPlnrMII44mVpMoBoSmtvQv9DgjwrH2Ry6k6EAbNSs/yCYasqbz6rdJWLIFYkqf++JAw/ZX1uboykoHzxboUASJuhMfnkPjgqfvIBtaU5TxCwMrEnbMhIB+nCV3zHMJpXdS9ip8VLD8vJOCg4kxP1gGCAmjyI3uuQvT2e0CUQ==",
+          "testFixture": true
+        }
+      ]
+    }
+  ]
+}
