@@ -135,7 +135,8 @@ established key or damaged record fails the list (`PHOTO_FAILED`) instead of
 re-keying. These checks detect accidental metadata damage, not hostile root
 rewriting or simultaneous loss of all identity metadata. JVM coverage is `PhotoIdentityTest`; the
 exact-APK staging check is `scripts/android-runner/photo_identity.py`
-([reproduce](reproduce.md)).
+([reproduce](reproduce.md)). The [alpha32 candidate receipt](photo-identity-alpha32-acceptance.md)
+records completed review and exact-APK staging, separately from pending phone feedback.
 
 ## `image.analyze`
 

@@ -1,0 +1,135 @@
+{
+  "task": "API 0.12 stable private-photo identity",
+  "pr": "https://github.com/blueworkslabs/construct/pull/33",
+  "host": "0.1.0-alpha32",
+  "sourceCommit": "2c132c9eeafd2b7757243c178efb190466bf2c94",
+  "runnerCommit": "a82d2d7",
+  "runnerSha256": "0f170679dd365e9bd6d3c868fdfc6fe054cb0c1ddc48e1d2479df255d0840106",
+  "run": "20260926T220109Z-photo-identity-a2c93e23",
+  "complete": true,
+  "stopped": true,
+  "apiLevel": "37",
+  "webView": "com.android.webview 155.0.8059.0",
+  "apkSha256": "8c92858b02d6ea5a2a648eca8e9a7d94bb9870cbd6b11edcff708e3b479d3627",
+  "apks": {
+    "arm64-v8a": {
+      "file": "construct-0.1.0-alpha32-arm64-v8a-2c132c9.apk",
+      "sha256": "2c92671f26e6accc31bf8ff6a66ffb4824949a7cda8d6745c53e6830cb74b9ea",
+      "bytes": 23806330,
+      "sameSignerAsAlpha31": true,
+      "sizeAlignmentAndPinnedAssetsVerified": true
+    },
+    "x86_64": {
+      "file": "construct-0.1.0-alpha32-x86_64-2c132c9.apk",
+      "sha256": "8c92858b02d6ea5a2a648eca8e9a7d94bb9870cbd6b11edcff708e3b479d3627",
+      "bytes": 26689915,
+      "sameSignerAsAlpha31": true,
+      "sizeAlignmentAndPinnedAssetsVerified": true
+    }
+  },
+  "catalog": "https://1e54f55f.construct-20x.pages.dev/fixtures/photo-identity/index.json",
+  "moduleSha256": {
+    "0.1.0": "d0b91bb50e30ee80172cb6bbde98d75381c392abaa95bbca7dc9d9d12255bc50",
+    "0.2.0": "4c84877285070304bce628dd7ee3a55c858198d96ba57b548d603aa30cb6879c",
+    "0.3.0": "382eaf5048e370f74e1745346480bb8939011c08f9af3e0ce87bd8507aa7fce6"
+  },
+  "checks": [
+    "Denied listing publishes no IDs before grants",
+    "Android camera permission remains independent of the module grant",
+    "API 0.11 module keeps the legacy list shape and allocates no identity",
+    "Update to API 0.12 backfills distinct IDs for legacy and byte-identical originals",
+    "IDs are unchanged across repeated list and process restart",
+    "A stable ID is rejected as open authority",
+    "IDs survive signed module update and rollback on identical APK bytes",
+    "Revoked library grant lists nothing; restored grant returns the same IDs",
+    "Identity truncated fails closed; restoring metadata returns the same IDs",
+    "Identity same-size corruption fails closed; restoring metadata returns the same IDs",
+    "Identity missing established key fails closed; restoring metadata returns the same IDs",
+    "Deletion retires an ID; recapture receives a new ID",
+    "Native clear-all retires IDs; new captures never reuse them"
+  ],
+  "localChecks": {
+    "jvm": 197,
+    "photoIdentityJvmSubset": 10,
+    "runner": 71,
+    "pythonSource": 32,
+    "cameraModule": 12,
+    "server": 1,
+    "lint": "pass (21 warnings, no errors)",
+    "architecture": "pass"
+  },
+  "reviewFix": "Checksummed identity metadata and a durable initialization marker reject same-size damage and loss of an established key; failed publication durability barriers are retried. Codex focused re-review clear.",
+  "failedAttempts": [
+    {
+      "run": "20260926T214405Z-photo-identity-d9456ea8",
+      "complete": false,
+      "stopped": true,
+      "checksPassed": 1,
+      "reason": "Driver skipped an off-screen Android camera-permission control; host correctly denied capture. Fixed driver only."
+    },
+    {
+      "run": "20260926T214826Z-photo-identity-6775b16b",
+      "complete": false,
+      "stopped": true,
+      "checksPassed": 10,
+      "reason": "ADB root transport closed after 10 checks; added bounded resulting-identity verification."
+    },
+    {
+      "run": "20260926T215936Z-photo-identity-7af7af69",
+      "complete": false,
+      "stopped": true,
+      "checksPassed": 0,
+      "reason": "Deliberately interrupted early to fix a later off-screen clear-all status assertion found during driver inspection."
+    }
+  ],
+  "buildNote": "First local assembly stopped on absent prepared OpenCV source after JVM/lint passed. Restored checksum-pinned dependency and completed pilot build.",
+  "screenshots": [
+    {
+      "file": "../images/photo-identity-alpha32/stable-ids-after-restart.png",
+      "sha256": "507a154c85bf25f8fa6cee57b00380254730eae92de5ef48745b75a6e999211e",
+      "reviewed": true,
+      "capture": "synthetic emulator console; host FLAG_SECURE unchanged",
+      "captureFilename": "stable-ids-after-restart-display/Screenshot_1790460398.png"
+    },
+    {
+      "file": "../images/photo-identity-alpha32/failed-closed-missing-established-key.png",
+      "sha256": "13efdb9bfac6369af36706bddfb1688ce54eff99cebbdf6b80cde1d75b5033eb",
+      "reviewed": true,
+      "capture": "synthetic emulator console; host FLAG_SECURE unchanged",
+      "captureFilename": "failed-closed-missing-established-key-display/Screenshot_1790460683.png"
+    },
+    {
+      "file": "../images/photo-identity-alpha32/trusted-delete.png",
+      "sha256": "3a223c75aea868800035e9bfc51b80543bc6f5ea389023957d21f9f4dd808acf",
+      "reviewed": true,
+      "capture": "synthetic emulator console; host FLAG_SECURE unchanged",
+      "captureFilename": "trusted-delete-display/Screenshot_1790460740.png"
+    },
+    {
+      "file": "../images/photo-identity-alpha32/failed-closed-same-size-corruption.png",
+      "sha256": "102d9b70f633e94000d5ba7456607662632ee1fd04acd273e321ac8c4bdf71d6",
+      "reviewed": true,
+      "capture": "synthetic emulator console; host FLAG_SECURE unchanged",
+      "captureFilename": "failed-closed-same-size-corruption-display/Screenshot_1790460624.png"
+    },
+    {
+      "file": "../images/photo-identity-alpha32/recovered-missing-established-key.png",
+      "sha256": "bd9dc501fd1912cd8aae411e8f2f075d401d809183914c59f173c9c292520e1c",
+      "reviewed": true,
+      "capture": "synthetic emulator console; host FLAG_SECURE unchanged",
+      "captureFilename": "recovered-missing-established-key-display/Screenshot_1790460711.png"
+    },
+    {
+      "file": "../images/photo-identity-alpha32/new-ids-after-clear-all.png",
+      "sha256": "e68a8db9110f777e14755fd3c86035542b52fbd70776401869d2dd166df66e23",
+      "reviewed": true,
+      "capture": "synthetic emulator console; host FLAG_SECURE unchanged",
+      "captureFilename": "new-ids-after-clear-all-display/Screenshot_1790460802.png"
+    }
+  ],
+  "limits": [
+    "Physical-phone alpha31-to-alpha32 upgrade and camera behavior await pilot feedback.",
+    "Cross-module non-correlation and post-rename directory-sync fault injection are JVM checks, not emulator claims.",
+    "This acceptance targets photo identity and its fixture; it is not a new full-host or Aim\u00e9 module acceptance."
+  ]
+}
