@@ -345,10 +345,85 @@ depends on it, not on Overture directly. Summary:
   a known tower; mark it; tap the horizon; tap two other things; report whether
   the right answers land in the top three and whether the wedge width looks
   honest. That is the real accuracy test and it precedes the merge.
-- **Slice 2 (later):** orientation API and live mode; elevation from `ele`
-  tags to separate near/far along a ray; on-device edge snapping for taps and
-  an automatic horizon proposal; lens distortion if hardware tests show edge
-  bias.
+- **Slice 2:** planned 2026-09-27 from the first hardware test; see
+  [Slice 2](#slice-2-precision-and-quality-of-life-planned-2026-09-27).
+- **Later:** live mode; elevation from `ele` tags to separate near/far along a
+  ray; on-device edge snapping for taps and an automatic horizon proposal;
+  lens distortion if hardware tests show edge bias.
+
+## Slice 2: precision and quality of life (planned 2026-09-27)
+
+From the first Pixel 8a test: basic identification works. Requests: a
+magnifier, movable points, a level indicator, zoom, map pin → photo,
+distances and a map ruler, and working screenshots.
+
+**2a, module only (no host change):**
+
+- **Magnifier:** press and hold on the photo shows a loupe (Pocket Measure's
+  pattern); release places the point. Applies to marks, horizon taps and
+  "what's that?" taps.
+- **Move points:** drag an existing mark or horizon point (with the loupe) to
+  correct it; the fit updates live; one-step undo. Sidecar writes follow the
+  existing per-photo record rules.
+- **Distances:** marks and candidates show distance and bearing from the
+  fitted viewpoint; the map gets a ruler (two taps → great-circle distance and
+  bearing, clearable).
+- **Map pin → photo:** long-press on the map drops a pin; the photo shows
+  `Resection.locate(cal, {point})`: the pin's bearing line, a band at ±2σ
+  (comparison σ, which includes the viewpoint error and the pin's distance),
+  and the distance. Out of frame, an arrow on the matching edge; behind the
+  camera, "behind you, to the left/right". Candidates get "show in photo" with
+  the same call.
+
+**2b, host additions (proposed API 0.13; Clawd implements, Astra accepts):**
+
+- `camera.photo {op:"capture", level?: true, zoom?: [1, 2]}`. `level` shows a
+  level indicator in the native viewfinder from the gravity sensor (horizon
+  line plus pitch/roll readout, highlighted within ±1°). `zoom` lists fixed
+  ratios offered as chips, clamped to the device's range, default 1×. No free
+  zoom.
+- Result `{saved: true, id, capture: {zoomRatio, fovDeg: {h, v}, tilt:
+  {pitchDeg, rollDeg, sigmaDeg}, headingDeg?, headingAccuracyDeg?}}`, all for
+  the saved image as the module opens it (after EXIF orientation), sampled at
+  the shutter. `id` is the new photo's stable id, which replaces the
+  before/after list association. `fovDeg` comes from the camera
+  characteristics (focal length, physical sensor size, the active-array crop
+  to the output aspect) divided by the zoom ratio.
+- **Tilt signs follow the solver** (`basis()` in `docs/aime/resection.js`):
+  `pitchDeg > 0` when the camera looks below the horizon; `rollDeg > 0` when
+  the camera's right side points down, so the horizon appears higher on the
+  right of the photo. The host converts from the Android sensor frame for the
+  photo's final orientation; the runner verifies both signs with
+  `adb emu sensor set acceleration`.
+- `headingDeg` from the rotation-vector sensor is a weak hint only (the solver
+  uses σ ≥ 12°) and is omitted when the sensor reports unreliable accuracy.
+  No location is added to capture metadata.
+- **Screenshots:** today every module with `image.read` and the viewfinder run
+  with the secure-window flag, which is why screenshots come out black.
+  Proposal: a per-module **Allow screenshots** switch in Module access, off by
+  default. When on, that module's session drops the flag; on Android 13+ the
+  Recents thumbnail stays hidden (`setRecentsScreenshotEnabled(false)`). On
+  older Android the thumbnail follows the flag, and the switch's copy says so.
+  The native viewfinder keeps the flag. Shape of the switch (per module or
+  global) is the project owner's decision.
+
+**2c, module adopts 2b:** request `level: true, zoom: [1, 2]`; store
+`capture` in the photo's sidecar; calibrate with `fov` (`fovSigma` 1°) and
+`tilt`; use the compass heading as a weak observation and to sort the "mark a
+landmark" search by direction. Horizon taps stay available for photos without
+measured tilt.
+
+**Solver support (in this revision):** `project`, `pixelAt`, `bearingLine`
+and `locate` for map → photo; `calibrate({tilt, fov, fovSigma})` for measured
+tilt and lens; result flag `tilt: "measured" | "none"`. Synthetic effect with
+one mark, random taps, tilt ±1° and lens ±0.5°: p90 bearing error 0.94°
+against 5.18° with guessed lens and level, 2σ coverage 100 % (99.4 %
+before). Astra's 25°-pitch case drops from 5.1° to 0.4° without horizon taps.
+
+**Acceptance:** solver tests in CI (25 checks); host runner checks for the
+capture metadata ranges and both tilt signs on the emulator; hardware: a 2×
+photo from a viewpoint with one mark and no horizon taps, plus a level-indicator
+comparison against a known level surface.
 
 ## Copy and UX rules
 

@@ -397,4 +397,88 @@ test("viewpoint offsets stay on the globe across the dateline and poles", () => 
     assert.ok(Math.abs(S.diff(S.bearing(at,moved),Math.atan2(east,north)*180/Math.PI))<.01);
   }
 });
+// ── Slice 2: map point → photo (inverse projection) and measured tilt ──
+test("projection inverts the ray model for random poses and pixels", () => {
+  for (let i = 0; i < 500; i++) {
+    const P = { heading: rnd() * 360, fov: 50 + rnd() * 40, pitch: -20 + rnd() * 50, roll: gauss(8) };
+    const x = rnd(), y = rnd();
+    const q = S.project(P, ASPECT, S.azimuthOf(P, ASPECT, x, y), S.elevationOf(P, ASPECT, x, y));
+    assert.ok(q && Math.abs(q.x - x) < 1e-9 && Math.abs(q.y - y) < 1e-9, `round trip ${JSON.stringify(q)} vs ${x},${y}`);
+  }
+  const P = { heading: 0, fov: 70, pitch: 0, roll: 0 };
+  assert.equal(S.project(P, ASPECT, 180, 0), null, "behind the camera");
+  assert.ok(Math.abs(S.project(P, ASPECT, S.columnAngle(0.3, 70), 0).x - 0.3) < 1e-9);
+  assert.ok(Math.abs(S.project(P, ASPECT, 0, 0).y - 0.5) < 1e-12);
+});
+test("sign conventions: pitch > 0 lifts the horizon, roll > 0 lifts its right end", () => {
+  const rolled = truthCal({ heading: 0, fov: 70, pitch: 0, roll: 10 });
+  assert.ok(S.horizonRow(rolled, 0.9) < S.horizonRow(rolled, 0.1), "horizon higher on the right");
+  const down = truthCal({ heading: 0, fov: 70, pitch: 15, roll: 0 });
+  assert.ok(S.horizonRow(down, 0.5) < 0.5, "horizon above centre when looking down");
+});
+test("bearing lines: every point shares the azimuth; tilt slants the line; behind is empty", () => {
+  const marks = [{ x: 0.5, y: 0.5, point: S.destination(viewer, 40, 8) }];
+  const cal = S.calibrate({ viewer, marks, tilt: { pitch: 12, roll: 6 }, width: W, height: H });
+  const line = S.bearingLine(cal, 55);
+  assert.ok(line.length > 10, `line points ${line.length}`);
+  for (const q of line) assert.ok(Math.abs(S.diff(S.bearingAt(cal, q.x, q.y), 55)) < 1e-6);
+  const xs = line.map((q) => q.x);
+  assert.ok(Math.max(...xs) - Math.min(...xs) > 0.005, "a rolled camera slants the line");
+  assert.deepEqual(S.bearingLine(cal, 220), []);
+});
+test("locate: a map pin lands on its own pixel with a ±2σ band; off-frame sides are reported", () => {
+  const P = { heading: 100, fov: 70, pitch: 5, roll: 0 };
+  const marks = [{ x: 0.3, y: 0.55, point: S.destination(viewer, truthBearing(P, 0.3, 0.55), 9) }];
+  const cal = S.calibrate({ viewer, marks, tilt: { pitch: 5, roll: 0 }, width: W, height: H });
+  const px = 0.7, py = S.horizonRow(truthCal(P), 0.7);
+  const target = { point: S.destination(viewer, truthBearing(P, px, py), 6), positionM: 10 };
+  const r = S.locate(cal, target);
+  console.log(`  pin at x=0.70: anchor x=${r.anchor.x.toFixed(3)}, σ ${fmt(r.sigmaDeg)}, ${r.distanceKm.toFixed(1)} km`);
+  assert.equal(r.inFrame, true);
+  assert.equal(r.side, null);
+  assert.ok(Math.abs(r.anchor.x - px) < 0.02 && Math.abs(r.anchor.y - py) < 0.02);
+  assert.ok(Math.abs(r.sigmaDeg - S.uncertainty(cal, r.anchor.x, r.anchor.y, target)) < 1e-9);
+  const nearest = (line) => line.reduce((b, q) => (Math.abs(q.y - r.anchor.y) < Math.abs(b.y - r.anchor.y) ? q : b));
+  const [lo, hi] = r.band;
+  assert.ok(lo.length && hi.length);
+  assert.ok(nearest(lo).x < r.anchor.x && nearest(hi).x > r.anchor.x, "band brackets the pin");
+  const left = S.locate(cal, { point: S.destination(viewer, 50, 5) });
+  assert.equal(left.inFrame, false);
+  assert.equal(left.side, "left");
+  const behind = S.locate(cal, { point: S.destination(viewer, 270, 5) });
+  assert.equal(behind.inFrame, false);
+  assert.match(behind.side, /^behind-(left|right)$/);
+  assert.throws(() => S.locate(cal, { point: null }), /Target/);
+});
+test("measured tilt levels the photo without horizon taps (review case: 25° pitch)", () => {
+  const P = { heading: 40, fov: 70, pitch: 25, roll: 0 };
+  const marks = [0.2, 0.8].map((x) => ({ x, y: 0.5, point: S.destination(viewer, truthBearing(P, x, 0.5), 10) }));
+  const err = (cal) => Math.abs(S.diff(S.bearingAt(cal, 0.8, 0.9), truthBearing(P, 0.8, 0.9)));
+  const plain = S.calibrate({ viewer, marks, width: W, height: H });
+  const tilted = S.calibrate({ viewer, marks, tilt: { pitch: 25.8, roll: -0.7 }, width: W, height: H });
+  console.log(`  tap (0.8, 0.9): no tilt ${fmt(err(plain))} (σ ${fmt(S.uncertainty(plain, 0.8, 0.9))}); sensor tilt ±1° ${fmt(err(tilted))} (σ ${fmt(S.uncertainty(tilted, 0.8, 0.9))})`);
+  assert.equal(tilted.tilt, "measured");
+  assert.equal(tilted.level, "fitted");
+  assert.equal(plain.tilt, "none");
+  assert.ok(err(tilted) < 1.2 && err(tilted) < err(plain) / 3);
+  assert.ok(err(tilted) <= 2 * S.uncertainty(tilted, 0.8, 0.9));
+  for (const bad of [{ pitch: 95, roll: 0 }, { pitch: 0, roll: NaN }, { pitch: 1, roll: 1, sigma: 0 }, { pitch: "5", roll: 0 }])
+    assert.throws(() => S.calibrate({ viewer, marks, tilt: bad, width: W, height: H }), /Tilt/);
+});
+test("measured tilt and lens: coverage holds and accuracy improves on random scenes", () => {
+  const plain = [], measured = [];
+  for (let i = 0; i < 400; i++) {
+    const s = scene(1);
+    plain.push(...evaluate(S.calibrate({ viewer: s.seen, marks: s.marks, width: W, height: H }), s.P));
+    const cal = S.calibrate({
+      viewer: s.seen, marks: s.marks, width: W, height: H,
+      tilt: { pitch: s.P.pitch + gauss(1), roll: s.P.roll + gauss(1) },
+      fov: s.P.fov + gauss(0.5), fovSigma: 1,
+    });
+    measured.push(...evaluate(cal, s.P));
+  }
+  const a = report("one mark, guessed lens and level", plain, 0.9);
+  const b = report("one mark, measured tilt ±1° and lens ±0.5°", measured, 0.9);
+  assert.ok(b.p90 < a.p90 / 2, `p90 ${b.p90} vs ${a.p90}`);
+});
 console.log(`${count} Aimé resection checks passed.`);

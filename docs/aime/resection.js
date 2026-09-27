@@ -35,6 +35,7 @@ const Resection = (() => {
     PITCH_PRIOR_SIGMA = 15, // degrees: hand-held viewpoint photos tilt this much
     ROLL_PRIOR_SIGMA = 5, // degrees: people hold phones roughly level
     HORIZON_SIGMA = 0.7, // degrees: tap on a true level horizon
+    TILT_SIGMA = 1.5, // degrees: phone gravity sensor at the shutter
     VIEWER_SIGMA_M = 20, // metres, when the fix has no accuracy
     FEATURE_SIGMA_M = 8; // metres: OSM node placement
   const point = (p) =>
@@ -79,12 +80,12 @@ const Resection = (() => {
   }
   const aspectOf = (width, height) =>
     num(width) && num(height) && width > 0 && height > 0 ? height / width : 0.75;
-  // World ray (east, north, up) of pixel (x, y) under pose P = {heading, fov, pitch, roll}.
-  function ray(P, aspect, x, y) {
-    const t = Math.tan(rad(clampFov(P.fov)) / 2),
-      u = (x - 0.5) * 2 * t,
-      v = (y - 0.5) * 2 * t * aspect,
-      H = rad(P.heading),
+  // Camera axes in world (east, north, up) for pose P = {heading, fov, pitch, roll}.
+  // Conventions: pitch > 0 looks down (the horizon moves above the centre);
+  // roll > 0 turns the camera's right side down, so the horizon appears
+  // HIGHER on the right of the photo. Host-captured tilt must use these signs.
+  function basis(P) {
+    const H = rad(P.heading),
       p = rad(P.pitch),
       r = rad(P.roll),
       sH = Math.sin(H),
@@ -99,7 +100,26 @@ const Resection = (() => {
       Dn = [-sH * sp, -cH * sp, -cp],
       Rr = [Rt[0] * cr + Dn[0] * sr, Rt[1] * cr + Dn[1] * sr, Rt[2] * cr + Dn[2] * sr],
       Dr = [Dn[0] * cr - Rt[0] * sr, Dn[1] * cr - Rt[1] * sr, Dn[2] * cr - Rt[2] * sr];
-    return [F[0] + u * Rr[0] + v * Dr[0], F[1] + u * Rr[1] + v * Dr[1], F[2] + u * Rr[2] + v * Dr[2]];
+    return { F, R: Rr, D: Dr, t: Math.tan(rad(clampFov(P.fov)) / 2) };
+  }
+  // World ray (east, north, up) of pixel (x, y) under pose P.
+  function ray(P, aspect, x, y) {
+    const { F, R, D, t } = basis(P),
+      u = (x - 0.5) * 2 * t,
+      v = (y - 0.5) * 2 * t * aspect;
+    return [F[0] + u * R[0] + v * D[0], F[1] + u * R[1] + v * D[1], F[2] + u * R[2] + v * D[2]];
+  }
+  // Inverse: pixel {x, y} of the world direction (azimuth, elevation), or null
+  // when it lies behind the camera. x/y may fall outside [0, 1] (off-frame).
+  function project(P, aspect, azimuth, elevation = 0) {
+    const a = rad(azimuth),
+      e = rad(elevation),
+      w = [Math.sin(a) * Math.cos(e), Math.cos(a) * Math.cos(e), Math.sin(e)],
+      { F, R, D, t } = basis(P),
+      dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2],
+      f = dot(w, F);
+    if (f <= 1e-6) return null;
+    return { x: 0.5 + dot(w, R) / f / (2 * t), y: 0.5 + dot(w, D) / f / (2 * t * aspect) };
   }
   const azimuthOf = (P, aspect, x, y) => {
     const w = ray(P, aspect, x, y);
@@ -146,7 +166,9 @@ const Resection = (() => {
   //   marks:   [{x, y, point, positionM?}]    known landmarks tapped in the photo
   //   horizon: [{x, y}]                       optional taps on a true level horizon
   //   heading: compass azimuth (optional)     weak observation
-  //   fov:     known lens FOV (optional)      tight prior
+  //   tilt:    {pitch, roll, sigma?} (optional) gravity-sensor tilt at the shutter,
+  //            solver sign conventions (see basis); sigma defaults to 1.5°
+  //   fov:     known lens FOV (optional)      tight prior (fovSigma, default 1°)
   //   width, height                           photo size for aspect and default FOV
   // Returns the fitted state, its covariance and honest flags.
   function calibrate(input) {
@@ -175,11 +197,20 @@ const Resection = (() => {
     if (!list.length && compass === null)
       throw new Error("Without a mark a compass heading is required.");
     if (compass !== null) obs.push({ kind: "compass", value: compass, sigma: COMPASS_SIGMA });
-    const fovGuess = num(input.fov) ? clampFov(input.fov) : defaultFov(width, height);
+    const tilt = input.tilt;
+    if (tilt != null) {
+      if (!num(tilt.pitch) || !num(tilt.roll) || Math.abs(tilt.pitch) > 89 || Math.abs(tilt.roll) > 89 ||
+          (tilt.sigma != null && !(num(tilt.sigma) && tilt.sigma > 0)))
+        throw new Error("Tilt needs pitch and roll within ±89° and a positive sigma.");
+      const s = tilt.sigma ?? TILT_SIGMA;
+      obs.push({ kind: "pitch", value: tilt.pitch, sigma: s }, { kind: "roll", value: tilt.roll, sigma: s });
+    }
+    const fovGuess = num(input.fov) ? clampFov(input.fov) : defaultFov(width, height),
+      fovSigma = num(input.fov) ? (num(input.fovSigma) && input.fovSigma > 0 ? input.fovSigma : 1) : FOV_PRIOR_SIGMA;
     // Priors keep unobserved parameters near sensible values and, more
     // importantly, feed their ignorance into the covariance.
     const prior = {
-      fov: { mu: fovGuess, sigma: num(input.fov) ? 1 : FOV_PRIOR_SIGMA },
+      fov: { mu: fovGuess, sigma: fovSigma },
       pitch: { mu: 0, sigma: PITCH_PRIOR_SIGMA },
       roll: { mu: 0, sigma: ROLL_PRIOR_SIGMA },
       east: { mu: 0, sigma: accuracyM },
@@ -198,7 +229,10 @@ const Resection = (() => {
       }
       P.heading = wrap(deg(Math.atan2(sy, sx)));
     } else P.heading = compass;
-    if (horizon.length) {
+    if (tilt != null) {
+      P.pitch = tilt.pitch;
+      P.roll = tilt.roll;
+    } else if (horizon.length) {
       // Horizon above centre means looking down: v_h = −tan(pitch).
       const v = horizon.reduce((s, h) => s + (h.y - 0.5) * 2 * Math.tan(rad(fovGuess) / 2) * aspect, 0) / horizon.length;
       P.pitch = deg(Math.atan(-v));
@@ -209,6 +243,8 @@ const Resection = (() => {
       for (const o of obs) {
         if (o.kind === "mark") r.push(diff(azimuthOf(Q, aspect, o.m.x, o.m.y), bearing(at, o.m.point)) / o.sigma);
         else if (o.kind === "horizon") r.push(elevationOf(Q, aspect, o.h.x, o.h.y) / o.sigma);
+        else if (o.kind === "pitch") r.push((Q.pitch - o.value) / o.sigma);
+        else if (o.kind === "roll") r.push((Q.roll - o.value) / o.sigma);
         else r.push(diff(Q.heading, o.value) / o.sigma);
       }
       for (const k of PRIOR_KEYS) r.push((Q[k] - prior[k].mu) / prior[k].sigma);
@@ -295,6 +331,7 @@ const Resection = (() => {
       source: list.length ? "marks" : "compass",
       marks: list.length,
       horizonPoints: horizon.length,
+      tilt: tilt != null ? "measured" : "none",
       // "assumed" means the data left the parameter near its prior width.
       lens: sigma.fov < 0.7 * FOV_PRIOR_SIGMA ? "fitted" : "assumed",
       level: sigma.pitch < 0.7 * PITCH_PRIOR_SIGMA && sigma.roll < 0.7 * ROLL_PRIOR_SIGMA ? "fitted" : "assumed",
@@ -349,6 +386,55 @@ const Resection = (() => {
     }
     return (lo + hi) / 2;
   }
+  // Pixel of a world direction under a calibration (null if behind the camera).
+  const pixelAt = (cal, azimuth, elevation = 0) => project(pose(cal), cal.aspect, azimuth, elevation);
+  // Polyline of pixels sharing one azimuth (elevations −60…60°), clipped to the
+  // frame with a small margin. With tilt it is not a vertical line.
+  function bearingLine(cal, azimuth, margin = 0.02) {
+    const pts = [];
+    for (let e = -60; e <= 60; e += 1) {
+      const q = pixelAt(cal, azimuth, e);
+      if (q && q.x >= -margin && q.x <= 1 + margin && q.y >= -margin && q.y <= 1 + margin) pts.push(q);
+    }
+    return pts;
+  }
+  // locate(cal, target) → where a map point lies in the photo.
+  //   target: {point, positionM?}
+  // Returns {bearing, distanceKm, sigmaDeg, inFrame, side, anchor, line, band}:
+  // `line` is the target's bearing line, `band` the lines at bearing ± 2σ where
+  // σ is the comparison uncertainty at the anchor pixel (the line's crossing of
+  // the horizon, or the nearest frame edge on the centre row). `side` is
+  // "left"/"right"/"behind" when the bearing is out of frame, else null.
+  function locate(cal, target) {
+    if (!target || !point(target.point)) throw new Error("Target position required.");
+    const b = bearing(cal.viewer, target.point),
+      d = distance(cal.viewer, target.point),
+      line = bearingLine(cal, b),
+      h = pixelAt(cal, b, 0);
+    let side = null,
+      anchor;
+    if (!h) side = "behind";
+    else if (h.x < 0) side = "left";
+    else if (h.x > 1) side = "right";
+    if (side === "behind") {
+      const rel = diff(b, cal.heading);
+      side = rel < 0 ? "left" : "right";
+      anchor = { x: rel < 0 ? 0 : 1, y: 0.5 };
+      return { bearing: b, distanceKm: d, sigmaDeg: uncertainty(cal, anchor.x, anchor.y, target), inFrame: false, side: "behind-" + side, anchor, line: [], band: [[], []] };
+    }
+    anchor = { x: Math.min(1, Math.max(0, h.x)), y: Math.min(1, Math.max(0, h.y)) };
+    const sigma = uncertainty(cal, anchor.x, anchor.y, target);
+    return {
+      bearing: b,
+      distanceKm: d,
+      sigmaDeg: sigma,
+      inFrame: side === null && line.length > 0,
+      side,
+      anchor,
+      line,
+      band: [bearingLine(cal, b - 2 * sigma), bearingLine(cal, b + 2 * sigma)],
+    };
+  }
   // rank(cal, x, y, candidates) → candidates sorted best first.
   //   candidates: [{point, weight?, maxKm?, positionM?, ...}]   weight: visibility prior ≥ 0
   // Bearings are taken from the fitted viewpoint. Each result carries the
@@ -393,11 +479,16 @@ const Resection = (() => {
     columnAngle,
     angleColumn,
     defaultFov,
+    TILT_SIGMA,
     azimuthOf,
     elevationOf,
+    project,
     calibrate,
     bearingAt,
     elevationAt,
+    pixelAt,
+    bearingLine,
+    locate,
     uncertainty,
     horizonRow,
     rank,
