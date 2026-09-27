@@ -454,6 +454,37 @@ const Resection = (() => {
     }
     return out[0].y <= out[out.length - 1].y ? out : out.reverse();
   }
+  // Clip the full angular sector to the frame, not just its two boundary
+  // segments. Corners belong to the band too. A sector wider than 180° is
+  // decomposed into two non-overlapping convex polygons to avoid alpha overlap.
+  function bearingBand(cal, azimuth, halfWidth) {
+    const frame = [{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:1}];
+    if (!(num(halfWidth) && halfWidth > 0)) return [];
+    if (halfWidth >= 180) return [frame];
+    const { F, R, D, t } = basis(pose(cal));
+    const plane = (angle) => {
+      const a = rad(angle), n = [Math.cos(a), -Math.sin(a), 0],
+        dot = (v) => n[0] * v[0] + n[1] * v[1],
+        f = dot(F), r = dot(R) * t, d = dot(D) * t * cal.aspect;
+      return (p) => f + (2*p.x-1)*r + (2*p.y-1)*d;
+    };
+    const clip = (poly, side) => {
+      const out = [];
+      for (let i=0; i<poly.length; i++) {
+        const a=poly[i], b=poly[(i+1)%poly.length], sa=side(a), sb=side(b);
+        if (sa>=0) out.push(a);
+        if ((sa>=0)!=(sb>=0)) {
+          const k=sa/(sa-sb);
+          out.push({x:a.x+k*(b.x-a.x), y:a.y+k*(b.y-a.y)});
+        }
+      }
+      return out;
+    };
+    const lower=plane(azimuth-halfWidth), upper=plane(azimuth+halfWidth),
+      left=clip(frame,lower), right=(p)=>-upper(p);
+    return (halfWidth<=90 ? [clip(left,right)] :
+      [left,clip(clip(frame,(p)=>-lower(p)),right)]).filter(p=>p.length>=3);
+  }
   // locate(cal, target) → where a map point lies in the photo.
   //   target: {point, positionM?}
   // Returns {bearing, distanceKm, sigmaDeg, inFrame, side, anchor, line, band}.
@@ -475,7 +506,7 @@ const Resection = (() => {
         anchor = inside(h) ? h : line.reduce((a, q) => (Math.abs(elevationAt(cal, q.x, q.y)) < Math.abs(elevationAt(cal, a.x, a.y)) ? q : a)),
         sigma = uncertainty(cal, anchor.x, anchor.y, target);
       return { bearing: b, distanceKm: d, sigmaDeg: sigma, inFrame: true, side: null, anchor: { x: anchor.x, y: anchor.y }, line,
-        band: [bearingLine(cal, b - 2 * sigma), bearingLine(cal, b + 2 * sigma)] };
+        band: [bearingLine(cal, b - 2 * sigma), bearingLine(cal, b + 2 * sigma)], bandPolygons: bearingBand(cal, b, 2 * sigma) };
     }
     const q = pixelAt(cal, b, elevationAt(cal, 0.5, 0.5));
     let side, anchor;
@@ -545,6 +576,7 @@ const Resection = (() => {
     elevationAt,
     pixelAt,
     bearingLine,
+    bearingBand,
     locate,
     uncertainty,
     horizonRow,

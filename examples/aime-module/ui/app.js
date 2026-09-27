@@ -392,8 +392,8 @@ function renderPin() {
 }
 function setPin(pin) {
   state.pin = pin;
-  if (state.pane === "map") renderMap(false);
   render();
+  if (state.pane === "map") renderMap(false);
 }
 function setMode(mode) {
   state.mode = mode;
@@ -816,7 +816,7 @@ function drawPin(o, H, px) {
       e.textContent = t;
       o.append(e);
     };
-  if (view.band.length) o.append(svg("polygon", { points: pts(view.band), fill: "#8CF0C42e", stroke: "#8CF0C480", "stroke-width": px(1) }));
+  for (const band of view.bands) o.append(svg("polygon", { points: pts(band), fill: "#8CF0C42e", stroke: "#8CF0C480", "stroke-width": px(1) }));
   if (view.line.length) {
     o.append(svg("polyline", { points: pts(view.line), fill: "none", stroke: "#06110B99", "stroke-width": px(5) }));
     o.append(svg("polyline", { points: pts(view.line), fill: "none", stroke: "#8CF0C4", "stroke-width": px(2) }));

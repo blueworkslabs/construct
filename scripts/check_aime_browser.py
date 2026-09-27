@@ -335,6 +335,7 @@ def main():
             dropped = page.evaluate("({pin:state.pin,scene:!!map.scene.pin,ruler:map.ruler.points.length,tools:!$('pin-tools').hidden})")
             assert dropped["pin"] and dropped["scene"] and dropped["tools"] and dropped["ruler"] == 0, dropped
             assert page.evaluate("JSON.stringify(current().viewer)") == viewer, "Long-press moved the viewpoint"
+            assert page.evaluate("$('map-legend').textContent.includes(pinStatus())"), "Map legend retained the previous pin details"
             page.locator("#map-ruler").click()
             page.locator("#pin-show").click()
             assert page.evaluate("state.pane === 'photo' && !!state.pinLoc")

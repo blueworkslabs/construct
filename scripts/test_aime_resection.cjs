@@ -558,4 +558,25 @@ test("heading references: magnetic needs a declination; sensor accuracy widens �
   assert.ok(Math.abs(tight.sigma.heading - 12) < 0.5, `floor 12°, got ${tight.sigma.heading}`);
   assert.ok(loose.sigma.heading > 28, `accuracy 30° widens σ, got ${loose.sigma.heading}`);
 });
+test("bearing-band polygons contain exactly the angular sector, including corners and wide/steep poses", () => {
+  const inside = (p, poly) => {
+    let yes=false;
+    for(let i=0,j=poly.length-1;i<poly.length;j=i++) {
+      const a=poly[i],b=poly[j];
+      if((a.y>p.y)!=(b.y>p.y) && p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x) yes=!yes;
+    }
+    return yes;
+  };
+  const rolled=truthCal({heading:0,pitch:0,roll:20,fov:70});
+  assert.ok(S.bearingBand(rolled,-25,8).some(p=>inside({x:.001,y:.001},p)), "rolled band must include the top-left corner");
+  for(let scene=0;scene<180;scene++) {
+    const P={heading:rnd()*360,pitch:rnd()*178-89,roll:rnd()*178-89,fov:20+rnd()*100}, cal=truthCal(P),
+      b=rnd()*360, width=[1,8,33,89,90,100,179,180][scene%8], polys=S.bearingBand(cal,b,width);
+    for(let x=.025;x<1;x+=.05) for(let y=.025;y<1;y+=.05) {
+      const delta=Math.abs(S.diff(truthBearing(P,x,y),b));
+      if(Math.abs(delta-width)<1e-7) continue;
+      assert.equal(polys.some(p=>inside({x,y},p)),delta<width,JSON.stringify({P,b,width,x,y,delta,polys}));
+    }
+  }
+});
 console.log(`${count} Aimé resection checks passed.`);

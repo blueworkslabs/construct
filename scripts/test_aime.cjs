@@ -513,14 +513,9 @@ check("map pin in the photo: locate's line and ±2σ band, edge arrows off frame
   assert.ok(Math.abs(R.diff(R.bearingAt(cal, F.taps.whatB.x, F.taps.whatB.y), b.bearing)) <= 2 * b.sigmaDeg && Math.abs(b.anchor.y - F.taps.whatB.y) < 0.02);
   assert.equal(ov.line, b.line);
   assert.equal(ov.arrow, null);
-  assert.equal(ov.band.length, b.band[0].length + b.band[1].length);
-  assert.deepEqual([ov.band[0], ov.band.at(-1)], [b.band[0][0], b.band[1][0]], "down one edge, back up the other");
+  assert.deepEqual(ov.bands, b.bandPolygons, "use solver-clipped polygons, including frame corners");
+  assert.ok(ov.bands.length > 0);
   assert.match(C.pinText(b, "Synthetic Peak B"), /^Synthetic Peak B: in the photo · 18 km · 42° NE · band ±\d+\.\d° \(2σ\)$/);
-  // A band edge beyond the frame follows the frame edge on its side.
-  const wide = C.pinOverlay({ ...b, band: [[], b.band[1]] });
-  assert.deepEqual(wide.band.slice(0, 2), [{ x: 0, y: 0 }, { x: 0, y: 1 }]);
-  assert.deepEqual(C.pinOverlay({ ...b, band: [b.band[0], []] }).band.slice(-2), [{ x: 1, y: 1 }, { x: 1, y: 0 }]);
-  // Out of frame to the left, in front of the camera.
   const left = R.locate(cal, { point: R.destination(F.viewer, F.pose.heading - 50, 5) });
   assert.equal(left.side, "left");
   assert.deepEqual(C.pinOverlay(left).arrow, { x: 0, y: Math.max(0.06, Math.min(0.94, left.anchor.y)), angle: 180 });

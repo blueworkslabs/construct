@@ -606,20 +606,17 @@ const AimeCore = (() => {
 
   // ---- Map pin in the photo (Resection.locate) -------------------------------
   // locate result → what the photo overlay draws. In frame: the bearing line and
-  // the ±2σ band as one closed polygon (a band edge that leaves the frame runs
-  // along the frame edge on its side). Out of frame: an arrow on the matching
+  // the ±2σ band as frame-clipped polygons from the reference solver. Out of frame: an arrow on the matching
   // edge, pointing out (degrees, 0 = right, 90 = down), kept off the corners.
   const ARROW = { left: 180, right: 0, above: -90, below: 90, "behind-left": 180, "behind-right": 0 };
   function pinOverlay(loc) {
     if (loc.inFrame) {
-      const [lo, hi] = loc.band,
-        edge = (x) => [{ x, y: 0 }, { x, y: 1 }];
-      return { line: loc.line, band: [...(lo.length ? lo : edge(0)), ...(hi.length ? hi : edge(1)).slice().reverse()], anchor: loc.anchor, arrow: null };
+      return { line: loc.line, bands: loc.bandPolygons, anchor: loc.anchor, arrow: null };
     }
     const a = loc.anchor,
       inset = (v) => Math.max(0.06, Math.min(0.94, v)),
       vertical = loc.side === "above" || loc.side === "below";
-    return { line: [], band: [], anchor: a, arrow: { x: vertical ? inset(a.x) : a.x, y: vertical ? a.y : inset(a.y), angle: ARROW[loc.side] } };
+    return { line: [], bands: [], anchor: a, arrow: { x: vertical ? inset(a.x) : a.x, y: vertical ? a.y : inset(a.y), angle: ARROW[loc.side] } };
   }
   const WHERE = { left: "out of frame to the left", right: "out of frame to the right", above: "above the photo", below: "below the photo", "behind-left": "behind you, to the left", "behind-right": "behind you, to the right" };
   // "Synthetic Peak B: in the photo · 18 km · 42° NE · band ±7.2° (2σ)".

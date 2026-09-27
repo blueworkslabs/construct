@@ -431,7 +431,7 @@ distances and a map ruler, and working screenshots.
   solver's bearings are true north, so the module passes `headingRef:
   "magnetic"` with a `declination` and the solver refuses a magnetic heading
   without one. Declination source: an additive `declination` field (degrees
-  east, WMM at the cell centre on the build date, 0.1°) in each aime-data
+  east, WMM2025 at the cell centre on the Overture release date, 0.1°) in each aime-data
   cell; the module takes it from the viewpoint's cell, and skips the heading
   when it is absent. `headingAccuracyDeg` becomes `headingSigma` (the solver
   floors it at 12°). The heading remains a weak hint. No location is added to
