@@ -53,6 +53,20 @@ def main():
         page.evaluate(
             """async()=>{state.store={photo1:AimeCore.newSidecar({...SyntheticAime.viewer,accuracyM:10,timestamp:Date.now()})};await openPhoto('photo1');const f=AimeCore.parseCell(AimeCore.parseIndex(SyntheticAime.index()),'46_9',SyntheticAime.cell('46_9')).find(f=>f.name==='Synthetic Tower A');await update(s=>({...s,marks:[AimeCore.markFrom(f,SyntheticAime.taps.markA.x,SyntheticAime.taps.markA.y)]}));}"""
         )
+        # A WebView may omit the compatibility click after a long press.
+        # Hiding the module during the fallback delay must cancel placement.
+        page.evaluate("setMode('horizon');state.horizonExplained=true;$('stage').addEventListener('click',e=>e.stopImmediatePropagation(),{capture:true,once:true})")
+        page.locator('#stage').scroll_into_view_if_needed()
+        r = page.locator('#stage').bounding_box()
+        cdp0 = page.context.new_cdp_session(page)
+        cdp0.send('Input.dispatchTouchEvent', {'type':'touchStart','touchPoints':[{'x':r['x']+r['width']*.7,'y':r['y']+r['height']*.6,'id':1}]})
+        page.wait_for_timeout(450)
+        cdp0.send('Input.dispatchTouchEvent', {'type':'touchEnd','touchPoints':[]})
+        page.evaluate("window.dispatchEvent(new CustomEvent('constructvisibilitychange',{detail:{visible:false}}))")
+        page.wait_for_timeout(400)
+        assert page.evaluate('current().horizon.length === 0'), 'Deferred hold saved a horizon point after module was hidden'
+        page.evaluate("window.dispatchEvent(new CustomEvent('constructvisibilitychange',{detail:{visible:true}}));setMode('what')")
+        print('PASS hiding module cancels deferred hold placement')
         # A cached lookup opens synchronously enough for pointerup -> click
         # retargeting on touch WebViews. At 2x text a candidate lies under the tap.
         page.set_viewport_size({"width": 360, "height": 604})

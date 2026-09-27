@@ -541,6 +541,8 @@ const gestures = (() => {
   };
   function cancel() {
     clearTimeout(holdTimer);
+    clearTimeout(tapTimer);
+    completedTap = null;
     if (g && g.drag) {
       g.drag.cancel();
       endPreview();
