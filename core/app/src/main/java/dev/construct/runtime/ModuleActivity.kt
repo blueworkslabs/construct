@@ -36,12 +36,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.DialogWindowProvider
 import java.util.concurrent.Executors
 
 /** One native accessibility root per launch. Configuration changes retain this session. */
@@ -142,6 +144,7 @@ class ModuleActivity : ComponentActivity() {
 
     private var screenCapture = ScreenCapturePolicy.Decision(secure = true, hideRecents = false)
     private var screenResumed = false
+    private val privacyCurtains = PrivacyCurtains(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
 
     private fun applyScreenCapture() {
         if (ScreenCapturePolicy.secureWindow(screenCapture, screenResumed, hasWindowFocus()))
@@ -155,15 +158,25 @@ class ModuleActivity : ComponentActivity() {
     }
 
     override fun onResume() {
-        super.onResume(); screenResumed = true; applyScreenCapture()
+        super.onResume(); screenResumed = true; applyScreenCapture(); privacyCurtains.resume()
     }
 
     override fun onPause() {
-        screenResumed = false; applyScreenCapture(); super.onPause()
+        privacyCurtains.pause(); screenResumed = false; applyScreenCapture(); super.onPause()
+    }
+
+    override fun onUserLeaveHint() {
+        privacyCurtains.userLeaving(); super.onUserLeaveHint()
+    }
+
+    override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        privacyCurtains.topResumed(isTopResumedActivity)
+        super.onTopResumedActivityChanged(isTopResumedActivity)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        privacyCurtains.register(window)
         // Never resurrect a stopped runtime after process death. Rotation is handled in-place.
         if (savedInstanceState != null) { finishSession(); return }
         store = ModuleStore.shared(this)
@@ -186,6 +199,7 @@ class ModuleActivity : ComponentActivity() {
                     val screen = ScreenCapturePolicy.decide(module.manifest.capabilities.map { it.id }, module.allowScreenshots,
                         android.os.Build.VERSION.SDK_INT)
                     screenCapture = screen
+                    privacyCurtains.protect(window, ScreenCapturePolicy.sensitive(module.manifest.capabilities.map { it.id }))
                     applyScreenCapture()
                     if (screen.hideRecents && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
                         setRecentsScreenshotEnabled(false)
@@ -216,6 +230,7 @@ class ModuleActivity : ComponentActivity() {
 
     override fun onStop() { if (!pickingImage && !capturingPhoto) finishSession(); super.onStop() }
     override fun onDestroy() {
+        privacyCurtains.close()
         webView?.destroy(); webView = null
         worker.shutdown()
         super.onDestroy()
@@ -231,6 +246,19 @@ class ModuleActivity : ComponentActivity() {
         }
     }
     private fun closeDiagnostics() { diagnosticText = null; diagnosticsOpen = false; menu = true }
+
+    /** Register the actual native dialog window, not the parent activity's decor. */
+    @Composable private fun ProtectDialogWindow() {
+        val view = LocalView.current
+        val dialogWindow = remember(view) {
+            generateSequence(view) { it.parent as? android.view.View }
+                .mapNotNull { (it as? DialogWindowProvider)?.window }.first()
+        }
+        DisposableEffect(dialogWindow) {
+            val registration = privacyCurtains.register(dialogWindow)
+            onDispose { registration.close() }
+        }
+    }
 
     @Composable private fun Session() {
         BackHandler {
@@ -301,6 +329,7 @@ class ModuleActivity : ComponentActivity() {
             onDismissRequest = { finishPhotoConfirmation(false) },
             title = { Text(if (confirmation.op == "delete") "Delete this private photo?" else "Save this photo to phone gallery?") },
             text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ProtectDialogWindow()
                 Text("Construct confirmation · ${active?.manifest?.name ?: "Module"}")
                 androidx.compose.foundation.Image(confirmation.image.asImageBitmap(), "Selected private photo",
                     Modifier.fillMaxWidth().heightIn(max = 220.dp), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
@@ -314,6 +343,7 @@ class ModuleActivity : ComponentActivity() {
             properties = androidx.compose.ui.window.DialogProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
             title = { Text("Diagnostics") },
             text = { Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+                ProtectDialogWindow()
                 Text("Local technical report. Review before sharing; module messages may contain data.", style = MaterialTheme.typography.bodySmall)
                 Text(diagnosticText ?: "Loading diagnostics…", style = MaterialTheme.typography.bodySmall)
             } },
