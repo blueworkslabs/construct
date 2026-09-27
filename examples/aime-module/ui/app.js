@@ -714,7 +714,8 @@ async function openMarkDialog() {
   try {
     const data = await features();
     if (!dialog.open || request !== markRequest || generation !== state.photoGeneration) return;
-    say("fetch-status", data.features.length ? `${data.features.length} landmarks within ${current().radiusKm} km. Nearest first.` : `No named landmarks found within ${current().radiusKm} km. Try a larger radius.`);
+    const note = C.coverageNote(data);
+    say("fetch-status", (data.features.length ? `${data.features.length} landmarks within ${current().radiusKm} km. Nearest first.` : `No named landmarks found within ${current().radiusKm} km. Try a larger radius.`) + (note ? " " + note : ""), note ? "attention" : undefined);
     renderResults();
   } catch (error) {
     if (!dialog.open || request !== markRequest || generation !== state.photoGeneration) return;
@@ -779,9 +780,9 @@ async function whatsThat(x, y) {
     ol = $("candidates");
   ol.replaceChildren();
   const wedge = ranked.length ? ranked[0].wedgeSigmaDeg : S.uncertainty(state.cal, x, y);
-  state.lastList = { rows: list.rows, wedge, bearing: S.bearingAt(state.cal, x, y) };
+  state.lastList = { rows: list.rows, wedge, bearing: S.bearingAt(state.cal, x, y), partialCoverage: data.partialCoverage };
   $("candidates-title").textContent = list.anyClose ? "Could be" : "No close match";
-  $("candidates-note").textContent = `Your tap points ${Math.round(S.bearingAt(state.cal, x, y))}° (${C.compass(S.bearingAt(state.cal, x, y))}), direction ±${wedge.toFixed(1)}°.` + (list.anyClose ? "" : " Nearest two shown greyed.");
+  $("candidates-note").textContent = `Your tap points ${Math.round(S.bearingAt(state.cal, x, y))}° (${C.compass(S.bearingAt(state.cal, x, y))}), direction ±${wedge.toFixed(1)}°.` + (list.anyClose ? "" : " Nearest two shown greyed.") + (data.partialCoverage ? " " + C.coverageNote(data) : "");
   let positionNote = false;
   list.rows.forEach((r, i) => {
     const li = document.createElement("li"),
@@ -930,6 +931,7 @@ function renderMap(fit, focus = null) {
     item(`Ring: ${v.corrected ? "your corrected" : v.review ? "estimated (please confirm)" : "your estimated"} viewpoint`, `±${Math.round(v.accuracyM || 20)} m accuracy, shown as the shaded circle`);
     if (fitted) item("Dot: viewpoint fitted from your marks", `${Math.round(S.distance(v, fitted) * 1000)} m from the ring; your saved viewpoint is unchanged`);
   }
+  if (list && list.partialCoverage) item("Partial landmark coverage", C.coverageNote(list));
   if (v && list) item(`Wedge: your tap points ${Math.round(list.bearing)}° (${C.compass(list.bearing)})`, `±${list.wedge.toFixed(1)}° (1σ), fainter band to ±${(2 * list.wedge).toFixed(1)}° (2σ); nearby candidates can have a wider ±σ of their own`);
   s.marks.forEach((m) => item(`Green pin: ${m.name}`, v ? `landmark you marked · ${C.km(S.distance(v, m))} · ${Math.round(S.bearing(v, m))}°` : "landmark you marked"));
   candidates.forEach((c, i) => {

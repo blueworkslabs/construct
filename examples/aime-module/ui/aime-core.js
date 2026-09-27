@@ -274,6 +274,10 @@ const AimeCore = (() => {
     }
   };
   const CELL = /^(-?\d{1,2})_(-?\d{1,3})$/;
+  const validCell = (value) => {
+    const m = typeof value === "string" && value.match(CELL);
+    return !!m && +m[1] >= -90 && +m[1] < 90 && +m[2] >= -180 && +m[2] < 180 && value === `${+m[1]}_${+m[2]}`;
+  };
   // 1° cells (integer south-west corner) of the radius's bounding box. The
   // longitude half-width is the spherical cap's, asin(sin δ / cos φ); a cap
   // over a pole spans every longitude.
@@ -300,14 +304,14 @@ const AimeCore = (() => {
     const kinds = new Set(Array.isArray(x.kinds) ? x.kinds.filter(isKind) : []);
     // dataset = <release>-r<revision>; its cells live under <dataset>/cells/.
     const dataset = isRelease(x.release) && Number.isInteger(x.revision) && x.revision >= 1 ? `${x.release}-r${x.revision}` : null;
-    if (!dataset || x.dataset !== dataset || !isRelease(x.dataset) || x.path !== dataset + "/cells/" || !Array.isArray(x.cells) || !kinds.size)
+    if (!dataset || x.dataset !== dataset || !isRelease(x.dataset) || x.path !== dataset + "/cells/" || !Array.isArray(x.cells) || !x.cells.every(validCell) || !kinds.size)
       throw unavailable("the landmark index is incomplete.");
     return {
       release: x.release,
       revision: x.revision,
       dataset,
       path: x.path,
-      cells: new Set(x.cells.filter((c) => typeof c === "string" && CELL.test(c))),
+      cells: new Set(x.cells),
       kinds,
       coverage: Array.isArray(x.coverage) ? x.coverage.filter((c) => typeof c === "string") : [],
       license: text(x.license, 40) || "ODbL-1.0",
@@ -345,7 +349,14 @@ const AimeCore = (() => {
   }
   // Identity of a landmark: name, kind and position to 5 decimals (no OSM ids).
   const featureKey = (f) => [f.name, f.kind || "", f.lat.toFixed(5), f.lon.toFixed(5)].join("|");
-  const sameFeature = (a, b) => featureKey(a) === featureKey(b);
+  const sameFeature = (a, b) => {
+    if (featureKey(a) === featureKey(b)) return true;
+    // Old OSM marks have no kind. Reselecting the same named position replaces
+    // its observation rather than giving the solver duplicate evidence.
+    const legacy = (f) => !f.kind && ["node", "way", "relation"].includes(f.osmType) && Number.isInteger(f.osmId);
+    return (legacy(a) || legacy(b)) && a.name === b.name && a.lat.toFixed(5) === b.lat.toFixed(5) && a.lon.toFixed(5) === b.lon.toFixed(5);
+  };
+  const coverageNote = (data) => data.partialCoverage ? "Partial coverage: some search-area cells are outside this dataset; landmarks may be missing." : "";
   // Features of the downloaded cells within the radius, deduplicated.
   function within(features, viewer, radiusKm) {
     const seen = new Set();
@@ -436,7 +447,8 @@ const AimeCore = (() => {
           plan = cellPlan(ix, viewer, radiusKm);
         if (!plan.length) throw dataError("OUTSIDE_COVERAGE", outsideMessage(ix.coverage), false);
         const lists = await Promise.all(plan.map((c) => cell(ix, c)));
-        return { features: within(lists.flat(), viewer, radiusKm), dataset: ix.dataset, cells: plan.length };
+        return { features: within(lists.flat(), viewer, radiusKm), dataset: ix.dataset, cells: plan.length,
+          partialCoverage: plan.length < cellsAround(viewer.lat, viewer.lon, radiusKm).length };
       },
     };
   }
@@ -539,6 +551,7 @@ const AimeCore = (() => {
     parseCell,
     featureKey,
     sameFeature,
+    coverageNote,
     within,
     cacheKey,
     outsideMessage,

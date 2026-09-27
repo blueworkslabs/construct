@@ -276,7 +276,10 @@ depends on it, not on Overture directly. Summary:
   without a valid `p`, is rejected as unavailable.
 - What leaves the phone: **the ids of the 1° cells** the radius touches (about
   110 × 70 km each) to the data host, and tile coordinates to OpenStreetMap.
-  Never the viewpoint, the radius, the photo, the marks or the taps.
+  The exact viewpoint and radius are not sent explicitly, but the requested
+  cell and tile set can reveal the approximate area and search extent. Photos,
+  marks and taps stay on the phone. If only some search-area cells are covered,
+  mark search, candidate results and the map explicitly warn of partial coverage.
 - Attribution "© OpenStreetMap contributors, Overture Maps Foundation" and the
   ODbL licence from `index.json` appear in the module's help and on the map.
 - **Sidecar per photo** (`storage.kv`, key `photos`, a map from stable photo

@@ -161,7 +161,7 @@ check("index validation: schema 1 only, dataset = release-rN with its path, list
   bad({ kinds: { peak: { placementM: 8 } } });
   bad({ kinds: [] });
   assert.throws(() => C.parseIndex("<html>404</html>"), { code: "DATA_INVALID" });
-  assert.deepEqual([...C.parseIndex(JSON.stringify({ ...INDEX, cells: ["46_9", "x", 7, "1000_1"] })).cells], ["46_9"]);
+  for (const invalid of ["x", 7, "1000_1", "90_1", "46_180", "046_9", "-0_9"]) bad({ cells: ["46_9", invalid] });
   assert.deepEqual(C.cellPlan(ix, { lat: 46.8, lon: 9.2 }, 30).sort(), ["46_9", "47_9"], "only listed cells");
   assert.deepEqual(C.cellPlan(ix, { lat: 40.4, lon: -3.7 }, 60), [], "outside coverage");
   assert.equal(C.outsideMessage(ix.coverage), "No landmark data here yet. Germany and Austria for now.");
@@ -263,10 +263,16 @@ check("feature identity is name + kind + position to 5 decimals; legacy OSM mark
   assert.deepEqual(C.cleanSidecar(structuredClone(legacy)), legacy, "unchanged on every re-save");
   assert.equal(C.cleanSidecar({ marks: [legacyMark(1, { osmType: "area" })] }).marks.length, 0);
   assert.deepEqual(C.calibrationInput(legacy, 1000, 750).marks[0], { x: 0.1, y: 0.5, point: { lat: 46.9, lon: 9.1 }, positionM: 8 });
-  // New marks next to legacy ones: identity never merges them by accident.
+  // Reselecting a legacy landmark replaces its tap without duplicate solver evidence.
   const next = C.markFrom({ name: "Mark 1", kind: "tower", lat: 46.9, lon: 9.1, p: 12, positionM: 12, dataset: "2026-09-23.1-r1", w: 1.3, e: 80 }, 0.3, 0.5);
   assert.deepEqual(next, { x: 0.3, y: 0.5, kind: "tower", name: "Mark 1", lat: 46.9, lon: 9.1, positionM: 12, dataset: "2026-09-23.1-r1" }, "marks store the dataset");
-  assert.ok(!C.sameFeature(next, legacy.marks[0]));
+  assert.ok(C.sameFeature(next, legacy.marks[0]));
+  assert.ok(C.sameFeature(legacy.marks[0], next));
+  assert.ok(!C.sameFeature({...next, name:"Different tower"}, legacy.marks[0]));
+  assert.ok(!C.sameFeature({...next, lon:next.lon + .001}, legacy.marks[0]));
+  const replaced=[...legacy.marks.filter(m=>!C.sameFeature(m,next)),next];
+  assert.equal(replaced.length,legacy.marks.length);
+  assert.equal(replaced.at(-1).x,.3);
   // A synthetic legacy photo still calibrates on its stored mark and ranks as before.
   const ix = C.parseIndex(F.index());
   const features = F.cells.flatMap((c) => C.parseCell(ix, c, F.cell(c)));
@@ -578,9 +584,13 @@ checkAsync("60 km fetches at most 9 listed cells, never more than two at once, a
   assert.ok(found.features.every((f) => C.metres(viewer, f) <= 60000));
   assert.deepEqual(found.features.map((f) => f.name).sort(), ["Centre 52_10", "Centre 52_9"]);
   assert.equal(found.dataset, INDEX.dataset);
-  // Only listed cells are requested; an unlisted neighbour is simply absent.
+  assert.equal(found.partialCoverage, false);
+  assert.equal(C.coverageNote(found), "");
+  // Only listed cells are fetched, but missing neighbours must be disclosed.
   const sparse = dataHost({ [C.INDEX_URL]: indexWith(["52_9"]), ...cellFiles(["52_9"]) });
-  await C.landmarkData(sparse.get).features(viewer, 60);
+  const partial=await C.landmarkData(sparse.get).features(viewer, 60);
+  assert.equal(partial.partialCoverage,true);
+  assert.match(C.coverageNote(partial), /Partial coverage/);
   assert.equal(sparse.log.length, 2);
 });
 

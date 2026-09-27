@@ -138,6 +138,19 @@ def main():
         print("PASS navigation cancellation and moving-pinch anchor")
         if page.evaluate("typeof AimeMap !== 'undefined'"):
             page.evaluate("call=window.originalCall")
+            # Partial coverage must remain visible in each result surface.
+            page.evaluate("async()=>{const data=await features();data.partialCoverage=true;await openMarkDialog()}")
+            assert "Partial coverage" in page.locator("#fetch-status").inner_text()
+            page.evaluate("$('mark-dialog').close()")
+            page.evaluate("whatsThat(SyntheticAime.taps.whatB.x,SyntheticAime.taps.whatB.y)")
+            assert "Partial coverage" in page.locator("#candidates-note").inner_text()
+            page.locator("#candidates button").first.click()
+            assert "Partial landmark coverage" in page.locator("#map-legend").inner_text()
+            # A real UI selection replaces a legacy observation of that point.
+            page.evaluate("""async()=>{showPane('photo');const m=current().marks[0];const {kind,dataset,...old}=m;await update(s=>({...s,marks:[{...old,osmType:'node',osmId:123}]}));state.pendingTap={x:.4,y:.5};pick({...m,p:m.positionM});}""")
+            page.wait_for_function("!state.busy")
+            assert page.evaluate("current().marks.length===1 && current().marks[0].x===.4 && !!current().marks[0].kind"), "Legacy selection duplicated a calibration mark"
+            print("PASS partial coverage in mark search, candidates and map; legacy mark replacement")
             page.evaluate(
                 "whatsThat(SyntheticAime.taps.whatB.x,SyntheticAime.taps.whatB.y)"
             )
