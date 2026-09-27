@@ -57,7 +57,7 @@ function rig({saved = {}, error = null, gpStatus = 200, pendingHttp = false, clo
           : u.includes('GROUP=visual') ? {status: 200, text: SATCAT}
           : u.includes('INTDES=') ? {status: 200, text: launchBody}
           : u.startsWith('https://en.wikipedia.org/') ? {status: 200, text: WIKI} : {status: 404};
-        if (pendingHttp) return new Promise(resolve => held.push(() => resolve(result)));
+        if (typeof pendingHttp === "function" ? pendingHttp(u) : pendingHttp) return new Promise(resolve => held.push(() => resolve(result)));
         return result;
       }
       throw Object.assign(new Error(method), {code: 'UNSUPPORTED'});
@@ -161,6 +161,16 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   r.el('close-info').click(); r.select(48274); r.el('details').click(); await flush(4);
   assert.match(r.el('info-body').text, /Launched with: FIRST/);
   assert.doesNotMatch(r.el('info-body').text, /Launched with: SECOND/);
+
+  // Closing and reopening the same object creates a new lookup view.
+  r = rig({saved, pendingHttp: u => u.includes('wikipedia')}); await flush(8);
+  r.select(29507); r.el('details').click(); await flush(4);
+  const oldWiki = r.el('wiki').onclick();
+  r.el('close-info').click(); r.el('details').click(); await flush(4);
+  r.finishHttp(); await oldWiki; await flush(4);
+  assert.equal(r.el('wiki').textContent, 'Read on Wikipedia', 'old lookup must not mark new view loaded');
+  const newWiki = r.el('wiki').onclick(); r.finishHttp(); await newWiki;
+  assert.match(r.el('info-body').text, /Chinese launch vehicle/);
 
   // CelesTrak failure: a clear message, a remembered back-off, no hammering.
   r = rig({gpStatus: 503}); await flush(8);

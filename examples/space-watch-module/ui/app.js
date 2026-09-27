@@ -36,6 +36,7 @@
     listKey = "",
     lastCounts = "",
     infoTarget = null,
+    infoGeneration = 0,
     infoBusy = false,
     wikiDone = false,
     wikiSection = null;
@@ -489,6 +490,8 @@
     const o = objects.find((x) => x.id === selected);
     if (!o || !place) return;
     infoTarget = o;
+    const generation = ++infoGeneration;
+    infoBusy = false;
     wikiDone = false;
     const d = info(o),
       c = satcat.get(o.id),
@@ -538,9 +541,9 @@
     $("wiki").disabled = false;
     $("wiki").textContent = "Read on Wikipedia";
     $("info-dialog").showModal();
-    loadLaunch(o, launch);
+    loadLaunch(o, launch, generation);
   }
-  async function loadLaunch(o, section) {
+  async function loadLaunch(o, section, generation) {
     const url = C.launchUrl(o.intdes);
     if (!url) return;
     let body = launches.get(o.intdes.slice(0, 8));
@@ -552,11 +555,11 @@
         body = r.text;
         launches.set(o.intdes.slice(0, 8), body);
       } catch (_) {
-        if (infoTarget === o) section.replaceChildren(element("p", "Launch details unavailable right now.", "note"));
+        if (infoTarget === o && generation === infoGeneration) section.replaceChildren(element("p", "Launch details unavailable right now.", "note"));
         return;
       }
     }
-    if (infoTarget !== o) return;
+    if (infoTarget !== o || generation !== infoGeneration) return;
     const v = C.parseLaunch(body, o.id);
     section.replaceChildren(element("h3", "Same launch"));
     if (!v.total) return section.append(element("p", "Nothing else is catalogued from this launch.", "note"));
@@ -575,7 +578,7 @@
       section.append(element("p", `${v.reentered} of these have already fallen back and burned up.`, "note"));
   }
   $("wiki").onclick = async () => {
-    const o = infoTarget;
+    const o = infoTarget, generation = infoGeneration;
     if (!o || infoBusy || wikiDone) return;
     const d = info(o),
       section = wikiSection;
@@ -594,7 +597,7 @@
         searched = search;
         if (result) break;
       }
-      if (infoTarget !== o) return;
+      if (infoTarget !== o || generation !== infoGeneration) return;
       section.replaceChildren(element("h3", "Wikipedia"));
       if (!result) section.append(element("p", "No Wikipedia article found for this object.", "note"));
       else {
@@ -608,17 +611,25 @@
       wikiDone = true;
       $("wiki").textContent = "Wikipedia loaded";
     } catch (e) {
-      if (infoTarget === o)
-        section.replaceChildren(element("h3", "Wikipedia"), element("p", describeError(e), "note attention"));
+      if (infoTarget !== o || generation !== infoGeneration) return;
+      section.replaceChildren(element("h3", "Wikipedia"), element("p", describeError(e), "note attention"));
       $("wiki").disabled = false;
     } finally {
-      infoBusy = false;
+      if (generation === infoGeneration) infoBusy = false;
     }
   };
   $("close-info").onclick = () => {
     infoTarget = null;
+    infoGeneration++;
+    infoBusy = false;
     $("info-dialog").close();
   };
+  $("info-dialog").addEventListener("close", () => {
+    if ($("info-dialog").open) return;
+    infoTarget = null;
+    infoGeneration++;
+    infoBusy = false;
+  });
   $("details").onclick = openInfo;
   $("clear").onclick = () => select(null);
 
@@ -769,6 +780,7 @@
       if ($("info-dialog").open) {
         $("info-dialog").close();
         infoTarget = null;
+        infoGeneration++;
       }
       message($("status"), "Paused while Construct’s menu is open.");
       if (!place) welcome("choose");
