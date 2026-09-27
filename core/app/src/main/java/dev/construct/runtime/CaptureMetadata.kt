@@ -112,9 +112,47 @@ internal data class FovDecision(val fov: FieldOfView?, val source: String?, val 
         const val NO_GEOMETRY = "no-geometry"
         const val FOCAL_MISMATCH = "focal-mismatch"
         const val BAD_CROP = "crop-region-invalid"
+        const val CROP_OFF_CENTRE = "crop-off-centre"
+        const val CROP_UNVERIFIABLE = "crop-unverifiable"
         const val FROM_RESULT = "capture-result"
         const val FROM_CHARACTERISTICS = "characteristics"
         fun omit(reason: String) = FovDecision(null, null, reason)
+    }
+}
+
+/**
+ * The capture contract assumes the optical axis passes through the saved image's centre; it has
+ * no principal-point field. A reported crop region whose centre lies off the active-array centre
+ * (the assumed optical axis) by more than [MAX_OFFSET_DEG] makes `fovDeg`, `tilt` and heading
+ * describe a different axis than the photo's centre, so all three are omitted.
+ */
+internal object CropCentre {
+    /** Axis error allowed from integer crop rounding: well below the 0.1° budget, a few pixels on phone sensors. */
+    const val MAX_OFFSET_DEG = 0.05
+
+    /** Angular offset (degrees, larger axis) of the crop centre from the active-array centre, or null if it cannot be computed. */
+    fun offsetDeg(geometry: SensorGeometry?, focalMm: Double?, crop: List<Int>): Double? {
+        if (geometry == null || !geometry.valid || focalMm == null || !focalMm.isFinite() || focalMm <= 0 || crop.size != 4) return null
+        val dx = (crop[0] + crop[2]) / 2.0 - geometry.activeWidth / 2.0
+        val dy = (crop[1] + crop[3]) / 2.0 - geometry.activeHeight / 2.0
+        val x = deg(atan(abs(dx) * geometry.physicalWidthMm / geometry.pixelArrayWidth / focalMm))
+        val y = deg(atan(abs(dy) * geometry.physicalHeightMm / geometry.pixelArrayHeight / focalMm))
+        return max(x, y)
+    }
+
+    /**
+     * Null when the still result reports no crop or a centred one; otherwise the reason. The crop is
+     * in the bound camera's active-array coordinates; the shortest candidate focal length gives the
+     * largest (strictest) angle per pixel.
+     */
+    fun problem(lens: LensState?, still: StillResult?): String? {
+        val crop = still?.cropRegion ?: return null
+        val focal = (listOfNotNull(still.focalMm) + lens?.focalLengths.orEmpty()).filter { it.isFinite() && it > 0 }.minOrNull()
+        val geometry = lens?.geometry
+        if (geometry != null && geometry.valid && (crop.size != 4 || crop[0] < 0 || crop[1] < 0 || crop[2] > geometry.activeWidth ||
+                crop[3] > geometry.activeHeight || crop[2] <= crop[0] || crop[3] <= crop[1])) return FovDecision.BAD_CROP
+        val offset = offsetDeg(geometry, focal, crop) ?: return FovDecision.CROP_UNVERIFIABLE
+        return if (offset > MAX_OFFSET_DEG) FovDecision.CROP_OFF_CENTRE else null
     }
 }
 
@@ -169,6 +207,8 @@ internal object CaptureGeometry {
         val (left, top, right, bottom) = (crop ?: listOf(0, 0, geometry.activeWidth, geometry.activeHeight)).map { it.toDouble() }
             .takeIf { it.size == 4 } ?: return null
         if (left < 0 || top < 0 || right > w || bottom > h || right <= left || bottom <= top) return null
+        // Off-axis crops cannot be expressed as a centred FOV (see CropCentre).
+        if (crop != null && (CropCentre.offsetDeg(geometry, focalMm, crop) ?: return null) > CropCentre.MAX_OFFSET_DEG) return null
         val factor = zoomRatio ?: if (crop != null) 1.0 else fallbackZoom
         if (!factor.isFinite() || factor <= 0) return null
         val cx = (left + right) / 2; val cy = (top + bottom) / 2
@@ -199,6 +239,8 @@ internal object CaptureGeometry {
      */
     fun decide(lens: LensState?, still: StillResult?, imageWidth: Int, imageHeight: Int, appliedZoom: Double): FovDecision {
         if (lens == null) return FovDecision.omit(FovDecision.NO_GEOMETRY)
+        // A known off-centre (or unverifiable) crop is never relabelled as a centred lens by any path.
+        CropCentre.problem(lens, still)?.let { return FovDecision.omit(it) }
         val focal = still?.focalMm?.takeIf { it.isFinite() && it > 0 }
         if (still != null && focal != null) {
             fun measured(geometry: SensorGeometry?, listed: CameraLens?): FovDecision {
@@ -459,10 +501,12 @@ internal object CaptureResult {
      * and heading for the front camera, mirrored or inconsistently oriented output, and stale,
      * unreliable or clock-inconsistent samples.
      */
-    fun describe(state: ShutterState): JSONObject = explain(state).first
+    fun describe(state: ShutterState): JSONObject = explain(state).json
 
-    /** Metadata plus the FOV decision, whose source or omission reason goes to host diagnostics. */
-    fun explain(state: ShutterState): Pair<JSONObject, FovDecision> {
+    /** Metadata, the FOV decision and why axis measurements were withheld, for host diagnostics. */
+    class Explanation(val json: JSONObject, val fov: FovDecision, val axisOmitted: String?)
+
+    fun explain(state: ShutterState): Explanation {
         val lens = state.lens
         val zoom = state.zoomRatio
         val decision = CaptureGeometry.decide(lens, state.still, state.imageWidth, state.imageHeight, zoom)
@@ -474,10 +518,12 @@ internal object CaptureResult {
             it.physicalWidthMm * it.activeWidth / it.pixelArrayWidth >= it.physicalHeightMm * it.activeHeight / it.pixelArrayHeight } ?: true
         val oriented = state.sensorRotationDegrees != null &&
             CaptureGeometry.orientationConsistent(state.sensorRotationDegrees, sensorLandscape, state.imageWidth, state.imageHeight)
-        val tilt = if (rear && !state.mirrored && oriented)
+        // Tilt and heading describe the optical axis; an off-centre crop moves the photo centre off it.
+        val axisOmitted = CropCentre.problem(lens, state.still)
+        val tilt = if (rear && !state.mirrored && oriented && axisOmitted == null)
             CaptureTilt.atShutter(state.gravity, state.window, state.displayRotation, state.accelerometer) else null
-        val heading = if (rear) CaptureHeading.atShutter(state.rotation, state.window) else null
-        return capture(zoom, fov, fovSigma, tilt, heading) to decision
+        val heading = if (rear && axisOmitted == null) CaptureHeading.atShutter(state.rotation, state.window) else null
+        return Explanation(capture(zoom, fov, fovSigma, tilt, heading), decision, axisOmitted)
     }
 
     fun capture(zoomRatio: Double, fov: FieldOfView?, fovSigmaDeg: Double, tilt: Tilt?, heading: Heading?): JSONObject {

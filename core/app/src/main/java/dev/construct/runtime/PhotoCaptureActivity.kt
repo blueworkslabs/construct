@@ -305,15 +305,16 @@ class PhotoCaptureActivity : ComponentActivity() {
         val mirrored = orientation in setOf(ExifInterface.ORIENTATION_FLIP_HORIZONTAL, ExifInterface.ORIENTATION_FLIP_VERTICAL,
             ExifInterface.ORIENTATION_TRANSPOSE, ExifInterface.ORIENTATION_TRANSVERSE)
         val (still, tie) = window?.let { tiedStill(it.startNs) } ?: (null to "none")
-        val (capture, fov) = CaptureResult.explain(ShutterState(zoom, lensAtShutter, rotation, sensorRotation,
+        val explained = CaptureResult.explain(ShutterState(zoom, lensAtShutter, rotation, sensorRotation,
             if (transposed) bounds.outHeight else bounds.outWidth, if (transposed) bounds.outWidth else bounds.outHeight, mirrored,
             window, gravity, sensors?.accelerometerFallback ?: false, rotationVector, still))
         // Camera facts only (no image, location or sensor values), so testers can see why FOV is missing.
         val facts = "still-result=$tie logical=${lensAtShutter?.logical} focalLengths=${lensAtShutter?.focalLengths?.size ?: 0}" +
             (still?.let { " resultFocal=${it.focalMm} activePhysical=${it.activePhysicalId ?: "none"} crop=${it.cropRegion != null} resultZoom=${it.zoomRatio}" } ?: "")
         runCatching { store.log("camera", "CAPTURE_FOV", installed.manifest,
-            (if (fov.omitted != null) "fov-omitted: ${fov.omitted}" else "fov-source: ${fov.source}") + "; " + facts) }
-        return capture
+            (if (explained.fov.omitted != null) "fov-omitted: ${explained.fov.omitted}" else "fov-source: ${explained.fov.source}") +
+                (explained.axisOmitted?.let { "; tilt-heading-omitted: $it" } ?: "") + "; " + facts) }
+        return explained.json
     }
     private fun shoot() {
         if (busy || !ready || zoomPending) return

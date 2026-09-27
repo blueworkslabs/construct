@@ -247,8 +247,22 @@ status, or with non-finite values are never used.
   or a narrower lens that could cover the view). Each capture writes one host
   diagnostic line, `CAPTURE_FOV`, with the FOV source or `fov-omitted: <reason>`
   (`multiple-focal-lengths`, `physical-unknown`, `lens-switch-possible`,
-  `no-geometry`, `focal-mismatch`, `crop-region-invalid`) and camera facts only: no
-  image, location or sensor values.
+  `no-geometry`, `focal-mismatch`, `crop-region-invalid`, `crop-off-centre`,
+  `crop-unverifiable`), `tilt-heading-omitted: <reason>` when applicable, and camera
+  facts only: no image, location or sensor values.
+
+  **Centred optical axis.** The contract has no principal-point field: `fovDeg`,
+  `tilt` and the heading all assume the optical axis passes through the saved
+  image's centre (taken as the active-array centre). When the still result reports
+  a crop region whose centre is more than **0.05°** off that axis (the larger of the
+  horizontal and vertical angles, using the shortest candidate focal length, so the
+  strictest), `fovDeg`, `fovSigmaDeg`, `tilt` and all heading fields are omitted
+  (`crop-off-centre`); the characteristics fallback is not used for such a frame. The
+  same applies to a crop outside the active array (`crop-region-invalid`) or one that
+  cannot be checked for lack of sensor geometry (`crop-unverifiable`). 0.05° keeps the
+  axis error well below 0.1° and still tolerates integer crop rounding (about 2–3
+  pixels on a 1.4 µm, 4.4 mm phone camera). Supporting off-centre crops would need an
+  explicit principal-point contract and consumer support.
   Distortion correction and lens tolerances are not modelled; `fovSigmaDeg` (always
   present with `fovDeg`, at least 0.5°) is 1° by default and 2° when the camera
   advertises distortion correction, which can change the saved crop. This host never
