@@ -60,6 +60,13 @@ class CaptureMetadataTest {
         )) denied("CAMERA_PARAMS") { CaptureOptions.parse(JSONObject(args), api) }
     }
 
+    @Test fun zoomSpacingAcceptsDecimalBoundaryWithoutAcceptingCloserSteps() {
+        for (pair in listOf("1.1,1.15", "2,2.05", "2.05,2"))
+            assertEquals(2, CaptureOptions.parse(JSONObject("{op:capture,zoom:[$pair]}"), "0.13.0").zoom.size)
+        for (pair in listOf("1.1,1.149999", "2,2.049999"))
+            denied("CAMERA_PARAMS") { CaptureOptions.parse(JSONObject("{op:capture,zoom:[$pair]}"), "0.13.0") }
+    }
+
     @Test fun zoomChipsAreClampedToTheDeviceRangeWithDefaultOneX() {
         assertEquals(listOf(1f, 2f), CaptureGeometry.zoomChoices(listOf(1.0, 2.0), 1f, 8f))
         // A 2× request on a device limited to 1.6× offers 1.6×; clamping never duplicates a chip.

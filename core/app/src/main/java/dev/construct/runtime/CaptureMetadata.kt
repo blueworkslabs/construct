@@ -56,7 +56,7 @@ internal data class CaptureOptions(val level: Boolean = false, val zoom: List<Do
                     "Zoom ratios must be between $MIN_ZOOM_RATIO and $MAX_ZOOM_RATIO")
                 ratio
             }
-            checkRule(result.all { a -> result.count { b -> abs(a - b) < MIN_ZOOM_STEP } == 1 }, "CAMERA_PARAMS",
+            checkRule(result.all { a -> result.count { b -> abs(a - b) < MIN_ZOOM_STEP - 1e-9 } == 1 }, "CAMERA_PARAMS",
                 "Zoom ratios must differ by at least $MIN_ZOOM_STEP")
             return result
         }
