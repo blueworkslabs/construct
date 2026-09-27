@@ -252,7 +252,9 @@ class PhotoCaptureActivity : ComponentActivity() {
         var tied: List<StillResult>
         while (true) {
             tied = synchronized(stillResults) { stillResults.filter { it.first >= startNs }.map { it.second } }
-            if (tied.isNotEmpty() || SystemClock.elapsedRealtime() >= deadline) break
+            // A first callback is not proof of uniqueness: another still frame may
+            // arrive later in this bounded window (e.g. a multi-frame capture).
+            if (SystemClock.elapsedRealtime() >= deadline) break
             Thread.sleep(20)
         }
         return when (tied.size) { 1 -> tied[0] to "tied"; 0 -> null to "none"; else -> null to "several" }
