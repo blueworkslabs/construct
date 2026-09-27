@@ -1,0 +1,44 @@
+{
+  "complete": true,
+  "stopped": true,
+  "apkSha256": "990f178d0516f4d0797b98d12c62da3813d665087e725a464ec7300851b65dbc",
+  "moduleSha256": "2c4719272af351590309d069cb692e2035722725d95c5424628ff6109ce8a685",
+  "fixtureSha256": "c9118c1322e9c4971ffa7f314a5d6b4c7b2ffcb9e799fd80a6c0394bfc25ed84",
+  "version": "0.1.5",
+  "scope": "Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy",
+  "checks": [
+    "Signed fixture opens its computed dome and equivalent overhead list",
+    "Fixture stage list selection gives EAST, 1½ fists up and Saturn anchor",
+    "Real same-launch lookup and explicit Wikipedia request render attributed results",
+    "Red mode and native touch rewind update the selected-object view",
+    "Red preference survives a genuine process restart",
+    "Canvas touch selects the ISS, independently of the list",
+    "Landscape dome and selected-object details remain operable",
+    "200% Android text: dome, scrolling details and close controls remain operable",
+    "Native menu pause/resume restores the sky",
+    "Real module refuses ungranted phone location and offers manual place",
+    "Real manual-place flow works without location, but ungranted HTTP stays denied",
+    "Real module: native granted fix and live CelesTrak orbits populate the sky",
+    "Real cached sky reopens with Wi-Fi and mobile data disabled"
+  ],
+  "apiLevel": "37",
+  "reopenedPalettePixels": {
+    "red": 19555,
+    "green": 1372
+  },
+  "realCounts": "0 visible · 2 above you",
+  "realDataStatus": "Orbit data 20 h old · CelesTrak",
+  "offlineCounts": "1 visible · 3 above you",
+  "runId": "20260927T225948Z-space-6757c864",
+  "moduleSource": "b238bfe",
+  "runnerCommit": "c8e09c85962481b632d3d19f815163cc96ac36bc",
+  "packageCommit": "c8e09c85962481b632d3d19f815163cc96ac36bc",
+  "catalog": "https://raw.githubusercontent.com/blueworkslabs/construct/c8e09c85962481b632d3d19f815163cc96ac36bc/catalog/candidates/space-watch-015/index.json",
+  "apkSource": "e1318303cbb64e43360a2807b81c3beebb5806c6",
+  "limitations": [
+    "No physical-device spotting or compass alignment tested",
+    "Synthetic position/orbit answers bypass authority; native gates exercised separately with real module",
+    "Menu-during-download cancellation checked in controller regressions; Android run checks native menu pause/resume with cached sky",
+    "Desktop browser layout checks are additional and do not substitute for Android captures"
+  ]
+}

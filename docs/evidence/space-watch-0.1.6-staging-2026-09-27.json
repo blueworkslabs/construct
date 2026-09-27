@@ -1,0 +1,66 @@
+{
+  "complete": true,
+  "stopped": true,
+  "apkSha256": "990f178d0516f4d0797b98d12c62da3813d665087e725a464ec7300851b65dbc",
+  "moduleSha256": "159262e0b2008b56130f92171eac929048236f0fd565444e639f8e5e42fd299c",
+  "fixtureSha256": "73152781304f28b4a6d7be6af76f2d6da60d18b034096c77cf943bf01e8041db",
+  "version": "0.1.6",
+  "scope": "Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy",
+  "checks": [
+    "Signed fixture opens its computed dome and equivalent overhead list",
+    "Fixture stage list selection gives EAST, 1½ fists up and Saturn anchor",
+    "Real same-launch lookup and explicit Wikipedia request render attributed results",
+    "Red mode and native touch rewind update the selected-object view",
+    "Red preference survives a genuine process restart",
+    "Canvas touch selects the ISS, independently of the list",
+    "Landscape dome and selected-object details remain operable",
+    "200% Android text: dome, scrolling details and close controls remain operable",
+    "Native menu pause/resume restores the sky",
+    "Real module refuses ungranted phone location and offers manual place",
+    "Real manual-place flow works without location, but ungranted HTTP stays denied",
+    "Real module: native granted fix and live CelesTrak orbits populate the sky",
+    "Real cached sky reopens with Wi-Fi and mobile data disabled"
+  ],
+  "apiLevel": "37",
+  "reopenedPalettePixels": {
+    "red": 19559,
+    "green": 1372
+  },
+  "realCounts": "2 visible · 4 above you",
+  "realDataStatus": "Orbit data 20 h old · CelesTrak",
+  "offlineCounts": "0 visible · 11 above you",
+  "runId": "20260927T230806Z-space-ce0668fa",
+  "moduleSource": "f092385",
+  "runnerCommit": "83a16ad3af6cf551fdf9a89fa5a551f39de40098",
+  "packageCommit": "83a16ad3af6cf551fdf9a89fa5a551f39de40098",
+  "catalog": "https://raw.githubusercontent.com/blueworkslabs/construct/83a16ad3af6cf551fdf9a89fa5a551f39de40098/catalog/candidates/space-watch-016/index.json",
+  "apkSource": "e1318303cbb64e43360a2807b81c3beebb5806c6",
+  "limitations": [
+    "No physical-device spotting or compass alignment tested",
+    "Synthetic position/orbit answers bypass authority; native gates exercised separately with real module",
+    "Menu-during-download cancellation checked in controller regressions; Android run checks native menu pause/resume with cached sky",
+    "Desktop browser layout checks are additional and do not substitute for Android captures"
+  ],
+  "captureNotes": [
+    "The real-network display capture is rewound 4 min 40 sec after a runner scroll crossed the range control; offline reopen resets to Now. Counts are observations at different sky times, not an equality assertion."
+  ],
+  "environmentNotes": [
+    "Emulator Bluetooth service aborted during startup; no Construct fatal exception found in retained crash/runtime logs."
+  ],
+  "screenshots": {
+    "space-landscape-details.png": "8d0cfd361192ac30eb758eb0e6223108a45dd7c50e4e595694afd41367038e45",
+    "space-red-rewind.png": "1b2012831b4b9ed056d054ee087267eff7679a0c70353e3d5a2dafe7fac4ddfb",
+    "space-dome.png": "8aa54cdce6381b3437d2df4009e94600bf1b7486578918855fab14f411bc6439",
+    "space-wikipedia.png": "41661a76a76f3916703ba425276029c7c91a4796839180df4970266c74f5469d",
+    "space-real-offline-cache.png": "65ea3cc2ff550570c144ef2c85dc5d070014d0bb2b87258ea33a5e4295ea2c77",
+    "space-large-text.png": "f6bffe31ad2dd8e57f826681b973793595afcc8beac300aff90e009e28538a45",
+    "space-canvas-selected.png": "2b3b72376c7ee014294e37e5bdf7faa817db108209e3b2ae6695835dd10e3540",
+    "space-real-network.png": "74b59a5ee34ebd7873187e353c5353f755d56be863ee342cca290122d80277b7",
+    "space-real-internet-denied.png": "269440004da8fb651719f77611c00fa8e7358536e6a10e58226e7ef4d97c0452",
+    "space-spot.png": "92a204efae4a10eb7f90e99f86a4609c43845d715f149b2cacf125d140965fab",
+    "space-large-text-details.png": "0ef9ebbd16710bea8e6a17271a58b8ea8b51047034d542ecbca0e2e0611cbe4d",
+    "space-real-location-denied.png": "cafec10cb16908da1e5db2c99e8f5a3a905f21a3bd2d1c4b27002f5d9d0c02dc",
+    "space-reopened.png": "700c9543fa861340a467feaf646dc3593c07513a894c34199afa4c8117595aa5",
+    "space-landscape.png": "b343947d27d1bcf9e9c8c67d382649733e2fc5531a0b2a706661066b8a67a767"
+  }
+}
