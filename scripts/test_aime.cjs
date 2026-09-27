@@ -319,7 +319,7 @@ check("capture metadata: validated per field group, rounded, optional; sidecars 
   const old = C.cleanSidecar({ viewer: { lat: 46.8, lon: 9.2 }, marks: [mark(1)] });
   assert.equal("capture" in old, false);
   assert.equal("capture" in C.newSidecar(null), false);
-  assert.deepEqual(C.measuredInputs(old.capture, 1024, 768), { input: {}, used: { level: false, lens: false, compass: false }, skipped: {} });
+  assert.deepEqual(C.measuredInputs(old.capture, 1024, 768), { input: {}, used: { level: false, lens: false, compass: false }, skipped: {}, prior: null });
   assert.deepEqual(C.calibrationInput(old, 1024, 768, 3), C.calibrationInput(old, 1024, 768), "nothing measured is passed");
 });
 
@@ -400,6 +400,113 @@ check("measured tilt and lens keep the synthetic ranking and tighten the fit wit
   // Measured tilt and horizon taps together: both are observations; the fit still agrees.
   const both = R.calibrate(C.calibrationInput(C.cleanSidecar({ ...base, horizon: F.taps.horizon, capture: FULL }), F.width, F.height, 3));
   assert.ok(Math.abs(both.pitch - 4) < 0.5 && Math.abs(both.roll - 1.5) < 0.5 && both.horizonPoints === 2);
+});
+
+check("zoom-aware lens prior: 2·atan(tan 35°·(width/long)/z) with the 1× prior's 8° carried through the crop; nothing at 1×", () => {
+  assert.equal(C.LENS_PRIOR_SIGMA, R.FOV_PRIOR_SIGMA, "the solver's default σ");
+  const p2 = C.lensPrior({ zoomRatio: 2 }, 4000, 3000);
+  assert.ok(Math.abs(p2.fov - 38.59) < 0.01 && Math.abs(p2.fovSigma - 5.31) < 0.01 && p2.zoom === 2, JSON.stringify(p2));
+  const portrait = C.lensPrior({ zoomRatio: 2 }, 3000, 4000);
+  assert.ok(Math.abs(portrait.fov - (2 * Math.atan((Math.tan((35 * Math.PI) / 180) * 0.75) / 2) * 180) / Math.PI) < 1e-9, "portrait is narrower across its width");
+  // Continuity with the solver's own default at 1×.
+  const near1 = C.lensPrior({ zoomRatio: 1.06 }, 3000, 4000);
+  assert.ok(Math.abs(near1.fov - R.defaultFov(3000, 4000) / 1.06) < 2 && near1.fovSigma < 8);
+  for (const c of [null, {}, { zoomRatio: 1 }, { zoomRatio: 1.02 }, { zoomRatio: "2" }]) assert.equal(C.lensPrior(c, 4000, 3000), null, JSON.stringify(c));
+  // A measured lens wins; the prior is only for a lens the camera did not report.
+  assert.equal(C.measuredInputs({ ...FULL, zoomRatio: 2 }, F.width, F.height).prior, null);
+  assert.equal(C.measuredInputs({ zoomRatio: 2 }, F.width, F.height).prior.zoom, 2);
+  const input = C.calibrationInput(C.cleanSidecar({ viewer: F.viewer, marks: [mark(1)], capture: { zoomRatio: 2 } }), 4000, 3000);
+  assert.deepEqual([input.fov.toFixed(2), input.fovSigma.toFixed(2)], ["38.59", "5.31"]);
+  assert.equal(C.calibrationInput(C.cleanSidecar({ viewer: F.viewer, marks: [mark(1)], capture: { zoomRatio: 1 } }), 4000, 3000).fov, undefined, "1×: the solver's default");
+});
+
+check("Fable's 2× case: two marks on one side, a target outside them; the zoom-aware prior removes the outward bias", () => {
+  // A 2× photo whose lens was not reported (Pixel 8a, alpha33): the 70° default
+  // is pulled to ~40–42° by the marks and pushes targets beyond them outward.
+  // Marks carry a 2 px inward tap error; the true 1× lens is 68°, 70° or 72°.
+  const W = 1024, H = 768, viewer = { lat: 52.37, lon: 9.73, accuracyM: 10 };
+  const rows = [];
+  for (const half1 of [34, 35, 36]) {
+    const P = { heading: 120, fov: (2 * Math.atan(Math.tan((half1 * Math.PI) / 180) / 2) * 180) / Math.PI, pitch: 2, roll: 0.5, aspect: H / W },
+      row = (x) => R.horizonRow(P, x),
+      at = (x, km) => R.destination(viewer, R.azimuthOf(P, P.aspect, x, row(x)), km);
+    const marks = [[0.1, 6, 0.002, "Tower", 8], [0.6, 9, -0.002, "Church", 16]].map(([x, d, e, name, p]) => ({ x: x + e, y: row(x), kind: "tower", name, ...at(x, d), positionM: p, dataset: "" })),
+      target = at(0.95, 9.3),
+      sidecar = (capture) => C.cleanSidecar({ viewer, marks, capture });
+    const bias = (capture) => {
+      const cal = R.calibrate(C.calibrationInput(sidecar(capture), W, H));
+      return { cal, bias: R.diff(R.bearingAt(cal, 0.95, row(0.95)), R.bearing(cal.viewer, target)) };
+    };
+    const tilt = { pitchDeg: 2, rollDeg: 0.5, sigmaDeg: 1, ageMs: 20 },
+      guess = bias({ zoomRatio: 1, tilt }), // 0.2.0 behaviour: the 1× default
+      zoomed = bias({ zoomRatio: 2, tilt });
+    rows.push(`true ${P.fov.toFixed(2)}°: 70° default fits ${guess.cal.fov.toFixed(2)}° → ${guess.bias.toFixed(3)}° (${Math.round((guess.bias * Math.PI * 9300) / 180)} m at 9.3 km); 2× prior fits ${zoomed.cal.fov.toFixed(2)}° → ${zoomed.bias.toFixed(3)}°`);
+    assert.ok(guess.bias > 0.9, "outward, as on hardware: " + guess.bias);
+    assert.ok(Math.abs(zoomed.bias) < 0.3 && Math.abs(zoomed.bias) < guess.bias / 4, "zoom-aware: " + zoomed.bias);
+    // Two marks this far apart do fit the lens; the panel names the prior it started from.
+    const m = C.measuredInputs({ zoomRatio: 2, tilt }, W, H),
+      panel = C.calibrationDetails({ capture: { zoomRatio: 2, tilt }, width: W, height: H, measured: m, cal: zoomed.cal, viewer, marks: [] });
+    assert.equal(C.lensFit(zoomed.cal, m).source, "fitted");
+    assert.match(panel[1].rows[0][1], /^\d+\.\d° ±\d\.\d° · fitted from your marks \(prior: default for 2×, 38\.6° ±5\.3°\)$/);
+  }
+  console.log("  " + rows.join("\n  "));
+});
+
+check("lens source and the calibration details panel (raw capture, used or why not, the fit, marks, viewpoint)", () => {
+  const ix = C.parseIndex(F.index());
+  const features = F.cells.flatMap((c) => C.parseCell(ix, c, F.cell(c)));
+  const tower = features.find((f) => f.name === "Synthetic Tower A");
+  const make = (capture, declination = 3) => {
+    const sc = C.cleanSidecar({ viewer: { lat: F.viewer.lat, lon: F.viewer.lon, accuracyM: 10 }, marks: [C.markFrom(tower, F.taps.markA.x, F.taps.markA.y)], capture });
+    const measured = C.measuredInputs(sc.capture, F.width, F.height, declination),
+      cal = R.calibrate(C.calibrationInput(sc, F.width, F.height, declination));
+    const residualDeg = R.diff(R.bearingAt(cal, F.taps.markA.x, F.taps.markA.y), R.bearing(cal.viewer, tower));
+    return { cal, measured, text: C.calibrationDetails({ capture: sc.capture, width: F.width, height: F.height, declination, measured, cal, viewer: sc.viewer,
+      viewpoint: { offsetM: 3.4, sigmaM: 9.6 }, marks: [{ name: tower.name, kind: "tower", positionM: 8, residualDeg, distanceKm: R.distance(cal.viewer, tower) }] }) };
+  };
+  const flat = (sections) => sections.map((s) => s.title + "\n" + s.rows.map(([k, v]) => k + ": " + v).join("\n")).join("\n");
+  const full = flat(make(FULL).text);
+  assert.match(full, /Zoom: 1×/);
+  assert.match(full, /Lens: h 66\.0° v 51\.9° ±1\.0° — used/);
+  assert.match(full, /Tilt: pitch \+4\.0° roll \+1\.5° ±1\.0° · 18 ms — used/);
+  assert.match(full, /Compass: 27\.0° magnetic ±10\.0° · 40 ms — used/);
+  assert.match(full, /Declination: \+3\.0° E \(viewpoint cell\) → true 30\.0°/);
+  assert.match(full, /Lens used: 66\.0° ±1\.0° · from the camera/);
+  assert.match(full, /Level: pitch \+4\.0° roll \+1\.\d° ±1\.0° · measured/);
+  assert.match(full, /1 Synthetic Tower A: tower · ±8 m · residual [+−]0\.\d\d° ≈ \d+ m at 6\.0 km/);
+  assert.match(full, /Viewpoint: phone location · ±10 m/);
+  assert.match(full, /Fitted: 3 m from the saved one · ±10 m/);
+  // Missing and skipped groups say why, in words.
+  const noLens = flat(make({ ...F.capture("no lens"), zoomRatio: 2 }).text);
+  assert.match(noLens, /Lens: not reported by the camera/);
+  assert.match(noLens, /Lens used: \d+\.\d° ±\d+\.\d° · default for 2× \(prior 38\.6° ±5\.3°\)/);
+  assert.match(flat(make(F.capture("no lens")).text), /Lens used: .* · default guess \(70° across the long edge\)/);
+  // The 66° scene labelled 2× (no lens reported): two marks pull the lens far
+  // from the 2× default, so it is reported as fitted, with a warning.
+  const sc = C.cleanSidecar({ viewer: { lat: F.viewer.lat, lon: F.viewer.lon, accuracyM: 10 }, capture: { zoomRatio: 2, tilt: FULL.tilt },
+    marks: [C.markFrom(tower, F.at.A.x, F.at.A.y), C.markFrom(features.find((f) => f.name === "Synthetic Castle D"), F.at.D.x, F.at.D.y)] });
+  const pulled = C.lensFit(R.calibrate(C.calibrationInput(sc, F.width, F.height)), C.measuredInputs(sc.capture, F.width, F.height));
+  assert.equal(pulled.source, "fitted");
+  assert.match(pulled.label, /far from the default: check the marks and zoom/);
+  const swapped = flat(make({ ...FULL, fovDeg: { h: 51.9, v: 66 } }).text);
+  assert.match(swapped, /Lens: h 51\.9° v 66\.0° ±1\.0° — doesn't match the photo's shape \(h\/v 51\.9°\/66\.0°, image 1024×768\)/);
+  assert.match(flat(make({ ...FULL, tilt: { ...FULL.tilt, ageMs: 400 } }).text), /Tilt: pitch \+4\.0° roll \+1\.5° ±1\.0° · 400 ms — too old \(400 ms\)/);
+  assert.match(flat(make({ ...FULL, tilt: { ...FULL.tilt, rollDeg: 91 } }).text), /photo held sideways \(pitch \+4\.0°, roll \+91\.0°\)/);
+  assert.match(flat(make({ ...FULL, headingAgeMs: 1500 }).text), /Compass: .* — too old \(1500 ms\)/);
+  assert.match(flat(make({ ...FULL, headingAccuracyDeg: 60 }).text), /Compass: .* — too inaccurate \(±60\.0°\)/);
+  const noDecl = flat(make(FULL, null).text);
+  assert.match(noDecl, /Compass: 27\.0° magnetic .* — no declination for this area yet/);
+  assert.match(noDecl, /Declination: none for this area yet/);
+  const library = flat(make(null).text);
+  assert.match(library, /Camera: no measurements \(library photo, or taken before Aimé 0\.2\)/);
+  assert.match(library, /Zoom: 1× \(assumed\)/);
+  assert.match(library, /Level: .* · assumed/);
+  assert.match(flat(C.calibrationDetails({ capture: null, width: 4, height: 3, cal: null, calError: "", viewer: null, marks: [] })), /Fit: not calibrated \(mark a landmark you know\)\nMarks\n: none yet\nViewpoint\nViewpoint: none/);
+  // Search-result precision hint.
+  assert.equal(C.precision({ positionM: 8 }), "±8 m, precise");
+  assert.equal(C.precision({ positionM: 16 }), "±16 m, precise");
+  assert.equal(C.precision({ positionM: 60 }), "±60 m");
+  assert.equal(C.precision({}), "");
 });
 
 check("landmark search orders by direction from the tap (in 2σ steps), then nearest; plain nearest first otherwise", () => {

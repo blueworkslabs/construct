@@ -35,6 +35,10 @@
           <button id="confirm-viewpoint" hidden>Use this viewpoint</button>
         </div>
         <div id="chips"></div>
+        <div class="row" id="calibration-row">
+          <button id="details-open" class="quiet">Calibration details</button
+          ><button id="lens-note" class="quiet" hidden>Lens not measured · why?</button>
+        </div>
         <div class="toolbar">
           <label>Radius<select id="radius">
               <option value="10">10 km</option>
@@ -136,7 +140,10 @@
           gives the local declination, and it orders the landmark list by
           direction. Photos without these measurements work as before. The
           camera's level makes horizon taps optional; any you add are combined
-          with it.
+          with it. “Calibration details”, under the chips, lists what the camera
+          reported, what was used or why not, the fitted lens and level, each
+          mark's residual and the viewpoint, on one screen. When the camera did
+          not report the lens, a 2× photo starts from the 2× default lens angle.
         </p>
         <h2>Viewpoint</h2>
         <p>
@@ -188,6 +195,11 @@
         <button id="skip-horizon">Skip</button
         ><button id="start-horizon" class="primary">Tap two points</button>
       </div>
+    </dialog>
+    <dialog id="details-dialog" aria-labelledby="details-title">
+      <h2 id="details-title">Calibration details</h2>
+      <div id="details"></div>
+      <div class="actions"><button id="close-details" class="primary">Close</button></div>
     </dialog>
     <dialog id="candidates-dialog">
       <h2 id="candidates-title">Could be</h2>

@@ -574,7 +574,34 @@ const AimeCore = (() => {
       else
         Object.assign(input, { heading: c.headingDeg, headingRef: "magnetic", declination, headingSigma: Math.max(12, c.headingAccuracyDeg) }), (used.compass = true);
     }
-    return { input, used, skipped };
+    return { input, used, skipped, prior: used.lens ? null : lensPrior(capture, width, height) };
+  }
+  // Lens prior when the camera did not measure the lens. The solver's default
+  // is ~70° across the long edge at 1× with σ 8° (its FOV_PRIOR_SIGMA). A zoom z
+  // is a digital crop: fov = 2·atan(tan(35°)·(width/long)/z), and σ is that 8°
+  // carried through the crop (5.3° at 2× landscape). It is passed as a wide
+  // prior, never as a measurement. At 1× or unknown zoom nothing is passed, so
+  // the solver's own default applies unchanged.
+  const LENS_PRIOR_SIGMA = 8;
+  function lensPrior(capture, width, height) {
+    const z = capture && inRange(capture.zoomRatio, 0.1, 10) ? capture.zoomRatio : 1;
+    if (Math.abs(z - 1) < 0.05 || !(width > 0 && height > 0)) return null;
+    const t1 = (width / Math.max(width, height)) * Math.tan((35 * Math.PI) / 180),
+      tz = t1 / z;
+    return { fov: (2 * Math.atan(tz) * 180) / Math.PI, fovSigma: (LENS_PRIOR_SIGMA * (1 + t1 * t1)) / (z * (1 + tz * tz)), zoom: z };
+  }
+  const zoomText = (z) => Math.round(z * 10) / 10 + "×";
+  // Where the fitted lens angle came from: the camera, the marks (σ well below
+  // its prior's, or pulled more than 2σ away from it: then the marks and the
+  // default disagree, worth checking), or the default (zoom-aware when known).
+  function lensFit(cal, measured) {
+    const prior = measured && measured.prior,
+      mu = prior ? prior.fov : cal.aspect > 1 ? (2 * Math.atan(Math.tan((35 * Math.PI) / 180) / cal.aspect) * 180) / Math.PI : 70,
+      sd = prior ? prior.fovSigma : LENS_PRIOR_SIGMA,
+      far = Math.abs(cal.fov - mu) > 2 * sd;
+    const source = measured && measured.used.lens ? "camera" : cal.sigma.fov < 0.7 * sd || far ? "fitted" : "default";
+    const label = source === "camera" ? "from the camera" : source === "fitted" ? "fitted from your marks" + (far ? ", far from the default: check the marks and zoom" : "") : prior ? "default for " + zoomText(prior.zoom) : "default guess (70° across the long edge)";
+    return { source, fov: cal.fov, sigma: cal.sigma.fov, label };
   }
   // True compass direction of the camera's axis, or null (see measuredInputs).
   const compassHeading = (capture, declination) => {
@@ -589,8 +616,13 @@ const AimeCore = (() => {
       horizon: sidecar.horizon.map((h) => ({ x: h.x, y: h.y })),
       width,
       height,
-      ...measuredInputs(sidecar.capture, width, height, declination).input,
+      ...calibrationExtras(sidecar.capture, width, height, declination),
     };
+  }
+  // Measured inputs plus the zoom-aware lens prior when the lens was not measured.
+  function calibrationExtras(capture, width, height, declination) {
+    const m = measuredInputs(capture, width, height, declination);
+    return { ...m.input, ...(m.prior ? { fov: m.prior.fov, fovSigma: m.prior.fovSigma } : {}) };
   }
   const candidatesOf = (features) =>
     features.map((f) => ({ point: { lat: f.lat, lon: f.lon }, weight: f.w, maxKm: f.maxKm, positionM: f.positionM, feature: f }));
@@ -703,6 +735,66 @@ const AimeCore = (() => {
   const pinText = (loc, name = "Pin") =>
     `${name}: ${loc.inFrame ? "in the photo" : WHERE[loc.side]} · ${range(loc.distanceKm, loc.bearing)}${loc.inFrame ? ` · band ±${(2 * loc.sigmaDeg).toFixed(1)}° (2σ)` : ""}`;
 
+  // ---- Calibration details (one screen, for a screenshot of the error budget) ----
+  // `d`: {capture, width, height, declination, measured (measuredInputs), cal,
+  // calError, viewer (sidecar viewer), viewpoint: {offsetM, sigmaM} of the fit,
+  // marks: [{name, kind, positionM, residualDeg, distanceKm}]} →
+  // [{title, rows: [[label, value]]}]. Angles in degrees, one decimal.
+  const d1 = (v) => (Math.round(v * 10) / 10).toFixed(1) + "°",
+    sgn = (v, k = 1) => (Math.round(v * 10 ** k) >= 0 ? "+" : "−") + Math.abs(v).toFixed(k) + "°",
+    ms = (v) => Math.round(v) + " ms";
+  function skipReason(group, measured, c, width, height) {
+    const code = measured.skipped[group];
+    if (group === "lens") {
+      if (code === "range") return `outside the solver's 20–120° (h ${d1(c.fovDeg.h)})`;
+      if (code === "orientation") return `doesn't match the photo's shape (h/v ${d1(c.fovDeg.h)}/${d1(c.fovDeg.v)}, image ${width}×${height})`;
+    } else if (group === "level") {
+      if (code === "old") return `too old (${ms(c.tilt.ageMs)})`;
+      if (code === "sideways") return `photo held sideways (pitch ${sgn(c.tilt.pitchDeg)}, roll ${sgn(c.tilt.rollDeg)})`;
+    } else if (code === "unreliable") return c.headingAgeMs > HEADING_MAX_AGE_MS ? `too old (${ms(c.headingAgeMs)})` : `too inaccurate (±${d1(c.headingAccuracyDeg)})`;
+    else if (code === "declination") return "no declination for this area yet (landmark data not loaded, or older data)";
+    return "not reported by the camera";
+  }
+  function calibrationDetails(d) {
+    const c = d.capture || {},
+      m = d.measured || measuredInputs(null, d.width, d.height),
+      state = (group, text) => (m.used[group] ? text + " — used" : (text ? text + " — " : "") + skipReason(group, m, c, d.width, d.height));
+    const camera = [];
+    if (!d.capture) camera.push(["Camera", "no measurements (library photo, or taken before Aimé 0.2)"]);
+    else {
+      camera.push(["Zoom", num(c.zoomRatio) ? zoomText(c.zoomRatio) : "not reported"]);
+      camera.push(["Lens", state("lens", c.fovDeg ? `h ${d1(c.fovDeg.h)} v ${d1(c.fovDeg.v)} ±${d1(c.fovSigmaDeg)}` : "")]);
+      camera.push(["Tilt", state("level", c.tilt ? `pitch ${sgn(c.tilt.pitchDeg)} roll ${sgn(c.tilt.rollDeg)} ±${d1(c.tilt.sigmaDeg)} · ${ms(c.tilt.ageMs)}` : "")]);
+      camera.push(["Compass", state("compass", num(c.headingDeg) ? `${d1(c.headingDeg)} magnetic ±${d1(c.headingAccuracyDeg)} · ${ms(c.headingAgeMs)}` : "")]);
+    }
+    camera.push(["Declination", num(d.declination) ? `${sgn(d.declination)} ${d.declination >= 0 ? "E" : "W"} (viewpoint cell)` + (m.used.compass ? ` → true ${d1((((c.headingDeg + d.declination) % 360) + 360) % 360)}` : "") : "none for this area yet"]);
+    const fit = [];
+    if (!d.cal) fit.push(["Fit", d.calError ? "failed: " + d.calError : "not calibrated (mark a landmark you know)"]);
+    else {
+      const lens = lensFit(d.cal, m),
+        prior = !m.used.lens && m.prior ? (lens.source === "fitted" ? ` (prior: default for ${zoomText(m.prior.zoom)}, ` : " (prior ") + `${d1(m.prior.fov)} ±${d1(m.prior.fovSigma)})` : "";
+      fit.push(["Lens used", `${d1(lens.fov)} ±${d1(lens.sigma)} · ${lens.label}${prior}`]);
+      fit.push(["Level", `pitch ${sgn(d.cal.pitch)} roll ${sgn(d.cal.roll)} ±${d1(Math.max(d.cal.sigma.pitch, d.cal.sigma.roll))} · ${m.used.level ? "measured" : d.cal.level === "fitted" ? "estimated" : "assumed"}`]);
+      fit.push(["Heading", `${d1(d.cal.heading)} ±${d1(d.cal.sigma.heading)}${m.used.compass ? " · compass hint used" : ""}`]);
+      if (!num(c.zoomRatio)) fit.push(["Zoom", "1× (assumed)"]);
+    }
+    const marks = d.marks.map((k, i) => [
+      `${i + 1} ${k.name}`,
+      `${k.kind} · ±${Math.round(k.positionM)} m` + (num(k.residualDeg) ? ` · residual ${sgn(k.residualDeg, 2)} ≈ ${Math.round((Math.abs(k.residualDeg) * Math.PI * k.distanceKm * 1000) / 180)} m at ${km(k.distanceKm)}` : ""),
+    ]);
+    const v = d.viewer;
+    const view = v
+      ? [["Viewpoint", `${v.corrected ? "set on the map" : "phone location"}${v.approximate ? " (approximate)" : ""} · ±${Math.round(v.accuracyM || 20)} m${v.review ? " · to confirm" : ""}`]]
+      : [["Viewpoint", "none"]];
+    if (v && d.viewpoint) view.push(["Fitted", `${Math.round(d.viewpoint.offsetM)} m from the saved one · ±${Math.round(d.viewpoint.sigmaM)} m`]);
+    return [
+      { title: "Camera at the shutter", rows: camera },
+      { title: "Fit", rows: fit },
+      { title: "Marks", rows: marks.length ? marks : [["", "none yet"]] },
+      { title: "Viewpoint", rows: view },
+    ];
+  }
+
   // ---- Formatting ---------------------------------------------------------
   const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
   const compass = (deg) => COMPASS[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
@@ -719,6 +811,10 @@ const AimeCore = (() => {
   // Every contract kind reads as words; unknown kinds fall back to their name.
   const KIND_LABEL = { observation: "observation tower", cooling: "cooling tower" };
   const kindLabel = (f) => (f && isKind(f.kind) ? KIND_LABEL[f.kind] || f.kind.replace(/_/g, " ") : "landmark");
+  // A feature's position uncertainty for the mark search: "±8 m, precise" when
+  // it can anchor a calibration well (≤ 16 m), else "±60 m".
+  const PRECISE_M = 16;
+  const precision = (f) => (num(f.positionM) && f.positionM > 0 ? `±${Math.round(f.positionM)} m${f.positionM <= PRECISE_M ? ", precise" : ""}` : "");
   // "2400 m" for terrain, "80 m tall" for structures, "" when unknown.
   const sizeLabel = (f) => (num(f.e) && f.e > 0 ? Math.round(f.e) + (TERRAIN.has(f.kind) ? " m" : " m tall") : "");
 
@@ -779,6 +875,11 @@ const AimeCore = (() => {
     TILT_MAX_AGE_MS,
     HEADING_MAX_AGE_MS,
     measuredInputs,
+    LENS_PRIOR_SIGMA,
+    lensPrior,
+    lensFit,
+    calibrationExtras,
+    calibrationDetails,
     compassHeading,
     calibrationInput,
     candidatesOf,
@@ -805,6 +906,8 @@ const AimeCore = (() => {
     range,
     age,
     kindLabel,
+    PRECISE_M,
+    precision,
     sizeLabel,
   };
 })();

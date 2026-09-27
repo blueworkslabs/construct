@@ -13,6 +13,7 @@ class AimePackageTest(unittest.TestCase):
         self.assertNotIn('ui/synthetic-aime.js', files)
         manifest = json.loads(zipfile.ZipFile(io.BytesIO(real)).read('manifest.json'))
         self.assertEqual(manifest['constructApi'], {'min': '0.13.0', 'target': '0.13.0'})
+        self.assertEqual((real_meta['version'], fixture_meta['version'], manifest['version']), ('0.2.1', '0.2.1', '0.2.1'))
         net = next(c for c in manifest['capabilities'] if c['id'] == 'net.http')
         self.assertEqual(net['origins'], ['https://aime-data.pages.dev', 'https://tile.openstreetmap.org'])
         self.assertEqual(net['reason'], 'Download landmark data for the map area around your photo (whole cells of about 110 × 70 km, never your exact position) and map tiles.')

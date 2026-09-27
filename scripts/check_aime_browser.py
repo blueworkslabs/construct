@@ -363,6 +363,8 @@ def main():
             order = page.locator("#search-order").inner_text()
             assert order.startswith("Sorted by direction: closest to where you tapped (about ") and "from the compass hint" in order, order
             assert page.locator("#results button").first.inner_text().startswith("Synthetic"), "No results"
+            precision = page.evaluate("[...document.querySelectorAll('#results small')].map(e=>e.textContent)")
+            assert any("±8 m, precise" in t for t in precision) and any("±60 m" in t and "precise" not in t for t in precision), precision
             page.locator("#cancel-mark").click()
             # Without a declination (older cells) the heading is skipped, never used as true.
             skipped = page.evaluate("(()=>{const d=state.data.declinationAt;state.data.declinationAt=()=>null;recalibrate();render();const r=[state.measured.used.compass,state.measured.skipped.compass,$('chips').textContent];state.data.declinationAt=d;recalibrate();render();return r})()")
@@ -381,6 +383,29 @@ def main():
             assert abs(tilted["d"]["bearing"] - 102.625) < 2, tilted
             assert tilted["d"]["sigmaDeg"] > 12 and tilted["marked"] is None, tilted
             print("PASS 0.13 capture: level and zoom requested, id used, metadata stored, measured inputs shown, direction-sorted search")
+            # Calibration details: the measured lens is shown as used; a 2× photo
+            # without a reported lens shows why and starts from the 2× default.
+            page.evaluate("(async()=>{const f=AimeCore.parseCell(AimeCore.parseIndex(SyntheticAime.index()),'46_9',SyntheticAime.cell('46_9')).find(f=>f.name==='Synthetic Tower A');await update(s=>({...s,marks:[AimeCore.markFrom(f,SyntheticAime.taps.markA.x,SyntheticAime.taps.markA.y)]}))})()")
+            idle()
+            assert page.evaluate("$('lens-note').hidden"), "Lens note shown for a measured lens"
+            page.locator("#details-open").click()
+            details = page.locator("#details").inner_text()
+            for text in ("Lens\nh 66.0° v 51.9° ±1.0° — used", "Lens used\n66.0° ±1.0° · from the camera", "Tilt\npitch +4.0° roll +1.5° ±1.0° · 18 ms — used", "Declination\n+3.0° E (viewpoint cell) → true 30.0°", "1 Synthetic Tower A\ntower · ±8 m · residual "):
+                assert text in details, (text, details)
+            box = page.evaluate("(()=>{const r=$('details-dialog').getBoundingClientRect();return [r.height,innerHeight]})()")
+            assert box[0] <= box[1], ("Details do not fit one screen", box)
+            page.locator("#close-details").click()
+            page.evaluate("update(s=>({...s,capture:{...SyntheticAime.capture('no lens'),zoomRatio:2}}))")
+            idle()
+            chips = page.locator("#chips").inner_text()
+            assert "Lens from camera" not in chips and "2× zoom" in chips, chips
+            assert page.evaluate("!$('lens-note').hidden"), "No lens-not-measured note"
+            page.locator("#lens-note").click()
+            details = page.locator("#details").inner_text()
+            assert "Lens\nnot reported by the camera" in details and ("(prior 38.6° ±5.3°)" in details or "(prior: default for 2×, 38.6° ±5.3°)" in details), details
+            assert abs(page.evaluate("state.cal.fov") - 70) > 20, "2× photo still fitted near the 1× default"
+            page.locator("#close-details").click()
+            print("PASS calibration details panel, lens-not-measured note, zoom-aware lens prior, ±m in search")
             page.evaluate("openPhoto('photo1')")
             idle()
             page.evaluate(

@@ -270,6 +270,51 @@ select:focus-visible {
   display: block;
   color: var(--muted);
 }
+/* Calibration details: one compact screen, numbers aligned for a screenshot. */
+#calibration-row {
+  margin: 2px 0 4px;
+}
+#calibration-row button {
+  min-height: 36px;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+}
+#lens-note {
+  color: var(--amber);
+  border-color: var(--amber);
+}
+#details-dialog {
+  padding: 12px 14px;
+}
+#details-dialog h2 {
+  margin-bottom: 6px;
+}
+#details h3 {
+  font-size: 0.8rem;
+  margin: 8px 0 2px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+#details dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 1px 10px;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+#details dt {
+  color: var(--muted);
+}
+#details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+#details-dialog .actions {
+  margin-top: 8px;
+}
 /* Dialogs */
 dialog {
   background: var(--surface);

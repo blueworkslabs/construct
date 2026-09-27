@@ -366,6 +366,49 @@ function origin() {
   const fitted = state.cal && S.distance(v, state.cal.viewer) * 1000 > 1;
   return { point: fitted ? state.cal.viewer : v, fitted };
 }
+// ---- Calibration details --------------------------------------------------------
+// Everything that feeds this photo's fit on one screen (AimeCore.calibrationDetails).
+function openDetails() {
+  const s = current(),
+    cal = state.cal,
+    from = cal ? cal.viewer : s.viewer;
+  const marks = s.marks.map((m) => ({
+    name: m.name,
+    kind: C.kindLabel(m),
+    positionM: m.positionM,
+    residualDeg: cal ? S.diff(S.bearingAt(cal, m.x, m.y), S.bearing(cal.viewer, m)) : null,
+    distanceKm: from ? S.distance(from, m) : 0,
+  }));
+  const sections = C.calibrationDetails({
+    capture: s.capture,
+    width: state.image ? state.image.width : 0,
+    height: state.image ? state.image.height : 0,
+    declination: declination(s),
+    measured: state.measured,
+    cal,
+    calError: state.calError,
+    viewer: s.viewer,
+    viewpoint: cal && s.viewer ? { offsetM: S.distance(s.viewer, cal.viewer) * 1000, sigmaM: Math.hypot(cal.sigma.east, cal.sigma.north) } : null,
+    marks,
+  });
+  const box = $("details");
+  box.replaceChildren();
+  for (const section of sections) {
+    const h = document.createElement("h3"),
+      dl = document.createElement("dl");
+    h.textContent = section.title;
+    for (const [label, value] of section.rows) {
+      const dt = document.createElement("dt"),
+        dd = document.createElement("dd");
+      dt.textContent = label;
+      dd.textContent = value;
+      dl.append(dt, dd);
+    }
+    box.append(h, dl);
+  }
+  if (!$("details-dialog").open) $("details-dialog").showModal();
+}
+
 // ---- Map pin in the photo -------------------------------------------------------
 // Where the pin lies in the photo, or null without a pin or a calibration.
 function pinLocation() {
@@ -435,7 +478,7 @@ function render() {
   };
   if (state.cal) {
     chip(`Calibrated · ${state.cal.marks} mark${state.cal.marks > 1 ? "s" : ""}`, "live");
-    if (state.cal.lens === "fitted" && !used.lens) chip("Lens fitted", "live");
+    if (!used.lens && C.lensFit(state.cal, state.measured).source === "fitted") chip("Lens fitted", "live");
     if (state.cal.level === "fitted" && !used.level) chip("Level estimated", "live");
     if (state.cal.viewpoint === "refined") chip("Viewpoint refined", "live");
     chip(`Centre ±${S.uncertainty(state.cal, 0.5, 0.5).toFixed(1)}°`);
@@ -446,6 +489,8 @@ function render() {
   if (used.lens) chip("Lens from camera", "live");
   if (used.compass) chip("Compass hint", "live");
   if (s.capture && s.capture.zoomRatio >= 1.05) chip(`${Math.round(s.capture.zoomRatio * 10) / 10}× zoom`);
+  // A photo taken with Aimé 0.2+ whose lens the camera did not report.
+  $("lens-note").hidden = !(s.capture && !used.lens);
   if (!state.cal && state.mode === "what") {
     // Removing the last mark ends calibration: fall back to marking.
     state.mode = "mark";
@@ -1073,7 +1118,7 @@ function renderResults() {
       b = document.createElement("button"),
       small = document.createElement("small");
     b.textContent = f.name;
-    small.textContent = [C.kindLabel(f), C.range(distanceM / 1000, S.bearing(from, f)), offDeg != null ? `${Math.round(offDeg)}° from your tap` : "", C.sizeLabel(f)].filter(Boolean).join(" · ");
+    small.textContent = [C.kindLabel(f), C.range(distanceM / 1000, S.bearing(from, f)), C.precision(f), offDeg != null ? `${Math.round(offDeg)}° from your tap` : "", C.sizeLabel(f)].filter(Boolean).join(" · ");
     b.append(small);
     b.onclick = () => pick(f);
     li.append(b);
@@ -1099,7 +1144,7 @@ function pick(feature) {
     else if (current().marks.length === 1) {
       say("photo-status", `Calibrated on ${mark.name}. Mark another to fit the lens, or tap What’s that?`);
       setMode("what");
-    } else say("photo-status", `${mark.name} marked. ${state.cal.lens === "fitted" ? "Lens fitted." : "Lens still assumed; marks further apart help."}`);
+    } else say("photo-status", `${mark.name} marked. ${state.measured && state.measured.used.lens ? "Lens from the camera." : C.lensFit(state.cal, state.measured).source === "fitted" ? "Lens fitted." : "Lens still assumed; marks further apart help."}`);
   });
 }
 
@@ -1334,6 +1379,8 @@ $("map-ruler-clear").onclick = () => {
   renderRuler();
 };
 $("pin-show").onclick = () => showPane("photo");
+$("details-open").onclick = $("lens-note").onclick = openDetails;
+$("close-details").onclick = () => $("details-dialog").close();
 $("pin-clear").onclick = () => {
   map.clearPin();
   setPin(null);

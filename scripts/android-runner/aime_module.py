@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aimé acceptance (0.2.0, Construct API 0.13) on a disposable synthetic-camera emulator.
+"""Aimé acceptance (0.2.1, Construct API 0.13) on a disposable synthetic-camera emulator.
 
 Synthetic Aimé (dev.construct.aime-fixture) proves the flow and the ranking on a
 known scene: grants denied/granted, capture → viewpoint, injected landmark data
@@ -21,7 +21,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_aime_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.aime package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.aime-fixture package digest')
-p.add_argument('--version',default='0.2.0')
+p.add_argument('--version',default='0.2.1')
 p.add_argument('--real-fix',default='52.37648,9.73848',help='lat,lon injected for the real-module landmark data check (Hannover, inside the DE/AT coverage)')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
@@ -260,6 +260,9 @@ try:
  # 2. Capture → estimated viewpoint saved with the photo (second fix after the 15 s spacing).
  shoot();contains('Estimated viewpoint · ±10 m',60);capture('aime-captured')
  reach_text('Level measured');reach_text('Lens from camera')
+ # No landmark cell is downloaded yet, so the compass waits for its declination.
+ click(lambda t:t=='Calibration details');reach_text('h 66.0° v 51.9° ±1.0° — used');reach_text('no declination for this area yet')
+ capture('aime-details-captured');click(lambda t:t=='Close')
  done('API 0.13 capture with level indicator and zoom chips opens the photo with its viewpoint and stored camera measurements')
 
  # 3. Landmark data offline and HTTP 503: unavailable, never an empty list; one manual retry.
@@ -274,7 +277,9 @@ try:
 
  # 4. Mark → calibrated ruler.
  click(lambda t:t.startswith('Synthetic Tower A'));reach_text('Calibrated · 1 mark');reach_text('Bearings along the middle row')
- capture('aime-calibrated');done('Marking a known landmark calibrates the bearing ruler')
+ click(lambda t:t=='Calibration details');reach_text('66.0° ±1.0° · from the camera');reach_text('1 Synthetic Tower A');capture('aime-details')
+ click(lambda t:t=='Close')
+ capture('aime-calibrated');done('Marking a known landmark calibrates the bearing ruler; Calibration details shows the camera lens used')
 
  # 5. Horizon → level line.
  click('Level horizon');find('Tap two points');tap('Tap two points')
@@ -332,17 +337,20 @@ try:
 
  # 8. A viewpoint outside the data coverage is a named state, not a failure or an empty list.
  to_library();fixture('toggle outside coverage');contains('Viewpoint: outside coverage')
- # This photo also has no capture metadata (full → no heading → no tilt → no lens → none).
- for _ in range(4):fixture('next capture metadata')
- contains('Capture metadata for new photos: none.')
- shoot();contains('Estimated viewpoint',60);absent('Level measured');absent('Lens from camera');absent('Compass hint')
+ # This photo's capture metadata omits the lens (full → no heading → no tilt → no lens).
+ for _ in range(3):fixture('next capture metadata')
+ contains('Capture metadata for new photos: no lens.')
+ shoot();contains('Estimated viewpoint',60);reach_text('Level measured');absent('Lens from camera')
+ click(lambda t:t=='Lens not measured · why?');reach_text('not reported by the camera');capture('aime-details-no-lens')
+ click(lambda t:t=='Close')
  tap_photo({'x':.5,'y':.5})
  contains('No landmark data here yet. Germany and Austria for now.');absent('landmarks within');absent('Landmark data unavailable')
  assert not any(t=='Retry' for t in labels()),'Outside coverage offers no retry'
  capture('aime-outside-coverage');click(lambda t:t=='Cancel')
  to_library();fixture('toggle outside coverage');contains('Viewpoint: synthetic scene')
- fixture('next capture metadata');contains('Capture metadata for new photos: full.')
- done('A viewpoint outside the coverage says so, without a retry or an empty list; a photo without capture metadata shows no measured inputs')
+ for _ in range(2):fixture('next capture metadata')
+ contains('Capture metadata for new photos: full.')
+ done('A viewpoint outside the coverage says so, without a retry or an empty list; a photo whose camera omitted the lens says so in Calibration details')
 
  # 9. Delete → stored record reconciled.
  fixture('count stored records');contains('Stored photo records: 2')
