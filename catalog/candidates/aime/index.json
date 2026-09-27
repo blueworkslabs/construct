@@ -8,10 +8,10 @@
         {
           "id": "dev.construct.aime",
           "name": "Aim\u00e9",
-          "version": "0.1.5",
-          "artifact": "dev.construct.aime-0.1.5.zip",
-          "sha256": "594c936954b69997e38d8bcdd7fa1987a9002da2cb2c58e3830c3e436efbe9a8",
-          "signature": "KY9dN1U/qYpdqlMIGNhTf7onRSZKbbhoLbWcBrQGnsgVpBXSbrg5Hi2t27jeqFGqK9vv9biJ8mCtrmjsWrUyhX2rd1ZQ5c2wRtIi7684QESVDx4XXVy4n7hRMlJ+PNXhuZsd7TdIG3K6fPP/hTjfSAxyDXyEEPZjc2t5zb46QolS8Q1Qey3xbnTY61uTFVxrAke/iFf8h7FwR+3G3rmXg/R/HbYVG3rRTQftcEEeKEkl8wPyCO20Pa03+fTz7zvRYHcJBHJHOJyuVED+qUNHoRLYWlyFpYco5c2Rr5QxXHP9LmeCbKs4kQ8ssyRl4rmtxrtbY9flciaXSaPaz8kC8A=="
+          "version": "0.1.6",
+          "artifact": "dev.construct.aime-0.1.6.zip",
+          "sha256": "7c45463402510a49cf263fab26541386a0f5f6a25f256609c51d31477ccbf020",
+          "signature": "Otfh7j3FZA9NBOxuqb4ZaK1uDc5qFiKMsoTU2bQSTG8fzWSO7SiJqCeCMZatDNtG8c3SZt/eI3fB/AzEIlOiD79fHQX1kjOYOZ3MEYg9HMxzO66ucmZCeXMCImgEK6+h5tpMOcDAZ7QFHwHm9jYlXAQByqtPb0ntemFV7nJu63QrR2iVwEKBpXHuY4quP+T0SGDfqM12VTvKBOiWRxwmaW+D39/yxAMdjAsq0lGKzhvhwRCdP8d76Y1VUpbm7jrXf4nJ8IHzISl7s9lEBTPDour5QIyWOWG+R8CrYUeviC4hm9lyK+jFr6P2O9uSEmgLmL6pLM7Xh4s0GcRYFj9ywA=="
         }
       ]
     },
@@ -22,10 +22,10 @@
         {
           "id": "dev.construct.aime-fixture",
           "name": "Synthetic Aim\u00e9",
-          "version": "0.1.5",
-          "artifact": "dev.construct.aime-fixture-0.1.5.zip",
-          "sha256": "618a41c0cefd096f2b24cc66fad36e2a5e88b9ae9ef9199cea90f62ae4aa933d",
-          "signature": "k4ygauXrzztbt4I3iyaA5P8NtJP4fln3hg+i2oPuZNse53WCCpLGVcDRlHAhYKLpBSHHmbokEtzEOJo6jqu430eFFp2qEjk7ZlNdT+orsVxEU186IiSxnZ/n/3m2zfkH2OQiUylt7Ey1BeHjUi1AxKZQXHFWyvEY4cihMARu9VQalYS4uFV8J4NhQHh1KcDyo2DRY7swRHCzZjYucVQqDN7jA+U+Vx49S/60HrutS2ADUu5h6KBnzuIBnBByq64ykGAl2nlbrLJN0lt7dc5ujy14KmVfqzEq0oe58V7/11ajpKN6OpoXVNcQogj0BN/ULhbhyWT4yX5AZb/xTdyFMw==",
+          "version": "0.1.6",
+          "artifact": "dev.construct.aime-fixture-0.1.6.zip",
+          "sha256": "91ef286e03456a7bc2f8d0f8851ced9501b06de2d36e227ec158e499863a42ce",
+          "signature": "dr12I7D8BizYby5uDr7jg/i4K11cnVcmNJxuVH98JX8Rh2C/ZnmQOulFXzRzjpU2JevQXfSeMZwMNwYhQtHMf7csr8LTXZ4lg0e3I6Aky7qD+bCfN92lOTOzIecSJeNspkL+tfVzHcvaPumDIN6JaqB2sYE3+38ef6153Lg0lIQXEV6qIGDhr78GIvHCnLzAcJ5YOlEBYG1G4yvUMygiaWwBbMwEBw9rpbKBFdnBNwPpdQrbeLpH5V8O3Ee6yqTGnfs7iHLWUshZMM68Id+66AyuBfda1ih5NW2XZzAenIeDS9CWUC88ux+m7hLwk/htqyFmaqGiohrbcwSyBcU8Hg==",
           "testFixture": true
         }
       ]
