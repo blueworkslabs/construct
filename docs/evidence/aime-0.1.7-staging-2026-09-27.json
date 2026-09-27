@@ -2,9 +2,9 @@
   "complete": true,
   "stopped": true,
   "apkSha256": "8c92858b02d6ea5a2a648eca8e9a7d94bb9870cbd6b11edcff708e3b479d3627",
-  "moduleSha256": "7c45463402510a49cf263fab26541386a0f5f6a25f256609c51d31477ccbf020",
-  "fixtureSha256": "91ef286e03456a7bc2f8d0f8851ced9501b06de2d36e227ec158e499863a42ce",
-  "version": "0.1.6",
+  "moduleSha256": "c976f8bf307c33adeec287ee6aab77ed884fd3f9b7c608ec9592ec54430df19b",
+  "fixtureSha256": "217285ba707ea6809191f1c916de6bbec853fbf656c36e8ad73b927745222575",
+  "version": "0.1.7",
   "scope": "Synthetic Aimé flow/ranking on a known scene plus real-module location/internet gates; not physical-phone accuracy",
   "checks": [
     "Fresh install: library and capture are denied until the new grants are on",
@@ -82,15 +82,15 @@
   "status": "passed_android_acceptance",
   "checksPassed": 14,
   "checksPlanned": 14,
-  "runId": "20260927T101856Z-aime-41cc71fe",
-  "moduleSourceCommit": "152e4fc",
-  "packageCommit": "648a1b35a98ae4cc5f84bb71ec06d5067ae966f1",
-  "runnerCommit": "152e4fc",
-  "runnerSha256": "0d6a867ed99be95ed954a06060711c1a1f96ab6d97f59aa4716dd7fb37117ebb",
+  "runId": "20260927T103132Z-aime-2767693a",
+  "moduleSourceCommit": "ee3e711",
+  "packageCommit": "c807a0e1250f1e8e0b8dd68d61d9fd9e806917f1",
+  "runnerCommit": "ee3e711",
+  "runnerSha256": "371891359f44479ec147659de0822d7b69bdb63991a11415e75215ef41713972",
   "apkVersion": "0.1.0-alpha32",
   "apkSourceCommit": "2c132c9eeafd2b7757243c178efb190466bf2c94",
   "webView": "com.android.webview 155.0.8059.0",
-  "catalog": "https://raw.githubusercontent.com/blueworkslabs/construct/648a1b35a98ae4cc5f84bb71ec06d5067ae966f1/catalog/candidates/aime/index.json",
+  "catalog": "https://raw.githubusercontent.com/blueworkslabs/construct/c807a0e1250f1e8e0b8dd68d61d9fd9e806917f1/catalog/candidates/aime/index.json",
   "dataset": {
     "release": "2026-09-23.1",
     "cells": 88,
@@ -710,44 +710,52 @@
   },
   "reviewedScreenshots": [
     {
-      "path": "images/aime-0.1.6/candidates.png",
-      "sha256": "253c77e5c6e0ca4cdd145865ad7f2bb735ad64e7617d5bd76d0e268aeab723cc",
-      "runId": "20260927T101856Z-aime-41cc71fe",
-      "original": "Screenshot_1790504538.png"
+      "path": "images/aime-0.1.7/candidates.png",
+      "sha256": "073e00e54de88c2b1951f0899d1cc03e8f8c1430acb286087f7b2e1c1a7c6450",
+      "runId": "20260927T103132Z-aime-2767693a",
+      "original": "Screenshot_1790505301.png"
     },
     {
-      "path": "images/aime-0.1.6/map.png",
-      "sha256": "5e5d0a0823c44f053c33a82e58a8069689f6c706c48bfbc40d11e818d8f7bdf8",
-      "runId": "20260927T101856Z-aime-41cc71fe",
-      "original": "Screenshot_1790504573.png"
+      "path": "images/aime-0.1.7/map.png",
+      "sha256": "b0b71b15a181d85938ee5c7dc81341f3db2a02f48d37dcfa5b77013adf1fe742",
+      "runId": "20260927T103132Z-aime-2767693a",
+      "original": "Screenshot_1790505335.png"
     },
     {
-      "path": "images/aime-0.1.6/landscape.png",
-      "sha256": "7a547d9b84cd695332f2a1f09a7671e4bdc6c3d6f8e3753c55127b75bb5a6859",
-      "runId": "20260927T101856Z-aime-41cc71fe",
-      "original": "Screenshot_1790504635.png"
+      "path": "images/aime-0.1.7/landscape.png",
+      "sha256": "036b642bf7b5f9933dc6141862076b7fa90719eddbd6ff9996b4a0f79c3d931a",
+      "runId": "20260927T103132Z-aime-2767693a",
+      "original": "Screenshot_1790505407.png"
     },
     {
-      "path": "images/aime-0.1.6/large-text.png",
-      "sha256": "656ebdb5d0ad052d10f8f5652b6247e28f0a63d65593c5560ef9469ccb7815f8",
-      "runId": "20260927T101856Z-aime-41cc71fe",
-      "original": "Screenshot_1790504684.png"
+      "path": "images/aime-0.1.7/large-text.png",
+      "sha256": "0f6eb64bdc772a6e85838aa9232089e3f999635d241870848e1142c031227453",
+      "runId": "20260927T103132Z-aime-2767693a",
+      "original": "Screenshot_1790505456.png"
     },
     {
-      "path": "images/aime-0.1.6/outside-coverage.png",
-      "sha256": "3126584ace58456b40f7ed8fc1acb7a3b32d47bd2563276c929a8de295e33b6d",
-      "runId": "20260927T101856Z-aime-41cc71fe",
-      "original": "Screenshot_1790504719.png"
+      "path": "images/aime-0.1.7/outside-coverage.png",
+      "sha256": "5f25f5c1041576787cb618e0e8851678e82c10fee6307a33182024d62eeca06b",
+      "runId": "20260927T103132Z-aime-2767693a",
+      "original": "Screenshot_1790505490.png"
     },
     {
-      "path": "images/aime-0.1.6/live-landmarks.png",
-      "sha256": "7057555214a8e883b641d07323c0c7660659959b9a08655dd79320a43a38bfe4",
-      "runId": "20260927T101856Z-aime-41cc71fe",
-      "original": "Screenshot_1790504945.png"
+      "path": "images/aime-0.1.7/live-landmarks.png",
+      "sha256": "f9c66f64e9ec496b59f4084df1a553d0968a81b4123badb305ca7fdc59cfc4cc",
+      "runId": "20260927T103132Z-aime-2767693a",
+      "original": "Screenshot_1790505707.png"
     }
   ],
   "hardwareAccuracyVerified": false,
   "priorAttempts": [
+    {
+      "runId": "20260927T101856Z-aime-41cc71fe",
+      "moduleVersion": "0.1.6",
+      "complete": true,
+      "stopped": true,
+      "checksPassed": 14,
+      "reason": "Successful full pass retained separately; superseded by consistent label sanitization before display/identity."
+    },
     {
       "runId": "20260927T100627Z-aime-69fe8c6f",
       "moduleVersion": "0.1.5",
@@ -791,6 +799,7 @@
     }
   ],
   "priorVersionEvidence": [
+    "aime-0.1.6-staging-2026-09-27.json",
     "aime-0.1.5-staging-2026-09-27.json",
     "aime-0.1.2-staging-2026-09-27.json",
     "aime-0.1.3-staging-2026-09-27.json"
@@ -801,6 +810,5 @@
     "Dataset position uncertainties are source/geometry heuristics, not measured guarantees.",
     "Full-frame landscape evidence is the settled before-tap capture, not the earlier top-of-page screenshot."
   ],
-  "superseded": true,
-  "supersededReason": "Restore consistent name sanitization before display and identity matching."
+  "crashLogReview": "Emulator Bluetooth native abort during boot; no Construct process crash observed."
 }
