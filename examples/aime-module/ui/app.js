@@ -342,6 +342,7 @@ function ensureDeclination() {
       recalibrate();
       render();
       if (state.pane === "map") renderMap(false);
+      if ($("details-dialog").open) openDetails();
     })
     .catch(() => {});
 }

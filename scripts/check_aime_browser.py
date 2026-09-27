@@ -431,6 +431,18 @@ def main():
             assert "Declination\n+3.0° E (viewpoint cell) → true 30.0°" in details and "Compass\n27.0° magnetic ±10.0° · 40 ms — used" in details, details
             page.locator("#close-details").click()
             print("PASS a saved photo gets its viewpoint cell's declination without a landmark lookup")
+            # Open details BEFORE a delayed declination reply, as a quick phone tap can.
+            page.evaluate("""(()=>{window.savedMarks=structuredClone(current().marks);current().marks=[];
+              state.data=AimeCore.landmarkData(dataGet);state.features.clear();
+              window.fetchDeclination=state.data.declinationFor;
+              state.data.declinationFor=v=>new Promise(resolve=>{window.finishDeclination=()=>fetchDeclination(v).then(resolve)});
+              recalibrate();ensureDeclination();openDetails();})()""")
+            assert "no declination for this area yet" in page.locator("#details").inner_text()
+            page.evaluate("finishDeclination()")
+            page.wait_for_function("state.measured.used.compass")
+            assert "Declination\n+3.0° E (viewpoint cell) → true 30.0°" in page.locator("#details").inner_text(), "Open details stayed stale after declination arrived"
+            page.locator("#close-details").click()
+            page.evaluate("state.data.declinationFor=fetchDeclination;current().marks=savedMarks;recalibrate();render()")
             # Precision hint: one mark, a tap well away from it; two marks, a tap beyond them.
             page.evaluate("whatsThat(SyntheticAime.taps.whatB.x,SyntheticAime.taps.whatB.y)")
             page.wait_for_function("$('candidates-dialog').open")
