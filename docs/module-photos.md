@@ -185,11 +185,12 @@ host APK, and not accepted until the staging check below has run on exact bytes.
 Modules declare API `min` and `target` `0.13.0`.
 
 Request: `{ "op": "capture", "level"?: boolean, "zoom"?: [ratio, …] }`. Exact keys;
-`level` must be a JSON boolean; `zoom` is 1–4 distinct numbers in 0.1–10. Anything
-else fails with `CAMERA_PARAMS`. `level: true` shows a level indicator in the native
+`level` must be a JSON boolean; `zoom` is 1–4 numbers in 0.1–10 that differ by at
+least 0.05 (closer steps would be indistinguishable chips and are rejected, never
+merged or rounded). Anything else fails with `CAMERA_PARAMS`. `level: true` shows a level indicator in the native
 viewfinder (horizon line plus a pitch/roll readout, green within ±1°) for the rear
 camera. `zoom` offers fixed steps as chips, each clamped to the bound camera's range
-(duplicates after clamping are dropped). The initial step is 1× when offered,
+(ratios keep their precision; only steps clamped onto the same range limit merge). The initial step is 1× when offered,
 otherwise the first; without `zoom` the capture is at 1×. There is no free zoom.
 
 Result after a save:
@@ -197,9 +198,9 @@ Result after a save:
 ```json
 { "saved": true, "id": "p…", "capture": {
   "zoomRatio": 2.0,
-  "fovDeg": { "h": 33.6, "v": 43.9 },
-  "tilt": { "pitchDeg": 4.2, "rollDeg": -0.8, "sigmaDeg": 1.0 },
-  "headingDeg": 212.5, "headingRef": "magnetic", "headingAccuracyDeg": 11.5 } }
+  "fovDeg": { "h": 33.6, "v": 43.9 }, "fovSigmaDeg": 1.0,
+  "tilt": { "pitchDeg": 4.2, "rollDeg": -0.8, "sigmaDeg": 1.0, "ageMs": 31 },
+  "headingDeg": 212.5, "headingRef": "magnetic", "headingAccuracyDeg": 11.5, "headingAgeMs": 44 } }
 ```
 
 Cancellation still returns `{ "saved": false }`. `id` is the new original's stable
@@ -210,9 +211,22 @@ No location is included.
 
 Every value describes the saved image **as the module opens it** (after EXIF
 orientation), sampled at the shutter. These are estimates from published camera
-characteristics and phone sensors, not a lens calibration. Each measurement except
-`zoomRatio` is **omitted** when it is unavailable or unreliable; modules must treat
-a missing key as unknown, never as zero.
+characteristics and phone sensors, not a lens calibration. Every measured field
+except `zoomRatio` is optional, carries its own uncertainty (`fovSigmaDeg`,
+`tilt.sigmaDeg`, `headingAccuracyDeg`) and, for sensor values, its age (`tilt.ageMs`,
+`headingAgeMs`); it is **omitted** rather than guessed when unavailable or
+unreliable. Modules treat a missing key as unknown, never as zero, and set a
+"measured" flag only for fields that are present.
+
+**Timing.** Sensor ages use each sample's measurement time (`SensorEvent.timestamp`,
+the `elapsedRealtimeNanos` clock), never its delivery time: a sample measured 2 s
+ago and delivered late is 2 s old. The exposure is known to start between the
+moment before `takePicture` and the arrival of CameraX's `onCaptureStarted` (or,
+if that callback never arrives, the moment the image is saved). A sample's age is
+its largest possible distance from any instant in that window, in milliseconds
+rounded up, and the host picks the sample with the smallest such age. Samples
+measured after their own delivery (clock mismatch), with unreliable or no-contact
+status, or with non-finite values are never used.
 
 - `zoomRatio`: the ratio CameraX reports as applied when the shutter is pressed.
 - `fovDeg`: from the lens focal length, physical sensor size, active-array crop,
@@ -222,9 +236,12 @@ a missing key as unknown, never as zero.
   `h < v`. Omitted when the camera lists more than one focal length or its sensor
   geometry is missing, and on a logical multi-camera when the step may be served by
   another lens (below 1×, or a narrower lens that covers the requested view).
-  Distortion correction and lens tolerances are not modelled.
-- `tilt`: from the gravity sensor (a low-pass-filtered accelerometer where there is
-  none), in the solver's signs (`basis()` in [`resection.js`](aime/resection.js)):
+  Distortion correction and lens tolerances are not modelled; `fovSigmaDeg` (always
+  present with `fovDeg`, at least 0.5°) is 1° by default and 2° when the camera
+  advertises distortion correction, which can change the saved crop. This host never
+  enables video or preview stabilization for the capture.
+- `tilt`: the gravity sample (raw accelerometer where there is no gravity sensor)
+  nearest the exposure, in the solver's signs (`basis()` in [`resection.js`](aime/resection.js)):
 
   | Field | Positive means | Negative means |
   | --- | --- | --- |
@@ -233,27 +250,31 @@ a missing key as unknown, never as zero.
 
   The conversion uses the display rotation the photo was saved for, so a photo
   taken with rotation locked while the phone is sideways reports roll near ±90°.
-  `sigmaDeg` is one standard deviation: √(1² + s²)/cos(pitch), where s is the
-  angular RMS of the last 0.5 s of samples (hand motion). Omitted for the front
-  camera, mirrored or inconsistently oriented output, samples older than 1 s, an
+  `sigmaDeg` is one standard deviation, never below 1°: √(1² + s²)/cos(pitch),
+  where s is the angular RMS of the samples measured within 250 ms of the chosen
+  one (hand motion). `ageMs` is that sample's age (above). Omitted for the front
+  camera, mirrored or inconsistently oriented output, no sample within 250 ms, an
   accelerometer reading more than 1.5 m/s² from 1 g, or `sigmaDeg` above 10°
-  (including poses within about 5° of vertical).
+  (including poses within about 5° of vertical). The viewfinder's level readout
+  uses a smoothed copy and is never the reported value.
 - `headingDeg`: azimuth of the rear camera's optical axis from the rotation-vector
   sensor, clockwise from **magnetic** north (`headingRef: "magnetic"`; no
   declination is applied because the capture carries no location). A weak hint
-  only. `headingAccuracyDeg` is the sensor's own estimate when it reports one.
-  Omitted for the front camera, when the sensor reports unreliable accuracy or no
-  contact, an accuracy estimate worse than 45°, samples older than 1 s, or an
-  optical axis within about 15° of vertical.
+  only. `headingAccuracyDeg` is the sensor's own accuracy estimate and is always
+  present with the heading; `headingAgeMs` is the sample's age. All heading fields
+  are omitted for the front camera, when the sensor reports unreliable accuracy or
+  no contact, gives no accuracy estimate (no uncertainty is invented), estimates
+  worse than 45°, has no sample within 1 s, or the optical axis is within about 15°
+  of vertical.
 
-The sample is refreshed when CameraX reports that exposure started, falling back to
-the moment the shutter is pressed. Orientation sensors run only while the API 0.13
-viewfinder is in the foreground; no stream reaches the module.
+Orientation sensors run only while the API 0.13 viewfinder is in the foreground;
+the host keeps at most the last 5 s of samples and no stream reaches the module.
 
 Source implementation: `CaptureMetadata.kt` (pure derivations), `CaptureSensors.kt`
 and `PhotoCaptureActivity`. JVM coverage is `CaptureMetadataTest` (validation, FOV,
-tilt in all four display rotations and both signs, heading omission, result shape,
-version gating) and `PhotoIdentityTest`; the exact-APK staging check is
+tilt in all four display rotations and both signs, sample timing including delayed
+delivery, fresh samples and clock mismatch through an injected clock, heading
+omission, result shape, version gating) and `PhotoIdentityTest`; the exact-APK staging check is
 `scripts/android-runner/capture_metadata.py` ([reproduce](reproduce.md)).
 
 ## Allow screenshots — API 0.13 source candidate

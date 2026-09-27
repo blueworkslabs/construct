@@ -11,7 +11,7 @@ def vector(value):
 
 
 def result(**capture):
-    base = dict(zoomRatio=1.0, fovDeg=dict(h=50.0, v=64.0), tilt=dict(pitchDeg=0.0, rollDeg=0.0, sigmaDeg=1.0))
+    base = dict(zoomRatio=1.0, fovDeg=dict(h=50.0, v=64.0), fovSigmaDeg=1.0, tilt=dict(pitchDeg=0.0, rollDeg=0.0, sigmaDeg=1.0, ageMs=30))
     base.update(capture)
     return dict(saved=True, id='pAbCdEfGhIjKlMnOpQrStUvWx', capture={k: v for k, v in base.items() if v is not None})
 
@@ -52,16 +52,28 @@ class ReadoutAndResultTest(unittest.TestCase):
         self.assertIsNone(parse_result(['Capture result: none']))
 
     def test_accepts_matching_signs_and_rejects_flips(self):
-        self.assertEqual([], check_result(result(tilt=dict(pitchDeg=9.6, rollDeg=0.2, sigmaDeg=1.1)), zoom=1, pitch=10, roll=0))
+        self.assertEqual([], check_result(result(tilt=dict(pitchDeg=9.6, rollDeg=0.2, sigmaDeg=1.1, ageMs=30)), zoom=1, pitch=10, roll=0))
         self.assertTrue(any('sign flipped' in p or 'expected' in p for p in
-                            check_result(result(tilt=dict(pitchDeg=-9.6, rollDeg=0.2, sigmaDeg=1.1)), zoom=1, pitch=10, roll=0)))
-        self.assertTrue(check_result(result(tilt=dict(pitchDeg=0.0, rollDeg=10.1, sigmaDeg=1.0)), zoom=1, pitch=0, roll=-10))
-        self.assertEqual([], check_result(result(tilt=dict(pitchDeg=0.0, rollDeg=-10.1, sigmaDeg=1.0)), zoom=1, pitch=0, roll=-10))
+                            check_result(result(tilt=dict(pitchDeg=-9.6, rollDeg=0.2, sigmaDeg=1.1, ageMs=30)), zoom=1, pitch=10, roll=0)))
+        self.assertTrue(check_result(result(tilt=dict(pitchDeg=0.0, rollDeg=10.1, sigmaDeg=1.0, ageMs=30)), zoom=1, pitch=0, roll=-10))
+        self.assertEqual([], check_result(result(tilt=dict(pitchDeg=0.0, rollDeg=-10.1, sigmaDeg=1.0, ageMs=30)), zoom=1, pitch=0, roll=-10))
 
     def test_rejects_missing_tilt_bad_ranges_extra_keys_and_orientation(self):
         self.assertIn('tilt missing', check_result(result(tilt=None), zoom=1, pitch=10, roll=0)[0])
         self.assertEqual([], check_result(result(tilt=None), zoom=1))
-        self.assertTrue(check_result(result(tilt=dict(pitchDeg=10, rollDeg=0, sigmaDeg=0)), zoom=1, pitch=10, roll=0))
+        self.assertTrue(check_result(result(tilt=dict(pitchDeg=10, rollDeg=0, sigmaDeg=0.5, ageMs=30)), zoom=1, pitch=10, roll=0))
+
+    def test_every_measurement_carries_uncertainty_and_age(self):
+        self.assertEqual([], check_result(result(tilt=dict(pitchDeg=0.0, rollDeg=0.0, sigmaDeg=1.0, ageMs=250)), zoom=1))
+        self.assertTrue(check_result(result(tilt=dict(pitchDeg=0.0, rollDeg=0.0, sigmaDeg=1.0, ageMs=251)), zoom=1))
+        self.assertTrue(check_result(result(tilt=dict(pitchDeg=0.0, rollDeg=0.0, sigmaDeg=1.0, ageMs=-1)), zoom=1))
+        self.assertTrue(check_result(result(tilt=dict(pitchDeg=0.0, rollDeg=0.0, sigmaDeg=1.0, ageMs=12.5)), zoom=1))
+        self.assertTrue(check_result(result(tilt=dict(pitchDeg=0.0, rollDeg=0.0, sigmaDeg=1.0)), zoom=1))
+        self.assertTrue(check_result(result(fovSigmaDeg=None), zoom=1))
+        self.assertTrue(check_result(result(fovSigmaDeg=0.2), zoom=1))
+        self.assertEqual([], check_result(result(fovSigmaDeg=2.0), zoom=1))
+        self.assertTrue(check_result(result(fovDeg=None), zoom=1))
+        self.assertEqual([], check_result(result(fovDeg=None, fovSigmaDeg=None), zoom=1))
         self.assertTrue(check_result(result(zoomRatio=1.0), zoom=2))
         self.assertTrue(check_result(result(fovDeg=dict(h=64.0, v=50.0)), zoom=1))
         self.assertEqual([], check_result(result(fovDeg=dict(h=64.0, v=50.0)), zoom=1, portrait=False))
@@ -72,11 +84,16 @@ class ReadoutAndResultTest(unittest.TestCase):
         self.assertTrue(check_result(legacy, zoom=1))
 
     def test_heading_is_optional_but_must_be_magnetic_and_bounded(self):
-        self.assertEqual([], check_result(result(headingDeg=123.4, headingRef='magnetic', headingAccuracyDeg=12.0), zoom=1))
+        good = dict(headingDeg=123.4, headingRef='magnetic', headingAccuracyDeg=12.0, headingAgeMs=40)
+        self.assertEqual([], check_result(result(**good), zoom=1))
         self.assertTrue(check_result(result(headingDeg=123.4), zoom=1))
-        self.assertTrue(check_result(result(headingDeg=360.0, headingRef='magnetic'), zoom=1))
+        self.assertTrue(check_result(result(**{**good, 'headingDeg': 360.0}), zoom=1))
         self.assertTrue(check_result(result(headingRef='magnetic'), zoom=1))
-        self.assertTrue(check_result(result(headingDeg=10.0, headingRef='magnetic', headingAccuracyDeg=90.0), zoom=1))
+        self.assertTrue(check_result(result(headingAgeMs=10), zoom=1))
+        self.assertTrue(check_result(result(**{**good, 'headingAccuracyDeg': 90.0}), zoom=1))
+        self.assertTrue(check_result(result(**{**good, 'headingAccuracyDeg': None}), zoom=1), 'no invented or missing uncertainty')
+        self.assertTrue(check_result(result(**{**good, 'headingAgeMs': 1001}), zoom=1))
+        self.assertTrue(check_result(result(**{**good, 'headingAgeMs': None}), zoom=1))
 
     def test_zoom_pair_uses_the_tangent_not_the_angle(self):
         self.assertAlmostEqual(38.59, zoomed(70, 2), places=2)

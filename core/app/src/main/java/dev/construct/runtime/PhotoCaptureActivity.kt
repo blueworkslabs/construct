@@ -10,6 +10,7 @@ import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
 import android.media.ExifInterface
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -75,7 +76,6 @@ class PhotoCaptureActivity : ComponentActivity() {
     private var lens: LensState? = null
     private var options = CaptureOptions()
     private var sensors: CaptureSensors? = null
-    private var shutter: CaptureSensors.Snapshot? = null
     private var zoomRequest = 0
     private var zoomChoices by mutableStateOf(emptyList<Float>())
     private var zoomSelected by mutableStateOf(1f)
@@ -207,7 +207,7 @@ class PhotoCaptureActivity : ComponentActivity() {
         control.setZoomRatio(ratio).addListener({ if (request == zoomRequest) zoomPending = false }, ContextCompat.getMainExecutor(this))
     }
     private fun refreshLevel() {
-        val up = sensors?.snapshot()?.up
+        val up = sensors?.level
         level = if (!options.level || !rearCamera || up == null) null
             else CaptureTilt.angles(up[0], up[1], up[2], capture?.targetRotation ?: android.view.Surface.ROTATION_0)
     }
@@ -221,7 +221,10 @@ class PhotoCaptureActivity : ComponentActivity() {
         val physical = if (!logical) emptyList() else characteristics.physicalCameraIds.map { id ->
             runCatching { lensSpec(manager.getCameraCharacteristics(id)) }.getOrNull()
         }
-        return LensState(lensSpec(characteristics), logical, physical, back)
+        // Distortion correction (default for stills where supported) can change the saved crop slightly.
+        val correction = characteristics.get(CameraCharacteristics.DISTORTION_CORRECTION_AVAILABLE_MODES)
+            ?.any { it != CameraMetadata.DISTORTION_CORRECTION_MODE_OFF } == true
+        return LensState(lensSpec(characteristics), logical, physical, back, cropMayChange = correction)
     }
     private fun lensSpec(c: CameraCharacteristics): LensSpec? {
         // Several focal lengths mean the lens actually used is unknown: omit rather than guess.
@@ -234,7 +237,7 @@ class PhotoCaptureActivity : ComponentActivity() {
     }
     /** Oriented size and mirroring of the saved JPEG as a module will open it. */
     private fun describe(temp: File, zoom: Double, lensAtShutter: LensState?, rotation: Int, sensorRotation: Int?,
-        sample: CaptureSensors.Snapshot?): JSONObject {
+        window: ExposureWindow?, gravity: List<SensorSample>, rotationVector: List<SensorSample>): JSONObject {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(temp.path, bounds)
         val orientation = runCatching { ExifInterface(temp.path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL) }
@@ -245,8 +248,7 @@ class PhotoCaptureActivity : ComponentActivity() {
             ExifInterface.ORIENTATION_TRANSPOSE, ExifInterface.ORIENTATION_TRANSVERSE)
         return CaptureResult.describe(ShutterState(zoom, lensAtShutter, rotation, sensorRotation,
             if (transposed) bounds.outHeight else bounds.outWidth, if (transposed) bounds.outWidth else bounds.outHeight, mirrored,
-            sample?.up, sample?.upAgeMs ?: -1, sample?.spreadDeg ?: 0.0, sample?.accelerometer ?: false,
-            sample?.rotation, sample?.rotationStatus ?: CaptureHeading.STATUS_UNRELIABLE, sample?.rotationAgeMs ?: -1))
+            window, gravity, sensors?.accelerometerFallback ?: false, rotationVector))
     }
     private fun shoot() {
         if (busy || !ready || zoomPending) return
@@ -254,12 +256,11 @@ class PhotoCaptureActivity : ComponentActivity() {
         try { checkAccess() } catch (e: Exception) { stopPreview(); error(e); return }
         busy = true; status = "Taking photo…"
         // Shutter-time state: the zoom actually applied, the camera's characteristics and the
-        // orientation CameraX saves for. The sensor sample is refreshed when exposure starts.
+        // orientation CameraX saves for. Sensor samples are chosen later by measurement time.
         val zoomAtShutter = camera?.cameraInfo?.zoomState?.value?.zoomRatio?.toDouble() ?: 1.0
         val lensAtShutter = lens
         val rotationAtShutter = image.targetRotation
         val sensorRotation = runCatching { camera?.cameraInfo?.getSensorRotationDegrees(rotationAtShutter) }.getOrNull()
-        shutter = sensors?.snapshot()
         // Reserve quota/check disk away from UI; shutter itself is native and user-driven.
         io.execute {
             try {
@@ -271,16 +272,22 @@ class PhotoCaptureActivity : ComponentActivity() {
                     temporary = temp
                     try {
                         checkAccess()
+                        // Exposure starts after this instant and before onCaptureStarted arrives
+                        // (or, without that callback, before the image is saved).
+                        val windowStart = SystemClock.elapsedRealtimeNanos()
+                        var windowEnd: Long? = null
                         image.takePicture(ImageCapture.OutputFileOptions.Builder(temp).build(), ContextCompat.getMainExecutor(this),
                             object : ImageCapture.OnImageSavedCallback {
-                                override fun onCaptureStarted() { sensors?.snapshot()?.let { shutter = it } }
+                                override fun onCaptureStarted() { if (windowEnd == null) windowEnd = SystemClock.elapsedRealtimeNanos() }
                                 override fun onError(e: ImageCaptureException) { temp.delete(); temporary = null; busy = false; if (live) error(ConstructError("CAMERA_CAPTURE", "Photo was not saved. Close and reopen to retry.")) }
                                 override fun onImageSaved(result: ImageCapture.OutputFileResults) {
-                                    val sample = shutter; shutter = null
+                                    val window = ExposureWindow(windowStart, windowEnd ?: SystemClock.elapsedRealtimeNanos())
+                                    val gravity = sensors?.gravity().orEmpty()
+                                    val rotationVector = sensors?.rotation().orEmpty()
                                     io.execute {
                                         try {
                                             val metadata = if (options.metadata)
-                                                describe(temp, zoomAtShutter, lensAtShutter, rotationAtShutter, sensorRotation, sample) else null
+                                                describe(temp, zoomAtShutter, lensAtShutter, rotationAtShutter, sensorRotation, window, gravity, rotationVector) else null
                                             var id: String? = null
                                             photos.commit(temp, publish = { write ->
                                                 synchronized(session) { store.withCapability(installed, "camera.photo") { write() } }

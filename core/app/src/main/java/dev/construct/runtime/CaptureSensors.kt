@@ -6,97 +6,86 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.SystemClock
-import kotlin.math.acos
-import kotlin.math.sqrt
 
 /**
- * Foreground-only orientation sampling for the native viewfinder (API 0.13). Only the
- * shutter snapshot leaves the host, as derived tilt/heading; no stream reaches a module.
- * Gravity is preferred; a low-pass-filtered accelerometer is the fallback.
+ * Foreground-only orientation sampling for the native viewfinder (API 0.13). Only derived
+ * tilt/heading for the shutter leave the host; no stream reaches a module. Gravity is preferred;
+ * the raw accelerometer is the fallback. Every sample keeps its measurement time
+ * (`SensorEvent.timestamp`) and its arrival time from [clock] (elapsedRealtimeNanos by default,
+ * injectable for tests), so selection at the shutter never mistakes a late delivery for a fresh one.
  */
-internal class CaptureSensors(context: Context, private val onUpdate: () -> Unit) : SensorEventListener {
-    class Snapshot(val up: DoubleArray?, val upAgeMs: Long, val spreadDeg: Double, val accelerometer: Boolean,
-        val rotation: FloatArray?, val rotationStatus: Int, val rotationAgeMs: Long)
+internal class CaptureSensors(context: Context, private val clock: () -> Long = SystemClock::elapsedRealtimeNanos,
+    private val onUpdate: () -> Unit) : SensorEventListener {
     companion object {
-        private const val WINDOW_MS = 500L
-        private const val UI_INTERVAL_MS = 100L
+        /** Long enough to cover a slow save after exposure; bounded by count as well. */
+        const val BUFFER_NS = 5_000_000_000L
+        const val MAX_SAMPLES = 1000
+        private const val UI_INTERVAL_NS = 100_000_000L
         private const val GRAVITY_ALPHA = 0.5
         private const val ACCELEROMETER_ALPHA = 0.15
     }
     private val manager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
-    private val gravity = manager?.getDefaultSensor(Sensor.TYPE_GRAVITY)
-    private val accelerometer = if (gravity == null) manager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) else null
-    private val rotationVector = manager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
-    val tiltAvailable: Boolean get() = gravity != null || accelerometer != null
-    private var filtered: DoubleArray? = null
-    private var upTime = 0L
-    private val recent = ArrayDeque<Pair<Long, DoubleArray>>()
-    private var rotation: FloatArray? = null
-    private var rotationStatus = SensorManager.SENSOR_STATUS_UNRELIABLE
-    private var rotationTime = 0L
+    private val gravitySensor = manager?.getDefaultSensor(Sensor.TYPE_GRAVITY)
+    private val accelerometerSensor = if (gravitySensor == null) manager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) else null
+    private val rotationSensor = manager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+    /** True when tilt comes from the raw accelerometer rather than a gravity sensor. */
+    val accelerometerFallback: Boolean get() = gravitySensor == null
+    private val gravitySamples = ArrayDeque<SensorSample>()
+    private val rotationSamples = ArrayDeque<SensorSample>()
+    /** Low-pass "up" vector for the live level readout only; never used for capture metadata. */
+    var level: DoubleArray? = null
+        private set
     private var lastUpdate = 0L
     private var running = false
+
+    fun now(): Long = clock()
 
     fun start() {
         if (running || manager == null) return
         running = true
-        (gravity ?: accelerometer)?.let { manager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
-        rotationVector?.let { manager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+        (gravitySensor ?: accelerometerSensor)?.let { manager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+        rotationSensor?.let { manager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
     }
 
     fun stop() {
         if (!running) return
         running = false
         manager?.unregisterListener(this)
-        filtered = null; recent.clear(); rotation = null
-        rotationStatus = SensorManager.SENSOR_STATUS_UNRELIABLE
+        level = null; gravitySamples.clear(); rotationSamples.clear()
     }
 
     override fun onSensorChanged(event: SensorEvent) {
-        if (!running || event.values.size < 3) return
-        val now = SystemClock.elapsedRealtime()
-        when (event.sensor.type) {
+        if (running) record(event.sensor.type, event.timestamp, event.values, event.accuracy)
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) { }
+
+    /** One event: [timestampNs] is its measurement time; arrival is stamped from [clock]. */
+    fun record(type: Int, timestampNs: Long, values: FloatArray, accuracy: Int) {
+        if (values.size < 3) return
+        val arrival = clock()
+        val sample = SensorSample(timestampNs, arrival, values.copyOf(), accuracy)
+        when (type) {
             Sensor.TYPE_GRAVITY, Sensor.TYPE_ACCELEROMETER -> {
-                val raw = doubleArrayOf(event.values[0].toDouble(), event.values[1].toDouble(), event.values[2].toDouble())
-                if (raw.any { !it.isFinite() }) return
-                val alpha = if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) ACCELEROMETER_ALPHA else GRAVITY_ALPHA
-                val previous = filtered
-                filtered = if (previous == null) raw else DoubleArray(3) { previous[it] + alpha * (raw[it] - previous[it]) }
-                upTime = now
-                val norm = sqrt(raw[0] * raw[0] + raw[1] * raw[1] + raw[2] * raw[2])
-                if (norm > 1e-6) recent.addLast(now to DoubleArray(3) { raw[it] / norm })
-                while (recent.isNotEmpty() && (now - recent.first().first > WINDOW_MS || recent.size > 200)) recent.removeFirst()
+                append(gravitySamples, sample, arrival)
+                val raw = DoubleArray(3) { values[it].toDouble() }
+                if (raw.all { it.isFinite() }) {
+                    val alpha = if (type == Sensor.TYPE_ACCELEROMETER) ACCELEROMETER_ALPHA else GRAVITY_ALPHA
+                    val previous = level
+                    level = if (previous == null) raw else DoubleArray(3) { previous[it] + alpha * (raw[it] - previous[it]) }
+                }
             }
-            Sensor.TYPE_ROTATION_VECTOR -> {
-                rotation = event.values.copyOf(); rotationStatus = event.accuracy; rotationTime = now
-            }
+            Sensor.TYPE_ROTATION_VECTOR -> append(rotationSamples, sample, arrival)
+            else -> return
         }
-        if (now - lastUpdate >= UI_INTERVAL_MS) { lastUpdate = now; onUpdate() }
+        if (arrival - lastUpdate >= UI_INTERVAL_NS) { lastUpdate = arrival; onUpdate() }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
-        if (sensor.type == Sensor.TYPE_ROTATION_VECTOR) rotationStatus = accuracy
+    private fun append(buffer: ArrayDeque<SensorSample>, sample: SensorSample, now: Long) {
+        buffer.addLast(sample)
+        while (buffer.isNotEmpty() && (now - buffer.first().arrivalNs > BUFFER_NS || buffer.size > MAX_SAMPLES)) buffer.removeFirst()
     }
 
-    /** Angular RMS (degrees) of the recent raw samples around their mean direction. */
-    private fun spread(): Double {
-        if (recent.size < 2) return 0.0
-        val mean = DoubleArray(3)
-        recent.forEach { (_, v) -> for (i in 0..2) mean[i] += v[i] }
-        val norm = sqrt(mean[0] * mean[0] + mean[1] * mean[1] + mean[2] * mean[2])
-        if (norm < 1e-6) return Double.POSITIVE_INFINITY
-        val sum = recent.sumOf { (_, v) ->
-            val cos = ((v[0] * mean[0] + v[1] * mean[1] + v[2] * mean[2]) / norm).coerceIn(-1.0, 1.0)
-            val angle = Math.toDegrees(acos(cos)); angle * angle
-        }
-        return sqrt(sum / recent.size)
-    }
-
-    fun snapshot(): Snapshot {
-        val now = SystemClock.elapsedRealtime()
-        val up = filtered?.copyOf()
-        val vector = rotation?.copyOf()
-        return Snapshot(up, if (up == null) -1 else now - upTime, spread(), gravity == null,
-            vector, rotationStatus, if (vector == null) -1 else now - rotationTime)
-    }
+    fun gravity(): List<SensorSample> = gravitySamples.toList()
+    fun rotation(): List<SensorSample> = rotationSamples.toList()
 }

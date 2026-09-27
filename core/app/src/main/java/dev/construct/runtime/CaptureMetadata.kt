@@ -30,6 +30,8 @@ internal data class CaptureOptions(val level: Boolean = false, val zoom: List<Do
         const val MAX_ZOOM_CHOICES = 4
         const val MIN_ZOOM_RATIO = 0.1
         const val MAX_ZOOM_RATIO = 10.0
+        /** Steps closer than this would be indistinguishable chips; they are rejected, never merged. */
+        const val MIN_ZOOM_STEP = 0.05
         private val metadataApis = setOf("0.13.0")
         fun metadataApi(api: String) = api in metadataApis
         fun parse(args: JSONObject, api: String): CaptureOptions {
@@ -54,7 +56,8 @@ internal data class CaptureOptions(val level: Boolean = false, val zoom: List<Do
                     "Zoom ratios must be between $MIN_ZOOM_RATIO and $MAX_ZOOM_RATIO")
                 ratio
             }
-            checkRule(result.distinct().size == result.size, "CAMERA_PARAMS", "Zoom ratios must be distinct")
+            checkRule(result.all { a -> result.count { b -> abs(a - b) < MIN_ZOOM_STEP } == 1 }, "CAMERA_PARAMS",
+                "Zoom ratios must differ by at least $MIN_ZOOM_STEP")
             return result
         }
     }
@@ -121,20 +124,66 @@ internal object CaptureGeometry {
         return (imageWidth > imageHeight) == (sensorLandscape != swapped)
     }
 
-    /** Offered zoom chips: each requested ratio clamped to the device range, duplicates dropped. */
+    /**
+     * Offered zoom chips: each requested ratio at full precision, clamped to the device range.
+     * Only ratios that clamp onto the same range limit collapse into one chip.
+     */
     fun zoomChoices(requested: List<Double>, minRatio: Float, maxRatio: Float): List<Float> {
         if (!(minRatio > 0f) || !(maxRatio >= minRatio)) return emptyList()
-        return requested.map { (Math.round(it.coerceIn(minRatio.toDouble(), maxRatio.toDouble()) * 100) / 100.0).toFloat() }
-            .map { it.coerceIn(minRatio, maxRatio) }.distinct()
+        return requested.map { it.toFloat().coerceIn(minRatio, maxRatio) }.distinct()
     }
 
     fun initialZoom(choices: List<Float>, minRatio: Float, maxRatio: Float): Float =
         choices.firstOrNull { abs(it - 1f) < 1e-3f } ?: choices.firstOrNull() ?: 1f.coerceIn(minRatio, maxRatio)
 
-    fun label(ratio: Float): String = if (abs(ratio - Math.round(ratio)) < 0.005f) "${Math.round(ratio)}×" else String.format(java.util.Locale.ROOT, "%.1f×", ratio)
+    fun label(ratio: Float): String = when {
+        abs(ratio - Math.round(ratio)) < 0.005f -> "${Math.round(ratio)}×"
+        abs(ratio * 10 - Math.round(ratio * 10)) < 0.05f -> String.format(java.util.Locale.ROOT, "%.1f×", ratio)
+        else -> String.format(java.util.Locale.ROOT, "%.2f×", ratio)
+    }
 }
 
-internal data class Tilt(val pitchDeg: Double, val rollDeg: Double, val sigmaDeg: Double)
+/**
+ * One sensor event. [timestampNs] is the measurement time (`SensorEvent.timestamp`, the
+ * `SystemClock.elapsedRealtimeNanos` clock); [arrivalNs] is when the host received it, on the
+ * same clock. Freshness always uses the measurement time: a sample delivered late is old.
+ */
+internal class SensorSample(val timestampNs: Long, val arrivalNs: Long, val values: FloatArray, val status: Int)
+
+/**
+ * The exposure started somewhere in [startNs, endNs] (elapsedRealtimeNanos): from just before
+ * `takePicture` until `onCaptureStarted` arrived, or until the image was saved when that
+ * callback never came. A sample's age is its worst-case distance from any instant in the window.
+ */
+internal data class ExposureWindow(val startNs: Long, val endNs: Long)
+
+internal object SampleTiming {
+    /** A measurement cannot postdate its delivery; beyond this tolerance the clocks disagree. */
+    const val FUTURE_TOLERANCE_NS = 5_000_000L
+    // SensorManager.SENSOR_STATUS_* values, kept here so the policy is pure.
+    const val STATUS_NO_CONTACT = -1
+    const val STATUS_UNRELIABLE = 0
+
+    /** Plausible clock, reliable status and finite values. */
+    fun usable(sample: SensorSample): Boolean = sample.timestampNs > 0 && sample.arrivalNs > 0 &&
+        sample.timestampNs <= sample.arrivalNs + FUTURE_TOLERANCE_NS && sample.status > STATUS_UNRELIABLE &&
+        sample.values.size >= 3 && sample.values.take(3).all { it.isFinite() }
+
+    fun worstAgeNs(timestampNs: Long, window: ExposureWindow): Long =
+        max(abs(timestampNs - window.startNs), abs(timestampNs - window.endNs))
+
+    fun ageMs(ageNs: Long): Long = (ageNs + 999_999) / 1_000_000
+
+    /** The usable sample nearest the exposure window and its worst-case age (ms), or null beyond [maxAgeMs]. */
+    fun nearest(samples: List<SensorSample>, window: ExposureWindow?, maxAgeMs: Long): Pair<SensorSample, Long>? {
+        if (window == null || window.startNs <= 0 || window.endNs < window.startNs) return null
+        val best = samples.filter(::usable).minByOrNull { worstAgeNs(it.timestampNs, window) } ?: return null
+        val age = ageMs(worstAgeNs(best.timestampNs, window))
+        return if (age <= maxAgeMs) best to age else null
+    }
+}
+
+internal data class Tilt(val pitchDeg: Double, val rollDeg: Double, val sigmaDeg: Double, val ageMs: Long)
 
 /**
  * Gravity → solver tilt (docs/aime/resection.js `basis()`): pitch > 0 when the camera looks
@@ -147,7 +196,9 @@ internal data class Tilt(val pitchDeg: Double, val rollDeg: Double, val sigmaDeg
 internal object CaptureTilt {
     const val BASE_SIGMA_DEG = 1.0
     const val MAX_SIGMA_DEG = 10.0
-    const val MAX_AGE_MS = 1000L
+    const val MAX_AGE_MS = 250L
+    /** Samples within this distance of the chosen one measure hand motion. */
+    const val SPREAD_WINDOW_NS = 250_000_000L
     const val GRAVITY = 9.80665
     /** Accelerometer magnitudes this far from 1 g are dominated by motion. */
     const val MAX_MAGNITUDE_ERROR = 1.5
@@ -174,9 +225,9 @@ internal object CaptureTilt {
     }
 
     /**
-     * Tilt with a one-sigma estimate, or null when unavailable or unreliable: no fresh sample,
-     * a motion-dominated accelerometer, or a pose so steep that roll is ill-defined.
-     * [spreadDeg] is the angular RMS of the recent samples (hand motion).
+     * Tilt of one vector with a one-sigma estimate (≥ [BASE_SIGMA_DEG]), or null when
+     * unreliable: too old, a motion-dominated accelerometer, or a pose so steep that roll is
+     * ill-defined. [spreadDeg] is the angular RMS of the surrounding samples (hand motion).
      */
     fun measure(x: Double, y: Double, z: Double, displayRotation: Int, spreadDeg: Double, ageMs: Long,
         accelerometer: Boolean): Tilt? {
@@ -185,27 +236,53 @@ internal object CaptureTilt {
         val (pitch, roll) = angles(x, y, z, displayRotation) ?: return null
         val base = hypot(BASE_SIGMA_DEG, spreadDeg)
         // Roll is measured from the in-image gravity component, which shrinks with cos(pitch).
-        val sigma = base / max(cos(rad(pitch)), 1e-3)
+        val sigma = max(BASE_SIGMA_DEG, base / max(cos(rad(pitch)), 1e-3))
         if (sigma > MAX_SIGMA_DEG) return null
-        return Tilt(pitch, roll, sigma)
+        return Tilt(pitch, roll, sigma, ageMs)
+    }
+
+    /** Angular RMS (degrees) of unit vectors around their mean direction. */
+    fun spreadDeg(vectors: List<DoubleArray>): Double {
+        if (vectors.size < 2) return 0.0
+        val mean = DoubleArray(3)
+        vectors.forEach { v -> for (i in 0..2) mean[i] += v[i] }
+        val norm = sqrt(mean[0] * mean[0] + mean[1] * mean[1] + mean[2] * mean[2])
+        if (norm < 1e-6) return Double.POSITIVE_INFINITY
+        val sum = vectors.sumOf { v ->
+            val cos = ((v[0] * mean[0] + v[1] * mean[1] + v[2] * mean[2]) / norm).coerceIn(-1.0, 1.0)
+            val angle = deg(kotlin.math.acos(cos)); angle * angle
+        }
+        return sqrt(sum / vectors.size)
+    }
+
+    /** The gravity/accelerometer sample nearest the exposure, within [MAX_AGE_MS] by measurement time. */
+    fun atShutter(samples: List<SensorSample>, window: ExposureWindow?, displayRotation: Int, accelerometer: Boolean): Tilt? {
+        val (chosen, age) = SampleTiming.nearest(samples, window, MAX_AGE_MS) ?: return null
+        val around = samples.filter { SampleTiming.usable(it) && abs(it.timestampNs - chosen.timestampNs) <= SPREAD_WINDOW_NS }
+            .mapNotNull { s ->
+                val v = DoubleArray(3) { s.values[it].toDouble() }
+                val n = sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+                if (n > 1e-6) DoubleArray(3) { v[it] / n } else null
+            }
+        val v = chosen.values
+        return measure(v[0].toDouble(), v[1].toDouble(), v[2].toDouble(), displayRotation, spreadDeg(around), age, accelerometer)
     }
 }
 
-internal data class Heading(val headingDeg: Double, val accuracyDeg: Double?)
+internal data class Heading(val headingDeg: Double, val accuracyDeg: Double, val ageMs: Long)
 
 /**
  * Magnetic heading of the rear camera's optical axis from a rotation-vector sample. Weak hint
  * only. Android's rotation vector is referenced to magnetic north; no declination is applied
- * because the capture carries no location.
+ * because the capture carries no location. Returned only with the sensor's own accuracy estimate.
  */
 internal object CaptureHeading {
     const val MAX_AGE_MS = 1000L
     const val MAX_ACCURACY_DEG = 45.0
     /** Near-vertical optical axes have no meaningful azimuth. */
     const val MIN_HORIZONTAL = 0.25
-    // SensorManager.SENSOR_STATUS_* values, kept here so the policy is pure.
-    const val STATUS_NO_CONTACT = -1
-    const val STATUS_UNRELIABLE = 0
+    const val STATUS_NO_CONTACT = SampleTiming.STATUS_NO_CONTACT
+    const val STATUS_UNRELIABLE = SampleTiming.STATUS_UNRELIABLE
 
     /** Azimuth (clockwise from magnetic north) of device −z, or null when the axis is near vertical. */
     fun azimuth(values: FloatArray): Double? {
@@ -221,57 +298,74 @@ internal object CaptureHeading {
         return (heading % 360.0 + 360.0) % 360.0
     }
 
+    /**
+     * Heading, or null when the status is unreliable, the sample is older than [MAX_AGE_MS], the
+     * sensor gives no accuracy estimate (values[4], radians, −1 if unavailable), or that estimate
+     * is worse than [MAX_ACCURACY_DEG]. An uncertainty is never invented.
+     */
     fun measure(values: FloatArray?, status: Int, ageMs: Long): Heading? {
-        if (values == null || status == STATUS_NO_CONTACT || status == STATUS_UNRELIABLE || ageMs < 0 || ageMs > MAX_AGE_MS) return null
+        if (values == null || status <= STATUS_UNRELIABLE || ageMs < 0 || ageMs > MAX_AGE_MS) return null
         val heading = azimuth(values) ?: return null
-        // values[4], when present, is the estimated heading accuracy in radians (−1 if unavailable).
-        val accuracy = values.getOrNull(4)?.toDouble()?.takeIf { it.isFinite() && it >= 0 }?.let { deg(it) }
-        if (accuracy != null && accuracy > MAX_ACCURACY_DEG) return null
-        return Heading(heading, accuracy)
+        val accuracy = values.getOrNull(4)?.toDouble()?.takeIf { it.isFinite() && it >= 0 }?.let { deg(it) } ?: return null
+        if (accuracy > MAX_ACCURACY_DEG) return null
+        return Heading(heading, accuracy, ageMs)
+    }
+
+    fun atShutter(samples: List<SensorSample>, window: ExposureWindow?): Heading? {
+        val (chosen, age) = SampleTiming.nearest(samples, window, MAX_AGE_MS) ?: return null
+        return measure(chosen.values, chosen.status, age)
     }
 }
 
-/** Camera characteristics of the bound camera; `lens` is null when they are unavailable or ambiguous. */
-internal data class LensState(val lens: LensSpec?, val logical: Boolean, val physical: List<LensSpec?>, val back: Boolean)
+/**
+ * Camera characteristics of the bound camera; `lens` is null when they are unavailable or
+ * ambiguous. [cropMayChange] is set when the camera advertises distortion correction (or a
+ * stabilization mode is in use), which can change the saved crop slightly.
+ */
+internal data class LensState(val lens: LensSpec?, val logical: Boolean, val physical: List<LensSpec?>, val back: Boolean,
+    val cropMayChange: Boolean = false)
 
 /** Everything known at the shutter, plus the saved image's oriented size. */
 internal class ShutterState(val zoomRatio: Double, val lens: LensState?, val displayRotation: Int, val sensorRotationDegrees: Int?,
-    val imageWidth: Int, val imageHeight: Int, val mirrored: Boolean,
-    val up: DoubleArray?, val upAgeMs: Long, val spreadDeg: Double, val accelerometer: Boolean,
-    val rotationVector: FloatArray?, val rotationStatus: Int, val rotationAgeMs: Long)
+    val imageWidth: Int, val imageHeight: Int, val mirrored: Boolean, val window: ExposureWindow?,
+    val gravity: List<SensorSample>, val accelerometer: Boolean, val rotation: List<SensorSample>)
 
 internal object CaptureResult {
+    const val FOV_SIGMA_DEG = 1.0
+    const val FOV_SIGMA_CROP_DEG = 2.0
+
     /**
      * Capture metadata for the saved image. Each measurement is omitted rather than guessed:
      * FOV without single-focal-length characteristics or when a lens switch is possible; tilt
-     * and heading for the front camera, mirrored or inconsistently oriented output, and stale
-     * or unreliable sensors.
+     * and heading for the front camera, mirrored or inconsistently oriented output, and stale,
+     * unreliable or clock-inconsistent samples.
      */
     fun describe(state: ShutterState): JSONObject {
         val lens = state.lens
         val zoom = state.zoomRatio
         val fov = lens?.lens?.takeIf { !CaptureGeometry.lensSwitchPossible(lens.logical, it, lens.physical, zoom) }
             ?.let { CaptureGeometry.fieldOfView(it, state.imageWidth, state.imageHeight, zoom) }
+        val fovSigma = if (lens?.cropMayChange == true) FOV_SIGMA_CROP_DEG else FOV_SIGMA_DEG
         // The optical-axis heading needs only the rear camera; tilt also needs the image's own axes.
         val rear = lens?.back == true
         val sensorLandscape = lens?.lens?.let { it.activeWidthMm >= it.activeHeightMm } ?: true
         val oriented = state.sensorRotationDegrees != null &&
             CaptureGeometry.orientationConsistent(state.sensorRotationDegrees, sensorLandscape, state.imageWidth, state.imageHeight)
-        val up = state.up
-        val tilt = if (rear && !state.mirrored && oriented && up != null && up.size == 3)
-            CaptureTilt.measure(up[0], up[1], up[2], state.displayRotation, state.spreadDeg, state.upAgeMs, state.accelerometer) else null
-        val heading = if (rear) CaptureHeading.measure(state.rotationVector, state.rotationStatus, state.rotationAgeMs) else null
-        return capture(zoom, fov, tilt, heading)
+        val tilt = if (rear && !state.mirrored && oriented)
+            CaptureTilt.atShutter(state.gravity, state.window, state.displayRotation, state.accelerometer) else null
+        val heading = if (rear) CaptureHeading.atShutter(state.rotation, state.window) else null
+        return capture(zoom, fov, fovSigma, tilt, heading)
     }
 
-    fun capture(zoomRatio: Double, fov: FieldOfView?, tilt: Tilt?, heading: Heading?): JSONObject {
+    fun capture(zoomRatio: Double, fov: FieldOfView?, fovSigmaDeg: Double, tilt: Tilt?, heading: Heading?): JSONObject {
         val result = JSONObject().put("zoomRatio", round(zoomRatio, 2))
-        fov?.let { result.put("fovDeg", JSONObject().put("h", round(it.h, 2)).put("v", round(it.v, 2))) }
+        fov?.let { result.put("fovDeg", JSONObject().put("h", round(it.h, 2)).put("v", round(it.v, 2)))
+            .put("fovSigmaDeg", round(max(0.5, fovSigmaDeg), 2)) }
         tilt?.let { result.put("tilt", JSONObject().put("pitchDeg", round(it.pitchDeg, 2)).put("rollDeg", round(it.rollDeg, 2))
-            .put("sigmaDeg", round(it.sigmaDeg, 2))) }
+            .put("sigmaDeg", round(max(CaptureTilt.BASE_SIGMA_DEG, it.sigmaDeg), 2)).put("ageMs", it.ageMs)) }
         heading?.let { h ->
             result.put("headingDeg", (round(h.headingDeg, 1) % 360.0 + 360.0) % 360.0).put("headingRef", "magnetic")
-            h.accuracyDeg?.let { result.put("headingAccuracyDeg", round(it, 1)) }
+                .put("headingAccuracyDeg", round(h.accuracyDeg, 1)).put("headingAgeMs", h.ageMs)
         }
         return result
     }

@@ -9,6 +9,8 @@ import math
 import re
 
 G = 9.80665
+TILT_MAX_AGE_MS = 250
+HEADING_MAX_AGE_MS = 1000
 READOUT = re.compile(r'(Pitch|Roll) ([+-]\d+\.\d)°')
 RESULT_PREFIX = 'Capture result: '
 
@@ -57,12 +59,18 @@ def _number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
+def _age(value, limit):
+    return isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= limit
+
+
 def check_result(result, *, zoom, pitch=None, roll=None, tolerance=2.0, portrait=True):
     """Problems (empty when acceptable) with one API 0.13 capture result.
 
     `pitch`/`roll` are the injected values; tilt must then be present with matching sign
     and magnitude. FOV may be omitted only if the device cannot state it, but when present
-    it must be plausible and oriented like the image (portrait: narrower horizontally).
+    it must be plausible, oriented like the image (portrait: narrower horizontally) and
+    carry fovSigmaDeg. Every measured field carries its own uncertainty and, for sensor
+    values, an age within the contract (tilt 250 ms, heading 1 s).
     """
     problems = []
     if not isinstance(result, dict) or result.get('saved') is not True:
@@ -74,7 +82,7 @@ def check_result(result, *, zoom, pitch=None, roll=None, tolerance=2.0, portrait
     capture = result.get('capture')
     if not isinstance(capture, dict):
         return problems + ['missing capture']
-    allowed = {'zoomRatio', 'fovDeg', 'tilt', 'headingDeg', 'headingRef', 'headingAccuracyDeg'}
+    allowed = {'zoomRatio', 'fovDeg', 'fovSigmaDeg', 'tilt', 'headingDeg', 'headingRef', 'headingAccuracyDeg', 'headingAgeMs'}
     if not set(capture) <= allowed:
         problems.append('unexpected capture keys %s' % sorted(set(capture) - allowed))
     ratio = capture.get('zoomRatio')
@@ -86,13 +94,24 @@ def check_result(result, *, zoom, pitch=None, roll=None, tolerance=2.0, portrait
             problems.append('implausible fovDeg %r' % (fov,))
         elif portrait != (fov['h'] < fov['v']):
             problems.append('fovDeg orientation does not match the image %r' % (fov,))
+        sigma = capture.get('fovSigmaDeg')
+        if not _number(sigma) or not 0.5 <= sigma <= 5:
+            problems.append('fovSigmaDeg missing or out of range %r' % (sigma,))
+    elif 'fovSigmaDeg' in capture:
+        problems.append('fovSigmaDeg without fovDeg')
     tilt = capture.get('tilt')
+    if tilt is not None and (not isinstance(tilt, dict) or set(tilt) != {'pitchDeg', 'rollDeg', 'sigmaDeg', 'ageMs'}
+                             or not all(_number(v) for v in tilt.values())):
+        problems.append('tilt malformed %r' % (tilt,))
+    elif tilt is not None:
+        if not 1 <= tilt['sigmaDeg'] <= 10:
+            problems.append('sigmaDeg out of range %r' % tilt['sigmaDeg'])
+        if not _age(tilt['ageMs'], TILT_MAX_AGE_MS):
+            problems.append('tilt ageMs out of range %r' % tilt['ageMs'])
     if pitch is not None or roll is not None:
-        if not isinstance(tilt, dict) or set(tilt) != {'pitchDeg', 'rollDeg', 'sigmaDeg'} or not all(_number(v) for v in tilt.values()):
+        if not isinstance(tilt, dict) or not all(k in tilt and _number(tilt[k]) for k in ('pitchDeg', 'rollDeg')):
             problems.append('tilt missing or malformed %r' % (tilt,))
         else:
-            if not 0 < tilt['sigmaDeg'] <= 10:
-                problems.append('sigmaDeg out of range %r' % tilt['sigmaDeg'])
             for name, expected in (('pitchDeg', pitch), ('rollDeg', roll)):
                 if expected is None:
                     continue
@@ -106,9 +125,11 @@ def check_result(result, *, zoom, pitch=None, roll=None, tolerance=2.0, portrait
         if not _number(heading) or not 0 <= heading < 360 or capture.get('headingRef') != 'magnetic':
             problems.append('malformed heading %r %r' % (heading, capture.get('headingRef')))
         accuracy = capture.get('headingAccuracyDeg')
-        if accuracy is not None and (not _number(accuracy) or not 0 <= accuracy <= 45):
-            problems.append('malformed headingAccuracyDeg %r' % accuracy)
-    elif 'headingRef' in capture or 'headingAccuracyDeg' in capture:
+        if not _number(accuracy) or not 0 <= accuracy <= 45:
+            problems.append('headingAccuracyDeg missing or out of range %r' % (accuracy,))
+        if not _age(capture.get('headingAgeMs'), HEADING_MAX_AGE_MS):
+            problems.append('headingAgeMs missing or out of range %r' % (capture.get('headingAgeMs'),))
+    elif any(k in capture for k in ('headingRef', 'headingAccuracyDeg', 'headingAgeMs')):
         problems.append('heading details without a heading')
     return problems
 
