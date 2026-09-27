@@ -19,23 +19,26 @@ const SyntheticAime = (() => {
     pose = { heading: 30, fov: 66, pitch: 4, roll: 1.5, aspect: height / width };
   // Outside the synthetic coverage: an index with no cell there.
   const outside = { lat: 40.4168, lon: -3.7038 };
-  // [letter, name, kind, e, w, bearing°, km]; weights follow the contract's rule.
-  // H lies in the next cell north; Z is beyond every radius (distance filter).
+  // [letter, name, kind, e, w, p, bearing°, km]; weights follow the contract's
+  // rule, p its provenance floors and footprints: 8 m OSM points, 16 m for a
+  // church footprint, 10 m chapel, 60 m places-derived castle and monument,
+  // 250 m places-only mountain. H lies in the next cell north; Z is beyond
+  // every radius (distance filter).
   const defs = [
-    ["A", "Synthetic Tower A", "tower", 80, 1.3, 18, 6],
-    ["B", "Synthetic Peak B", "peak", 2400, 1.5, 42, 18],
-    ["C", "Synthetic Church C", "church", 0, 1.1, 30, 3],
-    ["D", "Synthetic Castle D", "castle", 0, 1.1, 51, 11],
-    ["E", "Synthetic Mast E", "mast", 0, 1, 45, 25],
-    ["F", "Synthetic Monument F", "monument", 0, 1, 200, 4],
-    ["G", "Synthetic Chapel G", "chapel", 0, 0.6, 9, 2],
-    ["H", "Synthetic Transmitter H", "communication_tower", 160, 1.8, 36, 28],
-    ["Z", "Synthetic Far Peak Z", "peak", 1800, 1.5, 235, 64],
+    ["A", "Synthetic Tower A", "tower", 80, 1.3, 8, 18, 6],
+    ["B", "Synthetic Peak B", "peak", 2400, 1.5, 8, 42, 18],
+    ["C", "Synthetic Church C", "church", 0, 1.1, 16, 30, 3],
+    ["D", "Synthetic Castle D", "castle", 0, 1.1, 60, 51, 11],
+    ["E", "Synthetic Mast E", "mast", 0, 1, 8, 45, 25],
+    ["F", "Synthetic Monument F", "monument", 0, 1, 60, 200, 4],
+    ["G", "Synthetic Chapel G", "chapel", 0, 0.6, 10, 9, 2],
+    ["H", "Synthetic Transmitter H", "communication_tower", 160, 1.8, 8, 36, 28],
+    ["Z", "Synthetic Far Peak Z", "peak", 1800, 1.5, 250, 235, 64],
   ];
   const round = (v) => Math.round(v * 1e5) / 1e5;
-  const features = defs.map(([letter, name, kind, e, w, bearing, km]) => {
-    const p = R.destination(viewer, bearing, km);
-    return { letter, name, kind, e, w, bearing, km, lat: round(p.lat), lon: round(p.lon) };
+  const features = defs.map(([letter, name, kind, e, w, p, bearing, km]) => {
+    const at = R.destination(viewer, bearing, km);
+    return { letter, name, kind, e, w, p, bearing, km, lat: round(at.lat), lon: round(at.lon) };
   });
   const horizonRow = (x) => R.horizonRow(pose, x);
   // Pixel (normalised) where a feature's base meets the level horizon, or null
@@ -57,41 +60,40 @@ const SyntheticAime = (() => {
   // Synthetic aime-data (contract schema 1): index.json and the non-empty cells.
   const ORIGIN = "https://aime-data.pages.dev/",
     release = "synthetic-1",
+    revision = 1,
+    dataset = release + "-r" + revision,
     cellOf = (f) => Math.floor(f.lat) + "_" + Math.floor(f.lon),
     cells = [...new Set(features.map(cellOf))].sort();
-  const placement = (kinds, m) => Object.fromEntries(kinds.split(" ").map((k) => [k, { placementM: m }]));
   const index = () =>
     JSON.stringify({
       schema: 1,
       release,
+      revision,
+      dataset,
       built: "2026-09-27T00:00:00Z",
       cellDeg: 1,
       coverage: ["DE", "AT"],
-      path: release + "/cells/",
+      path: dataset + "/cells/",
       cells,
       license: "ODbL-1.0",
       attribution: "© OpenStreetMap contributors, Overture Maps Foundation",
-      kinds: {
-        ...placement("peak hill volcano tower observation communication_tower mast bell_tower water_tower watchtower minaret lighthouse windmill chimney radar", 8),
-        ...placement("church cathedral chapel mosque synagogue temple monastery castle ruins fort tall_building gasometer cooling", 25),
-        ...placement("monument memorial", 30),
-        ...placement("bridge dam", 50),
-      },
+      kinds: "peak hill volcano tower observation communication_tower mast bell_tower water_tower watchtower minaret lighthouse windmill chimney radar church cathedral chapel mosque synagogue temple monastery castle ruins fort tall_building gasometer cooling monument memorial bridge dam".split(" "),
     });
   const cell = (name) =>
     JSON.stringify({
       schema: 1,
       release,
+      revision,
       cell: name.split("_").map(Number),
       f: features
         .filter((f) => cellOf(f) === name)
         .sort((a, b) => b.w - a.w || a.name.localeCompare(b.name))
-        .map((f) => [f.name, f.kind, f.lat, f.lon, f.e, f.w]),
+        .map((f) => [f.name, f.kind, f.lat, f.lon, f.e, f.w, f.p]),
     });
   // Data host answer for a URL, as net.http would return it.
   function answer(url) {
     if (url === ORIGIN + "v1/index.json") return { status: 200, headers: {}, text: index() };
-    const m = url.match(/^https:\/\/aime-data\.pages\.dev\/v1\/synthetic-1\/cells\/(-?\d+_-?\d+)\.json$/);
+    const m = url.match(/^https:\/\/aime-data\.pages\.dev\/v1\/synthetic-1-r1\/cells\/(-?\d+_-?\d+)\.json$/);
     return m && cells.includes(m[1]) ? { status: 200, headers: {}, text: cell(m[1]) } : { status: 404, headers: {} };
   }
   function render() {
@@ -212,7 +214,7 @@ const SyntheticAime = (() => {
       document.getElementById("capture-note").after(note, tools, out);
     });
   }
-  return { viewer, outside, width, height, pose, features, at, taps, release, cells, index, cell, answer, install };
+  return { viewer, outside, width, height, pose, features, at, taps, release, revision, dataset, cells, index, cell, answer, install };
 })();
 if (typeof module !== "undefined") module.exports = SyntheticAime;
 else SyntheticAime.install();

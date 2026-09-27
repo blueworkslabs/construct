@@ -21,7 +21,7 @@ const state = {
   lastTap: null,
   lastList: null, // {rows, wedge, bearing} from the last What's that?
   pane: "photo",
-  features: new Map(), // cacheKey → {features, release, cells}
+  features: new Map(), // cacheKey → {features, dataset, cells}
   fetching: new Map(), // cacheKey → Promise
   data: null, // landmark index and cells for this session (aime-core.js `landmarkData`)
   lastLocationAt: -Infinity,

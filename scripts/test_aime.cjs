@@ -18,8 +18,8 @@ check("module solver is byte-identical to docs/aime/resection.js", () => {
   assert.ok(fs.readFileSync("examples/aime-module/ui/construct-ui.css").equals(fs.readFileSync("examples/sky-watch-module/ui/construct-ui.css")));
 });
 
-const mark = (i, extra = {}) => ({ x: 0.1 * (i % 9), y: 0.5, kind: "tower", name: "Mark " + i, lat: 46.9, lon: 9.1, positionM: 8, release: "2026-09-23.1", ...extra });
-// Saved by Aimé ≤ 0.1.2 (Overpass): OSM type and id instead of kind and release.
+const mark = (i, extra = {}) => ({ x: 0.1 * (i % 9), y: 0.5, kind: "tower", name: "Mark " + i, lat: 46.9, lon: 9.1, positionM: 8, dataset: "2026-09-23.1-r1", ...extra });
+// Saved by Aimé ≤ 0.1.2 (Overpass): OSM type and id instead of kind and dataset.
 const legacyMark = (i, extra = {}) => ({ x: 0.1 * (i % 9), y: 0.5, osmType: "node", osmId: 100 + i, name: "Mark " + i, lat: 46.9, lon: 9.1, positionM: 8, ...extra });
 check("sidecars are bounded and invalid parts dropped, not guessed", () => {
   const s = C.cleanSidecar({
@@ -33,10 +33,14 @@ check("sidecars are bounded and invalid parts dropped, not guessed", () => {
   assert.equal(s.marks[0].name.length, C.NAME_MAX);
   assert.equal(s.horizon.length, C.MAX_HORIZON);
   assert.equal(s.viewer.approximate, true);
-  assert.deepEqual(Object.keys(s.marks[0]), ["x", "y", "kind", "name", "lat", "lon", "positionM", "release"], "brief's mark shape");
+  assert.deepEqual(Object.keys(s.marks[0]), ["x", "y", "kind", "name", "lat", "lon", "positionM", "dataset"], "brief's mark shape");
   assert.equal(C.cleanSidecar({ marks: [mark(1, { positionM: undefined })] }).marks[0].positionM, 30, "conservative estimate when missing");
   assert.equal(C.cleanSidecar({ marks: [mark(1, { positionM: 45 })] }).marks[0].positionM, 45, "stored estimate kept on reopen");
-  assert.equal(C.cleanSidecar({ marks: [mark(1, { release: "../x" })] }).marks[0].release, "");
+  assert.equal(C.cleanSidecar({ marks: [mark(1, { dataset: "../x" })] }).marks[0].dataset, "");
+  // The unpublished interim shape carried `release`: accepted, dataset unknown.
+  const interim = C.cleanSidecar({ marks: [mark(1, { dataset: undefined, release: "2026-09-23.1" })] }).marks[0];
+  assert.equal(interim.dataset, "");
+  assert.equal("release" in interim, false);
   assert.equal(C.cleanSidecar({ marks: [mark(1, { kind: undefined })] }).marks.length, 0, "neither kind nor legacy OSM id");
   assert.equal(C.cleanSidecar({ marks: [mark(1, { kind: "Tower!" })] }).marks.length, 0);
   assert.equal(C.cleanSidecar({ viewer: { lat: 91, lon: 0 } }).viewer, null);
@@ -83,16 +87,18 @@ check("viewpoint keeps the later fix by timestamp and flags doubtful ones for re
 const INDEX = {
   schema: 1,
   release: "2026-09-23.1",
+  revision: 1,
+  dataset: "2026-09-23.1-r1",
   built: "2026-09-27T12:00:00Z",
   cellDeg: 1,
   coverage: ["DE", "AT"],
-  path: "2026-09-23.1/cells/",
+  path: "2026-09-23.1-r1/cells/",
   cells: ["46_9", "47_9", "47_-1", "52_9"],
   license: "ODbL-1.0",
   attribution: "© OpenStreetMap contributors, Overture Maps Foundation",
-  kinds: { peak: { placementM: 8 }, tower: { placementM: 8 }, church: { placementM: 25 }, monument: { placementM: 30 }, dam: { placementM: 50 } },
+  kinds: ["peak", "tower", "church", "monument", "dam"],
 };
-const cellText = (name, f, extra = {}) => JSON.stringify({ schema: 1, release: INDEX.release, cell: name.split("_").map(Number), f, ...extra });
+const cellText = (name, f, extra = {}) => JSON.stringify({ schema: 1, release: INDEX.release, revision: INDEX.revision, cell: name.split("_").map(Number), f, ...extra });
 const CONTRACT_KINDS = "peak hill volcano tower observation communication_tower mast bell_tower water_tower watchtower minaret lighthouse windmill chimney radar church cathedral chapel mosque synagogue temple monastery castle ruins fort tall_building gasometer cooling monument memorial bridge dam".split(" ");
 
 check("cell math: integer south-west corners, negative coordinates, the dateline and ≤ 9 cells at 60 km in the coverage latitudes", () => {
@@ -121,24 +127,39 @@ check("cell math: integer south-west corners, negative coordinates, the dateline
   assert.throws(() => C.cellsAround(46.8, 9.2, 20), /10\/30\/60/);
 });
 
-check("index validation: schema 1 only, safe path, listed cells and placementM per kind", () => {
+check("index validation: schema 1 only, dataset = release-rN with its path, listed cells and a plain kind list", () => {
   const ix = C.parseIndex(JSON.stringify(INDEX));
   assert.equal(ix.release, "2026-09-23.1");
+  assert.equal(ix.revision, 1);
+  assert.equal(ix.dataset, "2026-09-23.1-r1");
   assert.deepEqual([...ix.cells], INDEX.cells);
-  assert.equal(ix.kinds.church.placementM, 25);
+  assert.deepEqual([...ix.kinds], INDEX.kinds);
   assert.deepEqual(ix.coverage, ["DE", "AT"]);
   assert.equal(ix.attribution, "© OpenStreetMap contributors, Overture Maps Foundation");
   assert.equal(ix.license, "ODbL-1.0");
-  assert.equal(C.cellUrl(ix, "47_-1"), "https://aime-data.pages.dev/v1/2026-09-23.1/cells/47_-1.json");
+  assert.equal(C.cellUrl(ix, "47_-1"), "https://aime-data.pages.dev/v1/2026-09-23.1-r1/cells/47_-1.json");
+  // Cells are cached per dataset: revision 2 of the same release is new data.
+  const r2 = C.parseIndex(JSON.stringify({ ...INDEX, revision: 2, dataset: "2026-09-23.1-r2", path: "2026-09-23.1-r2/cells/" }));
+  assert.notEqual(C.cellKey(r2, "46_9"), C.cellKey(ix, "46_9"));
+  assert.equal(C.cellKey(ix, "46_9"), "2026-09-23.1-r1/46_9");
+  assert.equal(C.cellUrl(r2, "46_9"), "https://aime-data.pages.dev/v1/2026-09-23.1-r2/cells/46_9.json");
   assert.equal(C.INDEX_URL, "https://aime-data.pages.dev/v1/index.json");
   const bad = (patch) => assert.throws(() => C.parseIndex(JSON.stringify({ ...INDEX, ...patch })), (e) => e.code === "DATA_INVALID" && e.retry === true && /^Landmark data unavailable/.test(e.message));
   bad({ schema: 2 });
   bad({ schema: "1" });
   bad({ path: "../elsewhere/" });
   bad({ path: "https://evil.example/" });
+  bad({ path: "2026-09-23.1/cells/" });
   bad({ release: "" });
+  bad({ revision: 0 });
+  bad({ revision: "1" });
+  bad({ revision: 1.5 });
+  bad({ revision: undefined });
+  bad({ dataset: "2026-09-23.1-r2" });
+  bad({ dataset: undefined });
   bad({ cells: "46_9" });
-  bad({ kinds: { peak: { placementM: -1 } } });
+  bad({ kinds: { peak: { placementM: 8 } } });
+  bad({ kinds: [] });
   assert.throws(() => C.parseIndex("<html>404</html>"), { code: "DATA_INVALID" });
   assert.deepEqual([...C.parseIndex(JSON.stringify({ ...INDEX, cells: ["46_9", "x", 7, "1000_1"] })).cells], ["46_9"]);
   assert.deepEqual(C.cellPlan(ix, { lat: 46.8, lon: 9.2 }, 30).sort(), ["46_9", "47_9"], "only listed cells");
@@ -148,48 +169,67 @@ check("index validation: schema 1 only, safe path, listed cells and placementM p
   assert.equal(C.outsideMessage([]), "No landmark data here yet.");
 });
 
-check("cell parsing: placementM, e and w kept; bad records skipped; mismatched cells rejected", () => {
+check("cell parsing: p is the feature's positionM; e and w kept; records without a valid p or otherwise bad are skipped; mismatched cells rejected", () => {
   const ix = C.parseIndex(JSON.stringify(INDEX));
   const f = C.parseCell(ix, "46_9", cellText("46_9", [
-    ["Piz Test", "peak", 46.9, 9.3, 3012, 1.8],
-    ["St. Test", "church", 46.85, 9.25, 0, 1.1],
-    ["Test Memorial", "monument", 46.7, 9.1, 0, 1],
-    ["Test Dam", "dam", 46.71, 9.11, 120, 5],
-    ["Odd weight", "tower", 46.72, 9.12, "x", null],
-    ["Shop", "bakery", 46.7, 9.1, 0, 1],
-    ["", "peak", 46.7, 9.1, 0, 1],
-    [42, "peak", 46.7, 9.1, 0, 1],
-    ["Short", "peak", 46.7, 9.1, 0],
-    ["Long", "peak", 46.7, 9.1, 0, 1, "extra"],
-    ["NaN", "peak", NaN, 9.1, 0, 1],
-    ["Far", "peak", 91, 9.1, 0, 1],
-    ["Proto", "constructor", 46.7, 9.1, 0, 1],
+    ["Piz Test", "peak", 46.9, 9.3, 3012, 1.8, 8],
+    ["St. Test", "church", 46.85, 9.25, 0, 1.1, 16],
+    ["Places Church", "church", 46.84, 9.24, 0, 1.1, 60],
+    ["Test Memorial", "monument", 46.7, 9.1, 0, 1, 60],
+    ["Test Dam", "dam", 46.71, 9.11, 120, 5, 130],
+    ["Places Peak", "peak", 46.73, 9.13, 2100, 1.5, 250],
+    ["Odd weight", "tower", 46.72, 9.12, "x", null, 5],
+    ["Big bound", "tower", 46.74, 9.14, 0, 1, 1000],
+    ["No p", "peak", 46.7, 9.1, 0, 1],
+    ["Null p", "peak", 46.7, 9.1, 0, 1, null],
+    ["String p", "peak", 46.7, 9.1, 0, 1, "8"],
+    ["Fraction p", "peak", 46.7, 9.1, 0, 1, 8.5],
+    ["Small p", "peak", 46.7, 9.1, 0, 1, 4],
+    ["Zero p", "peak", 46.7, 9.1, 0, 1, 0],
+    ["Huge p", "peak", 46.7, 9.1, 0, 1, 1001],
+    ["Shop", "bakery", 46.7, 9.1, 0, 1, 8],
+    ["", "peak", 46.7, 9.1, 0, 1, 8],
+    [42, "peak", 46.7, 9.1, 0, 1, 8],
+    ["Short", "peak", 46.7, 9.1, 0, 1],
+    ["Long", "peak", 46.7, 9.1, 0, 1, 8, "extra"],
+    ["NaN", "peak", NaN, 9.1, 0, 1, 8],
+    ["Far", "peak", 91, 9.1, 0, 1, 8],
+    ["Proto", "constructor", 46.7, 9.1, 0, 1, 8],
     null,
     "Piz Test",
   ]));
-  assert.deepEqual(f.map((x) => x.name), ["Piz Test", "St. Test", "Test Memorial", "Test Dam", "Odd weight"]);
-  const [peak, church, memorial, dam, odd] = f;
-  assert.deepEqual([peak.positionM, church.positionM, memorial.positionM, dam.positionM, odd.positionM], [8, 25, 30, 50, 8], "placementM from the index");
+  assert.deepEqual(f.map((x) => x.name), ["Piz Test", "St. Test", "Places Church", "Test Memorial", "Test Dam", "Places Peak", "Odd weight", "Big bound"]);
+  const [peak, church, placesChurch, memorial, dam, placesPeak, odd, big] = f;
+  // Mixed p for the same kind: each feature carries its own, no kind default.
+  assert.deepEqual(f.map((x) => x.positionM), [8, 16, 60, 60, 130, 250, 5, 1000], "p used directly as positionM");
+  assert.deepEqual(f.map((x) => x.p), [8, 16, 60, 60, 130, 250, 5, 1000]);
+  assert.notEqual(church.positionM, placesChurch.positionM);
+  assert.notEqual(peak.positionM, placesPeak.positionM);
   assert.equal(peak.e, 3012);
   assert.equal(peak.w, 1.8);
   assert.equal(peak.maxKm, 100, "peaks may count beyond 40 km");
   assert.equal(church.maxKm, undefined);
-  assert.equal(peak.release, INDEX.release);
+  assert.equal(peak.dataset, INDEX.dataset);
   assert.equal(dam.w, 2, "weight clamped to the contract's 0.5–2.0");
   assert.deepEqual([odd.e, odd.w], [0, 1], "unknown e/w fall back");
-  const c = C.candidatesOf([peak])[0];
-  assert.deepEqual([c.weight, c.maxKm, c.positionM], [1.8, 100, 8], "the solver's prior is w and its position σ is placementM");
+  const cands = C.candidatesOf([peak, placesChurch, big]);
+  assert.deepEqual(cands.map((c) => [c.weight, c.positionM]), [[1.8, 8], [1.1, 60], [1, 1000]], "the solver's prior is w and its position σ is p");
+  assert.equal(C.markFrom(placesChurch, 0.4, 0.5).positionM, 60, "a mark keeps the feature's own p");
+  assert.equal(memorial.positionM, 60);
   const rejected = (body, re = /./) => assert.throws(() => C.parseCell(ix, "46_9", body), (e) => e.code === "DATA_INVALID" && e.retry && re.test(e.message));
-  rejected(cellText("46_9", [], { schema: 2 }), /release/);
-  rejected(cellText("46_9", [], { release: "2026-08-20.0" }), /release/);
+  rejected(cellText("46_9", [], { schema: 2 }), /dataset/);
+  rejected(cellText("46_9", [], { release: "2026-08-20.0" }), /dataset/);
+  rejected(cellText("46_9", [], { revision: 2 }), /dataset/);
+  rejected(cellText("46_9", [], { revision: "1" }), /dataset/);
+  rejected(cellText("46_9", [], { revision: undefined }), /dataset/);
   rejected(cellText("46_9", [], { cell: [47, 9] }), /malformed/);
   for (const cell of [undefined, null, "46_9", [46], [46, 9, 0]])
     rejected(cellText("46_9", [], { cell }), /malformed/);
   rejected(cellText("46_9", {}), /malformed/);
-  rejected(JSON.stringify({ schema: 1, release: INDEX.release, cell: [46, 9] }), /malformed/);
+  rejected(JSON.stringify({ schema: 1, release: INDEX.release, revision: INDEX.revision, cell: [46, 9] }), /malformed/);
   rejected("{", /unreadable/);
   assert.deepEqual(C.parseCell(ix, "46_9", cellText("46_9", [])), [], "an empty feature list is a valid cell");
-  assert.equal(C.parseCell(ix, "47_-1", cellText("47_-1", [["Phare", "tower", 47.5, -0.5, 0, 1]])).length, 1);
+  assert.equal(C.parseCell(ix, "47_-1", cellText("47_-1", [["Phare", "tower", 47.5, -0.5, 0, 1, 8]])).length, 1);
 });
 
 check("kind labels cover every contract kind with a fallback", () => {
@@ -224,8 +264,8 @@ check("feature identity is name + kind + position to 5 decimals; legacy OSM mark
   assert.equal(C.cleanSidecar({ marks: [legacyMark(1, { osmType: "area" })] }).marks.length, 0);
   assert.deepEqual(C.calibrationInput(legacy, 1000, 750).marks[0], { x: 0.1, y: 0.5, point: { lat: 46.9, lon: 9.1 }, positionM: 8 });
   // New marks next to legacy ones: identity never merges them by accident.
-  const next = C.markFrom({ name: "Mark 1", kind: "tower", lat: 46.9, lon: 9.1, positionM: 8, release: "r1", w: 1.3, e: 80 }, 0.3, 0.5);
-  assert.deepEqual(next, { x: 0.3, y: 0.5, kind: "tower", name: "Mark 1", lat: 46.9, lon: 9.1, positionM: 8, release: "r1" });
+  const next = C.markFrom({ name: "Mark 1", kind: "tower", lat: 46.9, lon: 9.1, p: 12, positionM: 12, dataset: "2026-09-23.1-r1", w: 1.3, e: 80 }, 0.3, 0.5);
+  assert.deepEqual(next, { x: 0.3, y: 0.5, kind: "tower", name: "Mark 1", lat: 46.9, lon: 9.1, positionM: 12, dataset: "2026-09-23.1-r1" }, "marks store the dataset");
   assert.ok(!C.sameFeature(next, legacy.marks[0]));
   // A synthetic legacy photo still calibrates on its stored mark and ranks as before.
   const ix = C.parseIndex(F.index());
@@ -342,11 +382,11 @@ const fullSidecar = (salt = 0) =>
   C.cleanSidecar({
     viewer: { lat: -45.123456789012345, lon: -170.12345678901234, accuracyM: 1234.567890123456, timestamp: 1790463000123 + salt, approximate: true, corrected: true, review: true },
     radiusKm: 60,
-    // Current marks with the longest kind and release, plus legacy OSM marks.
+    // Current marks with the longest kind and dataset, plus legacy OSM marks.
     marks: Array.from({ length: 9 }, (_, j) => ({
       x: 0.12345678901234567,
       y: 0.98765432109876543,
-      ...(j % 2 ? { osmType: "relation", osmId: Number.MAX_SAFE_INTEGER - j } : { kind: "communication_tower", release: "9".repeat(32) }),
+      ...(j % 2 ? { osmType: "relation", osmId: Number.MAX_SAFE_INTEGER - j } : { kind: "communication_tower", dataset: "9".repeat(40) }),
       name: nasty(200),
       lat: -89.12345678901234,
       lon: -179.12345678901234,
@@ -358,7 +398,7 @@ const longId = (i) => ("p" + '"\\'.repeat(40)).slice(0, 78) + String(i).padStart
 
 check("control characters are dropped from names; worst-case record and index fit one bridge message", () => {
   assert.equal(C.cleanSidecar({ marks: [mark(1, { name: "Tower\u0000\u202e A\u0007" })] }).marks[0].name, "Tower A");
-  const newest = C.cleanSidecar({ ...fullSidecar(), marks: fullSidecar().marks.map((m) => ({ ...m, kind: "communication_tower", release: "9".repeat(32) })) });
+  const newest = C.cleanSidecar({ ...fullSidecar(), marks: fullSidecar().marks.map((m) => ({ ...m, kind: "communication_tower", dataset: "9".repeat(40) })) });
   assert.ok(C.envelopeLength(C.recordKey(15), C.recordValue(longId(1), newest)) <= C.MESSAGE_BUDGET, "six current-shape marks");
   const record = C.envelopeLength(C.recordKey(15), C.recordValue(longId(1), fullSidecar()));
   const index = C.envelopeLength(C.INDEX_KEY, C.indexValue(Array.from({ length: C.MAX_SLOTS }, (_, i) => longId(i))));
@@ -481,7 +521,7 @@ checkAsync("a failed release keeps the records and memory for the next successfu
   assert.deepEqual(Object.keys(reopened.store), ["pA"]);
 });
 
-// ---- Landmark data: index once, cells per release+cell, bounded concurrency ----
+// ---- Landmark data: index once, cells per dataset+cell, bounded concurrency ----
 // A data host double: answers by URL, records requests and peak concurrency.
 function dataHost(files, { fail = () => null } = {}) {
   const log = [];
@@ -529,7 +569,7 @@ checkAsync("60 km fetches at most 9 listed cells, never more than two at once, a
   const all = [];
   for (let a = 50; a <= 54; a++) for (let o = 7; o <= 12; o++) all.push(a + "_" + o);
   const viewer = { lat: 52.37, lon: 9.74 },
-    host = dataHost({ [C.INDEX_URL]: indexWith(all), ...cellFiles(all, (c) => [["Centre " + c, "tower", Number(c.split("_")[0]) + 0.5, Number(c.split("_")[1]) + 0.5, 0, 1]]) }),
+    host = dataHost({ [C.INDEX_URL]: indexWith(all), ...cellFiles(all, (c) => [["Centre " + c, "tower", Number(c.split("_")[0]) + 0.5, Number(c.split("_")[1]) + 0.5, 0, 1, 8]]) }),
     data = C.landmarkData(host.get);
   const found = await data.features(viewer, 60);
   const cells = host.log.filter((u) => u.includes("/cells/"));
@@ -537,7 +577,7 @@ checkAsync("60 km fetches at most 9 listed cells, never more than two at once, a
   assert.ok(host.peak() <= C.DATA_CONCURRENCY && C.DATA_CONCURRENCY + 2 <= 4, "with the map's two tile requests, within the host's four");
   assert.ok(found.features.every((f) => C.metres(viewer, f) <= 60000));
   assert.deepEqual(found.features.map((f) => f.name).sort(), ["Centre 52_10", "Centre 52_9"]);
-  assert.equal(found.release, INDEX.release);
+  assert.equal(found.dataset, INDEX.dataset);
   // Only listed cells are requested; an unlisted neighbour is simply absent.
   const sparse = dataHost({ [C.INDEX_URL]: indexWith(["52_9"]), ...cellFiles(["52_9"]) });
   await C.landmarkData(sparse.get).features(viewer, 60);
@@ -547,7 +587,7 @@ checkAsync("60 km fetches at most 9 listed cells, never more than two at once, a
 checkAsync("outside coverage needs no cell request; a failed or mismatched cell is unavailable, never empty, and a retry fetches only what failed", async () => {
   const cells = ["46_9", "47_9"];
   let failing = new Set(["47_9"]);
-  const files = { [C.INDEX_URL]: indexWith(cells), ...cellFiles(cells, (c) => [["Tower " + c, "tower", 46.95, 9.3, 0, 1]]) };
+  const files = { [C.INDEX_URL]: indexWith(cells), ...cellFiles(cells, (c) => [["Tower " + c, "tower", 46.95, 9.3, 0, 1, 8]]) };
   const host = dataHost(files, { fail: (url) => ([...failing].some((c) => url.endsWith("/" + c + ".json")) ? C.httpProblem(null, 503) : null) });
   const data = C.landmarkData(host.get);
   await assert.rejects(data.features({ lat: 40.4168, lon: -3.7038 }, 60), (e) => e.code === "OUTSIDE_COVERAGE" && e.retry === false && e.message === "No landmark data here yet. Germany and Austria for now.");
@@ -558,11 +598,13 @@ checkAsync("outside coverage needs no cell request; a failed or mismatched cell 
   const found = await data.features({ lat: 46.95, lon: 9.3 }, 30);
   assert.deepEqual(host.log, [C.cellUrl(data.index, "47_9")], "the good cell stayed cached");
   assert.deepEqual(found.features.map((f) => f.name).sort(), ["Tower 46_9", "Tower 47_9"]);
-  // A cell from another release is rejected as unavailable.
-  const stale = dataHost({ [C.INDEX_URL]: indexWith(["46_9"]), [C.cellUrl(C.parseIndex(JSON.stringify(INDEX)), "46_9")]: cellText("46_9", [["T", "tower", 46.5, 9.5, 0, 1]], { release: "2026-08-20.0" }) });
-  await assert.rejects(C.landmarkData(stale.get).features({ lat: 46.5, lon: 9.5 }, 10), (e) => e.code === "DATA_INVALID" && e.retry);
+  // A cell from another release or revision is rejected as unavailable.
+  for (const other of [{ release: "2026-08-20.0" }, { revision: 2 }]) {
+    const stale = dataHost({ [C.INDEX_URL]: indexWith(["46_9"]), [C.cellUrl(C.parseIndex(JSON.stringify(INDEX)), "46_9")]: cellText("46_9", [["T", "tower", 46.5, 9.5, 0, 1, 8]], other) });
+    await assert.rejects(C.landmarkData(stale.get).features({ lat: 46.5, lon: 9.5 }, 10), (e) => e.code === "DATA_INVALID" && e.retry);
+  }
   // A cell that is not a feature list fails the lookup as well.
-  const broken = dataHost({ [C.INDEX_URL]: indexWith(["46_9"]), [C.cellUrl(C.parseIndex(JSON.stringify(INDEX)), "46_9")]: JSON.stringify({ schema: 1, release: INDEX.release, cell: [46, 9], f: null }) });
+  const broken = dataHost({ [C.INDEX_URL]: indexWith(["46_9"]), [C.cellUrl(C.parseIndex(JSON.stringify(INDEX)), "46_9")]: JSON.stringify({ schema: 1, release: INDEX.release, revision: INDEX.revision, cell: [46, 9], f: null }) });
   await assert.rejects(C.landmarkData(broken.get).features({ lat: 46.5, lon: 9.5 }, 10), { code: "DATA_INVALID" });
   // Schema 2 index: unavailable, not outside coverage.
   const future = dataHost({ [C.INDEX_URL]: indexWith(["46_9"], { schema: 2 }) });
@@ -582,7 +624,10 @@ checkAsync("Synthetic Aimé serves the contract: 8 landmarks at every radius, 50
   }
   assert.equal((await data.features(F.viewer, 30)).features.length, 8);
   await assert.rejects(data.features(F.outside, 60), { code: "OUTSIDE_COVERAGE" });
-  assert.equal(F.answer("https://aime-data.pages.dev/v1/synthetic-1/cells/0_0.json").status, 404);
+  assert.equal(F.answer("https://aime-data.pages.dev/v1/synthetic-1-r1/cells/0_0.json").status, 404);
+  assert.equal(F.answer("https://aime-data.pages.dev/v1/synthetic-1/cells/46_9.json").status, 404, "cells live under the dataset, not the release");
+  const byName = Object.fromEntries((await data.features(F.viewer, 60)).features.map((f) => [f.name, f.positionM]));
+  assert.deepEqual([byName["Synthetic Peak B"], byName["Synthetic Church C"], byName["Synthetic Castle D"]], [8, 16, 60], "fixture p per feature");
 });
 
 (async () => {

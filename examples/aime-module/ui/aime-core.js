@@ -37,11 +37,13 @@ const AimeCore = (() => {
   const latLon = (lat, lon) => num(lat) && num(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
   const OSM_TYPES = ["node", "way", "relation"];
   const isKind = (k) => typeof k === "string" && /^[a-z][a-z_]{0,39}$/.test(k),
-    isRelease = (r) => typeof r === "string" && /^[\w.-]{1,32}$/.test(r);
+    isRelease = (r) => typeof r === "string" && /^[\w.-]{1,40}$/.test(r),
+    // Position uncertainty per feature (contract `p`): integer metres, 5–1000.
+    isP = (p) => Number.isInteger(p) && p >= 5 && p <= 1000;
 
   // ---- Sidecars -------------------------------------------------------------
   // Shape (brief): { viewer: {lat, lon, accuracyM, timestamp, approximate, corrected,
-  // review}, radiusKm, marks: [{x, y, kind, name, lat, lon, positionM, release}],
+  // review}, radiusKm, marks: [{x, y, kind, name, lat, lon, positionM, dataset}],
   // horizon: [{x, y}] }. `review` (not in the brief's list) marks a viewpoint that
   // must be confirmed or corrected before any feature query.
   function cleanViewer(v) {
@@ -57,7 +59,7 @@ const AimeCore = (() => {
     };
   }
   // Marks saved before landmark cells (Aimé ≤ 0.1.2) carry an OSM type and id
-  // instead of kind and release. They keep that shape, name, position and
+  // instead of kind and dataset. They keep that shape, name, position and
   // estimate, so they load, calibrate and round-trip unchanged.
   function cleanMark(m) {
     if (!m || !inUnit(m.x) || !inUnit(m.y) || !latLon(m.lat, m.lon)) return null;
@@ -70,7 +72,7 @@ const AimeCore = (() => {
         lat: m.lat,
         lon: m.lon,
         positionM: num(m.positionM) && m.positionM > 0 ? m.positionM : 30,
-        release: isRelease(m.release) ? m.release : "",
+        dataset: isRelease(m.dataset) ? m.dataset : "",
       };
     if (!OSM_TYPES.includes(m.osmType) || !Number.isSafeInteger(m.osmId)) return null;
     return {
@@ -289,18 +291,21 @@ const AimeCore = (() => {
       for (let o = lon0; o <= lon1; o++) out.add(a + "_" + ((((o + 180) % 360) + 360) % 360 - 180));
     return [...out];
   }
-  // index.json text → {release, path, cells (Set), kinds, coverage, license,
-  // attribution}. Anything but schema 1 in the expected shape is unavailable.
+  // index.json text → {release, revision, dataset, path, cells (Set), kinds (Set),
+  // coverage, license, attribution}. Anything but schema 1 in the expected shape
+  // is unavailable. Kinds only validate records; they carry no position values.
   function parseIndex(body) {
     const x = readJson(body, "The landmark index");
     if (!x || x.schema !== 1) throw unavailable("the landmark index has an unsupported schema.");
-    const kinds = Object.create(null);
-    for (const [k, v] of Object.entries((x.kinds && typeof x.kinds === "object" && x.kinds) || {}))
-      if (isKind(k) && v && num(v.placementM) && v.placementM > 0) kinds[k] = { placementM: v.placementM };
-    if (!isRelease(x.release) || typeof x.path !== "string" || !/^[\w.-]+(\/[\w.-]+)*\/$/.test(x.path) || x.path.split("/").includes("..") || !Array.isArray(x.cells) || !Object.keys(kinds).length)
+    const kinds = new Set(Array.isArray(x.kinds) ? x.kinds.filter(isKind) : []);
+    // dataset = <release>-r<revision>; its cells live under <dataset>/cells/.
+    const dataset = isRelease(x.release) && Number.isInteger(x.revision) && x.revision >= 1 ? `${x.release}-r${x.revision}` : null;
+    if (!dataset || x.dataset !== dataset || !isRelease(x.dataset) || x.path !== dataset + "/cells/" || !Array.isArray(x.cells) || !kinds.size)
       throw unavailable("the landmark index is incomplete.");
     return {
       release: x.release,
+      revision: x.revision,
+      dataset,
       path: x.path,
       cells: new Set(x.cells.filter((c) => typeof c === "string" && CELL.test(c))),
       kinds,
@@ -310,23 +315,26 @@ const AimeCore = (() => {
     };
   }
   const cellUrl = (index, cell) => DATA_ORIGIN + "/v1/" + index.path + cell + ".json";
+  // Session cache key: a revision of the same release is a different dataset.
+  const cellKey = (index, cell) => index.dataset + "/" + cell;
   // Cells to download for a viewpoint and radius: only those the index lists.
   const cellPlan = (index, viewer, radiusKm) => cellsAround(viewer.lat, viewer.lon, radiusKm).filter((c) => index.cells.has(c));
   const TERRAIN = new Set(["peak", "hill", "volcano"]);
-  // Cell text → features. A cell whose schema, release or corner does not match
-  // the index, or without a feature array, is unavailable (never empty); single
-  // malformed records are skipped.
+  // Cell text → features. A cell whose schema, release, revision or corner does
+  // not match the index, or without a feature array, is unavailable (never
+  // empty); single malformed records (including a missing or invalid `p`) are
+  // skipped. `p` is the feature's positionM, with no kind-level fallback.
   function parseCell(index, cell, body) {
     const x = readJson(body, "Landmark cell " + cell),
       m = cell.match(CELL);
-    if (!x || x.schema !== 1 || x.release !== index.release) throw unavailable(`landmark cell ${cell} does not match the index release.`);
+    if (!x || x.schema !== 1 || x.release !== index.release || x.revision !== index.revision) throw unavailable(`landmark cell ${cell} does not match the index dataset (release and revision).`);
     if (!m || !Array.isArray(x.cell) || x.cell.length !== 2 || x.cell[0] !== Number(m[1]) || x.cell[1] !== Number(m[2]) || !Array.isArray(x.f)) throw unavailable(`landmark cell ${cell} is malformed.`);
     const features = [];
     for (const r of x.f) {
-      if (!Array.isArray(r) || r.length !== 6 || typeof r[0] !== "string" || typeof r[1] !== "string" || !index.kinds[r[1]] || !latLon(r[2], r[3])) continue;
+      if (!Array.isArray(r) || r.length !== 7 || typeof r[0] !== "string" || !index.kinds.has(r[1]) || !latLon(r[2], r[3]) || !isP(r[6])) continue;
       const name = text(r[0]);
       if (!name) continue;
-      const f = { name, kind: r[1], lat: r[2], lon: r[3], e: num(r[4]) ? r[4] : 0, w: num(r[5]) ? Math.min(2, Math.max(0.5, r[5])) : 1, positionM: index.kinds[r[1]].placementM, release: index.release };
+      const f = { name, kind: r[1], lat: r[2], lon: r[3], e: num(r[4]) ? r[4] : 0, w: num(r[5]) ? Math.min(2, Math.max(0.5, r[5])) : 1, p: r[6], positionM: r[6], dataset: index.dataset };
       // Peaks may count beyond the solver's default 40 km.
       if (TERRAIN.has(f.kind)) f.maxKm = 100;
       features.push(f);
@@ -385,7 +393,7 @@ const AimeCore = (() => {
     return (fn) => new Promise((resolve, reject) => (queue.push({ fn, resolve, reject }), next()));
   }
   // Landmark data over get(url) → Promise<JSON text> (throws the errors above).
-  // The index is fetched once per session and cells once per release and cell;
+  // The index is fetched once per session and cells once per dataset and cell;
   // only successes are kept, so a retry downloads just what failed.
   function landmarkData(get, concurrency = DATA_CONCURRENCY) {
     const limit = limiter(concurrency),
@@ -403,7 +411,7 @@ const AimeCore = (() => {
       return indexJob;
     }
     function cell(ix, name) {
-      const key = ix.release + "/" + name;
+      const key = cellKey(ix, name);
       if (cells.has(key)) return Promise.resolve(cells.get(key));
       if (!jobs.has(key))
         jobs.set(key, limit(() => get(cellUrl(ix, name)))
@@ -420,13 +428,13 @@ const AimeCore = (() => {
         return index;
       },
       loadIndex,
-      // → {features, release, cells}; outside coverage throws OUTSIDE_COVERAGE.
+      // → {features, dataset, cells}; outside coverage throws OUTSIDE_COVERAGE.
       async features(viewer, radiusKm) {
         const ix = await loadIndex(),
           plan = cellPlan(ix, viewer, radiusKm);
         if (!plan.length) throw dataError("OUTSIDE_COVERAGE", outsideMessage(ix.coverage), false);
         const lists = await Promise.all(plan.map((c) => cell(ix, c)));
-        return { features: within(lists.flat(), viewer, radiusKm), release: ix.release, cells: plan.length };
+        return { features: within(lists.flat(), viewer, radiusKm), dataset: ix.dataset, cells: plan.length };
       },
     };
   }
@@ -445,7 +453,7 @@ const AimeCore = (() => {
 
   // ---- Calibration and shortlist ------------------------------------------
   function markFrom(feature, x, y) {
-    return cleanMark({ x, y, kind: feature.kind, name: feature.name, lat: feature.lat, lon: feature.lon, positionM: feature.positionM, release: feature.release });
+    return cleanMark({ x, y, kind: feature.kind, name: feature.name, lat: feature.lat, lon: feature.lon, positionM: feature.positionM, dataset: feature.dataset });
   }
   function calibrationInput(sidecar, width, height) {
     const v = sidecar.viewer;
@@ -524,6 +532,7 @@ const AimeCore = (() => {
     cellsAround,
     parseIndex,
     cellUrl,
+    cellKey,
     cellPlan,
     parseCell,
     featureKey,
