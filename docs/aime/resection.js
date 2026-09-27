@@ -165,7 +165,9 @@ const Resection = (() => {
   //   viewer:  {lat, lon, accuracyM?}        reported fix; accuracy is the shared-offset prior
   //   marks:   [{x, y, point, positionM?}]    known landmarks tapped in the photo
   //   horizon: [{x, y}]                       optional taps on a true level horizon
-  //   heading: compass azimuth (optional)     weak observation
+  //   heading: compass azimuth (optional)     weak observation; headingRef
+  //            "true" (default) or "magnetic" (+ declination, east positive);
+  //            headingSigma widens σ (floor 12°)
   //   tilt:    {pitch, roll, sigma?} (optional) gravity-sensor tilt at the shutter,
   //            solver sign conventions (see basis); sigma defaults to 1.5°
   //   fov:     known lens FOV (optional)      tight prior (fovSigma, default 1°)
@@ -193,10 +195,25 @@ const Resection = (() => {
         throw new Error("Each horizon point needs x and y in [0, 1].");
       obs.push({ kind: "horizon", h, sigma: HORIZON_SIGMA });
     }
-    const compass = num(input.heading) ? wrap(input.heading) : null;
+    // Compass: true north by default; a magnetic heading needs the declination
+    // (east positive) and is never silently used as true. The sensor's accuracy
+    // widens σ but never below COMPASS_SIGMA.
+    let compass = null,
+      compassSigma = COMPASS_SIGMA;
+    if (input.heading != null) {
+      const ref = input.headingRef ?? "true";
+      if (!num(input.heading) || (ref !== "true" && ref !== "magnetic"))
+        throw new Error("Heading needs degrees and headingRef true or magnetic.");
+      if (ref === "magnetic" && !num(input.declination))
+        throw new Error("Magnetic heading needs a declination.");
+      if (input.headingSigma != null && !(num(input.headingSigma) && input.headingSigma > 0))
+        throw new Error("Heading sigma must be positive.");
+      compass = wrap(input.heading + (ref === "magnetic" ? input.declination : 0));
+      if (input.headingSigma != null) compassSigma = Math.max(COMPASS_SIGMA, input.headingSigma);
+    }
     if (!list.length && compass === null)
       throw new Error("Without a mark a compass heading is required.");
-    if (compass !== null) obs.push({ kind: "compass", value: compass, sigma: COMPASS_SIGMA });
+    if (compass !== null) obs.push({ kind: "compass", value: compass, sigma: compassSigma });
     const tilt = input.tilt;
     if (tilt != null) {
       if (!num(tilt.pitch) || !num(tilt.roll) || Math.abs(tilt.pitch) > 89 || Math.abs(tilt.roll) > 89 ||
@@ -388,52 +405,92 @@ const Resection = (() => {
   }
   // Pixel of a world direction under a calibration (null if behind the camera).
   const pixelAt = (cal, azimuth, elevation = 0) => project(pose(cal), cal.aspect, azimuth, elevation);
-  // Polyline of pixels sharing one azimuth (elevations −60…60°), clipped to the
-  // frame with a small margin. With tilt it is not a vertical line.
-  function bearingLine(cal, azimuth, margin = 0.02) {
-    const pts = [];
-    for (let e = -60; e <= 60; e += 1) {
-      const q = pixelAt(cal, azimuth, e);
-      if (q && q.x >= -margin && q.x <= 1 + margin && q.y >= -margin && q.y <= 1 + margin) pts.push(q);
+  // Pixels sharing one azimuth, found analytically: all directions with azimuth
+  // A form the vertical half-plane spanned by h = (sin A, cos A, 0) and up. Its
+  // image is the line n·(F + uR + vD) = 0 with n = h × up, clipped to the frame
+  // and to the half where h·d > 0 (A, not A + 180°). Works at any pitch/roll.
+  // Returns up to `steps + 1` points ordered top to bottom, or [] if not visible.
+  function bearingLine(cal, azimuth, steps = 24) {
+    const { F, R, D, t } = basis(pose(cal)),
+      U = t,
+      V = t * cal.aspect,
+      A = rad(azimuth),
+      h = [Math.sin(A), Math.cos(A), 0],
+      n = [Math.cos(A), -Math.sin(A), 0],
+      dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2],
+      al = dot(n, F), be = dot(n, R), ga = dot(n, D),
+      g = (q) => dot(h, F) + q.u * dot(h, R) + q.v * dot(h, D),
+      eps = 1e-12;
+    const hits = [];
+    if (Math.abs(ga) > eps)
+      for (const u of [-U, U]) {
+        const v = -(al + be * u) / ga;
+        if (Math.abs(v) <= V * (1 + 1e-9)) hits.push({ u, v });
+      }
+    if (Math.abs(be) > eps)
+      for (const v of [-V, V]) {
+        const u = -(al + ga * v) / be;
+        if (Math.abs(u) <= U * (1 + 1e-9)) hits.push({ u, v });
+      }
+    let p0 = null, p1 = null, best = -1;
+    for (let i = 0; i < hits.length; i++)
+      for (let j = i + 1; j < hits.length; j++) {
+        const dd = Math.hypot(hits[i].u - hits[j].u, hits[i].v - hits[j].v);
+        if (dd > best) { best = dd; p0 = hits[i]; p1 = hits[j]; }
+      }
+    if (!p0 || best < 1e-9 * U) return [];
+    // Keep the half-plane h·d > 0; stop just short of the zenith/nadir crossing.
+    let g0 = g(p0), g1 = g(p1);
+    const floor = 1e-6 * (Math.abs(g0) + Math.abs(g1) + 1e-12);
+    if (g0 <= floor && g1 <= floor) return [];
+    const cut = (a, b, ga_, gb) => { const k = (floor - ga_) / (gb - ga_); return { u: a.u + k * (b.u - a.u), v: a.v + k * (b.v - a.v) }; };
+    if (g0 < floor) p0 = cut(p0, p1, g0, g1);
+    else if (g1 < floor) p1 = cut(p1, p0, g1, g0);
+    const out = [];
+    for (let k = 0; k <= steps; k++) {
+      const u = p0.u + ((p1.u - p0.u) * k) / steps,
+        v = p0.v + ((p1.v - p0.v) * k) / steps;
+      out.push({ x: Math.min(1, Math.max(0, 0.5 + u / (2 * U))), y: Math.min(1, Math.max(0, 0.5 + v / (2 * V))) });
     }
-    return pts;
+    return out[0].y <= out[out.length - 1].y ? out : out.reverse();
   }
   // locate(cal, target) → where a map point lies in the photo.
   //   target: {point, positionM?}
-  // Returns {bearing, distanceKm, sigmaDeg, inFrame, side, anchor, line, band}:
-  // `line` is the target's bearing line, `band` the lines at bearing ± 2σ where
-  // σ is the comparison uncertainty at the anchor pixel (the line's crossing of
-  // the horizon, or the nearest frame edge on the centre row). `side` is
-  // "left"/"right"/"behind" when the bearing is out of frame, else null.
+  // Returns {bearing, distanceKm, sigmaDeg, inFrame, side, anchor, line, band}.
+  // Visibility is the bearing line's actual intersection with the frame. The
+  // anchor is where that line crosses the horizon when the crossing is in frame,
+  // otherwise the line point nearest the horizon; σ is the comparison
+  // uncertainty there and `band` holds the lines at bearing ± 2σ. Out of frame,
+  // `side` is "left"/"right"/"above"/"below" or "behind-left"/"behind-right",
+  // judged at the elevation of the image centre, and the anchor is the matching
+  // frame edge.
   function locate(cal, target) {
     if (!target || !point(target.point)) throw new Error("Target position required.");
     const b = bearing(cal.viewer, target.point),
       d = distance(cal.viewer, target.point),
       line = bearingLine(cal, b),
-      h = pixelAt(cal, b, 0);
-    let side = null,
-      anchor;
-    if (!h) side = "behind";
-    else if (h.x < 0) side = "left";
-    else if (h.x > 1) side = "right";
-    if (side === "behind") {
-      const rel = diff(b, cal.heading);
-      side = rel < 0 ? "left" : "right";
-      anchor = { x: rel < 0 ? 0 : 1, y: 0.5 };
-      return { bearing: b, distanceKm: d, sigmaDeg: uncertainty(cal, anchor.x, anchor.y, target), inFrame: false, side: "behind-" + side, anchor, line: [], band: [[], []] };
+      inside = (q) => q && q.x >= 0 && q.x <= 1 && q.y >= 0 && q.y <= 1;
+    if (line.length) {
+      const h = pixelAt(cal, b, 0),
+        anchor = inside(h) ? h : line.reduce((a, q) => (Math.abs(elevationAt(cal, q.x, q.y)) < Math.abs(elevationAt(cal, a.x, a.y)) ? q : a)),
+        sigma = uncertainty(cal, anchor.x, anchor.y, target);
+      return { bearing: b, distanceKm: d, sigmaDeg: sigma, inFrame: true, side: null, anchor: { x: anchor.x, y: anchor.y }, line,
+        band: [bearingLine(cal, b - 2 * sigma), bearingLine(cal, b + 2 * sigma)] };
     }
-    anchor = { x: Math.min(1, Math.max(0, h.x)), y: Math.min(1, Math.max(0, h.y)) };
-    const sigma = uncertainty(cal, anchor.x, anchor.y, target);
-    return {
-      bearing: b,
-      distanceKm: d,
-      sigmaDeg: sigma,
-      inFrame: side === null && line.length > 0,
-      side,
-      anchor,
-      line,
-      band: [bearingLine(cal, b - 2 * sigma), bearingLine(cal, b + 2 * sigma)],
-    };
+    const q = pixelAt(cal, b, elevationAt(cal, 0.5, 0.5));
+    let side, anchor;
+    if (!q) {
+      const lr = diff(b, bearingAt(cal, 0.5, 0.5)) < 0 ? "left" : "right";
+      side = "behind-" + lr;
+      anchor = { x: lr === "left" ? 0 : 1, y: 0.5 };
+    } else if (q.x < 0 || q.x > 1) {
+      side = q.x < 0 ? "left" : "right";
+      anchor = { x: q.x < 0 ? 0 : 1, y: Math.min(1, Math.max(0, q.y)) };
+    } else {
+      side = q.y < 0 ? "above" : "below";
+      anchor = { x: q.x, y: q.y < 0 ? 0 : 1 };
+    }
+    return { bearing: b, distanceKm: d, sigmaDeg: uncertainty(cal, anchor.x, anchor.y, target), inFrame: false, side, anchor, line: [], band: [[], []] };
   }
   // rank(cal, x, y, candidates) → candidates sorted best first.
   //   candidates: [{point, weight?, maxKm?, positionM?, ...}]   weight: visibility prior ≥ 0

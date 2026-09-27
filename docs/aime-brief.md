@@ -382,10 +382,20 @@ distances and a map ruler, and working screenshots.
   line plus pitch/roll readout, highlighted within ±1°). `zoom` lists fixed
   ratios offered as chips, clamped to the device's range, default 1×. No free
   zoom.
-- Result `{saved: true, id, capture: {zoomRatio, fovDeg: {h, v}, tilt:
-  {pitchDeg, rollDeg, sigmaDeg}, headingDeg?, headingAccuracyDeg?}}`, all for
-  the saved image as the module opens it (after EXIF orientation), sampled at
-  the shutter. `id` is the new photo's stable id, which replaces the
+- Result `{saved: true, id, capture: {zoomRatio, fovDeg?: {h, v},
+  fovSigmaDeg?, tilt?: {pitchDeg, rollDeg, sigmaDeg, ageMs}, headingDeg?,
+  headingRef?: "magnetic", headingAccuracyDeg?, headingAgeMs?}}`, all for the
+  saved image as the module opens it (after EXIF orientation). **Every
+  measured field is optional and carries its own uncertainty; the host omits
+  a field rather than guessing** (sensor missing, unreliable status, crop
+  unknown). Availability rules: `tilt` is the gravity/accelerometer sample
+  nearest the shutter, omitted when older than 250 ms, with `sigmaDeg` ≥ 1°;
+  `fovDeg` is omitted when the characteristics or the saved-image crop are
+  unknown, and `fovSigmaDeg` (≥ 0.5°, default 1°, 2° when stabilization or
+  distortion correction may change the crop) always accompanies it; heading
+  fields are omitted when the rotation-vector sensor reports unreliable
+  accuracy or the sample is older than 1 s. The module sets a "measured" flag
+  only for fields that are present. `id` is the new photo's stable id, which replaces the
   before/after list association. `fovDeg` comes from the camera
   characteristics and the actual capture crop (focal length, physical sensor
   size, active-array crop, output aspect and zoom). Do not divide an angle by
@@ -400,9 +410,19 @@ distances and a map ruler, and working screenshots.
   right of the photo. The host converts from the Android sensor frame for the
   photo's final orientation; the runner verifies both signs with
   `adb emu sensor set acceleration`.
-- `headingDeg` from the rotation-vector sensor is a weak hint only (the solver
-  uses σ ≥ 12°) and is omitted when the sensor reports unreliable accuracy.
-  No location is added to capture metadata.
+- `headingDeg` from the rotation-vector sensor is **magnetic** (`headingRef:
+  "magnetic"`); the host has no location and applies no declination. The
+  solver's bearings are true north, so the module passes `headingRef:
+  "magnetic"` with a `declination` and the solver refuses a magnetic heading
+  without one. Declination source: an additive `declination` field (degrees
+  east, WMM at the cell centre on the build date, 0.1°) in each aime-data
+  cell; the module takes it from the viewpoint's cell, and skips the heading
+  when it is absent. `headingAccuracyDeg` becomes `headingSigma` (the solver
+  floors it at 12°). The heading remains a weak hint. No location is added to
+  capture metadata.
+- Tilt is sampled on every API 0.13 capture; `level` only controls the
+  indicator's visibility. Modules with `camera.photo` but without `image.read`
+  stay non-secure as today (they cannot read pixels).
 - **Screenshots:** today every module with `image.read` and the viewfinder run
   with the secure-window flag, which is why screenshots come out black.
   Confirmed choice: a per-module **Allow screenshots** switch in Module access, off by
@@ -413,19 +433,30 @@ distances and a map ruler, and working screenshots.
   per-module switch on 2026-09-27; no global override is planned.
 
 **2c, module adopts 2b:** request `level: true, zoom: [1, 2]`; store
-`capture` in the photo's sidecar; calibrate with `fov` (`fovSigma` 1°) and
-`tilt`; use the compass heading as a weak observation and to sort the "mark a
-landmark" search by direction. Horizon taps stay available for photos without
-measured tilt.
+`capture` in the photo's sidecar; calibrate with `fov` and `fovSigma` from
+`fovDeg.h`/`fovSigmaDeg`, `tilt` with its `sigmaDeg`, and the heading as
+`{heading, headingRef: "magnetic", declination, headingSigma}` when the cell
+has a declination; use the corrected heading to sort the "mark a landmark"
+search by direction. Horizon taps stay available for photos without measured
+tilt. The cell parser must ignore unknown additive fields such as
+`declination` in older data and accept its absence.
 
-**Solver support (in this revision):** `project`, `pixelAt`, `bearingLine`
-and `locate` for map → photo; `calibrate({tilt, fov, fovSigma})` for measured
-tilt and lens; result flag `tilt: "measured" | "none"`. Synthetic effect with
+**Integration:** the module's copy of the solver must stay byte-identical
+(main's `test_aime.cjs`), so this reference lands through slice 2a: Clawd
+merges this branch into the 2a branch and copies the file into the new signed
+module version; the accepted 0.1.7 package is never rewritten.
+
+**Solver support (in this revision):** `project`, `pixelAt`, analytic
+`bearingLine` (the azimuth's vertical half-plane intersected with the frame,
+valid at any pitch/roll) and `locate` for map → photo, with visibility from the
+line's real frame intersection and sides left/right/above/below/behind;
+`calibrate({tilt, fov, fovSigma, heading, headingRef, declination,
+headingSigma})` for measured pose; result flag `tilt: "measured" | "none"`. Synthetic effect with
 one mark, random taps, tilt ±1° and lens ±0.5°: p90 bearing error 0.94°
 against 5.18° with guessed lens and level, 2σ coverage 100 % (99.4 %
 before). Astra's 25°-pitch case drops from 5.1° to 0.4° without horizon taps.
 
-**Acceptance:** solver tests in CI (25 checks); host runner checks for the
+**Acceptance:** solver tests in CI (30 checks, including Astra's tilted-photo and 80°-pitch reproductions and a randomized completeness check over extreme poses); host runner checks for the
 capture metadata ranges and both tilt signs on the emulator; hardware: a 2×
 photo from a viewpoint with one mark and no horizon taps, plus a level-indicator
 comparison against a known level surface.

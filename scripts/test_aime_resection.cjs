@@ -481,4 +481,81 @@ test("measured tilt and lens: coverage holds and accuracy improves on random sce
   const b = report("one mark, measured tilt ±1° and lens ±0.5°", measured, 0.9);
   assert.ok(b.p90 < a.p90 / 2, `p90 ${b.p90} vs ${a.p90}`);
 });
+// ── #39 review: analytic bearing lines at any pose; heading references ──
+const exactCal = (P, v = viewer) => S.calibrate({ viewer: { ...v, accuracyM: 15 }, marks: [], heading: P.heading, headingSigma: 12,
+  tilt: { pitch: P.pitch, roll: P.roll, sigma: 0.01 }, fov: P.fov, fovSigma: 0.01, width: W, height: H });
+test("review case: tilted photo with a visible bearing is reported in frame", () => {
+  const hv = { lat: 52.37648, lon: 9.73848 };
+  const cal = exactCal({ heading: 0, pitch: 25, roll: 10, fov: 70 }, hv);
+  const r = S.locate(cal, { point: S.destination(hv, 36, 5) });
+  console.log(`  pitch 25°, roll 10°, bearing 36°: inFrame ${r.inFrame}, side ${r.side}, ${r.line.length} line points`);
+  assert.equal(r.inFrame, true);
+  assert.equal(r.side, null);
+  assert.ok(r.line.length > 2);
+  for (const q of r.line) assert.ok(Math.abs(S.diff(S.bearingAt(cal, q.x, q.y), r.bearing)) < 1e-6);
+});
+test("review case: steep 80° pitch with a 20° lens keeps the visible line", () => {
+  const cal = exactCal({ heading: 0, pitch: 80, roll: 0, fov: 20 });
+  assert.ok(Math.abs(S.diff(S.bearingAt(cal, 0.5, 0.5), 0)) < 1e-6);
+  const r = S.locate(cal, { point: S.destination(viewer, 0, 3) });
+  console.log(`  pitch 80°, fov 20°, bearing 0°: inFrame ${r.inFrame}, ${r.line.length} points, anchor y ${r.anchor.y.toFixed(2)}`);
+  assert.equal(r.inFrame, true);
+  assert.ok(r.line.some((q) => Math.abs(q.x - 0.5) < 1e-6 && Math.abs(q.y - 0.5) < 0.05), "line passes through the centre");
+  // Looking almost straight down, the opposite azimuth must not be drawn on this side.
+  const back = S.bearingLine(cal, 180);
+  for (const q of back) assert.ok(Math.abs(S.diff(S.bearingAt(cal, q.x, q.y), 180)) < 1e-6);
+});
+test("bearing lines are complete and on the right half-plane for extreme random poses", () => {
+  let visible = 0, checked = 0;
+  for (let i = 0; i < 300; i++) {
+    const P = { heading: rnd() * 360, pitch: -89 + rnd() * 178, roll: -60 + rnd() * 120, fov: 20 + rnd() * 100 };
+    const cal = exactCal(P);
+    const A = rnd() * 360, line = S.bearingLine(cal, A);
+    for (const q of line) assert.ok(Math.abs(S.diff(S.bearingAt(cal, q.x, q.y), A)) < 1e-5, `off-azimuth point ${JSON.stringify(q)} pose ${JSON.stringify(P)} A ${A}`);
+    // Brute force: grid pixels whose bearing is within 0.2° of A must lie on the returned segment.
+    for (let gx = 0; gx <= 40; gx++)
+      for (let gy = 0; gy <= 40; gy++) {
+        const x = gx / 40, y = gy / 40;
+        if (Math.abs(S.elevationAt(cal, x, y)) > 88) continue; // azimuth undefined near zenith/nadir
+        if (Math.abs(S.diff(S.bearingAt(cal, x, y), A)) > 0.2) continue;
+        checked++;
+        assert.ok(line.length, `visible pixel ${x},${y} but empty line; pose ${JSON.stringify(P)} A ${A}`);
+        const dmin = Math.min(...line.slice(1).map((q, k) => {
+          const p = line[k], vx = q.x - p.x, vy = q.y - p.y, L = vx * vx + vy * vy || 1e-18,
+            s2 = Math.max(0, Math.min(1, ((x - p.x) * vx + (y - p.y) * vy) / L));
+          return Math.hypot(p.x + s2 * vx - x, p.y + s2 * vy - y);
+        }));
+        assert.ok(dmin < 0.02, `pixel ${x},${y} is ${dmin} from the line`);
+      }
+    if (line.length) visible++;
+  }
+  console.log(`  ${visible}/300 random poses show the bearing; ${checked} grid pixels confirmed on their lines`);
+  assert.ok(visible > 30 && checked > 50);
+});
+test("locate reports corners, above/below and behind consistently at steep pitch and roll", () => {
+  const cal = exactCal({ heading: 90, pitch: 70, roll: 20, fov: 40 });
+  for (const b of [0, 45, 90, 135, 180, 225, 270, 315]) {
+    const r = S.locate(cal, { point: S.destination(viewer, b, 4) });
+    assert.equal(r.inFrame, r.line.length > 0);
+    if (r.inFrame) assert.equal(r.side, null);
+    else assert.match(r.side, /^(left|right|above|below|behind-left|behind-right)$/);
+    assert.ok(r.anchor.x >= 0 && r.anchor.x <= 1 && r.anchor.y >= 0 && r.anchor.y <= 1 && r.sigmaDeg > 0);
+  }
+  const corner = S.pixelAt(cal, S.bearingAt(cal, 0.999, 0.001), S.elevationAt(cal, 0.999, 0.001));
+  assert.ok(Math.abs(corner.x - 0.999) < 1e-6 && Math.abs(corner.y - 0.001) < 1e-6);
+  assert.ok(S.bearingLine(cal, S.bearingAt(cal, 0.999, 0.001)).length > 0, "corner bearing is visible");
+});
+test("heading references: magnetic needs a declination; sensor accuracy widens σ with a 12° floor", () => {
+  const marks = [];
+  assert.throws(() => S.calibrate({ viewer, marks, heading: 30, headingRef: "magnetic", width: W, height: H }), /declination/);
+  assert.throws(() => S.calibrate({ viewer, marks, heading: 30, headingRef: "grid", width: W, height: H }), /headingRef/);
+  assert.throws(() => S.calibrate({ viewer, marks, heading: 30, headingSigma: 0, width: W, height: H }), /sigma/);
+  const mag = S.calibrate({ viewer, marks, heading: 30, headingRef: "magnetic", declination: 4.2, width: W, height: H });
+  const tru = S.calibrate({ viewer, marks, heading: 34.2, width: W, height: H });
+  assert.ok(Math.abs(S.diff(mag.heading, tru.heading)) < 1e-9, "magnetic + declination equals true");
+  const tight = S.calibrate({ viewer, marks, heading: 30, headingSigma: 5, width: W, height: H });
+  const loose = S.calibrate({ viewer, marks, heading: 30, headingSigma: 30, width: W, height: H });
+  assert.ok(Math.abs(tight.sigma.heading - 12) < 0.5, `floor 12°, got ${tight.sigma.heading}`);
+  assert.ok(loose.sigma.heading > 28, `accuracy 30° widens σ, got ${loose.sigma.heading}`);
+});
 console.log(`${count} Aimé resection checks passed.`);
