@@ -17,10 +17,10 @@
         {
           "id": "dev.construct.capture-metadata",
           "name": "Capture metadata probe",
-          "version": "0.2.0",
-          "artifact": "dev.construct.capture-metadata-0.2.0.zip",
-          "sha256": "8394f3e47ae67589c5fac4d564a51647f4af019617bca29040d15f6239fb5913",
-          "signature": "jtks8yGX0z0iyzPNBcoqbajF3GXzKqavEithOIXlgfpQ1z4EBREronYPSjr21EdmZWMMWfN18Zhe/z2+/WVrAbNx+VX1Ja60emyPbsCwjxgvdF6LVN59flXgduCoa8Rxag6PqtnXwS66Rv7aU93MOQtbvUw3074TDpuTURHE2PE+ZkTEXWPk2VpxpIowecCxut8I4op5IURStykOmv3EzbAKBUIX0mzcMEaFwjTi7HPlet7SyIjp/+6FNVelJrZmtNLIzkt+QX7KDSCUvv6CS+zkihDIBQ+IwklSfTho+kBFnC62o8ak4BrJu/XNa9xXhiF12j9dmw7Alu9eJhhecw==",
+          "version": "0.2.1",
+          "artifact": "dev.construct.capture-metadata-0.2.1.zip",
+          "sha256": "b72498b10a32d5eb48cdb873d91206e30a06243684c2fccc1be3d55c9c01d606",
+          "signature": "IsCY1GZYsFpVAgoOfqLTDLNGwsXlTdfo36O+3roVYat6XwbEF14KRPX+7nDX7tkxiriH3SptU4/OOczCdzwdLOD9OVDaZORHoBM6knvtsGPSffFMs29R1eIRUBKWNDY2RdRhkoqbdeI/rJoWtTbDQUD27yHh1OT3b3qeZozkl2SBB0R1Xiy0XCLtV0Nos4TbkaMocqCkO/9OfSmxFW2dt+K0g0f55KJyU2qWsAXmhQULDsdzTbTNncDEmu9CQcUWDlCg+D7UxAh6bKSKY1Co6YnG1FmvTQI4cvNudZCvwGpndZlGgQuftwEh7tLwGwhYUkNraNtnLc1WuqDj4f2SIQ==",
           "testFixture": true
         }
       ]
