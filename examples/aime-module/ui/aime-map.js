@@ -96,7 +96,7 @@ class AimeMap {
     }
     const at = this.local(e),
       v = this.scene.viewer && this.xy(this.scene.viewer),
-      onViewer = this.editable && v && Math.hypot(v.x - at.x, v.y - at.y) < 32;
+      onViewer = !this.ruler && this.editable && v && Math.hypot(v.x - at.x, v.y - at.y) < 32;
     this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, moved: false, viewer: onViewer,
       original: onViewer ? { viewer: { ...this.scene.viewer }, fitted: this.scene.fitted, wedge: this.scene.wedge } : null };
   }

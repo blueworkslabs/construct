@@ -231,6 +231,13 @@ const ok = (name) => {
     fire("pointerup", m.x + 5, m.y - 16);
     assert.deepEqual(events.ruler.at(-1), [{ lat: 46.8, lon: 9.2 }, { lat: 46.81, lon: 9.21 }], "taps near the viewer and a pin head snap to them");
     assert.equal(events.viewer.length, 0, "a tap on the ring measures; it does not move the viewpoint");
+    const beforeViewer = { ...map.scene.viewer }, beforeCenter = { ...map.center };
+    fire("pointerdown", v.x, v.y);
+    fire("pointermove", v.x + 45, v.y + 20);
+    fire("pointerup", v.x + 45, v.y + 20);
+    assert.equal(events.viewer.length, 0, "ruler-mode drags on the ring must pan, never correct the viewpoint");
+    assert.deepEqual(map.scene.viewer, beforeViewer);
+    assert.notDeepEqual(map.center, beforeCenter);
     const labels = [];
     map.cb.rulerLabel = (r) => (labels.push(r), "label");
     map.draw();
