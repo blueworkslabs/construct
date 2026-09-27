@@ -118,6 +118,15 @@ def tap_photo(point,checkpoint=None):
   capture('before-tap-'+checkpoint)
   (run/('before-tap-'+checkpoint+'-bounds.json')).write_text(json.dumps({'stage':[x1,y1,x2,y2],'tap':[x,y],'nodes':[dict(n.attrib) for n in nodes()]},indent=2))
  adb('shell','input','tap',str(x),str(y));time.sleep(.6)
+def hold_photo(point):
+ x1,y1,x2,y2=stage();x=str(round(x1+1+point['x']*(x2-x1-2)));y=str(round(y1+1+point['y']*(y2-y1-2)))
+ press=subprocess.Popen([ui.ADB,'-s',SERIAL,'shell','input','swipe',x,y,x,y,'6000'])
+ try:
+  time.sleep(1);capture('aime-loupe-held')
+  assert press.wait(timeout=12)==0,'Long press failed'
+ finally:
+  if press.poll() is None:press.terminate();press.wait(timeout=5)
+ time.sleep(.8)
 def drag_photo(a,b,ms=700):
  """Press on photo point a and drag to b; the stage moves a mark or horizon point it starts on."""
  x1,y1,x2,y2=stage();px=lambda p:(round(x1+1+p['x']*(x2-x1-2)),round(y1+1+p['y']*(y2-y1-2)))
@@ -251,7 +260,9 @@ try:
 
  # 5. Horizon → level line.
  click('Level horizon');find('Tap two points');tap('Tap two points')
- tap_photo(F['horizon'][0]);reach_text('Horizon point saved');tap_photo(F['horizon'][1]);reach_text('Level estimated')
+ hold_photo(F['horizon'][0]);reach_text('Horizon point saved')
+ done('Long-press release places a horizon point; held magnifier screenshot captured for visual review')
+ tap_photo(F['horizon'][1]);reach_text('Level estimated')
  capture('aime-levelled');done('Two true-level horizon taps level the picture (Level estimated)')
 
  # 5b. Drag a horizon point (stored once on release), then undo it.
