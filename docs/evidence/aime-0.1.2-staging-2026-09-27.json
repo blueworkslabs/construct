@@ -75,6 +75,19 @@
       "seconds": 6.759446
     }
   },
+  "cooldownRecheck": {
+    "at": "2026-09-27T01:34:00Z",
+    "from": "staging host",
+    "query": "same saved 30 km public injected viewpoint query from /tmp/aime-live-query.txt",
+    "userAgent": "Construct-Module/0.9",
+    "accept": "application/json",
+    "status": 0,
+    "curlHttpCode": "000",
+    "seconds": 15.002832,
+    "sizeDownload": 0,
+    "result": "timed out at the 15s host cap with no response body",
+    "fullSuiteLaunched": false
+  },
   "localChecks": {
     "module": 19,
     "map": 10,

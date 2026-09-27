@@ -16,7 +16,7 @@ Passed in this run: grants denied/granted, real native capture and saved viewpoi
 
 The final real-module lookup **failed twice**, with a 30-second pause before its single visible Retry. Both attempts returned `HTTP_UNAVAILABLE`. A separate request from the staging host using the same real 30 km query received **HTTP 504 after 10.29s**, with the server explaining `Dispatcher_Client::request_read_and_idx::timeout` and “The server is probably too busy to handle your request.” A tiny control query succeeded from staging in 6.76s; the same tiny query from the review host received the same busy-server 504. This establishes provider overload during the check, not a successful live lookup.
 
-The host has an 8s read timeout and 15s total call limit; the Overpass query allows 20s server execution. No host timeout was widened, alternate origin added, radius reduced, or synthetic response substituted to make the acceptance pass. After a cooldown, first check that the exact query completes within the existing host budget, then rerun acceptance. Persistent failure needs a provider/query reliability decision, not more broad-suite retries.
+The host has an 8s read timeout and 15s total call limit; the Overpass query allows 20s server execution. No host timeout was widened, alternate origin added, radius reduced, or synthetic response substituted to make the acceptance pass. A cooldown recheck at 2026-09-27 01:34 UTC used the exact saved staging query with the same `Construct-Module/0.9` user agent and `Accept: application/json`; it timed out at the 15s host cap with `http_code=000` and no response body. The Android suite was not relaunched. Persistent failure needs a provider/query reliability decision, not more broad-suite retries.
 
 ## Review and fixes
 
