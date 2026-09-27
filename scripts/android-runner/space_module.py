@@ -215,8 +215,12 @@ try:
  contains('Phone location isn’t enabled');capture('space-real-location-denied')
  done('Real module refuses ungranted phone location and offers manual place')
  click('Choose place')
- edits=[n for n in nodes() if n.get('class')=='android.widget.EditText']
- assert len(edits)==2,'Coordinate inputs missing'
+ end=time.monotonic()+20
+ while time.monotonic()<end:
+  edits=[n for n in nodes() if n.get('class')=='android.widget.EditText' and n.get('resource-id') in ('latitude','longitude')]
+  if len(edits)==2:break
+  time.sleep(.25)
+ else:raise RuntimeError('Coordinate inputs missing after dialog settled')
  ui._device(className='android.widget.EditText',instance=0).set_text('52.52')
  ui._device(className='android.widget.EditText',instance=1).set_text('13.405')
  # set_text does not necessarily show a keyboard; an unconditional Back opens
@@ -227,23 +231,27 @@ try:
  reach_text('Enable the requested capability');capture('space-real-internet-denied')
  done('Real manual-place flow works without location, but ungranted HTTP stays denied')
  module_access();switch('Allow approved internet sources',True);switch('Allow reading phone location',True)
- permission('Allow Android location access');reopen()
+ permission('Allow Android location access')
  adb('shell','cmd','location','set-location-enabled','true')
+ reopen()
  for _ in range(3):adb('emu','geo','fix','13.405','52.52');time.sleep(1)
  # Grant-denied attempts never reached the provider: reopening must fetch
  # automatically, with no compensating manual refresh.
  contains('Your location',45)
  # Loading the object list moves the status below the viewport. Read the
  # settled result via actual scrolling, not only currently exposed XML text.
- status=reach_text('Orbit data ')
+ status=text_of(reveal(lambda t:bool(re.match(r'^Orbit data .+ old · CelesTrak',t))))
  assert re.match(r'^Orbit data .+ old · CelesTrak',status), ('Live orbit data not ready',status)
  receipt['realDataStatus']=status;save()
- reveal('Sky dome:');capture('space-real-network');receipt['realCounts']=contains('above you')
+ receipt['realCounts']=text_of(reveal(lambda t:bool(re.fullmatch(r'\d+ visible · \d+ above you',t))))
+ capture('space-real-network')
  done('Real module: native granted fix and live CelesTrak orbits populate the sky')
  # Cached sky with actual connectivity disabled, no hidden replacement data.
  adb('shell','svc','wifi','disable');adb('shell','svc','data','disable')
  adb('shell','am','force-stop','dev.construct.runtime');open_module(REAL)
- contains('Your location',45);contains('above you');capture('space-real-offline-cache')
+ contains('Your location',45)
+ receipt['offlineCounts']=text_of(reveal(lambda t:bool(re.fullmatch(r'\d+ visible · \d+ above you',t))))
+ capture('space-real-offline-cache')
  done('Real cached sky reopens with Wi-Fi and mobile data disabled')
  receipt['complete']=True
 
