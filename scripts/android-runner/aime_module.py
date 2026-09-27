@@ -29,11 +29,21 @@ run=CONFIG.root/'results'/(datetime.datetime.now(datetime.timezone.utc).strftime
 os.environ['CONSTRUCT_RESULTS']=str(run)
 import ui
 from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
+from keyboard_prompt import gboard_contacts_denial
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'fixtureSha256':a.fixture_sha,'version':a.version,
  'scope':'Synthetic Aimé flow/ranking on a known scene plus real-module location/internet gates; not physical-phone accuracy','checks':[],'candidates':{}}
 started=False
+def nodes():
+ current=ui.nodes();deny=gboard_contacts_denial(current)
+ if deny is not None:
+  print('Declining unrelated Gboard contacts/accounts prompt',flush=True)
+  tap_node(deny);receipt.setdefault('systemInterruptions',[]).append('Gboard contacts/accounts permission declined');save()
+  time.sleep(.5);current=ui.nodes()
+ return current
+def labels():
+ return [n.get('text') or n.get('content-desc') for n in nodes() if n.get('text') or n.get('content-desc')]
 FIXTURE='Synthetic Aimé';REAL='Aimé';heading=FIXTURE+' · '+a.version
 def save():(run/'result.json').write_text(json.dumps(receipt,indent=2,ensure_ascii=False)+'\n')
 def done(text):receipt['checks'].append(text);save();print('PASS:',text,flush=True)
