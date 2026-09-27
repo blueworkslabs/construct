@@ -222,6 +222,16 @@ check("cell parsing: p is the feature's positionM; e and w kept; invalid p rejec
   assert.equal(C.parseCell(ix, "47_-1", cellText("47_-1", [["Phare", "tower", 47.5, -0.5, 0, 1, 8]])).length, 1);
 });
 
+check("invalid uncertainty rejects both wholly invalid and mixed valid/invalid cells", () => {
+  const ix = C.parseIndex(JSON.stringify(INDEX));
+  const valid = ["Valid", "peak", 46.9, 9.3, 3012, 1.8, 8];
+  for (const p of [undefined, null, "8", 8.5, 4, 0, 1001]) {
+    const bad = p === undefined ? valid.slice(0, 6) : [...valid.slice(0, 6), p];
+    for (const rows of [[bad], [valid, bad]])
+      assert.throws(() => C.parseCell(ix, "46_9", cellText("46_9", rows)), { code: "DATA_INVALID" });
+  }
+});
+
 check("kind labels cover every contract kind with a fallback", () => {
   for (const kind of CONTRACT_KINDS) {
     const label = C.kindLabel({ kind });
