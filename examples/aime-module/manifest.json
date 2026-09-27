@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "id": "dev.construct.aime",
   "name": "Aimé",
-  "version": "0.1.9",
-  "description": "Tap something in your photo to see which named landmarks it could be. Calibrate by marking a landmark you know; no cloud vision, the photo stays on your phone. Requires Construct API 0.12.",
+  "version": "0.2.0",
+  "description": "Tap something in your photo to see which named landmarks it could be. Calibrate by marking a landmark you know; no cloud vision, the photo stays on your phone. Requires Construct API 0.13.",
   "constructApi": {
-    "min": "0.12.0",
-    "target": "0.12.0"
+    "min": "0.13.0",
+    "target": "0.13.0"
   },
   "runtime": {
     "kind": "webview-js"
@@ -15,7 +15,7 @@
   "capabilities": [
     {
       "id": "camera.photo",
-      "reason": "Open the visible native viewfinder; only you can press the shutter to save a private photo."
+      "reason": "Open the visible native viewfinder with a level indicator and 1×/2× zoom; only you can press the shutter to save a private photo. The camera's lens angle, tilt and compass reading at the shutter are returned with it."
     },
     {
       "id": "photos.library",
@@ -39,7 +39,7 @@
     },
     {
       "id": "storage.kv",
-      "reason": "Save each photo's estimated viewpoint, the landmarks and horizon you marked, and the fitted direction. After photo deletion, metadata is cleaned up when this module can next access its library and storage."
+      "reason": "Save each photo's estimated viewpoint, the camera's measurements, the landmarks and horizon you marked, and the fitted direction. After photo deletion, metadata is cleaned up when this module can next access its library and storage."
     }
   ],
   "themeColor": "#0B1410"

@@ -19,9 +19,10 @@
       </header>
       <section id="library">
         <p class="note" id="capture-note">
-          Use the main rear camera, not ultrawide or zoom. Aimé saves an
-          estimated viewpoint with each photo; direction comes from the
-          landmarks you mark afterwards.
+          Use the main rear camera at 1× or 2×, not ultrawide. Aimé saves an
+          estimated viewpoint with each photo, and the camera's lens angle,
+          level and compass reading when Construct can measure them; direction
+          comes from the landmarks you mark afterwards.
         </p>
         <button id="take" class="primary wide">Take photo</button>
         <p id="status" role="status"></p>
@@ -126,6 +127,17 @@
           out of frame or behind you. “Show in photo” does the same for a
           candidate.
         </p>
+        <h2>Measured by the camera</h2>
+        <p>
+          Photos taken in Aimé carry what the phone measured at the shutter:
+          the lens angle (“Lens from camera”), the tilt (“Level measured”) and a
+          compass reading. The compass is magnetic, so it is used only as a
+          weak hint (“Compass hint”) once the landmark data for your viewpoint
+          gives the local declination, and it orders the landmark list by
+          direction. Photos without these measurements work as before. The
+          camera's level makes horizon taps optional; any you add are combined
+          with it.
+        </p>
         <h2>Viewpoint</h2>
         <p>
           Each photo keeps an estimated viewpoint: the later of two location
@@ -154,9 +166,10 @@
     <dialog id="mark-dialog">
       <h2>Which landmark did you tap?</h2>
       <p id="fetch-status" role="status"></p>
+      <p id="search-order" class="note"></p>
       <button id="retry-fetch" hidden>Retry</button>
       <label>Search<input id="search" type="search" autocomplete="off" placeholder="Name, e.g. Feldberg" /></label>
-      <ul id="results" class="construct-list" aria-label="Nearby landmarks, nearest first"></ul>
+      <ul id="results" class="construct-list" aria-label="Nearby landmarks, in the order described above"></ul>
       <div class="actions"><button id="cancel-mark">Cancel</button></div>
     </dialog>
     <dialog id="horizon-dialog">

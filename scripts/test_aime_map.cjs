@@ -324,6 +324,42 @@ const ok = (name) => {
     assert.equal(map.scene.pin, null);
     ok("long-press drops a pin (snapping to mark/candidate pins), never on the ring, in placing mode, after a drag or pinch; clearable");
   }
+  {
+    // #43: placement precision uses the dropped or dragged point's own latitude,
+    // not the map centre's (Mercator metres per pixel scale with cos(latitude)).
+    TestMap.HOLD_MS = 30;
+    const wait = () => new Promise((r) => setTimeout(r, 60));
+    const { map, fire, events } = rig();
+    map.center = { lat: 60, lon: 10 };
+    map.zoom = 4;
+    map.draw();
+    fire("pointerdown", 150, 290);
+    await wait();
+    fire("pointerup", 150, 290);
+    const pin = events.pins.at(-1),
+      mpp = (lat) => (40075016 * Math.cos((lat * Math.PI) / 180)) / (256 * 2 ** 4);
+    assert.ok(pin.lat < 55, "the pin is well south of the centre: " + pin.lat);
+    assert.ok(Math.abs(pin.mPerPx - mpp(pin.lat)) < 1e-6, "pin latitude scale");
+    assert.ok(pin.mPerPx / mpp(60) > 1.1, "the centre's scale would understate it");
+    map.editable = false;
+    map.placing = true;
+    map.setScene({ viewer: null }, false);
+    fire("pointerdown", 150, 10);
+    fire("pointerup", 150, 10);
+    const placed = events.viewer.at(-1);
+    assert.ok(placed.lat > 62 && Math.abs(placed.mPerPx - mpp(placed.lat)) < 1e-6, "placed viewpoint at its own latitude");
+    map.placing = false;
+    map.editable = true;
+    map.setScene({ viewer: { lat: 60, lon: 10, accuracyM: 10 } }, false);
+    fire("pointerdown", 150, 150);
+    fire("pointermove", 150, 200);
+    fire("pointerup", 150, 280);
+    const dragged = events.viewer.at(-1);
+    assert.ok(dragged.lat < 58 && Math.abs(dragged.mPerPx - mpp(dragged.lat)) < 1e-6, "dragged viewpoint at its own latitude");
+    // Local behaviour unchanged: at the centre both agree.
+    assert.ok(Math.abs(map.metresPerPixel(60) - map.metresPerPixel()) < 1e-9);
+    ok("#43: dropped pins, placed and dragged viewpoints use their own latitude's map scale");
+  }
   console.log(`${checks} Aimé map checks passed.`);
 })().catch((e) => {
   console.error(e);

@@ -17,6 +17,7 @@ const state = {
   image: null, // {url, width, height}
   cal: null,
   calError: null,
+  measured: null, // AimeCore.measuredInputs for the photo's capture metadata
   mode: "mark",
   horizonExplained: false,
   pendingTap: null,
@@ -210,62 +211,58 @@ async function task(fn) {
 }
 
 // ---- Capture ----------------------------------------------------------------
+// API 0.13: the viewfinder shows a level indicator and 1×/2× chips; the result
+// names the new photo by its stable id and carries the camera's metadata,
+// which is stored with the viewpoint.
 async function takePhoto() {
-  let before;
-  try {
-    before = C.listIds(await library({ op: "list" }));
-  } catch (error) {
-    say("status", describe(error, "Photo library"), "error");
-    return;
-  }
   say("status", "Getting your estimated viewpoint…");
   const first = await locate(false);
   const openedAt = Date.now();
-  say("status", "Camera open. Use the main rear camera.");
-  let saved;
+  say("status", "Camera open. Use the main rear camera at 1× or 2×, and hold the phone level (the level line turns green).");
+  let result;
   try {
-    saved = (await call("camera.photo", { op: "capture" })).saved;
+    result = await call("camera.photo", { op: "capture", level: true, zoom: [1, 2] });
   } catch (error) {
     say("status", describe(error, "Camera"), "error");
     return;
   }
-  if (!saved) {
+  if (!result || !result.saved) {
     say("status", "Capture canceled. No photo saved; the location fix was discarded.");
     return;
   }
-  const savedAt = Date.now();
+  const savedAt = Date.now(),
+    id = C.captureId(result);
   say("status", "Photo saved. Taking a second viewpoint fix…");
   const second = await locate(true);
-  let after;
+  const chosen = C.chooseViewpoint(first.fix, second.fix, openedAt, savedAt);
+  let after = null,
+    note = "";
   try {
-    const result = await library({ op: "list" });
-    after = C.listIds(result);
-    state.items = result.photos.map((p) => ({ ref: p.ref, id: p.id }));
+    const list = await library({ op: "list" });
+    after = C.listIds(list);
+    state.items = list.photos.map((p) => ({ ref: p.ref, id: p.id }));
   } catch (error) {
-    say("status", "Photo saved, but the library could not be listed, so it stays without a viewpoint. " + describe(error, "Photo library"), "attention");
-    return;
+    note = "The library could not be listed. " + describe(error, "Photo library");
   }
-  const id = C.associate(before, after),
-    chosen = C.chooseViewpoint(first.fix, second.fix, openedAt, savedAt);
-  let note = "";
-  if (!id) note = "Photo saved, but it could not be matched to this capture, so it has no viewpoint.";
+  if (!id) note = "Photo saved, but Construct did not identify it, so it has no viewpoint.";
   else if (!state.store) note = "Photo saved. Storage access is off, so its viewpoint was not saved.";
   else {
     try {
-      await releaseExcept(after).catch(() => {});
-      await putSidecar(id, C.newSidecar(chosen ? chosen.viewer : null));
+      if (after) await releaseExcept(after).catch(() => {});
+      await putSidecar(id, C.newSidecar(chosen ? chosen.viewer : null, C.DEFAULT_RADIUS, result.capture));
       if (!chosen) note = "Photo saved without a viewpoint: " + (second.error || first.error ? describe(second.error || first.error, "Location") : "no usable location fix.");
       else if (chosen.reasons.length) note = `Photo saved. Please confirm the viewpoint (${chosen.reasons.join(", ")}).`;
+      else if (!after) note = "Photo and viewpoint saved. " + note;
     } catch (error) {
       note = "Photo saved, but its viewpoint could not be stored. " + describe(error, "Storage");
     }
   }
   renderGrid();
-  if (id) {
+  if (id && after && after.includes(id)) {
     say("status", "");
     await openPhoto(id);
     if (note) say("photo-status", note, "attention");
-  } else say("status", note, "attention");
+  } else say("status", note || "Photo saved. Reopen Aimé to see it.", "attention");
 }
 
 // ---- Photo view ---------------------------------------------------------------
@@ -325,13 +322,16 @@ function showLibrary() {
   if (state.busy) state.refreshPending = true;
   else task(refresh);
 }
+// The viewpoint cell's declination, once its landmark cell is downloaded.
+const declination = (s) => state.data.declinationAt(s.viewer);
 function recalibrate() {
   const s = current();
   state.cal = null;
   state.calError = null;
+  state.measured = state.image ? C.measuredInputs(s.capture, state.image.width, state.image.height, declination(s)) : null;
   if (!s.viewer || !s.marks.length || !state.image) return;
   try {
-    state.cal = S.calibrate(C.calibrationInput(s, state.image.width, state.image.height));
+    state.cal = S.calibrate(C.calibrationInput(s, state.image.width, state.image.height, declination(s)));
   } catch (error) {
     state.calError = error.message;
   }
@@ -405,8 +405,9 @@ function hint() {
   if (!s.viewer) return "This photo has no usable viewpoint. Set where you stood on the map before marking landmarks.";
   if (s.viewer.review) return "Check the estimated viewpoint: confirm it, or drag it on the map to where you stood.";
   const precise = s.marks.length || s.horizon.length ? " Press and hold to magnify; drag a point to move it." : " Press and hold to magnify.";
-  if (state.mode === "mark") return (s.marks.length ? `Tap another landmark you know to fit the lens (optional). ${s.marks.length}/${C.MAX_MARKS} marked.` : "Tap a landmark you know, like a church tower or summit, then pick it from the list.") + precise;
-  if (state.mode === "horizon") return `Tap a true level horizon: ${s.horizon.length}/${C.MAX_HORIZON} points.` + precise;
+  const used = state.measured ? state.measured.used : {};
+  if (state.mode === "mark") return (s.marks.length ? `Tap another landmark you know${used.lens ? "" : " to fit the lens"} (optional). ${s.marks.length}/${C.MAX_MARKS} marked.` : "Tap a landmark you know, like a church tower or summit, then pick it from the list.") + precise;
+  if (state.mode === "horizon") return (used.level ? "The camera measured the level; horizon taps are optional and are combined with it. " : "") + `Tap a true level horizon: ${s.horizon.length}/${C.MAX_HORIZON} points.` + precise;
   return state.cal ? "Tap anything to see what it could be." + precise : "Mark a landmark you know first.";
 }
 function render() {
@@ -423,7 +424,8 @@ function render() {
     vp.className = v.review ? "attention" : "";
   }
   $("confirm-viewpoint").hidden = !(v && v.review);
-  const chips = $("chips");
+  const chips = $("chips"),
+    used = state.measured ? state.measured.used : {};
   chips.replaceChildren();
   const chip = (label, tone = "") => {
     const c = document.createElement("span");
@@ -433,12 +435,17 @@ function render() {
   };
   if (state.cal) {
     chip(`Calibrated · ${state.cal.marks} mark${state.cal.marks > 1 ? "s" : ""}`, "live");
-    if (state.cal.lens === "fitted") chip("Lens fitted", "live");
-    if (state.cal.level === "fitted") chip("Level estimated", "live");
+    if (state.cal.lens === "fitted" && !used.lens) chip("Lens fitted", "live");
+    if (state.cal.level === "fitted" && !used.level) chip("Level estimated", "live");
     if (state.cal.viewpoint === "refined") chip("Viewpoint refined", "live");
     chip(`Centre ±${S.uncertainty(state.cal, 0.5, 0.5).toFixed(1)}°`);
   } else if (state.calError) chip(state.calError, "attention");
   else chip("Not calibrated");
+  // Inputs measured by the camera (API 0.13) and used for this photo.
+  if (used.level) chip("Level measured", "live");
+  if (used.lens) chip("Lens from camera", "live");
+  if (used.compass) chip("Compass hint", "live");
+  if (s.capture && s.capture.zoomRatio >= 1.05) chip(`${Math.round(s.capture.zoomRatio * 10) / 10}× zoom`);
   if (!state.cal && state.mode === "what") {
     // Removing the last mark ends calibration: fall back to marking.
     state.mode = "mark";
@@ -754,7 +761,7 @@ function onTap(x, y) {
     task(async () => {
       await edit(`adding horizon point ${s.horizon.length + 1}`, (x0) => ({ ...x0, horizon: [...x0.horizon, { x, y }] }));
       const n = current().horizon.length;
-      say("photo-status", n < C.MAX_HORIZON ? "Horizon point saved. Tap a second point well apart from the first." : state.cal && state.cal.level === "fitted" ? "Horizon levelled. Level estimated." : "Horizon points saved.");
+      say("photo-status", n < C.MAX_HORIZON ? "Horizon point saved. Tap a second point well apart from the first." : state.measured && state.measured.used.level ? "Horizon points saved and combined with the measured level." : state.cal && state.cal.level === "fitted" ? "Horizon levelled. Level estimated." : "Horizon points saved.");
       if (n >= C.MAX_HORIZON) setMode(state.cal ? "what" : "mark");
     });
   } else {
@@ -985,6 +992,11 @@ async function features() {
       const found = await state.data.features(s.viewer, s.radiusKm);
       showAttribution(state.data.index);
       state.features.set(key, found);
+      // The viewpoint cell's declination can now correct the compass hint.
+      if (current().capture && current().capture.headingDeg != null && !state.preview) {
+        recalibrate();
+        render();
+      }
       return found;
     })();
     state.fetching.set(key, job);
@@ -1007,6 +1019,7 @@ async function openMarkDialog() {
   const dialog = $("mark-dialog");
   $("search").value = "";
   $("results").replaceChildren();
+  $("search-order").textContent = "";
   $("retry-fetch").hidden = true;
   if (!dialog.open) dialog.showModal();
   say("fetch-status", `Looking up named landmarks within ${current().radiusKm} km…`);
@@ -1014,7 +1027,7 @@ async function openMarkDialog() {
     const data = await features();
     if (!dialog.open || request !== markRequest || generation !== state.photoGeneration) return;
     const note = C.coverageNote(data);
-    say("fetch-status", (data.features.length ? `${data.features.length} landmarks within ${current().radiusKm} km. Nearest first.` : `No named landmarks found within ${current().radiusKm} km. Try a larger radius.`) + (note ? " " + note : ""), note ? "attention" : undefined);
+    say("fetch-status", (data.features.length ? `${data.features.length} landmarks within ${current().radiusKm} km.` : `No named landmarks found within ${current().radiusKm} km. Try a larger radius.`) + (note ? " " + note : ""), note ? "attention" : undefined);
     renderResults();
   } catch (error) {
     if (!dialog.open || request !== markRequest || generation !== state.photoGeneration) return;
@@ -1022,18 +1035,39 @@ async function openMarkDialog() {
     $("retry-fetch").hidden = error.retry === false;
   }
 }
+// Direction of a tap for ordering the landmark list: from the calibration, else
+// from the declination-corrected compass hint and the lens angle (measured or
+// assumed). Sorting steps are the direction's 2σ, so noise does not reorder.
+function tapDirection(tap) {
+  if (!tap || !state.image) return null;
+  let d;
+  if (state.cal) d = { bearing: S.bearingAt(state.cal, tap.x, tap.y), sigmaDeg: S.uncertainty(state.cal, tap.x, tap.y), source: "calibration" };
+  else {
+    const s = current(),
+      compass = C.compassHeading(s.capture, declination(s));
+    if (!compass) return null;
+    const { width, height } = state.image,
+      fov = (state.measured && state.measured.input.fov) || S.defaultFov(width, height);
+    d = { bearing: S.wrap(compass.bearing + S.columnAngle(tap.x, fov)), sigmaDeg: compass.sigmaDeg, source: "compass" };
+  }
+  return { ...d, stepDeg: Math.max(2, Math.ceil(2 * d.sigmaDeg)) };
+}
 function renderResults() {
   const data = state.features.get(currentKey()),
     ul = $("results");
   ul.replaceChildren();
   if (!data) return;
-  const from = origin().point;
-  for (const { feature: f, distanceM } of C.search(data.features, $("search").value, from)) {
+  const from = origin().point,
+    toward = tapDirection(state.pendingTap);
+  $("search-order").textContent = toward
+    ? `Sorted by direction: closest to where you tapped (${toward.source === "calibration" ? "" : "about "}${C.degrees(toward.bearing)}° ${C.compass(toward.bearing)} ±${Math.ceil(toward.sigmaDeg)}°, from ${toward.source === "calibration" ? "your calibration" : "the compass hint"}) first, then nearest.`
+    : "Sorted nearest first.";
+  for (const { feature: f, distanceM, offDeg } of C.search(data.features, $("search").value, from, 30, toward && { bearing: toward.bearing, stepDeg: toward.stepDeg })) {
     const li = document.createElement("li"),
       b = document.createElement("button"),
       small = document.createElement("small");
     b.textContent = f.name;
-    small.textContent = [C.kindLabel(f), C.range(distanceM / 1000, S.bearing(from, f)), C.sizeLabel(f)].filter(Boolean).join(" · ");
+    small.textContent = [C.kindLabel(f), C.range(distanceM / 1000, S.bearing(from, f)), offDeg != null ? `${Math.round(offDeg)}° from your tap` : "", C.sizeLabel(f)].filter(Boolean).join(" · ");
     b.append(small);
     b.onclick = () => pick(f);
     li.append(b);

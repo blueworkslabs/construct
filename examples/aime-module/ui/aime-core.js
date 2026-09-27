@@ -45,8 +45,10 @@ const AimeCore = (() => {
   // ---- Sidecars -------------------------------------------------------------
   // Shape (brief): { viewer: {lat, lon, accuracyM, timestamp, approximate, corrected,
   // review}, radiusKm, marks: [{x, y, kind, name, lat, lon, positionM, dataset}],
-  // horizon: [{x, y}] }. `review` (not in the brief's list) marks a viewpoint that
-  // must be confirmed or corrected before any feature query.
+  // horizon: [{x, y}], capture? }. `review` (not in the brief's list) marks a
+  // viewpoint that must be confirmed or corrected before any feature query.
+  // `capture` (Aimé ≥ 0.2.0, API 0.13) is the camera's metadata for the photo;
+  // 0.1.x records and library photos have none.
   function cleanViewer(v) {
     if (!v || !latLon(v.lat, v.lon)) return null;
     return {
@@ -88,8 +90,30 @@ const AimeCore = (() => {
       positionM: num(m.positionM) && m.positionM > 0 ? m.positionM : m.osmType === "node" ? 8 : 30,
     };
   }
+  // API 0.13 capture metadata, validated field group by field group: a group
+  // with any invalid value is dropped whole (never repaired), since every
+  // measured field is optional. Values are rounded so a record stays bounded.
+  const round = (v, k = 100) => Math.round(v * k) / k,
+    inRange = (v, lo, hi) => num(v) && v >= lo && v <= hi;
+  function cleanCapture(c) {
+    if (!c || typeof c !== "object") return null;
+    const out = {};
+    if (inRange(c.zoomRatio, 0.1, 10)) out.zoomRatio = round(c.zoomRatio);
+    const f = c.fovDeg;
+    if (f && inRange(f.h, 1, 179) && inRange(f.v, 1, 179) && inRange(c.fovSigmaDeg, 0.1, 30)) {
+      out.fovDeg = { h: round(f.h), v: round(f.v) };
+      out.fovSigmaDeg = round(c.fovSigmaDeg);
+    }
+    const t = c.tilt;
+    if (t && inRange(t.pitchDeg, -180, 180) && inRange(t.rollDeg, -180, 180) && inRange(t.sigmaDeg, 0.1, 90) && inRange(t.ageMs, 0, 3600000))
+      out.tilt = { pitchDeg: round(t.pitchDeg), rollDeg: round(t.rollDeg), sigmaDeg: round(t.sigmaDeg), ageMs: Math.round(t.ageMs) };
+    if (inRange(c.headingDeg, 0, 360) && c.headingRef === "magnetic" && inRange(c.headingAccuracyDeg, 0.1, 180) && inRange(c.headingAgeMs, 0, 3600000))
+      Object.assign(out, { headingDeg: round(c.headingDeg), headingRef: "magnetic", headingAccuracyDeg: round(c.headingAccuracyDeg), headingAgeMs: Math.round(c.headingAgeMs) });
+    return Object.keys(out).length ? out : null;
+  }
   function cleanSidecar(raw) {
     if (!raw || typeof raw !== "object") return null;
+    const capture = cleanCapture(raw.capture);
     return {
       viewer: cleanViewer(raw.viewer),
       radiusKm: RADII.includes(raw.radiusKm) ? raw.radiusKm : DEFAULT_RADIUS,
@@ -98,6 +122,7 @@ const AimeCore = (() => {
         .filter((h) => h && inUnit(h.x) && inUnit(h.y))
         .map((h) => ({ x: h.x, y: h.y }))
         .slice(0, MAX_HORIZON),
+      ...(capture ? { capture } : {}),
     };
   }
   const validId = (id) => typeof id === "string" && /^[\x21-\x7e]{1,80}$/.test(id);
@@ -208,8 +233,8 @@ const AimeCore = (() => {
       },
     };
   }
-  function newSidecar(viewer, radiusKm = DEFAULT_RADIUS) {
-    return cleanSidecar({ viewer, radiusKm, marks: [], horizon: [] });
+  function newSidecar(viewer, radiusKm = DEFAULT_RADIUS, capture = null) {
+    return cleanSidecar({ viewer, radiusKm, marks: [], horizon: [], capture });
   }
   // Library list → ids. Throws when the list is not the API 0.12 shape, so a
   // missing id is never treated as an empty or partial library.
@@ -220,12 +245,11 @@ const AimeCore = (() => {
       throw Object.assign(new Error("This Construct version does not provide stable photo IDs. Update Construct."), { code: "PHOTO_IDS" });
     return ids;
   }
-  // Exactly one new id between two successful complete lists, else null.
-  function associate(beforeIds, afterIds) {
-    const before = new Set(beforeIds),
-      fresh = afterIds.filter((id) => !before.has(id));
-    return fresh.length === 1 ? fresh[0] : null;
-  }
+  // API 0.13 capture result → the new photo's stable id. The host fails a
+  // capture it cannot identify, so a saved result without a valid id is a
+  // contract error: the photo stays unassociated, never matched by guessing.
+  const captureId = (result) => (result && result.saved === true && validId(result.id) ? result.id : null);
+
 
   // ---- Viewpoint from before/after fixes ----------------------------------
   // location.read result → viewer candidate, or null when unusable.
@@ -238,6 +262,13 @@ const AimeCore = (() => {
       timestamp: result.timestamp,
       approximate: result.approximate === true,
     };
+  }
+  // Initial great-circle bearing a → b, degrees clockwise from true north.
+  function bearing(a, b) {
+    const rad = Math.PI / 180,
+      y = Math.sin((b.lon - a.lon) * rad) * Math.cos(b.lat * rad),
+      x = Math.cos(a.lat * rad) * Math.sin(b.lat * rad) - Math.sin(a.lat * rad) * Math.cos(b.lat * rad) * Math.cos((b.lon - a.lon) * rad);
+    return (((Math.atan2(y, x) * 180) / Math.PI) % 360 + 360) % 360;
   }
   function metres(a, b) {
     const rad = Math.PI / 180,
@@ -488,13 +519,19 @@ const AimeCore = (() => {
 
   // ---- Local name search --------------------------------------------------
   const fold = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  function search(features, query, viewer, limit = 30) {
+  // Nearest first; with `toward` {bearing, stepDeg} (the tapped direction and
+  // its uncertainty) by angular distance from that direction in steps of
+  // `stepDeg`, then nearest first within a step. Rows carry `offDeg` then.
+  function search(features, query, viewer, limit = 30, toward = null) {
     const q = fold(text(query, 120));
-    const withDistance = (f) => ({ feature: f, distanceM: viewer ? metres(viewer, f) : null });
+    const off = (f) => Math.abs(((((bearing(viewer, f) - toward.bearing) % 360) + 540) % 360) - 180);
+    const row = (f) => ({ feature: f, distanceM: viewer ? metres(viewer, f) : null, ...(toward && viewer ? { offDeg: off(f) } : {}) });
+    const step = toward ? Math.max(1, toward.stepDeg) : 1,
+      bucket = (r) => (r.offDeg == null ? 0 : Math.floor(r.offDeg / step));
     const hits = features.filter((f) => !q || fold(f.name).includes(q));
     return hits
-      .map(withDistance)
-      .sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0) || a.feature.name.localeCompare(b.feature.name))
+      .map(row)
+      .sort((a, b) => bucket(a) - bucket(b) || (a.distanceM ?? 0) - (b.distanceM ?? 0) || a.feature.name.localeCompare(b.feature.name))
       .slice(0, limit);
   }
 
@@ -502,7 +539,49 @@ const AimeCore = (() => {
   function markFrom(feature, x, y) {
     return cleanMark({ x, y, kind: feature.kind, name: feature.name, lat: feature.lat, lon: feature.lon, positionM: feature.positionM, dataset: feature.dataset });
   }
-  function calibrationInput(sidecar, width, height) {
+  // Stored capture → the solver's measured-pose arguments. Each group is used
+  // only when present, fresh and meaningful for the image as opened; the
+  // reason it was skipped is reported instead. Thresholds follow API 0.13:
+  // tilt ≤ 250 ms old and within the solver's ±89°; a lens angle within the
+  // solver's 20–120° whose h/v agree with the opened image's aspect (h runs
+  // across the image, the solver's axis); a magnetic heading ≤ 1 s old, at
+  // most ±45°, and only with the viewpoint cell's declination (true = magnetic
+  // + declination east).
+  const TILT_MAX_AGE_MS = 250,
+    HEADING_MAX_AGE_MS = 1000;
+  function measuredInputs(capture, width, height, declination = null) {
+    const input = {},
+      used = { level: false, lens: false, compass: false },
+      skipped = {},
+      c = capture || {};
+    const t = c.tilt;
+    if (t) {
+      if (t.ageMs > TILT_MAX_AGE_MS) skipped.level = "old";
+      else if (Math.abs(t.pitchDeg) > 89 || Math.abs(t.rollDeg) > 89) skipped.level = "sideways";
+      else (input.tilt = { pitch: t.pitchDeg, roll: t.rollDeg, sigma: Math.max(1, t.sigmaDeg) }), (used.level = true);
+    }
+    const f = c.fovDeg;
+    if (f) {
+      const r = (d) => Math.tan((d * Math.PI) / 360),
+        aspect = width > 0 && height > 0 ? height / width : NaN;
+      if (f.h < 20 || f.h > 120) skipped.lens = "range";
+      else if (!(Math.abs(r(f.v) / r(f.h) / aspect - 1) <= 0.03)) skipped.lens = "orientation";
+      else (input.fov = f.h), (input.fovSigma = c.fovSigmaDeg), (used.lens = true);
+    }
+    if (num(c.headingDeg)) {
+      if (c.headingAgeMs > HEADING_MAX_AGE_MS || c.headingAccuracyDeg > 45) skipped.compass = "unreliable";
+      else if (!inRange(declination, -180, 180)) skipped.compass = "declination";
+      else
+        Object.assign(input, { heading: c.headingDeg, headingRef: "magnetic", declination, headingSigma: c.headingAccuracyDeg }), (used.compass = true);
+    }
+    return { input, used, skipped };
+  }
+  // True compass direction of the camera's axis, or null (see measuredInputs).
+  const compassHeading = (capture, declination) => {
+    const m = measuredInputs(capture ? { headingDeg: capture.headingDeg, headingAccuracyDeg: capture.headingAccuracyDeg, headingAgeMs: capture.headingAgeMs } : null, 1, 1, declination);
+    return m.used.compass ? { bearing: (((m.input.heading + m.input.declination) % 360) + 360) % 360, sigmaDeg: Math.max(12, m.input.headingSigma) } : null;
+  };
+  function calibrationInput(sidecar, width, height, declination = null) {
     const v = sidecar.viewer;
     return {
       viewer: { lat: v.lat, lon: v.lon, accuracyM: v.accuracyM ?? undefined },
@@ -510,6 +589,7 @@ const AimeCore = (() => {
       horizon: sidecar.horizon.map((h) => ({ x: h.x, y: h.y })),
       width,
       height,
+      ...measuredInputs(sidecar.capture, width, height, declination).input,
     };
   }
   const candidatesOf = (features) =>
@@ -659,6 +739,7 @@ const AimeCore = (() => {
     MESSAGE_LIMIT,
     MESSAGE_BUDGET,
     cleanSidecar,
+    cleanCapture,
     newSidecar,
     recordKey,
     loadIndex,
@@ -671,9 +752,10 @@ const AimeCore = (() => {
     checkEnvelope,
     persistence,
     listIds,
-    associate,
+    captureId,
     fixFrom,
     metres,
+    bearing,
     chooseViewpoint,
     queryable,
     cellsAround,
@@ -694,6 +776,10 @@ const AimeCore = (() => {
     landmarkData,
     search,
     markFrom,
+    TILT_MAX_AGE_MS,
+    HEADING_MAX_AGE_MS,
+    measuredInputs,
+    compassHeading,
     calibrationInput,
     candidatesOf,
     shortlist,

@@ -57,12 +57,13 @@ check("list ids require the API 0.12 shape and never become an empty library", (
   assert.throws(() => C.listIds(null), { code: "PHOTO_LIST" });
 });
 
-check("capture association needs exactly one new stable id", () => {
-  assert.equal(C.associate(["a", "b"], ["a", "b", "c"]), "c");
-  assert.equal(C.associate(["a", "b"], ["b", "c"]), "c", "a concurrent deletion does not hide the new photo");
-  assert.equal(C.associate(["a"], ["a"]), null, "nothing new");
-  assert.equal(C.associate(["a"], ["a", "b", "c"]), null, "ambiguous: never assigned by position");
-  assert.equal(C.associate([], ["x"]), "x");
+check("API 0.13 capture names the new photo by its stable id; no id is never guessed", () => {
+  assert.equal(C.captureId({ saved: true, id: "p123", capture: { zoomRatio: 1 } }), "p123");
+  assert.equal(C.captureId({ saved: true }), null, "a saved result without id stays unassociated");
+  assert.equal(C.captureId({ saved: true, id: "bad id" }), null);
+  assert.equal(C.captureId({ saved: true, id: 7 }), null);
+  assert.equal(C.captureId({ saved: false, id: "p1" }), null);
+  assert.equal(C.captureId(null), null);
 });
 
 const fix = (t, lat = 46.8, lon = 9.2, accuracyM = 10) => C.fixFrom({ latitude: lat, longitude: lon, accuracyM, timestamp: t, approximate: false });
@@ -292,6 +293,118 @@ check("declination: an optional additive cell field, kept when valid, otherwise 
   assert.deepEqual(C.parseCell(ix, "46_9", cellText("46_9", rows, { declination: 2.4 })), read({}).features, "parseCell still returns the feature list");
   const fx = C.parseIndex(F.index());
   assert.deepEqual(F.cells.map((c) => C.readCell(fx, c, F.cell(c)).declination), [2.7, 3, 3.2], "every fixture cell carries one");
+});
+
+// ---- API 0.13 capture metadata → measured solver inputs ---------------------
+const FULL = F.capture("full");
+check("capture metadata: validated per field group, rounded, optional; sidecars without it load as before", () => {
+  const host = { zoomRatio: 2.0, fovDeg: { h: 33.6, v: 43.9 }, fovSigmaDeg: 1.0, tilt: { pitchDeg: 4.2, rollDeg: -0.8, sigmaDeg: 1.0, ageMs: 31 }, headingDeg: 212.5, headingRef: "magnetic", headingAccuracyDeg: 11.5, headingAgeMs: 44 };
+  assert.deepEqual(C.cleanCapture(host), host, "the contract's example is kept as is");
+  assert.deepEqual(C.cleanCapture({ ...host, tilt: { ...host.tilt, pitchDeg: 4.123456789 } }).tilt.pitchDeg, 4.12);
+  const only = (patch) => C.cleanCapture({ ...host, ...patch });
+  assert.equal(only({ fovSigmaDeg: undefined }).fovDeg, undefined, "a lens angle without its σ is dropped");
+  assert.equal(only({ fovDeg: { h: "33" , v: 43.9 } }).fovDeg, undefined);
+  assert.equal(only({ tilt: { ...host.tilt, ageMs: undefined } }).tilt, undefined);
+  assert.equal(only({ tilt: { ...host.tilt, sigmaDeg: 0 } }).tilt, undefined);
+  assert.equal(only({ headingRef: "true" }).headingDeg, undefined, "only the contract's magnetic reference");
+  assert.equal(only({ headingAccuracyDeg: undefined }).headingDeg, undefined, "no invented heading σ");
+  assert.equal(only({ zoomRatio: 0 }).zoomRatio, undefined);
+  assert.deepEqual(Object.keys(only({ headingDeg: NaN })), ["zoomRatio", "fovDeg", "fovSigmaDeg", "tilt"]);
+  assert.equal(C.cleanCapture({ junk: 1 }), null);
+  assert.equal(C.cleanCapture("x"), null);
+  const s = C.newSidecar({ lat: 46.8, lon: 9.2, accuracyM: 10 }, 30, host);
+  assert.deepEqual(s.capture, host);
+  assert.deepEqual(C.cleanSidecar(structuredClone(s)), s, "round-trips unchanged");
+  // A 0.1.x record (and a library photo) has no capture key and none is added.
+  const old = C.cleanSidecar({ viewer: { lat: 46.8, lon: 9.2 }, marks: [mark(1)] });
+  assert.equal("capture" in old, false);
+  assert.equal("capture" in C.newSidecar(null), false);
+  assert.deepEqual(C.measuredInputs(old.capture, 1024, 768), { input: {}, used: { level: false, lens: false, compass: false }, skipped: {} });
+  assert.deepEqual(C.calibrationInput(old, 1024, 768, 3), C.calibrationInput(old, 1024, 768), "nothing measured is passed");
+});
+
+check("measured inputs map to the solver: fov = h across the opened image, tilt in the solver's signs, heading only with a declination", () => {
+  const m = C.measuredInputs(FULL, F.width, F.height, 3);
+  assert.deepEqual(m.input, { tilt: { pitch: 4, roll: 1.5, sigma: 1 }, fov: 66, fovSigma: 1, heading: 27, headingRef: "magnetic", declination: 3, headingSigma: 10 });
+  assert.deepEqual(m.used, { level: true, lens: true, compass: true });
+  // Sign: true = magnetic + declination east. The solver's compass-only fit
+  // lands on the scene's true heading (30°), not 24° (magnetic − declination).
+  const compassOnly = R.calibrate({ viewer: F.viewer, marks: [], width: F.width, height: F.height, ...m.input });
+  assert.ok(Math.abs(R.diff(compassOnly.heading, F.pose.heading)) < 0.5, "true heading " + compassOnly.heading);
+  assert.deepEqual(C.compassHeading(FULL, 3), { bearing: 30, sigmaDeg: 12 }, "the solver's 12° floor");
+  assert.deepEqual(C.compassHeading(FULL, -2.5), { bearing: 24.5, sigmaDeg: 12 }, "west declination subtracts");
+  // No declination (cell not downloaded, or older data): the heading is skipped.
+  for (const d of [null, undefined, NaN, 200]) {
+    const none = C.measuredInputs(FULL, F.width, F.height, d);
+    assert.equal(none.input.heading, undefined);
+    assert.equal(none.used.compass, false);
+    assert.equal(none.skipped.compass, "declination");
+    assert.equal(C.compassHeading(FULL, d), null);
+    assert.doesNotThrow(() => R.calibrate(C.calibrationInput(C.cleanSidecar({ viewer: F.viewer, marks: [mark(1, { lat: 46.9, lon: 9.3 })], capture: FULL }), F.width, F.height, d)), "never a magnetic heading without declination");
+  }
+  // Stale, sideways or unreliable groups are simply not used.
+  const skip = (patch, key, why) => {
+    const r = C.measuredInputs(C.cleanCapture({ ...FULL, ...patch }), F.width, F.height, 3);
+    assert.equal(r.used[key], false, why);
+    assert.equal(r.skipped[key], why);
+  };
+  skip({ tilt: { ...FULL.tilt, ageMs: 251 } }, "level", "old");
+  skip({ tilt: { ...FULL.tilt, rollDeg: 90 } }, "level", "sideways");
+  skip({ tilt: { ...FULL.tilt, pitchDeg: -89.5 } }, "level", "sideways");
+  skip({ headingAgeMs: 1001 }, "compass", "unreliable");
+  skip({ headingAccuracyDeg: 50 }, "compass", "unreliable");
+  skip({ fovDeg: { h: 15, v: 11.3 } }, "lens", "range");
+  // Axis check: h must run across the image as opened. Swapped h/v (a
+  // portrait reading for this landscape image) is not used.
+  skip({ fovDeg: { h: 51.9, v: 66 } }, "lens", "orientation");
+  const portrait = C.measuredInputs({ fovDeg: { h: 51.9, v: 66 }, fovSigmaDeg: 1 }, 768, 1024);
+  assert.equal(portrait.input.fov, 51.9, "a portrait photo has h < v");
+  // The contract's 2× example (portrait 3:4): h 33.6°, v 43.9° agree with 3000 × 4000.
+  assert.equal(C.measuredInputs({ fovDeg: { h: 33.6, v: 43.9 }, fovSigmaDeg: 1 }, 3000, 4000).input.fov, 33.6);
+  assert.equal(C.measuredInputs({ tilt: { pitchDeg: 1, rollDeg: 1, sigmaDeg: 0.5, ageMs: 1 } }, 4, 3).input.tilt.sigma, 1, "σ never below 1°");
+});
+
+check("measured tilt and lens keep the synthetic ranking and tighten the fit without horizon taps", () => {
+  const ix = C.parseIndex(F.index());
+  const features = C.within(F.cells.flatMap((c) => C.parseCell(ix, c, F.cell(c))), F.viewer, 30);
+  const tower = features.find((f) => f.name === "Synthetic Tower A");
+  const base = { viewer: { lat: F.viewer.lat, lon: F.viewer.lon, accuracyM: 10 }, marks: [C.markFrom(tower, F.taps.markA.x, F.taps.markA.y)] };
+  const fit = (capture, declination = null) => R.calibrate(C.calibrationInput(C.cleanSidecar({ ...base, capture }), F.width, F.height, declination));
+  const guessed = fit(null),
+    measured = fit(F.capture("no heading")),
+    all = fit(FULL, 3);
+  assert.equal(measured.tilt, "measured");
+  assert.equal(guessed.tilt, "none");
+  assert.ok(Math.abs(measured.fov - 66) < 1 && Math.abs(measured.pitch - 4) < 1 && Math.abs(measured.roll - 1.5) < 1);
+  const error = (cal, tap, name) => Math.abs(R.diff(R.bearingAt(cal, F.taps[tap].x, F.taps[tap].y), R.bearing(cal.viewer, features.find((f) => f.name === name))));
+  for (const [tap, name] of [["whatB", "Synthetic Peak B"], ["whatD", "Synthetic Castle D"]]) {
+    for (const cal of [measured, all]) {
+      const list = C.shortlist(R.rank(cal, F.taps[tap].x, F.taps[tap].y, C.candidatesOf(features)));
+      assert.equal(list.rows[0].candidate.feature.name, name, tap);
+      assert.ok(error(cal, tap, name) < 0.3 && error(cal, tap, name) < error(guessed, tap, name), `${tap}: ${error(cal, tap, name)} vs ${error(guessed, tap, name)}`);
+      assert.ok(R.uncertainty(cal, F.taps[tap].x, F.taps[tap].y) < R.uncertainty(guessed, F.taps[tap].x, F.taps[tap].y));
+    }
+  }
+  // Measured tilt and horizon taps together: both are observations; the fit still agrees.
+  const both = R.calibrate(C.calibrationInput(C.cleanSidecar({ ...base, horizon: F.taps.horizon, capture: FULL }), F.width, F.height, 3));
+  assert.ok(Math.abs(both.pitch - 4) < 0.5 && Math.abs(both.roll - 1.5) < 0.5 && both.horizonPoints === 2);
+});
+
+check("landmark search orders by direction from the tap (in 2σ steps), then nearest; plain nearest first otherwise", () => {
+  const ix = C.parseIndex(F.index());
+  const features = F.cells.flatMap((c) => C.parseCell(ix, c, F.cell(c)));
+  const names = (rows) => rows.map((r) => r.feature.name.replace("Synthetic ", ""));
+  assert.equal(C.bearing(F.viewer, features[0]).toFixed(9), R.bearing(F.viewer, features[0]).toFixed(9));
+  const nearest = C.search(features, "", F.viewer);
+  assert.deepEqual(names(nearest).slice(0, 3), ["Chapel G", "Church C", "Monument F"]);
+  assert.ok(nearest.every((r) => !("offDeg" in r)));
+  // Toward Peak B (42°) in 4° steps: B and Mast E (45°) share the first step, B is nearer.
+  const toward = C.search(features, "", F.viewer, 30, { bearing: 42, stepDeg: 4 });
+  assert.deepEqual(names(toward).slice(0, 3), ["Peak B", "Mast E", "Transmitter H"]);
+  assert.ok(toward[0].offDeg < 0.1 && toward[1].offDeg > 2.9);
+  // Coarse steps (a compass hint's ±24°) fall back to nearest within the step.
+  assert.deepEqual(names(C.search(features, "", F.viewer, 30, { bearing: 42, stepDeg: 24 })).slice(0, 6), ["Church C", "Castle D", "Peak B", "Mast E", "Transmitter H", "Chapel G"]);
+  assert.deepEqual(names(C.search(features, "peak", F.viewer, 30, { bearing: 235, stepDeg: 4 })), ["Far Peak Z", "Peak B"], "the text filter still applies");
 });
 
 check("kind labels cover every contract kind with a fallback", () => {
@@ -584,8 +697,10 @@ function host({ failGet = () => false, failSet = () => false } = {}) {
   };
 }
 const nasty = (n) => ('"\\').repeat(n).slice(0, n);
+const WORST_CAPTURE = { zoomRatio: 9.99, fovDeg: { h: 178.12345, v: 178.12345 }, fovSigmaDeg: 29.99, tilt: { pitchDeg: -179.99, rollDeg: -179.99, sigmaDeg: 89.99, ageMs: 3599999 }, headingDeg: 359.99, headingRef: "magnetic", headingAccuracyDeg: 179.99, headingAgeMs: 3599999 };
 const fullSidecar = (salt = 0) =>
   C.cleanSidecar({
+    capture: WORST_CAPTURE,
     viewer: { lat: -45.123456789012345, lon: -170.12345678901234, accuracyM: 1234.567890123456, timestamp: 1790463000123 + salt, approximate: true, corrected: true, review: true },
     radiusKm: 60,
     // Current marks with the longest kind and dataset, plus legacy OSM marks.
@@ -606,6 +721,10 @@ check("control characters are dropped from names; worst-case record and index fi
   assert.equal(C.cleanSidecar({ marks: [mark(1, { name: "Tower\u0000\u202e A\u0007" })] }).marks[0].name, "Tower A");
   const newest = C.cleanSidecar({ ...fullSidecar(), marks: fullSidecar().marks.map((m) => ({ ...m, kind: "communication_tower", dataset: "9".repeat(40) })) });
   assert.ok(C.envelopeLength(C.recordKey(15), C.recordValue(longId(1), newest)) <= C.MESSAGE_BUDGET, "six current-shape marks");
+  // The worst record now includes the largest valid capture metadata (API 0.13).
+  assert.equal(JSON.stringify(fullSidecar().capture).length < 260, true);
+  const { capture, ...withoutCapture } = fullSidecar();
+  assert.ok(C.envelopeLength(C.recordKey(15), C.recordValue(longId(1), fullSidecar())) - C.envelopeLength(C.recordKey(15), C.recordValue(longId(1), withoutCapture)) < 280, "capture costs under 280 characters per record");
   const record = C.envelopeLength(C.recordKey(15), C.recordValue(longId(1), fullSidecar()));
   const index = C.envelopeLength(C.INDEX_KEY, C.indexValue(Array.from({ length: C.MAX_SLOTS }, (_, i) => longId(i))));
   assert.ok(record <= C.MESSAGE_BUDGET && record < C.MESSAGE_LIMIT, "record " + record);

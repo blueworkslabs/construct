@@ -117,7 +117,8 @@ class AimeMap {
     this.lastTap = null;
     this.scene.pin = this.snap(at, true);
     this.draw();
-    this.cb.onPin?.({ ...this.scene.pin }, this.metresPerPixel());
+    // Placement precision at the pin's own latitude (Mercator scale varies).
+    this.cb.onPin?.({ ...this.scene.pin }, this.metresPerPixel(this.scene.pin.lat));
   }
   clearPin() {
     this.scene.pin = null;
@@ -182,7 +183,7 @@ class AimeMap {
     }
     if (d.held) return;
     if (d.moved) {
-      if (d.viewer) this.cb.onViewer?.({ lat: this.scene.viewer.lat, lon: this.scene.viewer.lon, mPerPx: this.metresPerPixel() });
+      if (d.viewer) this.cb.onViewer?.({ lat: this.scene.viewer.lat, lon: this.scene.viewer.lon, mPerPx: this.metresPerPixel(this.scene.viewer.lat) });
       return;
     }
     const at = this.local(e);
@@ -198,7 +199,7 @@ class AimeMap {
       const point = this.geoAt(at.x, at.y);
       this.scene.viewer = { ...point, accuracyM: null };
       this.draw();
-      this.cb.onViewer?.({ ...point, mPerPx: this.metresPerPixel() });
+      this.cb.onViewer?.({ ...point, mPerPx: this.metresPerPixel(point.lat) });
       return;
     }
     const t = this.lastTap,
@@ -350,7 +351,7 @@ class AimeMap {
       const v = this.xy(sc.viewer);
       if (sc.viewer.accuracyM > 0) {
         ctx.beginPath();
-        ctx.arc(v.x, v.y, Math.max(6, sc.viewer.accuracyM / mpp), 0, Math.PI * 2);
+        ctx.arc(v.x, v.y, Math.max(6, sc.viewer.accuracyM / this.metresPerPixel(sc.viewer.lat)), 0, Math.PI * 2);
         ctx.fillStyle = "#5fd3a022";
         ctx.fill();
         ctx.strokeStyle = "#5fd3a088";

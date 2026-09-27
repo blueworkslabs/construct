@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Aimé slice 1 acceptance on a disposable synthetic-camera emulator.
+"""Aimé acceptance (0.2.0, Construct API 0.13) on a disposable synthetic-camera emulator.
 
 Synthetic Aimé (dev.construct.aime-fixture) proves the flow and the ranking on a
 known scene: grants denied/granted, capture → viewpoint, injected landmark data
 offline/HTTP 503 with a single retry, mark → calibrated ruler, horizon → level
-line, dragging a horizon point and undoing it, tap → candidates → map, the map
+line (the fixture's API 0.13 capture metadata makes it "Level measured", "Lens
+from camera" and, with the cell's declination, "Compass hint"; a photo without
+metadata shows none), dragging a horizon point and undoing it, tap → candidates → map, the map
 ruler, a long-press map pin and a candidate shown in the photo, rotation, 2× text, a viewpoint outside the data coverage, delete →
 stored record reconciled.
 The real Aimé package (dev.construct.aime) then proves the real location and
@@ -19,7 +21,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_aime_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.aime package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.aime-fixture package digest')
-p.add_argument('--version',default='0.1.9')
+p.add_argument('--version',default='0.2.0')
 p.add_argument('--real-fix',default='52.37648,9.73848',help='lat,lon injected for the real-module landmark data check (Hannover, inside the DE/AT coverage)')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
@@ -173,9 +175,14 @@ def reopen():tap_node(reach_native('Reopen module'));find('Take photo')
 def install(name,digest):
  library();select_after(name+' · '+a.version,('Review & install',));tap('Allow & install');installed_status()
  assert any(e.get('code')=='INSTALLED_TRIAL' and e.get('packageDigest')==digest for e in diagnostics()),'Wrong signed module '+name
-def shoot():
+def shoot(zoom=None):
  click('Take photo');end=time.monotonic()+60
  while time.monotonic()<end and not any((t or '').startswith('Camera preview ready.') for t in labels()):time.sleep(.3)
+ # API 0.13 viewfinder: Aimé requests the level indicator and 1×/2× chips.
+ seen=labels()
+ assert any(t and (t.startswith('Pitch ') or t=='Level unavailable') for t in seen),'Level indicator missing'
+ assert find('Zoom 1×') is not None and find('Zoom 2×') is not None,'Zoom chips missing'
+ if zoom:tap_node(find('Zoom '+zoom));time.sleep(.8)
  capture_native_shutter()
 def capture_native_shutter():
  # The native viewfinder's shutter; the module WebView is behind the capture activity.
@@ -242,7 +249,8 @@ try:
 
  # 2. Capture → estimated viewpoint saved with the photo (second fix after the 15 s spacing).
  shoot();contains('Estimated viewpoint · ±10 m',60);capture('aime-captured')
- done('Real shutter capture opens the photo with its estimated viewpoint')
+ reach_text('Level measured');reach_text('Lens from camera')
+ done('API 0.13 capture with level indicator and zoom chips opens the photo with its viewpoint and stored camera measurements')
 
  # 3. Landmark data offline and HTTP 503: unavailable, never an empty list; one manual retry.
  # Nothing is downloaded before this step, so neither failure is served from the session cache.
@@ -262,13 +270,13 @@ try:
  click('Level horizon');find('Tap two points');tap('Tap two points')
  hold_photo(F['horizon'][0]);reach_text('Horizon point saved')
  done('Long-press release places a horizon point; held magnifier screenshot captured for visual review')
- tap_photo(F['horizon'][1]);reach_text('Level estimated')
- capture('aime-levelled');done('Two true-level horizon taps level the picture (Level estimated)')
+ tap_photo(F['horizon'][1]);reach_text('combined with the measured level')
+ capture('aime-levelled');done('Two true-level horizon taps are combined with the measured level')
 
  # 5b. Drag a horizon point (stored once on release), then undo it.
  moved=dict(F['horizon'][0]);moved['y']=min(.95,moved['y']+.08)
  drag_photo(F['horizon'][0],moved);reach_text('Horizon point 1 moved');capture('aime-dragged')
- click(lambda t:t=='Undo moving horizon point 1');reach_text('Undone: moving horizon point 1');reach_text('Level estimated')
+ click(lambda t:t=='Undo moving horizon point 1');reach_text('Undone: moving horizon point 1');reach_text('Level measured')
  done('Dragging a horizon point moves it; Undo restores it and the level fit')
 
  # 6. What's that? → candidates with own ±σ → map.
@@ -297,10 +305,12 @@ try:
 
  # Persisted calibration must survive a real process restart on this exact host.
  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);open_first_photo()
- reach_text('Calibrated · 1 mark');reach_text('Level estimated');reveal('What’s that?')
+ reach_text('Calibrated · 1 mark');reach_text('Level measured');reveal('What’s that?')
  what(F['whatB'],'Synthetic Peak B','B-restart')
  click(lambda t:t in ('Show Synthetic Peak B in the photo','Show in photo'));reach_text('Synthetic Peak B: in the photo')
  capture('aime-show-in-photo');click(lambda t:t=='Clear pin')
+ # The lookup above downloaded the viewpoint cell; its declination enables the compass hint.
+ reach_text('Compass hint')
  done('Photo viewpoint, landmark and horizon calibration survive process restart with the same ranking; Show in photo draws Peak B in frame')
 
  # 7. Rotation and 2× text keep the flow usable.
@@ -312,12 +322,17 @@ try:
 
  # 8. A viewpoint outside the data coverage is a named state, not a failure or an empty list.
  to_library();fixture('toggle outside coverage');contains('Viewpoint: outside coverage')
- shoot();contains('Estimated viewpoint',60);tap_photo({'x':.5,'y':.5})
+ # This photo also has no capture metadata (full → no heading → no tilt → no lens → none).
+ for _ in range(4):fixture('next capture metadata')
+ contains('Capture metadata for new photos: none.')
+ shoot();contains('Estimated viewpoint',60);absent('Level measured');absent('Lens from camera');absent('Compass hint')
+ tap_photo({'x':.5,'y':.5})
  contains('No landmark data here yet. Germany and Austria for now.');absent('landmarks within');absent('Landmark data unavailable')
  assert not any(t=='Retry' for t in labels()),'Outside coverage offers no retry'
  capture('aime-outside-coverage');click(lambda t:t=='Cancel')
  to_library();fixture('toggle outside coverage');contains('Viewpoint: synthetic scene')
- done('A viewpoint outside the coverage says so, without a retry or an empty list')
+ fixture('next capture metadata');contains('Capture metadata for new photos: full.')
+ done('A viewpoint outside the coverage says so, without a retry or an empty list; a photo without capture metadata shows no measured inputs')
 
  # 9. Delete → stored record reconciled.
  fixture('count stored records');contains('Stored photo records: 2')
@@ -339,7 +354,8 @@ try:
  permission('Allow Android location access');reopen()
  adb('shell','cmd','location','set-location-enabled','true')
  for _ in range(3):adb('emu','geo','fix',lon,lat);time.sleep(1)
- to_library();shoot();contains('Estimated viewpoint',60)
+ to_library();shoot('2×');contains('Estimated viewpoint',60);reach_text('2× zoom')
+ receipt['realCaptureChips']=[t for t in labels() if t in ('Level measured','Lens from camera','Compass hint','2× zoom')];save()
  click('Mark landmark');tap_photo({'x':.5,'y':.5})
  # The loading sentence also contains "landmarks within 30 km". Only a
  # completed count is success; wait for it rather than matching that fragment.

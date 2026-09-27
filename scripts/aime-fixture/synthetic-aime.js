@@ -7,10 +7,13 @@
 //                   feature set (tile requests pass through)
 //   photos.library open → the real host open (ref/grant checks unchanged), with
 //                   the pixels replaced by a rendered view of the scene
-// Capture, list, delete, storage and grants are the real host. Fixture-only
+// camera.photo → the real host capture, with its API 0.13 capture metadata
+//                   replaced by the scene's lens, tilt and magnetic heading
+// List, delete, storage and grants are the real host. Fixture-only
 // buttons inject one offline data request or one HTTP 503 cell, move the
-// viewpoint outside the data coverage, and read the stored record count, so
-// acceptance can see error handling and sidecar reconciliation.
+// viewpoint outside the data coverage, cycle which capture metadata fields
+// are returned, and read the stored record count, so acceptance can see error
+// handling, measured-input fallbacks and sidecar reconciliation.
 const SyntheticAime = (() => {
   const R = typeof Resection !== "undefined" ? Resection : require("../../examples/aime-module/ui/resection.js");
   const viewer = { lat: 46.8, lon: 9.2 },
@@ -79,15 +82,16 @@ const SyntheticAime = (() => {
       attribution: "© OpenStreetMap contributors, Overture Maps Foundation",
       kinds: "peak hill volcano tower observation communication_tower mast bell_tower water_tower watchtower minaret lighthouse windmill chimney radar church cathedral chapel mosque synagogue temple monastery castle ruins fort tall_building gasometer cooling monument memorial bridge dam".split(" "),
     });
+  // Additive field (degrees east, WMM at the cell centre): a plausible
+  // synthetic value per cell, so the viewpoint cell's can be checked.
+  const declinationOf = (name) => Math.round((3 + (Number(name.split("_")[0]) - 46) * 0.2 + (Number(name.split("_")[1]) - 9) * 0.3) * 10) / 10;
   const cell = (name) =>
     JSON.stringify({
       schema: 1,
       release,
       revision,
       cell: name.split("_").map(Number),
-      // Additive field (degrees east, WMM at the cell centre): a plausible
-      // synthetic value per cell, so the viewpoint cell's can be checked.
-      declination: Math.round((3 + (Number(name.split("_")[0]) - 46) * 0.2 + (Number(name.split("_")[1]) - 9) * 0.3) * 10) / 10,
+      declination: declinationOf(name),
       f: features
         .filter((f) => cellOf(f) === name)
         .sort((a, b) => b.w - a.w || a.name.localeCompare(b.name))
@@ -98,6 +102,22 @@ const SyntheticAime = (() => {
     if (url === ORIGIN + "v1/index.json") return { status: 200, headers: {}, text: index() };
     const m = url.match(/^https:\/\/aime-data\.pages\.dev\/v1\/synthetic-1-r1\/cells\/(-?\d+_-?\d+)\.json$/);
     return m && cells.includes(m[1]) ? { status: 200, headers: {}, text: cell(m[1]) } : { status: 404, headers: {} };
+  }
+  // API 0.13 capture metadata for the rendered view, in the host's shape: the
+  // lens angle across the image as opened (h) and down it (v), the pose's tilt
+  // in the solver's signs, and the heading as a magnetic reading that the
+  // viewpoint cell's declination turns back into the true pose heading.
+  // `mode` drops groups to exercise the fallbacks: "full", "no heading",
+  // "no tilt", "no lens" or "none" (zoomRatio only).
+  const CAPTURE_MODES = ["full", "no heading", "no tilt", "no lens", "none"];
+  function capture(mode = "full") {
+    const out = { zoomRatio: 1 },
+      vfov = (2 * Math.atan(Math.tan((pose.fov * Math.PI) / 360) * pose.aspect) * 180) / Math.PI;
+    if (mode === "full" || mode === "no heading" || mode === "no tilt") Object.assign(out, { fovDeg: { h: pose.fov, v: Math.round(vfov * 10) / 10 }, fovSigmaDeg: 1 });
+    if (mode === "full" || mode === "no heading" || mode === "no lens") out.tilt = { pitchDeg: pose.pitch, rollDeg: pose.roll, sigmaDeg: 1, ageMs: 18 };
+    if (mode === "full" || mode === "no tilt" || mode === "no lens")
+      Object.assign(out, { headingDeg: Math.round((pose.heading - declinationOf(cellOf(viewer))) * 10) / 10, headingRef: "magnetic", headingAccuracyDeg: 10, headingAgeMs: 40 });
+    return out;
   }
   function render() {
     const c = document.createElement("canvas");
@@ -160,7 +180,8 @@ const SyntheticAime = (() => {
     // "503" the next cell request. Downloaded cells stay cached in the module,
     // so these apply to lookups not yet made in this session.
     let inject = null,
-      away = false;
+      away = false,
+      metadata = 0;
     call = async function (method, params) {
       if (method === "location.read") {
         const at = away ? outside : viewer;
@@ -178,6 +199,8 @@ const SyntheticAime = (() => {
       }
       const result = await real(method, params);
       if (method === "photos.library" && params.op === "open") return { ...result, url: render(), width, height };
+      // The scene is fixed, so the real camera's zoom and sensors never apply.
+      if (method === "camera.photo" && result && result.saved) return { ...result, capture: capture(CAPTURE_MODES[metadata]) };
       return result;
     };
     document.addEventListener("DOMContentLoaded", () => {
@@ -201,6 +224,10 @@ const SyntheticAime = (() => {
       };
       button("Fixture: next data offline", () => ((inject = "offline"), (out.textContent = "Next landmark data request: offline.")));
       button("Fixture: next cell 503", () => ((inject = "503"), (out.textContent = "Next landmark cell: HTTP 503.")));
+      button("Fixture: next capture metadata", () => {
+        metadata = (metadata + 1) % CAPTURE_MODES.length;
+        out.textContent = "Capture metadata for new photos: " + CAPTURE_MODES[metadata] + ".";
+      });
       button("Fixture: toggle outside coverage", () => {
         away = !away;
         out.textContent = away ? "Viewpoint: outside coverage for new photos." : "Viewpoint: synthetic scene for new photos.";
@@ -217,7 +244,7 @@ const SyntheticAime = (() => {
       document.getElementById("capture-note").after(note, tools, out);
     });
   }
-  return { viewer, outside, width, height, pose, features, at, taps, release, revision, dataset, cells, index, cell, answer, install };
+  return { viewer, outside, width, height, pose, features, at, taps, release, revision, dataset, cells, index, cell, declinationOf, CAPTURE_MODES, capture, answer, install };
 })();
 if (typeof module !== "undefined") module.exports = SyntheticAime;
 else SyntheticAime.install();

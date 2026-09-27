@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Aimé late-result, moving-pinch, magnifier, point-drag/undo, map-ruler and
-map-pin-in-photo regressions using Playwright Chromium.
+"""Aimé late-result, moving-pinch, magnifier, point-drag/undo, map-ruler,
+map-pin-in-photo and API 0.13 capture-metadata regressions using Playwright
+Chromium.
 Install playwright and its Chromium browser in an isolated Python environment.
 This uses synthetic pixels and a fake bridge; it does not test host permissions.
 """
@@ -46,7 +47,7 @@ def main():
 
         page.route("http://aime.test/**", route)
         page.add_init_script(
-            """window.mock={store:{},sets:[],photos:[{id:'photo1',ref:'ref1'}]};window.construct={postMessage(raw){let q=JSON.parse(raw),result=null;if(q.method==='storage.kv'){if(q.params.op==='get')result=mock.store[q.params.key]??null;else{mock.store[q.params.key]=q.params.value;mock.sets.push(q.params.key);}}else if(q.method==='photos.library'){if(q.params.op==='list')result={photos:mock.photos,limit:8};else if(q.params.op==='open')result={url:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',width:1,height:1};}queueMicrotask(()=>construct.onmessage({data:JSON.stringify({id:q.id,result})}));}};"""
+            """window.mock={store:{},sets:[],captures:[],photos:[{id:'photo1',ref:'ref1'}]};window.construct={postMessage(raw){let q=JSON.parse(raw),result=null;if(q.method==='storage.kv'){if(q.params.op==='get')result=mock.store[q.params.key]??null;else{mock.store[q.params.key]=q.params.value;mock.sets.push(q.params.key);}}else if(q.method==='camera.photo'){mock.captures.push(q.params);const n=mock.photos.length+1;mock.photos=[...mock.photos,{id:'photo'+n,ref:'ref'+n}];result={saved:true,id:'photo'+n,capture:{zoomRatio:1}};}else if(q.method==='photos.library'){if(q.params.op==='list')result={photos:mock.photos,limit:8};else if(q.params.op==='open')result={url:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',width:1,height:1};}queueMicrotask(()=>construct.onmessage({data:JSON.stringify({id:q.id,result})}));}};"""
         )
         page.goto("http://aime.test/index.html")
         page.wait_for_function("!state.busy && state.items.length===1")
@@ -342,6 +343,38 @@ def main():
             page.locator("#pin-clear").click()
             assert page.evaluate("$('pin-tools').hidden && state.pin === null && map.scene.pin === null")
             print("PASS map pin and candidate shown in the photo; behind-you arrow; clear")
+            # API 0.13 capture: level and 1×/2× requested, the id used directly,
+            # the metadata stored and fed to the solver; heading only with the
+            # viewpoint cell's declination; the landmark list sorted by direction.
+            page.evaluate("AimeCore.LOCATION_SPACING_MS=0;showLibrary()")
+            idle()
+            page.locator("#take").click()
+            page.wait_for_function("state.selectedId === 'photo2' && !state.busy")
+            assert page.evaluate("JSON.stringify(mock.captures)") == '[{"op":"capture","level":true,"zoom":[1,2]}]'
+            assert page.evaluate("JSON.stringify(current().capture) === JSON.stringify(AimeCore.cleanCapture(SyntheticAime.capture('full')))"), "Capture metadata not stored"
+            chips = page.locator("#chips").inner_text()
+            # The viewpoint's cell was downloaded earlier this session, so its
+            # declination already turns the magnetic reading into a hint.
+            assert "Level measured" in chips and "Lens from camera" in chips and "Compass hint" in chips, chips
+            page.evaluate("setMode('mark')")
+            touch("touchStart", at({"x": 0.64, "y": 0.42}))
+            touch("touchEnd")
+            page.wait_for_function("$('mark-dialog').open && $('search-order').textContent !== ''")
+            order = page.locator("#search-order").inner_text()
+            assert order.startswith("Sorted by direction: closest to where you tapped (about ") and "from the compass hint" in order, order
+            assert page.locator("#results button").first.inner_text().startswith("Synthetic"), "No results"
+            page.locator("#cancel-mark").click()
+            # Without a declination (older cells) the heading is skipped, never used as true.
+            skipped = page.evaluate("(()=>{const d=state.data.declinationAt;state.data.declinationAt=()=>null;recalibrate();render();const r=[state.measured.used.compass,state.measured.skipped.compass,$('chips').textContent];state.data.declinationAt=d;recalibrate();render();return r})()")
+            assert skipped[0] is False and skipped[1] == "declination" and "Compass hint" not in skipped[2], skipped
+            # A fresh session: no cell yet, so no hint; downloading it enables the hint.
+            page.evaluate("state.data=AimeCore.landmarkData(dataGet);state.features.clear();recalibrate();render()")
+            assert "Compass hint" not in page.locator("#chips").inner_text()
+            page.evaluate("features()")
+            page.wait_for_function("$('chips').textContent.includes('Compass hint')")
+            print("PASS 0.13 capture: level and zoom requested, id used, metadata stored, measured inputs shown, direction-sorted search")
+            page.evaluate("openPhoto('photo1')")
+            idle()
             page.evaluate(
                 "whatsThat(SyntheticAime.taps.whatB.x,SyntheticAime.taps.whatB.y)"
             )
