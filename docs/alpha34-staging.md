@@ -26,3 +26,9 @@ Legacy API, stable library IDs, both pitch and roll signs, near-zero level, 1×/
 Recorded retakes: []. Raw capture entries preserve every attempt. The emulator's capture-result FOV path is exercised, but this is not a logical multi-camera. Dataset remains r2, r3 held. No merge, public release or production promotion.
 
 Shutdown caveat: all eight checks completed before the requested stop, and no emulator remained running, but the emulator process aborted during teardown (systemd core-dump/SIGABRT). This is not recorded as a clean emulator exit or a Construct crash. The guest crash buffer contains only its known Bluetooth boot abort.
+
+## Remaining tracked limits
+
+[Host edge cases #46](https://github.com/blueworkslabs/construct/issues/46) remain before general release: damaged identity-key publication rollback, nonzero sensor active-array origins (conservative metadata omission), near-1 fractional zoom defaults (Aimé requests exact 1×/2×), and pre-13 privacy disclosure. This is a bounded Pixel pilot, not an all-cameras/all-platforms clearance.
+
+[Retake evidence #47](https://github.com/blueworkslabs/construct/issues/47): older attempts inferred stale tilt from heading age, which does not prove gravity/exposure timing. Their descriptions overstated that evidence. This final run has zero retakes and does not rely on that predicate; raw historical attempts remain preserved.

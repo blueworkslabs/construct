@@ -13,3 +13,5 @@ At the same viewpoint, take 1× and 2× photos, level indicator on, initially no
 Look for Lens from camera. Whether present or absent, Diagnostics → CAPTURE_FOV should give its source/omission reason. The emulator verifies capture-result geometry, not whether the Pixel supplies the needed still-frame metadata. Existing photos cannot acquire missing shutter measurements retroactively.
 
 Zero pitch means pointing the camera horizontally, not laying the phone flat. Unsupported, stale or off-centre measurements are deliberately omitted. Dataset remains r2; r3 is held. No automatic saved-mark movement, public release or production promotion.
+
+Known host follow-ups are tracked in issue #46. In particular, nonzero sensor-array origins can conservatively omit lens metadata; report CAPTURE_FOV rather than assuming this build supports every camera. Damaged identity-key rollback and pre-13 disclosure are not covered by this normal Pixel pilot.
