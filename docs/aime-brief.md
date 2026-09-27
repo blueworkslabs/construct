@@ -42,7 +42,7 @@ shows the candidate's bearing, its signed offset from the tap, its comparison
 | Where you stood | `location.read {op:"get"}` | One fix, accuracy in m; no altitude. Cached fix may be up to 120 s old. |
 | Which way the phone pointed | none | No orientation API. Direction is **derived** by marking, not captured. |
 | Lens field of view | none | Assumed from aspect ratio; fitted from marks. |
-| Map features | `net.http` with declared origins | Overpass (`https://overpass-api.de`) JSON; OSM tiles for the map. |
+| Map features | `net.http` with declared origins | Pre-built landmark cells from the `aime-data` repository on Cloudflare Pages (Overture Maps / OSM, ODbL); OSM tiles for the map. |
 | Remember per-photo data | `storage.kv` | 100 keys, 64 KiB per module. |
 
 Conclusion: API 0.11 supports the whole flow except **durable photo identity**.
@@ -232,42 +232,49 @@ skylines. Different error distributions and difficult geometries can differ.
 
 ## Data: features, queries, storage, consent
 
-**Overpass query, once per confirmed viewpoint and selected radius** (10/30/60
-km picker, default 30 km; example below is 30 km), cached in memory for the
-session and reused for marks and candidates:
+**Landmark cells (decided 2026-09-27, replaces live Overpass queries).** The
+public Overpass instance failed every spike request within the host's 15 s
+limit, once silently as an empty result
+(`experiments/aime-overture-spike/README.md`). Landmarks now come from
+pre-built static files, built monthly from Overture Maps in the separate
+`blueworkslabs/aime-data` repository and served from Cloudflare Pages. The
+**data contract (schema 1) lives in that repository's README**; the module
+depends on it, not on Overture directly. Summary:
 
-```
-[out:json][timeout:20];
-(
-  nwr(around:30000,LAT,LON)["name"]["natural"="peak"];
-  nwr(around:30000,LAT,LON)["name"]["man_made"~"^(tower|mast|lighthouse|windmill|chimney|water_tower|communications_tower)$"];
-  nwr(around:30000,LAT,LON)["name"]["building"~"^(cathedral|church|chapel|castle|tower|mosque|synagogue|temple)$"];
-  nwr(around:30000,LAT,LON)["name"]["historic"~"^(castle|monument|tower|fort|ruins)$"];
-  nwr(around:30000,LAT,LON)["name"]["tourism"~"^(attraction|viewpoint)$"];
-  nwr(around:30000,LAT,LON)["name"]["aeroway"="aerodrome"];
-);
-out tags center 400;
-```
-
-- Ways/relations come with `center`; nodes with `lat/lon`. Keep `name`,
-  `ele`, `height`, the matching kind tag and the OSM **type plus id** (numeric
-  ids overlap across types). Drop everything else. Way/relation centres get a
-  larger `positionM` (30 m) than nodes (8 m) in the solver.
-- The 400-element cap is a partial dataset, not the nearest or most visible
-  400; at the cap, label results incomplete and offer a smaller radius.
-- Overpass returns `application/json` for `[out:json]`; the host's 2 MiB cap
-  still applies and a count limit does not bound bytes. The host's 15 s total
-  and 8 s read deadlines can expire before the server's 20 s limit. Size, MIME
-  and transport failures are shown as such, never as empty results. 429/504:
-  show the reason and offer a retry; no loop. Verify the deployed host's fixed
-  User-Agent against the public instance's policy before release. Name search
-  is a local filter over this set, so no per-keystroke requests.
-- What leaves the phone: **a confirmed viewpoint and the selected radius** to
-  Overpass, and tile coordinates to OpenStreetMap. Never the photo, never the
-  marks, never the taps.
+- `v1/index.json`: Overture `release`, data `revision` and `dataset`
+  (`<release>-r<N>`), coverage (`DE`, `AT` for the pilot), the list of
+  non-empty 1° cells, the allowed kinds, licence and attribution. Fetched once
+  per session.
+- `v1/<dataset>/cells/<lat>_<lon>.json`: features `[name, kind, lat, lon, e,
+  w, p]` with `e` = elevation (terrain) or height (structures), `w` =
+  visibility weight 0.5–2.0, `p` = per-feature position uncertainty in metres.
+  Each cell under 1 MiB (host cap 2 MiB); the spike's largest was 113 KiB.
+  A published dataset path is never rewritten; corrections within one
+  Overture release get a new revision.
+- For a confirmed viewpoint and radius (10/30/60 km picker, default 30 km)
+  the module fetches only the cells listed in the index that intersect the
+  radius's bounding box: at most 9 at 60 km, within the host's four concurrent
+  requests. Cells are cached in memory for the session and reused for marks
+  and candidates; name search is a local filter.
+- Each landmark's position uncertainty in the solver is its own `p`, used
+  directly as `positionM` for marks and candidates. The pipeline derives it
+  from provenance and footprint: `max(source floor, 0.5 × bbox
+  half-diagonal)`, floors 8 m for OSM-derived base features, 10 m for
+  building footprints, 60 m for places-derived POIs, 250 m for places-only
+  mountains; merges never lower it. There is no kind-level default.
+- Outside coverage (viewpoint radius touching no listed cell) the module says
+  "No landmark data here yet. Germany and Austria for now." A failed download
+  is shown as a failure with retry, never as an empty result. A cell whose
+  `schema`, `release` or `revision` does not match the index, or any feature
+  without a valid `p`, is rejected as unavailable.
+- What leaves the phone: **the ids of the 1° cells** the radius touches (about
+  110 × 70 km each) to the data host, and tile coordinates to OpenStreetMap.
+  Never the viewpoint, the radius, the photo, the marks or the taps.
+- Attribution "© OpenStreetMap contributors, Overture Maps Foundation" and the
+  ODbL licence from `index.json` appear in the module's help and on the map.
 - **Sidecar per photo** (`storage.kv`, key `photos`, a map from stable photo
   id): `{ viewer: {lat, lon, accuracyM, timestamp, approximate, corrected},
-  radiusKm, marks: [{x, y, osmType, osmId, name, lat, lon, positionM}], horizon: [{x, y}],
+  radiusKm, marks: [{x, y, kind, name, lat, lon, positionM, dataset}], horizon: [{x, y}],
   pose?: {heading, fov, pitch, roll, sigma} }`. Position and radius saved
   automatically after capture; marks and horizon as the user adds them; the
   pose is derived and re-fitted on load, stored only as a display cache. Names
@@ -279,8 +286,11 @@ out tags center 400;
   `storage.kv` "Save each photo's estimated viewpoint, the landmarks and horizon
   you marked, and the fitted direction. After photo deletion, metadata is cleaned
   up when this module can next access its library and storage."
-  `net.http` "Fetch named map features around your photo position and map
-  tiles." `photos.library` / `camera.photo` / `image.read` as the Camera module.
+  `net.http` "Download landmark data for the map area around your photo (whole
+  cells of about 110 × 70 km, never your exact position) and map tiles."
+  Origins: the `aime-data` Pages origin (default `https://aime-data.pages.dev`,
+  final name set when Pages is configured) and `https://tile.openstreetmap.org`.
+  `photos.library` / `camera.photo` / `image.read` as the Camera module.
 - Module storage never holds the photo pixels; originals stay in the host's
   private photo store as today.
 
@@ -307,7 +317,8 @@ out tags center 400;
   unit test, runner check. Astra accepts on staging before 1b relies on it.
 - **Slice 1b (Clawd, module):** `examples/aime-module` on API 0.12: library +
   capture + sidecar keyed by id with orphan reconciliation; photo view with
-  taps, bearing ruler and level line; Overpass fetch, 10/30/60 km picker and
+  taps, bearing ruler and level line; Overpass fetch (replaced by landmark
+  cells in slice 1c), 10/30/60 km picker and
   local name search; marks and horizon taps feeding the reference solver
   **unchanged**; candidates sheet with per-candidate σ and the "no close
   match" state; map view built from the Sky Watch
@@ -317,6 +328,14 @@ out tags center 400;
   module (like Synthetic Sky) that injects a known photo, viewpoint, horizon
   and feature set so the emulator proves the flow and the ranking without a
   real horizon.
+- **Slice 1c (Clawd, data):** in `blueworkslabs/aime-data`: the monthly build
+  pipeline per its README (STAC file selection, DuckDB extraction, selection
+  rules including the spike's fixes, DE+AT coverage, contract validation,
+  publish to the `pages` branch), with unit tests for the rules and the
+  validator. In `construct`, one module PR stacked on slice 1b: replace the
+  Overpass fetch/parse with index + cell fetch/parse, swap the manifest origin
+  and consent text, update the fixture to serve synthetic cells, and add the
+  "outside coverage" and "data unavailable" states. Nothing else changes.
 - **Slice 1 acceptance (Astra):** Codex review; runner covering grants
   denied/granted, capture → sidecar, mark → calibrated ruler, horizon → level
   line, tap → candidates → map, delete → sidecar reconciled, offline/429,
@@ -343,8 +362,9 @@ out tags center 400;
   marking.
 - "Level estimated" appears only when `level` is fitted; "lens fitted" only when
   `lens` is fitted. Otherwise the wedge is simply wider.
-- Errors name the gate: location denied, internet denied, Overpass busy,
-  library unavailable.
+- Errors name the gate: location denied, internet denied, landmark data
+  unavailable, outside coverage ("Germany and Austria for now"), library
+  unavailable.
 - Same header, buttons, chips, help block and status line as Sky Watch 0.3.
 
 ## Product choices confirmed 2026-09-26
@@ -353,6 +373,14 @@ out tags center 400;
 - Automatically save available viewpoint and calibration metadata per photo;
   no repeated per-photo save prompt; no fabricated direction.
 - 10/30/60 km radius picker, default 30 km.
+
+## Product choices confirmed 2026-09-27
+
+- Landmark data from pre-built Overture cells instead of the public Overpass
+  instance, after the spike (draft PR #36).
+- New repository `blueworkslabs/aime-data` for the pipeline and data contract;
+  Cloudflare Pages hosting set up by the project owner.
+- Pilot coverage: Germany and Austria. Hannover is the hardware-test region.
 
 ## Review decisions (revisions 2 and 3)
 
