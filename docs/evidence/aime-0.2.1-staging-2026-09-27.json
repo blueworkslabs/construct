@@ -1,0 +1,178 @@
+{
+  "complete": true,
+  "stopped": true,
+  "apkSha256": "7d85825695ae7acc418d30c8ab8e5d376c1cb835196c3cca784f4fc08b46a77e",
+  "moduleSha256": "b92e19be370c923514823a1b8581808acf75b3b22628cfacb509c632d4a50069",
+  "fixtureSha256": "df6c6aedac1b048f67aeb505ae832cf336a91e363b7cc2d6942da5bbbb218bb1",
+  "version": "0.2.1",
+  "scope": "Synthetic Aimé flow/ranking on a known scene plus real-module location/internet gates; not physical-phone accuracy",
+  "checks": [
+    "Fresh install: library and capture are denied until the new grants are on",
+    "Grants and Android camera permission enabled through native Module access",
+    "API 0.13 capture with level indicator and zoom chips opens the photo with its viewpoint and stored camera measurements",
+    "Offline and HTTP 503 are shown as landmark data unavailable with a single retry, never as an empty result",
+    "Marking a known landmark calibrates the bearing ruler; Calibration details shows the camera lens used",
+    "Long-press release places a horizon point; held magnifier screenshot captured for visual review",
+    "Two true-level horizon taps are combined with the measured level",
+    "Dragging a horizon point moves it; Undo restores it and the level fit",
+    "Tap ranks the known landmark first; a candidate opens the map with wedge, pins and viewer",
+    "Map ruler: two taps show the great-circle distance and initial bearing; it clears",
+    "Long-press on the map drops a pin; the photo shows where it lies; it clears",
+    "Photo viewpoint, landmark and horizon calibration survive process restart with the same ranking; Show in photo draws Peak B in frame",
+    "Landscape keeps the photo tappable and the ranking unchanged",
+    "Two-times text keeps controls reachable and the ranking unchanged",
+    "A viewpoint outside the coverage says so, without a retry or an empty list; a photo whose camera omitted the lens says so in Calibration details",
+    "Native-confirmed deletion removes the photo and its stored record",
+    "Real module with location off: the photo stays unlocated and opens on the map; the internet gate is named",
+    "Real module: injected fix → estimated viewpoint → live aime-data cells return named landmarks"
+  ],
+  "candidates": {
+    "B": [
+      "Could be Synthetic Peak B peak · 18 km · 42° NE · −0.0° from your tap · ±1.1°",
+      "Synthetic Mast E mast · 25 km · 45° NE · +3.0° from your tap · ±1.1° · not close",
+      "Synthetic Transmitter H communication tower · 28 km · 36° NE · −6.0° from your tap · ±1.1° · not close",
+      "Synthetic Castle D castle · 11 km · 51° NE · +9.0° from your tap · ±1.1° · not close",
+      "Synthetic Church C church · 3.0 km · 30° NNE · −12.0° from your tap · ±1.1° · not close"
+    ],
+    "B-restart": [
+      "Could be Synthetic Peak B peak · 18 km · 42° NE · −0.0° from your tap · ±1.1°",
+      "Synthetic Mast E mast · 25 km · 45° NE · +3.0° from your tap · ±1.1° · not close",
+      "Synthetic Transmitter H communication tower · 28 km · 36° NE · −6.0° from your tap · ±1.1° · not close",
+      "Synthetic Castle D castle · 11 km · 51° NE · +9.0° from your tap · ±1.1° · not close",
+      "Synthetic Church C church · 3.0 km · 30° NNE · −12.0° from your tap · ±1.1° · not close"
+    ],
+    "B-landscape": [
+      "Could be Synthetic Peak B peak · 18 km · 42° NE · −0.1° from your tap · ±1.1°",
+      "Synthetic Mast E mast · 25 km · 45° NE · +2.9° from your tap · ±1.1° · not close",
+      "Synthetic Transmitter H communication tower · 28 km · 36° NE · −6.1° from your tap · ±1.1° · not close"
+    ],
+    "B-large-text": [
+      "Could be Synthetic Peak B peak · 18 km · 42° NE · −0.0° from your tap · ±1.1°",
+      "Synthetic Mast E mast · 25 km · 45° NE · +3.0° from your tap · ±1.1° · not close",
+      "Synthetic Transmitter H communication tower · 28 km · 36° NE · −6.0° from your tap · ±1.1° · not close"
+    ]
+  },
+  "snapshot": {
+    "avd": "construct-api37",
+    "name": "clean",
+    "loaded": true
+  },
+  "apiLevel": "37",
+  "targets": {
+    "markA": {
+      "x": 0.33,
+      "y": 0.43
+    },
+    "horizon": [
+      {
+        "x": 0.12,
+        "y": 0.44
+      },
+      {
+        "x": 0.88,
+        "y": 0.41
+      }
+    ],
+    "whatB": {
+      "x": 0.66,
+      "y": 0.42
+    }
+  },
+  "realCaptureChips": [
+    "Level measured",
+    "Lens from camera",
+    "2× zoom"
+  ],
+  "realLandmarks": "807 landmarks within 30 km.",
+  "realLandmarksAttempts": 1,
+  "realCaptureChipsAfterData": [
+    "Level measured",
+    "Lens from camera",
+    "Compass hint",
+    "2× zoom"
+  ],
+  "status": "passed_android_acceptance",
+  "checksPassed": 18,
+  "checksPlanned": 18,
+  "runId": "20260927T175347Z-aime-cedcab79",
+  "moduleSourceCommit": "5c42a46",
+  "packageCommit": "426216024036a9dbf78770c38ddeed2d97e4ffc9",
+  "runnerCommit": "5c42a46",
+  "apkVersion": "0.1.0-alpha33",
+  "webView": "com.android.webview 155.0.8059.0",
+  "catalog": "https://raw.githubusercontent.com/blueworkslabs/construct/426216024036a9dbf78770c38ddeed2d97e4ffc9/catalog/candidates/aime-021/index.json",
+  "reviewedScreenshots": [
+    {
+      "path": "images/aime-0.2.1/details.png",
+      "sha256": "725c5df93adfbdaffca6eea4908955739b0a4fd4d42225e59ed23ac674c43eea",
+      "original": "Screenshot_1790531838.png"
+    },
+    {
+      "path": "images/aime-0.2.1/details-no-lens.png",
+      "sha256": "b092150f11c08944b9a4ebcfcc60c95a32460b08db28b769a91d4f48921cd6b2",
+      "original": "Screenshot_1790532138.png"
+    },
+    {
+      "path": "images/aime-0.2.1/measured-calibration.png",
+      "sha256": "45f1dadb0de04114a9f919fdd24456239ccae6e49982f54d908adf88b29adabe",
+      "original": "Screenshot_1790531840.png"
+    },
+    {
+      "path": "images/aime-0.2.1/held-loupe.png",
+      "sha256": "f0da0d7b70ae9d0ca8c2646e8357e618837d9707da508eebdc2c3770235644e9",
+      "original": "Screenshot_1790531850.png"
+    },
+    {
+      "path": "images/aime-0.2.1/map-pin.png",
+      "sha256": "5bfcbb815b0592cd5daf2d850c106b87023efa7b7fb4aa82fb77bb67b07544bf",
+      "original": "Screenshot_1790531965.png"
+    },
+    {
+      "path": "images/aime-0.2.1/landscape.png",
+      "sha256": "6aca8e941a78000d1a652e3138a66493b8009b56c2f60ab11f6eb69b957b7452",
+      "original": "Screenshot_1790532038.png"
+    },
+    {
+      "path": "images/aime-0.2.1/large-text.png",
+      "sha256": "1dda3696776fac7b729602be865662c85b824ffae83d8929b11f0f077dacf150",
+      "original": "Screenshot_1790532099.png"
+    },
+    {
+      "path": "images/aime-0.2.1/outside-coverage.png",
+      "sha256": "897299ab39b7edbb119c8701b0b1557d6db62cff33979757112bbd7e3d15a9ce",
+      "original": "Screenshot_1790532150.png"
+    },
+    {
+      "path": "images/aime-0.2.1/real-measured.png",
+      "sha256": "9d35217eaf4abe75e407429bb699bb3d4826d132d61200c3263a5ffce8dc7571",
+      "original": "Screenshot_1790532382.png"
+    },
+    {
+      "path": "images/aime-0.2.1/live-landmarks.png",
+      "sha256": "a32a7aea0d184f5ce6ddde3ee63ee4267975b4929249897e7c9f41a624068277",
+      "original": "Screenshot_1790532390.png"
+    },
+    {
+      "path": "images/aime-0.2.1/real-measured-restart.png",
+      "sha256": "ff81d9039620f6ef0ae0388685a65f1d33dd6ee68025631b77b13be1c3b0091f",
+      "original": "Screenshot_1790532423.png"
+    }
+  ],
+  "hardwareAccuracyVerified": false,
+  "limitations": [
+    "Real host fields may be omitted when sensors or lens geometry are unavailable; an omitted input is not measured evidence.",
+    "Physical-phone 1x/2x accuracy and vendor camera geometry require the combined phone check.",
+    "Saving a new photo in 0.1.9 after rollback can discard camera metadata; older than0.1.3 also loses cell-based marks.",
+    "No public APK release, module promotion or merge is implied.",
+    "Alpha34 and proposed r3 are blocked separately; this run uses accepted alpha33 and unchanged r2.",
+    "Stored landmark coordinates are not refreshed automatically; the saved-photo comparison isolates the module prior.",
+    "Long-name details containment and the 2× missing-lens prior are covered by browser/module regressions; Android missing-lens fixture is 1×."
+  ],
+  "dataset": {
+    "dataset": "2026-09-23.1-r2",
+    "publicationCommit": "a9afc6ec1b46c2fefbe32f12b4e050dbceeb02eb",
+    "previousFullAudit": "aime-0.1.9-staging-2026-09-27.json"
+  },
+  "independentShutdownConfirmed": true,
+  "realCaptureRetakes": 0
+}
