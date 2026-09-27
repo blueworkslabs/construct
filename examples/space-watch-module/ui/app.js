@@ -231,6 +231,7 @@
     }
   }
   async function fetchSatcat(t) {
+    const previous = fetchState.satcatLast;
     fetchState.satcatLast = t;
     try {
       const r = await getJson(C.SATCAT_URL);
@@ -242,7 +243,10 @@
       described.clear();
       await saveRows("satcat", rows, t, SATCAT_CHUNKS);
     } catch (e) {
-      if (e.code === "RUN_PAUSED") throw e;
+      if (e.code === "RUN_PAUSED") {
+        fetchState.satcatLast = previous;
+        throw e;
+      }
       /* Descriptions fall back to the object names. */
     } finally {
       await saveFetchState();

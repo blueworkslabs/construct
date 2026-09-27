@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.1.2** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
+Space Watch **0.1.3** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
 alpha26** and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.

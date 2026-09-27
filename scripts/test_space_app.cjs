@@ -201,6 +201,14 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   assert.equal(r.calls.filter(c => c.method === 'location.read').length, 0);
   assert.equal(r.el('welcome-title').textContent, 'Where are you watching from?');
 
+  // A menu interruption of the *catalog* must not impose a 15-minute penalty.
+  r = rig({pendingHttp: u => u.includes('/satcat/')}); await flush(8);
+  assert.equal(r.http().filter(u => u.includes('/satcat/')).length, 1);
+  r.visibility(false); r.finishHttp(); await flush(4);
+  r.visibility(true); await flush(4);
+  assert.equal(r.http().filter(u => u.includes('/satcat/')).length, 2, 'interrupted catalog retries on resume');
+  r.finishHttp(); await flush(8);
+
   // Platform Back/Escape must cancel an in-flight manual location request too.
   r = rig({saved: {preferences: {startWithLocation: false}}, pendingLocation: true}); await flush(4);
   r.el('start').click(); r.el('use-location').click();
