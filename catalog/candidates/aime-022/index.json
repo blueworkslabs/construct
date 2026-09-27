@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.aime",
+      "name": "Aim\u00e9",
+      "versions": [
+        {
+          "id": "dev.construct.aime",
+          "name": "Aim\u00e9",
+          "version": "0.2.2",
+          "artifact": "dev.construct.aime-0.2.2.zip",
+          "sha256": "13943529480f5d9be769be659e2b6a7353813e85df8d79d42999255c25b19b64",
+          "signature": "Kc0+QLZYpalkSGY7u/PAVPVGefLKBD+mGPaDsua/MAQy8jMDMqYKIrcTuEfVWJq/D2uVI9gaPe1HkzPRj81vb/W7zasueb4QWa6VULhN0vcVT6d9syTyVxbEZEaa2wB64W+lY7kL8MulhTf0U13NV5lBNlllJWAKh6dVfYtkXqQ28qNZeePVXmipJbketvNVvrWZpQ96sTDVsu83JjodGtTa1QLFZ5AsjgJueGBYuZ3Z6Cx/KHcu48HpDZF/bo2jG7XfXLFt4Vn2EV1WroBimF29rwrgGbRwTJMtNSM0HXZqbh/o7AXUjYbeKavBmU8lKUKFkux4UiZdzg9cBobtnw=="
+        }
+      ],
+      "latest": "0.2.2"
+    },
+    {
+      "id": "dev.construct.aime-fixture",
+      "name": "Synthetic Aim\u00e9",
+      "versions": [
+        {
+          "id": "dev.construct.aime-fixture",
+          "name": "Synthetic Aim\u00e9",
+          "version": "0.2.2",
+          "artifact": "dev.construct.aime-fixture-0.2.2.zip",
+          "sha256": "ceb5f11cbb36952392b6c33f79aae77c524d66cd37c0138d5501530209fbcfbb",
+          "signature": "gEJYlA29vYL0qTkBmWMmCj+ZiX/E2oTwQc8cMxYt46bWiktPOF+Eyq2avKDlj2Swq3ivfsIMcHbzfs1fsXW2huPyq9BI6FfLq5laiYBPpk+NATUG9oKM4mcYby9Sr8G1QEVM5KYh+L9gbUslg2aTaZpEtewRIiS28z7CDOwjdmaVpaCV5GcKsLsMcpS7Nqd+5yCMi3HOSsNlf3Aoi0bg6BqEpIfQOpGDkj1IW+3DPPeiutq6pD2lxrpKxVIo9RX7ubMrHxxFaotqUKV/D1LSQ/oFvmX6aSoktMg5CgDpliWJmsef6tsDUKegIic+003UfV45Pc+83njnzb/UftRuEA==",
+          "testFixture": true
+        }
+      ]
+    }
+  ]
+}
