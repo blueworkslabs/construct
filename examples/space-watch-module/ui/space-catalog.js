@@ -220,7 +220,10 @@ const SpaceCatalog = (() => {
       ? `https://celestrak.org/satcat/records.php?INTDES=${intdes.slice(0, 8)}&FORMAT=json`
       : null;
   function parseLaunch(body, selfId) {
-    const list = parseSatcat(body).map(record);
+    return summarizeLaunch(parseSatcat(body), selfId);
+  }
+  function summarizeLaunch(rowList, selfId) {
+    const list = rowList.map(record);
     const others = list.filter((x) => x.id !== selfId);
     const order = { PAY: 0, "R/B": 1, UNK: 2, DEB: 3 };
     others.sort((a, b) => order[a.type] - order[b.type] || (a.intdes || "").localeCompare(b.intdes || ""));
@@ -277,6 +280,7 @@ const SpaceCatalog = (() => {
     years,
     launchUrl,
     parseLaunch,
+    summarizeLaunch,
     wikiUrl,
     parseWiki,
     NOTABLE,

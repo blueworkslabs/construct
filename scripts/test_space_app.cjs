@@ -13,8 +13,8 @@ const LAUNCH = JSON.stringify([
   {NORAD_CAT_ID: 29507, OBJECT_TYPE: 'R/B', OBJECT_NAME: 'CZ-4B R/B', OBJECT_ID: '2006-046C'},
 ]);
 const WIKI = JSON.stringify({query: {pages: [{title: 'Long March 4B', extract: 'The Long March 4B is a Chinese launch vehicle.', fullurl: 'https://en.wikipedia.org/wiki/Long_March_4B'}]}});
-function rig({saved = {}, error = null, gpStatus = 200, pendingHttp = false, clock = START, launchBody = LAUNCH} = {}) {
-  const elements = new Map(), events = {}, timers = [], calls = [], held = [];
+function rig({saved = {}, error = null, gpStatus = 200, pendingHttp = false, clock = START, launchBody = LAUNCH, pendingLocation = false} = {}) {
+  const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [];
   const storage = structuredClone(saved);
   let now = clock;
   class Element {
@@ -49,7 +49,9 @@ function rig({saved = {}, error = null, gpStatus = 200, pendingHttp = false, clo
       }
       if (method === 'location.read') {
         if (error) throw Object.assign(new Error(error), {code: error});
-        return {latitude: 52.52, longitude: 13.405, accuracyM: 12};
+        const result = {latitude: 52.52, longitude: 13.405, accuracyM: 12};
+        if (pendingLocation) return new Promise(resolve => heldLocation.push(() => resolve(result)));
+        return result;
       }
       if (method === 'net.http') {
         const u = params.url;
@@ -71,6 +73,7 @@ function rig({saved = {}, error = null, gpStatus = 200, pendingHttp = false, clo
   }
   const http = () => calls.filter(c => c.method === 'net.http').map(c => c.params.url);
   return {el, calls, storage, classes, http, select: id => sandbox.selectObject(id),
+    finishLocation: () => heldLocation.splice(0).forEach(f => f()),
     finishHttp: () => held.splice(0).forEach(f => f()),
     tick: (n = 1, ms = 1000) => { for (let i = 0; i < n; i++) { now += ms; timers.forEach(f => f()); } },
     advance: ms => { now += ms; },
@@ -197,6 +200,14 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   r = rig({saved: {preferences: {startWithLocation: false, red: false}}}); await flush(4);
   assert.equal(r.calls.filter(c => c.method === 'location.read').length, 0);
   assert.equal(r.el('welcome-title').textContent, 'Where are you watching from?');
+
+  // Platform Back/Escape must cancel an in-flight manual location request too.
+  r = rig({saved: {preferences: {startWithLocation: false}}, pendingLocation: true}); await flush(4);
+  r.el('start').click(); r.el('use-location').click();
+  r.el('area-dialog').listeners.cancel?.(); r.el('area-dialog').close();
+  r.finishLocation(); await flush(8);
+  assert(r.el('workspace').hidden, 'cancelled dialog location must not set a viewpoint');
+  assert.equal(r.http().length, 0);
 
   // A download interrupted by the native menu is dropped and retried on return.
   r = rig({pendingHttp: true}); await flush(4);

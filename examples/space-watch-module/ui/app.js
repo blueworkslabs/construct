@@ -546,21 +546,21 @@
   async function loadLaunch(o, section, generation) {
     const url = C.launchUrl(o.intdes);
     if (!url) return;
-    let body = launches.get(o.intdes.slice(0, 8));
-    if (!body) {
+    let rows = launches.get(o.intdes.slice(0, 8));
+    if (!rows) {
       section.append(element("p", "Looking up the rest of its launch…", "note"));
       try {
         const r = await getJson(url);
         if (r.status !== 200) throw new Error(`HTTP ${r.status}`);
-        body = r.text;
-        launches.set(o.intdes.slice(0, 8), body);
+        rows = C.parseSatcat(r.text);
+        launches.set(o.intdes.slice(0, 8), rows);
       } catch (_) {
         if (infoTarget === o && generation === infoGeneration) section.replaceChildren(element("p", "Launch details unavailable right now.", "note"));
         return;
       }
     }
     if (infoTarget !== o || generation !== infoGeneration) return;
-    const v = C.parseLaunch(body, o.id);
+    const v = C.summarizeLaunch(rows, o.id);
     section.replaceChildren(element("h3", "Same launch"));
     if (!v.total) return section.append(element("p", "Nothing else is catalogued from this launch.", "note"));
     if (v.payloads.length)
@@ -727,6 +727,10 @@
     $("area-dialog").close();
     if (!place && !busy) welcome("choose");
   };
+  $("area-dialog").addEventListener("cancel", () => {
+    discardLocation();
+    if (!place) welcome("choose");
+  });
   $("use-location").onclick = () => locate("dialog");
   $("start-with-location").onchange = () => {
     prefs.startWithLocation = $("start-with-location").checked;

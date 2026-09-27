@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.1.1** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
+Space Watch **0.1.2** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
 alpha26** and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -129,7 +129,7 @@ view, not a map.
   - Every URL is built from fixed strings plus a catalogue designator or an object
     name.
   - **No coordinate, fix, time zone or device detail is ever part of a request.**
-    CelesTrak receives only "the visual group"; Wikipedia receives only an
+    CelesTrak receives the visual-group request or a public launch designator; Wikipedia receives only an
     object or launcher name, and only after **Read on Wikipedia**.
 - **`location.read`** is optional: one foreground fix at opening or on **Use my
   location**. It is held in memory for the session and never stored or sent.
@@ -199,7 +199,9 @@ view, not a map.
   - a fixed Berlin viewpoint;
   - a captured 24-object CelesTrak subset.
 
-  Storage, grants, same-launch lookups and Wikipedia stay real. `?celestrak=503`
+  Storage, same-launch lookups and Wikipedia use the real host. The synthetic
+  location and orbit answers bypass those native grants; use the real module to
+  verify permission gates. `?celestrak=503`
   exercises the error path. In it, the ISS is low in the south-west and sets at
   about 17:53:10. The "Long March 4B rocket stage" is **EAST · 1½ fists up**, one
   fist above Saturn.
