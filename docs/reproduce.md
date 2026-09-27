@@ -194,3 +194,8 @@ scripts (they refuse an occupied emulator and preserve incomplete receipts):
 The synthetic runner injects licensed fixtures only into an asserted empty
 per-module directory on the disposable userdebug emulator. It restores unprivileged
 ADB identity. Never run that fixture setup on a personal phone or existing album.
+
+Aimé 0.1.3 preserves marks from 0.1.2 on update, but rollback to 0.1.2 or older
+is not supported after saving cell-based marks: the old parser omits those
+marks and a subsequent save can erase them. Do not offer the old Overpass
+candidate as a data-preserving rollback target for the cell-data pilot.

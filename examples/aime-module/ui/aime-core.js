@@ -320,7 +320,7 @@ const AimeCore = (() => {
     const x = readJson(body, "Landmark cell " + cell),
       m = cell.match(CELL);
     if (!x || x.schema !== 1 || x.release !== index.release) throw unavailable(`landmark cell ${cell} does not match the index release.`);
-    if ((Array.isArray(x.cell) && (x.cell[0] !== Number(m[1]) || x.cell[1] !== Number(m[2]))) || !Array.isArray(x.f)) throw unavailable(`landmark cell ${cell} is malformed.`);
+    if (!m || !Array.isArray(x.cell) || x.cell.length !== 2 || x.cell[0] !== Number(m[1]) || x.cell[1] !== Number(m[2]) || !Array.isArray(x.f)) throw unavailable(`landmark cell ${cell} is malformed.`);
     const features = [];
     for (const r of x.f) {
       if (!Array.isArray(r) || r.length !== 6 || typeof r[0] !== "string" || typeof r[1] !== "string" || !index.kinds[r[1]] || !latLon(r[2], r[3])) continue;

@@ -183,6 +183,8 @@ check("cell parsing: placementM, e and w kept; bad records skipped; mismatched c
   rejected(cellText("46_9", [], { schema: 2 }), /release/);
   rejected(cellText("46_9", [], { release: "2026-08-20.0" }), /release/);
   rejected(cellText("46_9", [], { cell: [47, 9] }), /malformed/);
+  for (const cell of [undefined, null, "46_9", [46], [46, 9, 0]])
+    rejected(cellText("46_9", [], { cell }), /malformed/);
   rejected(cellText("46_9", {}), /malformed/);
   rejected(JSON.stringify({ schema: 1, release: INDEX.release, cell: [46, 9] }), /malformed/);
   rejected("{", /unreadable/);
