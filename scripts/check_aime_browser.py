@@ -50,7 +50,7 @@ def main():
         page.goto("http://aime.test/index.html")
         page.wait_for_function("!state.busy && state.items.length===1")
         page.evaluate(
-            """async()=>{state.store={photo1:AimeCore.newSidecar({...SyntheticAime.viewer,accuracyM:10,timestamp:Date.now()})};await openPhoto('photo1');const f=AimeCore.parseOverpass(SyntheticAime.overpass()).features.find(f=>f.name==='Synthetic Tower A');await update(s=>({...s,marks:[AimeCore.markFrom(f,SyntheticAime.taps.markA.x,SyntheticAime.taps.markA.y)]}));}"""
+            """async()=>{state.store={photo1:AimeCore.newSidecar({...SyntheticAime.viewer,accuracyM:10,timestamp:Date.now()})};await openPhoto('photo1');const f=AimeCore.parseCell(AimeCore.parseIndex(SyntheticAime.index()),'46_9',SyntheticAime.cell('46_9')).find(f=>f.name==='Synthetic Tower A');await update(s=>({...s,marks:[AimeCore.markFrom(f,SyntheticAime.taps.markA.x,SyntheticAime.taps.markA.y)]}));}"""
         )
         # A cached lookup opens synchronously enough for pointerup -> click
         # retargeting on touch WebViews. At 2x text a candidate lies under the tap.
@@ -79,7 +79,7 @@ def main():
         print("PASS touch tap opens candidates without selecting one at 2x text")
         # A delayed feature response while the visible Photos control leaves the photo.
         page.evaluate(
-            """()=>{const old=call;window.originalCall=call;call=(m,p)=>m==='net.http'?new Promise(r=>window.releaseFetch=()=>r({status:200,text:SyntheticAime.overpass()})):old(m,p);state.features.clear();window.pendingWhat=task(()=>whatsThat(.7,.4));}"""
+            """()=>{const old=call;window.originalCall=call;const gate=new Promise(r=>window.releaseFetch=r);call=(m,p)=>m==='net.http'?gate.then(()=>SyntheticAime.answer(p.url)):old(m,p);state.features.clear();state.data=AimeCore.landmarkData(dataGet);window.pendingWhat=task(()=>whatsThat(.7,.4));}"""
         )
         page.click("#back")
         page.evaluate("releaseFetch()")

@@ -165,11 +165,11 @@ scripts (they refuse an occupied emulator and preserve incomplete receipts):
   modules must be in the catalog; neither version restores native application UI.
 - Aimé (slice 1b, module only): `python scripts/prepare_aime_fixture.py --output DIR`
   signs `dev.construct.aime` and the **Synthetic Aimé** fixture
-  (`dev.construct.aime-fixture`: fixed viewpoint, Overpass features and rendered
-  scene from `scripts/aime-fixture/synthetic-aime.js`; capture, list, delete,
+  (`dev.construct.aime-fixture`: fixed viewpoint, a synthetic aime-data index
+  and landmark cells, and a rendered scene from `scripts/aime-fixture/synthetic-aime.js`; capture, list, delete,
   storage and grants stay real). The fixture's library screen prints the
-  normalised tap targets and fixture-only buttons (next Overpass 429/offline,
-  stored record count). Module logic checks: `node scripts/test_aime.cjs` and
+  normalised tap targets and fixture-only buttons (next landmark data request
+  offline, next cell HTTP 503, viewpoint outside coverage, stored record count). Module logic checks: `node scripts/test_aime.cjs` and
   `node scripts/test_aime_map.cjs`.
   Optional browser regressions: install `playwright` and its Chromium browser
   in an isolated Python environment, then run `python scripts/check_aime_browser.py`.
@@ -177,10 +177,11 @@ scripts (they refuse an occupied emulator and preserve incomplete receipts):
   pinch anchoring; it does not replace exact-package Android acceptance.
 - `aime_module.py --apk APK --sha APK_SHA --catalog HTTPS_INDEX_URL --module-sha
   AIME_SHA --fixture-sha SYNTHETIC_AIME_SHA`: synthetic-camera runner covering
-  grants, capture → viewpoint, Overpass offline/429 + retry, mark → calibrated
-  ruler, horizon → level line, tap → candidates → map, rotation, 2× text and
-  delete → stored record reconciled on Synthetic Aimé; then the real module's
-  location/internet gates and one real Overpass request around `--real-fix`.
+  grants, capture → viewpoint, landmark data offline/HTTP 503 + retry, mark →
+  calibrated ruler, horizon → level line, tap → candidates → map, rotation, 2×
+  text, outside coverage and delete → stored record reconciled on Synthetic
+  Aimé; then the real module's location/internet gates and one real landmark
+  lookup (aime-data index and cells) around `--real-fix` (Hannover by default).
 - `photo_identity.py --apk APK --sha APK_SHA --catalog HTTPS_FIXTURE_INDEX_URL
   --legacy-sha PHOTO_IDENTITY_0_1_0_SHA --module-sha PHOTO_IDENTITY_0_2_0_SHA
   --update-sha PHOTO_IDENTITY_0_3_0_SHA`: API 0.12 stable photo IDs using the

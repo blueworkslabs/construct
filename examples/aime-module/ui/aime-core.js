@@ -1,7 +1,8 @@
 "use strict";
 // Aimé module logic without DOM or host calls: per-photo sidecars keyed by the
 // API 0.12 stable photo id, capture association, orphan reconciliation, the
-// Overpass query and parser, local name search and the candidates shortlist.
+// landmark cells (aime-data contract, schema 1), local name search and the
+// candidates shortlist.
 // Global `AimeCore` in the module, CommonJS under Node for scripts/test_aime.cjs.
 const AimeCore = (() => {
   const RADII = [10, 30, 60],
@@ -9,8 +10,12 @@ const AimeCore = (() => {
     MAX_MARKS = 6,
     MAX_HORIZON = 2,
     NAME_MAX = 80,
-    OVERPASS_CAP = 400,
-    OVERPASS_ORIGIN = "https://overpass-api.de",
+    // Landmark cells: index once per session, then the 1° cells a radius touches.
+    DATA_ORIGIN = "https://aime-data.pages.dev",
+    INDEX_URL = DATA_ORIGIN + "/v1/index.json",
+    // The host runs at most four requests per module; the map's tile loader
+    // keeps up to two in flight, so landmark downloads use the other two.
+    DATA_CONCURRENCY = 2,
     // A fix older than the host's own cache limit, or a viewfinder wait longer
     // than this, may no longer be where the photo was taken.
     OLD_FIX_MS = 120000,
@@ -31,10 +36,12 @@ const AimeCore = (() => {
   const inUnit = (v) => num(v) && v >= 0 && v <= 1;
   const latLon = (lat, lon) => num(lat) && num(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
   const OSM_TYPES = ["node", "way", "relation"];
+  const isKind = (k) => typeof k === "string" && /^[a-z][a-z_]{0,39}$/.test(k),
+    isRelease = (r) => typeof r === "string" && /^[\w.-]{1,32}$/.test(r);
 
   // ---- Sidecars -------------------------------------------------------------
   // Shape (brief): { viewer: {lat, lon, accuracyM, timestamp, approximate, corrected,
-  // review}, radiusKm, marks: [{x, y, osmType, osmId, name, lat, lon, positionM}],
+  // review}, radiusKm, marks: [{x, y, kind, name, lat, lon, positionM, release}],
   // horizon: [{x, y}] }. `review` (not in the brief's list) marks a viewpoint that
   // must be confirmed or corrected before any feature query.
   function cleanViewer(v) {
@@ -49,8 +56,23 @@ const AimeCore = (() => {
       review: v.review === true,
     };
   }
+  // Marks saved before landmark cells (Aimé ≤ 0.1.2) carry an OSM type and id
+  // instead of kind and release. They keep that shape, name, position and
+  // estimate, so they load, calibrate and round-trip unchanged.
   function cleanMark(m) {
-    if (!m || !inUnit(m.x) || !inUnit(m.y) || !OSM_TYPES.includes(m.osmType) || !Number.isSafeInteger(m.osmId) || !latLon(m.lat, m.lon)) return null;
+    if (!m || !inUnit(m.x) || !inUnit(m.y) || !latLon(m.lat, m.lon)) return null;
+    if (isKind(m.kind))
+      return {
+        x: m.x,
+        y: m.y,
+        kind: m.kind,
+        name: text(m.name) || "Landmark",
+        lat: m.lat,
+        lon: m.lon,
+        positionM: num(m.positionM) && m.positionM > 0 ? m.positionM : 30,
+        release: isRelease(m.release) ? m.release : "",
+      };
+    if (!OSM_TYPES.includes(m.osmType) || !Number.isSafeInteger(m.osmId)) return null;
     return {
       x: m.x,
       y: m.y,
@@ -236,129 +258,185 @@ const AimeCore = (() => {
     if (num(openedAt) && num(savedAt) && savedAt - openedAt > LONG_WAIT_MS) reasons.push("long viewfinder wait");
     return { viewer: cleanViewer({ ...kept, corrected: false, review: reasons.length > 0 }), reasons };
   }
-  // A viewpoint that may be sent to Overpass.
+  // A viewpoint that may be used for a landmark lookup.
   const queryable = (viewer) => !!viewer && !viewer.review;
 
-  // ---- Overpass -----------------------------------------------------------
-  function overpassQuery(lat, lon, radiusKm) {
-    if (!latLon(lat, lon) || !RADII.includes(radiusKm)) throw new Error("Viewpoint and a 10/30/60 km radius are required.");
-    const a = `(around:${radiusKm * 1000},${lat.toFixed(5)},${lon.toFixed(5)})`;
-    return [
-      "[out:json][timeout:20];",
-      "(",
-      `  nwr${a}["name"]["natural"="peak"];`,
-      `  nwr${a}["name"]["man_made"~"^(tower|mast|lighthouse|windmill|chimney|water_tower|communications_tower)$"];`,
-      `  nwr${a}["name"]["building"~"^(cathedral|church|chapel|castle|tower|mosque|synagogue|temple)$"];`,
-      `  nwr${a}["name"]["historic"~"^(castle|monument|tower|fort|ruins)$"];`,
-      `  nwr${a}["name"]["tourism"~"^(attraction|viewpoint)$"];`,
-      `  nwr${a}["name"]["aeroway"="aerodrome"];`,
-      ");",
-      `out tags center ${OVERPASS_CAP};`,
-    ].join("\n");
-  }
-  const overpassUrl = (lat, lon, radiusKm) => OVERPASS_ORIGIN + "/api/interpreter?data=" + encodeURIComponent(overpassQuery(lat, lon, radiusKm));
-  const featureKey = (f) => f.osmType + "/" + f.osmId;
-  const cacheKey = (viewer, radiusKm) => viewer.lat.toFixed(5) + "," + viewer.lon.toFixed(5) + "," + radiusKm;
-  // Matching kind tag, in query order; the first match names the kind.
-  const KINDS = [
-    ["natural", /^peak$/],
-    ["man_made", /^(tower|mast|lighthouse|windmill|chimney|water_tower|communications_tower)$/],
-    ["building", /^(cathedral|church|chapel|castle|tower|mosque|synagogue|temple)$/],
-    ["historic", /^(castle|monument|tower|fort|ruins)$/],
-    ["tourism", /^(attraction|viewpoint)$/],
-    ["aeroway", /^aerodrome$/],
-  ];
-  const measure = (s) => {
-    const m = typeof s === "string" && s.trim().match(/^(-?\d+(?:\.\d+)?)\s*(m)?$/);
-    return m ? Number(m[1]) : null;
-  };
-  // Visibility prior (brief): peak with ele 1.5, tower/mast/cathedral 1.3,
-  // castle/monument 1.1, viewpoint 0.8, other 1.0. Peaks may count beyond 40 km.
-  function weightOf(f) {
-    if (f.kindTag === "natural" && num(f.ele)) return 1.5;
-    if (["tower", "mast", "communications_tower", "cathedral"].includes(f.kind)) return 1.3;
-    if (["castle", "monument"].includes(f.kind)) return 1.1;
-    if (f.kind === "viewpoint") return 0.8;
-    return 1;
-  }
-  // Overpass JSON text → {features, incomplete}. Malformed data throws; it is
-  // never an empty result.
-  function parseOverpass(textBody) {
-    let data;
+  // ---- Landmark cells (aime-data contract, schema 1) -----------------------
+  const dataError = (code, message, retry = true) => Object.assign(new Error(message), { code, retry });
+  const unavailable = (reason) => dataError("DATA_INVALID", "Landmark data unavailable: " + reason + " Retry later.");
+  const readJson = (body, what) => {
     try {
-      data = JSON.parse(textBody);
+      return JSON.parse(body);
     } catch {
-      throw Object.assign(new Error("Overpass returned unreadable data."), { code: "OVERPASS_DATA" });
+      throw unavailable(what + " is unreadable.");
     }
-    if (!data || !Array.isArray(data.elements)) throw Object.assign(new Error("Overpass returned unexpected data."), { code: "OVERPASS_DATA" });
-    // Runtime timeouts/resource failures can arrive as HTTP 200 with an empty
-    // or partial elements array. Never cache these as a complete feature list.
-    if (typeof data.remark === "string" && data.remark.trim())
-      throw Object.assign(new Error("Overpass could not complete the lookup. Retry, or pick a smaller radius."), { code: "OVERPASS_INCOMPLETE" });
-    const seen = new Set(),
-      features = [];
-    for (const e of data.elements) {
-      if (!e || !OSM_TYPES.includes(e.type) || !Number.isSafeInteger(e.id) || !e.tags) continue;
-      const name = text(e.tags.name);
-      const at = e.type === "node" ? e : e.center;
-      if (!name || !at || !latLon(at.lat, at.lon)) continue;
-      const match = KINDS.find(([k, re]) => typeof e.tags[k] === "string" && re.test(e.tags[k]));
-      if (!match) continue;
-      const f = {
-        osmType: e.type,
-        osmId: e.id,
-        name,
-        lat: at.lat,
-        lon: at.lon,
-        kindTag: match[0],
-        kind: e.tags[match[0]],
-        ele: measure(e.tags.ele),
-        height: measure(e.tags.height),
-        positionM: e.type === "node" ? 8 : 30,
-      };
-      if (seen.has(featureKey(f))) continue;
-      seen.add(featureKey(f));
-      f.weight = weightOf(f);
-      if (f.kindTag === "natural") f.maxKm = 100;
+  };
+  const CELL = /^(-?\d{1,2})_(-?\d{1,3})$/;
+  // 1° cells (integer south-west corner) of the radius's bounding box. The
+  // longitude half-width is the spherical cap's, asin(sin δ / cos φ); a cap
+  // over a pole spans every longitude.
+  function cellsAround(lat, lon, radiusKm) {
+    if (!latLon(lat, lon) || !RADII.includes(radiusKm)) throw new Error("Viewpoint and a 10/30/60 km radius are required.");
+    const deg = 180 / Math.PI,
+      d = radiusKm / 6371.0088,
+      dLat = d * deg,
+      s = Math.sin(d) / Math.cos(lat / deg),
+      dLon = lat + dLat >= 90 || lat - dLat <= -90 || s >= 1 ? 180 : Math.asin(s) * deg,
+      lon0 = Math.floor(lon - dLon),
+      lon1 = Math.min(Math.floor(lon + dLon), lon0 + 359),
+      out = new Set();
+    for (let a = Math.max(-90, Math.floor(lat - dLat)); a <= Math.min(89, Math.floor(lat + dLat)); a++)
+      for (let o = lon0; o <= lon1; o++) out.add(a + "_" + ((((o + 180) % 360) + 360) % 360 - 180));
+    return [...out];
+  }
+  // index.json text → {release, path, cells (Set), kinds, coverage, license,
+  // attribution}. Anything but schema 1 in the expected shape is unavailable.
+  function parseIndex(body) {
+    const x = readJson(body, "The landmark index");
+    if (!x || x.schema !== 1) throw unavailable("the landmark index has an unsupported schema.");
+    const kinds = Object.create(null);
+    for (const [k, v] of Object.entries((x.kinds && typeof x.kinds === "object" && x.kinds) || {}))
+      if (isKind(k) && v && num(v.placementM) && v.placementM > 0) kinds[k] = { placementM: v.placementM };
+    if (!isRelease(x.release) || typeof x.path !== "string" || !/^[\w.-]+(\/[\w.-]+)*\/$/.test(x.path) || x.path.split("/").includes("..") || !Array.isArray(x.cells) || !Object.keys(kinds).length)
+      throw unavailable("the landmark index is incomplete.");
+    return {
+      release: x.release,
+      path: x.path,
+      cells: new Set(x.cells.filter((c) => typeof c === "string" && CELL.test(c))),
+      kinds,
+      coverage: Array.isArray(x.coverage) ? x.coverage.filter((c) => typeof c === "string") : [],
+      license: text(x.license, 40) || "ODbL-1.0",
+      attribution: text(x.attribution, 120) || "© OpenStreetMap contributors, Overture Maps Foundation",
+    };
+  }
+  const cellUrl = (index, cell) => DATA_ORIGIN + "/v1/" + index.path + cell + ".json";
+  // Cells to download for a viewpoint and radius: only those the index lists.
+  const cellPlan = (index, viewer, radiusKm) => cellsAround(viewer.lat, viewer.lon, radiusKm).filter((c) => index.cells.has(c));
+  const TERRAIN = new Set(["peak", "hill", "volcano"]);
+  // Cell text → features. A cell whose schema, release or corner does not match
+  // the index, or without a feature array, is unavailable (never empty); single
+  // malformed records are skipped.
+  function parseCell(index, cell, body) {
+    const x = readJson(body, "Landmark cell " + cell),
+      m = cell.match(CELL);
+    if (!x || x.schema !== 1 || x.release !== index.release) throw unavailable(`landmark cell ${cell} does not match the index release.`);
+    if ((Array.isArray(x.cell) && (x.cell[0] !== Number(m[1]) || x.cell[1] !== Number(m[2]))) || !Array.isArray(x.f)) throw unavailable(`landmark cell ${cell} is malformed.`);
+    const features = [];
+    for (const r of x.f) {
+      if (!Array.isArray(r) || r.length !== 6 || typeof r[0] !== "string" || typeof r[1] !== "string" || !index.kinds[r[1]] || !latLon(r[2], r[3])) continue;
+      const name = text(r[0]);
+      if (!name) continue;
+      const f = { name, kind: r[1], lat: r[2], lon: r[3], e: num(r[4]) ? r[4] : 0, w: num(r[5]) ? Math.min(2, Math.max(0.5, r[5])) : 1, positionM: index.kinds[r[1]].placementM, release: index.release };
+      // Peaks may count beyond the solver's default 40 km.
+      if (TERRAIN.has(f.kind)) f.maxKm = 100;
       features.push(f);
     }
-    return { features, incomplete: data.elements.length >= OVERPASS_CAP };
+    return features;
   }
-  // net.http failures and statuses → one message naming the gate.
+  // Identity of a landmark: name, kind and position to 5 decimals (no OSM ids).
+  const featureKey = (f) => [f.name, f.kind || "", f.lat.toFixed(5), f.lon.toFixed(5)].join("|");
+  const sameFeature = (a, b) => featureKey(a) === featureKey(b);
+  // Features of the downloaded cells within the radius, deduplicated.
+  function within(features, viewer, radiusKm) {
+    const seen = new Set();
+    return features.filter((f) => metres(viewer, f) <= radiusKm * 1000 && !seen.has(featureKey(f)) && seen.add(featureKey(f)));
+  }
+  const cacheKey = (viewer, radiusKm) => viewer.lat.toFixed(5) + "," + viewer.lon.toFixed(5) + "," + radiusKm;
+  const COUNTRIES = { DE: "Germany", AT: "Austria" };
+  function outsideMessage(coverage) {
+    const names = coverage.map((c) => COUNTRIES[c] || c);
+    const list = names.length > 1 ? names.slice(0, -1).join(", ") + " and " + names[names.length - 1] : names[0];
+    return "No landmark data here yet." + (list ? ` ${list} for now.` : "");
+  }
+  // net.http failures and statuses from the data host → one "unavailable" error
+  // naming the gate. Only a denied grant has no retry.
   function httpProblem(error, status) {
-    if (status === 429) return { code: "OVERPASS_BUSY", message: "Overpass is busy (429). Wait a minute, then retry.", retry: true };
-    if (status === 504) return { code: "OVERPASS_BUSY", message: "Overpass timed out (504). Retry, or pick a smaller radius.", retry: true };
-    if (num(status)) return { code: "OVERPASS_STATUS", message: `Overpass answered HTTP ${status}. Retry later.`, retry: true };
+    if (num(status)) return dataError("DATA_STATUS", `Landmark data unavailable: the data host answered HTTP ${status}. Retry later.`);
     const code = (error && error.code) || "HTTP_UNAVAILABLE";
     const messages = {
       CAPABILITY_DENIED: "Internet access is off for Aimé. Turn it on in Construct menu → Module access.",
-      HTTP_SIZE: "The feature list was too large for one request. Pick a smaller radius.",
-      SIZE_LIMIT: "The feature list was too large for one request. Pick a smaller radius.",
-      HTTP_DATA: "Overpass sent data Construct could not accept (type or size). Pick a smaller radius or retry.",
-      HTTP_RATE: "Too many requests from this module. Wait a minute, then retry.",
-      HTTP_BUSY: "Other requests are still running. Retry in a moment.",
-      HTTP_UNAVAILABLE: "Overpass could not be reached (offline or timed out). Retry when online.",
-      TIMEOUT: "Overpass did not answer in time. Retry, or pick a smaller radius.",
+      HTTP_SIZE: "the data host sent a file Construct could not accept (size).",
+      SIZE_LIMIT: "the data host sent a file Construct could not accept (size).",
+      HTTP_DATA: "the data host sent a file Construct could not accept (type or size).",
+      HTTP_RATE: "too many requests from this module. Wait a minute, then retry.",
+      HTTP_BUSY: "other requests are still running. Retry in a moment.",
+      HTTP_UNAVAILABLE: "the data host could not be reached (offline or timed out). Retry when online.",
+      TIMEOUT: "the data host did not answer in time. Retry.",
     };
-    return { code, message: messages[code] || (error && error.message) || "Feature lookup failed.", retry: code !== "CAPABILITY_DENIED" };
+    if (code === "CAPABILITY_DENIED") return dataError(code, messages[code], false);
+    return dataError(code, "Landmark data unavailable: " + (messages[code] || (error && error.message) || "download failed."));
+  }
+  // At most `n` tasks at once, in call order.
+  function limiter(n) {
+    let active = 0;
+    const queue = [];
+    const next = () => {
+      if (active >= n || !queue.length) return;
+      active++;
+      const { fn, resolve, reject } = queue.shift();
+      Promise.resolve()
+        .then(fn)
+        .then(resolve, reject)
+        .finally(() => {
+          active--;
+          next();
+        });
+    };
+    return (fn) => new Promise((resolve, reject) => (queue.push({ fn, resolve, reject }), next()));
+  }
+  // Landmark data over get(url) → Promise<JSON text> (throws the errors above).
+  // The index is fetched once per session and cells once per release and cell;
+  // only successes are kept, so a retry downloads just what failed.
+  function landmarkData(get, concurrency = DATA_CONCURRENCY) {
+    const limit = limiter(concurrency),
+      cells = new Map(),
+      jobs = new Map();
+    let index = null,
+      indexJob = null;
+    function loadIndex() {
+      if (index) return Promise.resolve(index);
+      if (!indexJob)
+        indexJob = limit(() => get(INDEX_URL))
+          .then(parseIndex)
+          .then((i) => (index = i))
+          .finally(() => (indexJob = null));
+      return indexJob;
+    }
+    function cell(ix, name) {
+      const key = ix.release + "/" + name;
+      if (cells.has(key)) return Promise.resolve(cells.get(key));
+      if (!jobs.has(key))
+        jobs.set(key, limit(() => get(cellUrl(ix, name)))
+          .then((body) => {
+            const f = parseCell(ix, name, body);
+            cells.set(key, f);
+            return f;
+          })
+          .finally(() => jobs.delete(key)));
+      return jobs.get(key);
+    }
+    return {
+      get index() {
+        return index;
+      },
+      loadIndex,
+      // → {features, release, cells}; outside coverage throws OUTSIDE_COVERAGE.
+      async features(viewer, radiusKm) {
+        const ix = await loadIndex(),
+          plan = cellPlan(ix, viewer, radiusKm);
+        if (!plan.length) throw dataError("OUTSIDE_COVERAGE", outsideMessage(ix.coverage), false);
+        const lists = await Promise.all(plan.map((c) => cell(ix, c)));
+        return { features: within(lists.flat(), viewer, radiusKm), release: ix.release, cells: plan.length };
+      },
+    };
   }
 
   // ---- Local name search --------------------------------------------------
   const fold = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  // Typed OSM ids: "node/123", "way 45", "r678" or a bare number.
-  function parseOsmId(q) {
-    const m = q.trim().toLowerCase().match(/^(?:(node|way|relation|n|w|r)\s*[/ ]?\s*)?(\d{1,15})$/);
-    if (!m) return null;
-    const type = { n: "node", w: "way", r: "relation" }[m[1]] || m[1] || null;
-    return { type, id: Number(m[2]) };
-  }
   function search(features, query, viewer, limit = 30) {
-    const q = fold(text(query, 120)),
-      typed = parseOsmId(query || "");
+    const q = fold(text(query, 120));
     const withDistance = (f) => ({ feature: f, distanceM: viewer ? metres(viewer, f) : null });
-    const hits = features.filter((f) =>
-      typed ? f.osmId === typed.id && (!typed.type || f.osmType === typed.type) : !q || fold(f.name).includes(q),
-    );
+    const hits = features.filter((f) => !q || fold(f.name).includes(q));
     return hits
       .map(withDistance)
       .sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0) || a.feature.name.localeCompare(b.feature.name))
@@ -367,7 +445,7 @@ const AimeCore = (() => {
 
   // ---- Calibration and shortlist ------------------------------------------
   function markFrom(feature, x, y) {
-    return cleanMark({ x, y, osmType: feature.osmType, osmId: feature.osmId, name: feature.name, lat: feature.lat, lon: feature.lon, positionM: feature.positionM });
+    return cleanMark({ x, y, kind: feature.kind, name: feature.name, lat: feature.lat, lon: feature.lon, positionM: feature.positionM, release: feature.release });
   }
   function calibrationInput(sidecar, width, height) {
     const v = sidecar.viewer;
@@ -380,7 +458,7 @@ const AimeCore = (() => {
     };
   }
   const candidatesOf = (features) =>
-    features.map((f) => ({ point: { lat: f.lat, lon: f.lon }, weight: f.weight, maxKm: f.maxKm, positionM: f.positionM, feature: f }));
+    features.map((f) => ({ point: { lat: f.lat, lon: f.lon }, weight: f.w, maxKm: f.maxKm, positionM: f.positionM, feature: f }));
   // Ranked results → what the sheet shows. Up to five, best first. With no
   // `close` result: "no close match" and the two angularly nearest, greyed.
   function shortlist(ranked, max = 5) {
@@ -403,8 +481,11 @@ const AimeCore = (() => {
     const s = Math.round(ms / 1000);
     return s < 90 ? s + " s" : s < 5400 ? Math.round(s / 60) + " min" : s < 172800 ? Math.round(s / 3600) + " h" : Math.round(s / 86400) + " days";
   }
-  const KIND_LABEL = { natural: "peak", aeroway: "airfield" };
-  const kindLabel = (f) => (KIND_LABEL[f.kindTag] || String(f.kind || "feature")).replace(/_/g, " ");
+  // Every contract kind reads as words; unknown kinds fall back to their name.
+  const KIND_LABEL = { observation: "observation tower", cooling: "cooling tower" };
+  const kindLabel = (f) => (f && isKind(f.kind) ? KIND_LABEL[f.kind] || f.kind.replace(/_/g, " ") : "landmark");
+  // "2400 m" for terrain, "80 m tall" for structures, "" when unknown.
+  const sizeLabel = (f) => (num(f.e) && f.e > 0 ? Math.round(f.e) + (TERRAIN.has(f.kind) ? " m" : " m tall") : "");
 
   return {
     RADII,
@@ -412,7 +493,9 @@ const AimeCore = (() => {
     MAX_MARKS,
     MAX_HORIZON,
     NAME_MAX,
-    OVERPASS_CAP,
+    DATA_ORIGIN,
+    INDEX_URL,
+    DATA_CONCURRENCY,
     OLD_FIX_MS,
     LONG_WAIT_MS,
     LOCATION_SPACING_MS,
@@ -438,13 +521,19 @@ const AimeCore = (() => {
     metres,
     chooseViewpoint,
     queryable,
-    overpassQuery,
-    overpassUrl,
+    cellsAround,
+    parseIndex,
+    cellUrl,
+    cellPlan,
+    parseCell,
     featureKey,
+    sameFeature,
+    within,
     cacheKey,
-    parseOverpass,
+    outsideMessage,
     httpProblem,
-    parseOsmId,
+    limiter,
+    landmarkData,
     search,
     markFrom,
     calibrationInput,
@@ -456,6 +545,7 @@ const AimeCore = (() => {
     signed,
     age,
     kindLabel,
+    sizeLabel,
   };
 })();
 if (typeof module !== "undefined") module.exports = AimeCore;
