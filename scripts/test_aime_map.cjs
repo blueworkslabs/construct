@@ -245,6 +245,13 @@ const ok = (name) => {
     assert.ok(Math.abs(labels[0].km - R.distance({ lat: 46.8, lon: 9.2 }, { lat: 46.81, lon: 9.21 })) < 1e-9);
     map.setScene({ viewer: { lat: 46.8, lon: 9.2 } }, false);
     assert.equal(map.ruler.points.length, 2, "a new scene (after an edit) keeps the ruler");
+    const dropped = { lat: 46.83, lon: 9.24, name: "Dropped pin" };
+    map.setScene({ pin: dropped }, false);
+    map.clearRuler();
+    const head = map.xy(dropped);
+    fire("pointerdown", head.x + 3, head.y - 16);
+    fire("pointerup", head.x + 3, head.y - 16);
+    assert.deepEqual(events.ruler.at(-1), [{ lat: dropped.lat, lon: dropped.lon }], "ruler snaps to the dropped pin head, not the ground above it");
     ok("ruler snaps to the viewer and pins, labels the line through the app's formatter and survives scene updates");
   }
   {

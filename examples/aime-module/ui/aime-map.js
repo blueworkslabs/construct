@@ -214,7 +214,7 @@ class AimeMap {
   // to mark and candidate pins only, keeping their name and position estimate.
   snap(at, pin = false) {
     const s = this.scene,
-      targets = (pin ? [...s.marks, ...s.candidates] : [s.viewer, s.fitted, ...s.marks, ...s.candidates]).filter(Boolean);
+      targets = (pin ? [...s.marks, ...s.candidates] : [s.viewer, s.fitted, s.pin, ...s.marks, ...s.candidates]).filter(Boolean);
     let best = null,
       bestD = 24;
     for (const t of targets) {
