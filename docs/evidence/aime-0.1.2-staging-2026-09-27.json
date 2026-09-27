@@ -1,0 +1,167 @@
+{
+  "status": "blocked_live_overpass",
+  "complete": false,
+  "stopped": true,
+  "checksPassed": 12,
+  "checksPlanned": 13,
+  "runId": "20260927T003703Z-aime-a6476488",
+  "moduleVersion": "0.1.2",
+  "moduleSourceCommit": "0e0f345c0e02c579788130bdeb7eb6a2e2062696",
+  "runnerCommit": "4b7ad4afa627d3ab73c485e271050e3c5c410738",
+  "runnerSha256": "5d5f87bad4e3fd8de1f90d83d56568987e4f5048234574b5b4bde19f46c0868e",
+  "apkVersion": "0.1.0-alpha32",
+  "apkSourceCommit": "2c132c9eeafd2b7757243c178efb190466bf2c94",
+  "apkSha256": "8c92858b02d6ea5a2a648eca8e9a7d94bb9870cbd6b11edcff708e3b479d3627",
+  "moduleSha256": "6336ed342c00e1e39c796200e69f63c69da7341f42b0b373ec4d55ea589d55a4",
+  "fixtureSha256": "d910bbfddcb64102591c51cdc3a7f39c39ef584397065008551d9a8cc3c5d1d6",
+  "catalog": "https://raw.githubusercontent.com/blueworkslabs/construct/1830e79d1a1307d6234d44744025b4295169f657/catalog/candidates/aime/index.json",
+  "apiLevel": "37",
+  "webView": "com.android.webview 155.0.8059.0",
+  "checks": [
+    "Fresh install: library and capture are denied until the new grants are on",
+    "Grants and Android camera permission enabled through native Module access",
+    "Real shutter capture opens the photo with its estimated viewpoint",
+    "Offline and 429 are shown as such with a single retry, never as an empty result",
+    "Marking a known landmark calibrates the bearing ruler",
+    "Two true-level horizon taps level the picture (Level estimated)",
+    "Tap ranks the known landmark first; a candidate opens the map with wedge, pins and viewer",
+    "Photo viewpoint, landmark and horizon calibration survive process restart with the same ranking",
+    "Landscape keeps the photo tappable and the ranking unchanged",
+    "Two-times text keeps controls reachable and the ranking unchanged",
+    "Native-confirmed deletion removes the photo and its stored record",
+    "Real module with location off: the photo stays unlocated and opens on the map; the internet gate is named"
+  ],
+  "candidates": {
+    "B": [
+      "Could be Synthetic Peak B peak · 18 km · −1.8° from your tap · ±3.8°",
+      "Could be Synthetic Mast E mast · 25 km · +1.2° from your tap · ±3.8°",
+      "Could be Synthetic Castle D castle · 11 km · +7.2° from your tap · ±3.8°",
+      "Synthetic Airfield H airfield · 28 km · −7.8° from your tap · ±3.8° · not close",
+      "Synthetic Church C church · 3.0 km · −13.8° from your tap · ±3.9° · not close"
+    ],
+    "B-restart": [
+      "Could be Synthetic Peak B peak · 18 km · −1.8° from your tap · ±3.8°",
+      "Could be Synthetic Mast E mast · 25 km · +1.2° from your tap · ±3.8°",
+      "Could be Synthetic Castle D castle · 11 km · +7.2° from your tap · ±3.8°",
+      "Synthetic Airfield H airfield · 28 km · −7.8° from your tap · ±3.8° · not close",
+      "Synthetic Church C church · 3.0 km · −13.8° from your tap · ±3.9° · not close"
+    ],
+    "B-landscape": [
+      "Could be Synthetic Peak B peak · 18 km · −1.9° from your tap · ±3.8°",
+      "Could be Synthetic Mast E mast · 25 km · +1.1° from your tap · ±3.8°",
+      "Could be Synthetic Castle D castle · 11 km · +7.1° from your tap · ±3.8°",
+      "Synthetic Airfield H airfield · 28 km · −7.9° from your tap · ±3.8° · not close",
+      "Synthetic Church C church · 3.0 km · −13.9° from your tap · ±3.9° · not close"
+    ],
+    "B-large-text": [
+      "Could be Synthetic Peak B peak · 18 km · −1.8° from your tap · ±3.8°",
+      "Could be Synthetic Mast E mast · 25 km · +1.2° from your tap · ±3.8°",
+      "Could be Synthetic Castle D castle · 11 km · +7.2° from your tap · ±3.8°",
+      "Synthetic Airfield H airfield · 28 km · −7.8° from your tap · ±3.8° · not close",
+      "Synthetic Church C church · 3.0 km · −13.8° from your tap · ±3.9° · not close"
+    ]
+  },
+  "error": "Real Overpass lookup did not complete: [HTTP_UNAVAILABLE] Overpass could not be reached (offline or timed out). Retry when online.",
+  "realOverpassRetryReason": "[HTTP_UNAVAILABLE] Overpass could not be reached (offline or timed out). Retry when online.",
+  "realOverpassRequests": 2,
+  "probe": {
+    "from": "staging host",
+    "query": "same 30 km public injected viewpoint query",
+    "status": 504,
+    "seconds": 10.287301,
+    "serverMessage": "Dispatcher_Client::request_read_and_idx::timeout. The server is probably too busy to handle your request.",
+    "tinyControlQuery": {
+      "status": 200,
+      "seconds": 6.759446
+    }
+  },
+  "localChecks": {
+    "module": 19,
+    "map": 10,
+    "solver": 19,
+    "runnerExistingSuite": 71,
+    "package": "passed",
+    "browser": "passed; fake bridge and real Chromium touch",
+    "codex": "source and touch-fix reviews clear; scrolling-helper follow-up clear"
+  },
+  "limits": [
+    "No full acceptance pass or hardware-test green light.",
+    "Synthetic fixture replaces viewpoint, feature data and rendered photo; host capture/list/storage/grants are real.",
+    "The live landmark lookup has not succeeded.",
+    "No merge, production catalog promotion or alpha32 release."
+  ],
+  "priorRuns": [
+    {
+      "attempt": 1,
+      "version": "0.1.0",
+      "complete": false,
+      "stopped": true,
+      "partialAssertions": 3,
+      "error": "Expected text missing: Take photo"
+    },
+    {
+      "attempt": 2,
+      "version": "0.1.0",
+      "complete": false,
+      "stopped": true,
+      "partialAssertions": 4,
+      "error": "Expected text missing: Calibrated · 1 mark"
+    },
+    {
+      "attempt": 3,
+      "version": "0.1.0",
+      "complete": false,
+      "stopped": true,
+      "partialAssertions": 9,
+      "error": "Expected text missing: Your tap points"
+    },
+    {
+      "attempt": 4,
+      "version": "0.1.1",
+      "complete": false,
+      "stopped": true,
+      "partialAssertions": 1,
+      "error": "Missing switch: Allow taking private photos"
+    },
+    {
+      "attempt": 5,
+      "version": "0.1.1",
+      "complete": false,
+      "stopped": true,
+      "partialAssertions": 1,
+      "error": "Native grant must be a checkable control: Allow taking private photos"
+    },
+    {
+      "attempt": 6,
+      "version": "0.1.1",
+      "complete": false,
+      "stopped": true,
+      "partialAssertions": 7,
+      "error": "Expected text missing: Your tap points"
+    },
+    {
+      "attempt": 7,
+      "version": "0.1.1",
+      "complete": false,
+      "stopped": true,
+      "partialAssertions": 9,
+      "error": "Expected text missing: Your tap points"
+    },
+    {
+      "attempt": 8,
+      "version": "0.1.2",
+      "complete": false,
+      "stopped": true,
+      "partialAssertions": 12,
+      "error": "Switch did not change: Allow reading phone location"
+    },
+    {
+      "attempt": 9,
+      "version": "0.1.2",
+      "complete": false,
+      "stopped": true,
+      "partialAssertions": 12,
+      "error": "Looking up named landmarks within 30 km…"
+    }
+  ]
+}

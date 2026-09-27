@@ -58,8 +58,9 @@ def web():
  w=next((n for n in nodes() if n.get('class')=='android.webkit.WebView' and visible(n)),None)
  if w is None:raise RuntimeError('No module WebView')
  return bounds(w)
-def scroll(direction):
+def scroll(direction,distance=None):
  x1,y1,x2,y2=web();x=x1+6;lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
+ if distance is not None:lo=hi-max(24,min(hi-lo,round(distance)))
  adb('shell','input','swipe',str(x),str(hi if direction=='down' else lo),str(x),str(lo if direction=='down' else hi),'300');time.sleep(.35)
 def reveal(match):
  """First visible node whose text satisfies match (a string prefix or predicate), scrolling the module page."""
@@ -82,6 +83,7 @@ def stage():
  label='Selected photo. Tap to mark'
  for direction in ('down','up'):
   for _ in range(10):
+   correction=None
    s=next((n for n in nodes() if text_of(n).startswith(label) and visible(n)),None)
    if s is not None:
     b=bounds(s);w=web()
@@ -93,7 +95,8 @@ def stage():
      settled=next((n for n in nodes() if text_of(n).startswith(label) and bounds(n)==b),None)
      if settled is not None:return b
     direction='down' if b[3]>=w[3]-2 else 'up'
-   scroll(direction)
+    if heading.startswith(FIXTURE):correction=max(24,(b[2]-b[0]-2)*.75+2-(b[3]-b[1])+8)
+   scroll(direction,correction)
  raise RuntimeError('Photo stage not fully visible')
 def tap_photo(point,checkpoint=None):
  x1,y1,x2,y2=stage()
