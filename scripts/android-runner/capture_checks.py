@@ -202,3 +202,12 @@ def zoom_chip_selected(nodes, label):
                 return True
             node = parents.get(node)
     return False
+
+
+def freshness_omission(result, problems):
+    """A narrowly justified retake, not an exemption from any metadata/sign check."""
+    capture = result.get('capture', {})
+    return (problems == ['tilt missing or malformed None'] and 'tilt' not in capture
+            and not check_result(result, zoom=capture.get('zoomRatio'))
+            and _age(capture.get('headingAgeMs'), HEADING_MAX_AGE_MS)
+            and capture['headingAgeMs'] > TILT_MAX_AGE_MS)

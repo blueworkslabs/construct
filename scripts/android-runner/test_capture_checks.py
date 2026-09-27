@@ -3,7 +3,7 @@ import json
 import math
 import unittest
 from capture_checks import (G, acceleration, check_result, check_zoom_pair, dark_fraction, level_readout,
-                            parse_result, readout_matches, secure_blackout, screenshot_content_bounds, zoom_chip_selected, zoomed)
+                            parse_result, readout_matches, secure_blackout, screenshot_content_bounds, zoom_chip_selected, freshness_omission, zoomed)
 
 
 def vector(value):
@@ -103,6 +103,20 @@ class ReadoutAndResultTest(unittest.TestCase):
         self.assertEqual([], check_zoom_pair(one, good))
         self.assertEqual(2, len(check_zoom_pair(one, naive)))
         self.assertTrue(check_zoom_pair(result(fovDeg=None), good))
+
+
+class RetakeTest(unittest.TestCase):
+    def test_only_well_formed_freshness_omission_can_be_retaken(self):
+        raw=result(tilt=None, headingDeg=0, headingRef='magnetic', headingAccuracyDeg=0, headingAgeMs=534)
+        missing=check_result(raw,zoom=1,pitch=10,roll=0)
+        self.assertTrue(freshness_omission(raw,missing))
+        self.assertFalse(freshness_omission(raw,['pitchDeg sign flipped']))
+        raw['capture']['headingAgeMs']=177
+        self.assertFalse(freshness_omission(raw,missing))
+        del raw['capture']['headingAgeMs']
+        self.assertFalse(freshness_omission(raw,missing))
+        raw['capture']['headingAgeMs']=1100
+        self.assertFalse(freshness_omission(raw,missing))
 
 
 class ZoomChipTest(unittest.TestCase):

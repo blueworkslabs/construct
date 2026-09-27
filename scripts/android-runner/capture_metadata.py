@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """API 0.13 capture metadata and screenshot-switch acceptance on a disposable synthetic-camera emulator.
 Ties every observation to one APK and two signed fixture versions of dev.construct.capture-metadata:
-0.1.0 (API 0.12: exact {op} request, {saved} result) and 0.2.1 (API 0.13).
+0.1.0 (API 0.12: exact {op} request, {saved} result) and 0.2.2 (API 0.13).
 Both tilt signs are injected with `adb emu sensor set acceleration` on a portrait-locked display.
 Pure checks live in capture_checks.py (unit-tested without a device).
 """
 import argparse,datetime,fcntl,hashlib,io,json,os,re,subprocess,time,uuid
 from pathlib import Path
 from config import CONFIG,SERIAL,require_runner,catalog
-from capture_checks import acceleration,check_result,check_zoom_pair,level_readout,parse_result,readout_matches,secure_blackout,screenshot_content_bounds,zoom_chip_selected
+from capture_checks import acceleration,check_result,check_zoom_pair,level_readout,parse_result,readout_matches,secure_blackout,screenshot_content_bounds,zoom_chip_selected,freshness_omission
 p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.add_argument('--sha',required=True)
 p.add_argument('--catalog',required=True);p.add_argument('--legacy-sha',required=True,help='0.1.0 package digest (API 0.12)')
-p.add_argument('--module-sha',required=True,help='0.2.1 package digest (API 0.13)')
+p.add_argument('--module-sha',required=True,help='0.2.2 package digest (API 0.13)')
 a=p.parse_args();require_runner();catalog(a.catalog)
 if hashlib.sha256(a.apk.read_bytes()).hexdigest()!=a.sha:raise SystemExit('APK checksum mismatch')
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -23,7 +23,7 @@ import ui
 from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
-receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':{'0.1.0':a.legacy_sha,'0.2.1':a.module_sha},
+receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':{'0.1.0':a.legacy_sha,'0.2.2':a.module_sha},
  'recents':'Not captured yet','checks':[],'captures':[]}
 started=False
 name='Capture metadata probe';heading=name+' · 0.1.0'
@@ -124,17 +124,27 @@ def zoom(label):
   if zoom_chip_selected(nodes(),label):return
   time.sleep(.3)
  raise RuntimeError('Zoom chip not selected: '+label)
-def measured(pitch,roll,ratio):
+def measured(pitch,roll,ratio,attempt=1):
  tilt(pitch,roll);before=viewfinder('Capture with level and zoom')
  require(find('Zoom 1×') is not None and find('Zoom 2×') is not None,'Zoom chips missing')
  readout=level_settles(pitch,roll)
  if ratio!='1×':zoom(ratio)
- capture('viewfinder-%+d-%+d-%s'%(pitch,roll,ratio.rstrip('×')))
+ capture('viewfinder-%+d-%+d-%s-attempt%d'%(pitch,roll,ratio.rstrip('×'),attempt))
  tap('Take photo');require(result(before,90)=='Captured.','Capture failed')
  raw=parse_result(labels());require(raw is not None,'No capture result')
  problems=check_result(raw,zoom=float(ratio.rstrip('×')),pitch=pitch,roll=roll)
  require('ID listed: yes' in labels(),'Returned id is not in photos.library list')
- receipt['captures'].append({'injected':{'pitch':pitch,'roll':roll},'zoom':ratio,'readout':readout,'result':raw,'problems':problems});save()
+ receipt['captures'].append({'injected':{'pitch':pitch,'roll':roll},'zoom':ratio,'readout':readout,'result':raw,'problems':problems,'attempt':attempt});save()
+ # Optional tilt may be correctly omitted on a slow emulator shutter. Retake
+ # only a well-formed omission with direct evidence that this exposure window
+ # exceeded tilt's 250 ms bound (heading has the separate 1 s bound). Never
+ # retry wrong values/signs, malformed results, or an unexplained absence.
+ if freshness_omission(raw,problems) and attempt<3:
+  receipt.setdefault('retakes',[]).append({'pitch':pitch,'roll':roll,'attempt':attempt,'reason':'Tilt omitted; heading age exceeds the 250 ms tilt bound','headingAgeMs':raw['capture']['headingAgeMs']});save()
+  print('RETAKE: optional tilt omitted for slow shutter, attempt',attempt,flush=True)
+  before=act('Open photo confirmation',wait=False);find('Delete this private photo?');tap('Delete photo')
+  require(result(before)=='Deleted.','Retake quota cleanup failed')
+  return measured(pitch,roll,ratio,attempt+1)
  require(not problems,'Capture metadata problems: %r'%problems)
  return raw
 
@@ -181,7 +191,7 @@ try:
 
  # The successful legacy capture returns to the already-open module. Starting
  # MainActivity here only brings its task forward; it does not close the module.
- tap('Construct menu');tap('Mark working');install('0.2.1',a.module_sha);opened()
+ tap('Construct menu');tap('Mark working');install('0.2.2',a.module_sha);opened()
  require(screenshot_black('module-switch-off'),'Pixel-bearing module screen is capturable with the switch off')
  module_access()
  require(switch('Allow screenshots',True)=='false','Allow screenshots must default to off')
