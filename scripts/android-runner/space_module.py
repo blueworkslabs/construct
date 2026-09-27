@@ -172,10 +172,16 @@ try:
  done('Red mode and native touch rewind update the selected-object view')
  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE)
  contains('visible ·');capture('space-reopened')
- # UIAutomator represents aria-pressed as checked; inspect retained preference
- # through its rendered checkable state, with screenshot as independent review.
- red=reveal(lambda t:t=='Red mode')
- assert red.get('checked')=='true', 'Red mode did not survive process restart'
+ # WebView exposes this aria-pressed ToggleButton without a checked state.
+ # Assert the actual rendered palette instead of inventing accessibility state.
+ from PIL import Image
+ png=next((run/'space-reopened-display').glob('*.png'))
+ pixels=Image.open(png).convert('RGB');red=green=0
+ for rr,gg,bb in pixels.crop((0,80,pixels.width,pixels.height-40)).getdata():
+  red += rr>60 and rr>gg*1.8 and rr>bb*1.5
+  green += gg>60 and gg>rr*1.3 and gg>bb*1.1
+ assert red>1000 and red>green*3, ('Red palette did not survive restart',red,green)
+ receipt['reopenedPalettePixels']={'red':red,'green':green};save()
  done('Red preference survives a genuine process restart')
  click(lambda t:t=='Red mode')
  # Known clock starts again on reopen. Select the ISS using computed canvas
