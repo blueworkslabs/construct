@@ -2,12 +2,13 @@
 """Aimé slice 1 acceptance on a disposable synthetic-camera emulator.
 
 Synthetic Aimé (dev.construct.aime-fixture) proves the flow and the ranking on a
-known scene: grants denied/granted, capture → viewpoint, injected Overpass
-offline/429 with a single retry, mark → calibrated ruler, horizon → level line,
-tap → candidates → map, rotation, 2× text, delete → stored record reconciled.
+known scene: grants denied/granted, capture → viewpoint, injected landmark data
+offline/HTTP 503 with a single retry, mark → calibrated ruler, horizon → level
+line, tap → candidates → map, rotation, 2× text, a viewpoint outside the data
+coverage, delete → stored record reconciled.
 The real Aimé package (dev.construct.aime) then proves the real location and
 internet gates: location off → unlocated photo opens on the map; with an injected
-emulator fix, live Overpass returns named landmarks.
+emulator fix, the live aime-data cells return named landmarks.
 Physical-phone accuracy is the pilot tester's viewpoint test, not claimed here.
 """
 import argparse,datetime,fcntl,hashlib,json,os,re,subprocess,time,uuid
@@ -17,8 +18,8 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_aime_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.aime package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.aime-fixture package digest')
-p.add_argument('--version',default='0.1.2')
-p.add_argument('--real-fix',default='47.34953,8.49154',help='lat,lon injected for the real-module Overpass check (public viewpoint)')
+p.add_argument('--version',default='0.1.7')
+p.add_argument('--real-fix',default='52.37648,9.73848',help='lat,lon injected for the real-module landmark data check (Hannover, inside the DE/AT coverage)')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -28,11 +29,21 @@ run=CONFIG.root/'results'/(datetime.datetime.now(datetime.timezone.utc).strftime
 os.environ['CONSTRUCT_RESULTS']=str(run)
 import ui
 from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
+from keyboard_prompt import gboard_contacts_denial
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'fixtureSha256':a.fixture_sha,'version':a.version,
  'scope':'Synthetic Aimé flow/ranking on a known scene plus real-module location/internet gates; not physical-phone accuracy','checks':[],'candidates':{}}
 started=False
+def nodes():
+ current=ui.nodes();deny=gboard_contacts_denial(current)
+ if deny is not None:
+  print('Declining unrelated Gboard contacts/accounts prompt',flush=True)
+  tap_node(deny);receipt.setdefault('systemInterruptions',[]).append('Gboard contacts/accounts permission declined');save()
+  time.sleep(.5);current=ui.nodes()
+ return current
+def labels():
+ return [n.get('text') or n.get('content-desc') for n in nodes() if n.get('text') or n.get('content-desc')]
 FIXTURE='Synthetic Aimé';REAL='Aimé';heading=FIXTURE+' · '+a.version
 def save():(run/'result.json').write_text(json.dumps(receipt,indent=2,ensure_ascii=False)+'\n')
 def done(text):receipt['checks'].append(text);save();print('PASS:',text,flush=True)
@@ -160,7 +171,7 @@ def to_library():
 def open_first_photo():click(lambda t:t.startswith('Photo 1.'));contains('viewpoint',20)
 def fixture(action):click('Fixture: '+action)
 def candidates():
- return [t for t in labels() if t and (t.startswith('Could be ') or re.match(r'^Synthetic .+ (peak|tower|mast|castle|church|chapel|airfield|viewpoint) · ',t))]
+ return [t for t in labels() if t and (t.startswith('Could be ') or re.match(r'^Synthetic .+ (peak|tower|mast|castle|church|chapel|monument|communication tower) · ',t))]
 def what(point,expected,key):
  click(lambda t:t=='What’s that?');reach_text('Tap anything to see what it could be.')
  tap_photo(point,checkpoint=key);contains('Your tap points',20)
@@ -218,14 +229,15 @@ try:
  shoot();contains('Estimated viewpoint · ±10 m',60);capture('aime-captured')
  done('Real shutter capture opens the photo with its estimated viewpoint')
 
- # 3. Overpass offline and 429: named, never an empty list; one manual retry.
- to_library();fixture('next Overpass offline');open_first_photo()
- tap_photo(F['markA']);contains('[HTTP_UNAVAILABLE] Overpass could not be reached');absent('landmarks within')
+ # 3. Landmark data offline and HTTP 503: unavailable, never an empty list; one manual retry.
+ # Nothing is downloaded before this step, so neither failure is served from the session cache.
+ to_library();fixture('next data offline');open_first_photo()
+ tap_photo(F['markA']);contains('[HTTP_UNAVAILABLE] Landmark data unavailable: the data host could not be reached');absent('landmarks within')
  capture('aime-offline');click(lambda t:t=='Cancel')
- to_library();fixture('next Overpass 429');open_first_photo()
- tap_photo(F['markA']);contains('[OVERPASS_BUSY] Overpass is busy (429)');absent('landmarks within');capture('aime-429')
+ to_library();fixture('next cell 503');open_first_photo()
+ tap_photo(F['markA']);contains('[DATA_STATUS] Landmark data unavailable: the data host answered HTTP 503');absent('landmarks within');capture('aime-503')
  click(lambda t:t=='Retry');contains('8 landmarks within 30 km')
- done('Offline and 429 are shown as such with a single retry, never as an empty result')
+ done('Offline and HTTP 503 are shown as landmark data unavailable with a single retry, never as an empty result')
 
  # 4. Mark → calibrated ruler.
  click(lambda t:t.startswith('Synthetic Tower A'));reach_text('Calibrated · 1 mark');reach_text('Bearings along the middle row')
@@ -257,15 +269,23 @@ try:
  reveal('Mark landmark');reveal('Delete this photo');capture('aime-large-text');reveal('What’s that?');what(F['whatB'],'Synthetic Peak B','B-large-text');click(lambda t:t=='Close')
  adb('shell','settings','put','system','font_scale','1.0');time.sleep(2);done('Two-times text keeps controls reachable and the ranking unchanged')
 
- # 8. Delete → stored record reconciled.
- to_library();shoot();contains('Estimated viewpoint',60);to_library()
+ # 8. A viewpoint outside the data coverage is a named state, not a failure or an empty list.
+ to_library();fixture('toggle outside coverage');contains('Viewpoint: outside coverage')
+ shoot();contains('Estimated viewpoint',60);tap_photo({'x':.5,'y':.5})
+ contains('No landmark data here yet. Germany and Austria for now.');absent('landmarks within');absent('Landmark data unavailable')
+ assert not any(t=='Retry' for t in labels()),'Outside coverage offers no retry'
+ capture('aime-outside-coverage');click(lambda t:t=='Cancel')
+ to_library();fixture('toggle outside coverage');contains('Viewpoint: synthetic scene')
+ done('A viewpoint outside the coverage says so, without a retry or an empty list')
+
+ # 9. Delete → stored record reconciled.
  fixture('count stored records');contains('Stored photo records: 2')
  click(lambda t:t.startswith('Photo 2.'));contains('viewpoint',20)
  click('Delete this photo');find('Delete this private photo?');capture('aime-trusted-delete');tap('Delete photo')
  contains('Photo deleted.');fixture('count stored records');contains('Stored photo records: 1')
  done('Native-confirmed deletion removes the photo and its stored record')
 
- # 9. Real Aimé: location and internet gates on the real host path.
+ # 10. Real Aimé: location and internet gates on the real host path.
  tap('Construct menu');tap('Mark working');install(REAL,a.module_sha)
  open_module(REAL);module_access()
  for label in ['Allow taking private photos','Allow this module’s private photo library','Allow selected image pixels']:switch(label,True)
@@ -290,18 +310,18 @@ try:
    text=labels()
    found=next((t for t in text if t and re.match(r'^[1-9]\d* landmarks within 30 km',t)),None)
    if found:break
-   error=next((t for t in text if t and re.search(r'\[(?:OVERPASS_|HTTP_|CAPABILITY_|LOCATION_)[A-Z_]*\]',t)),None)
+   error=next((t for t in text if t and (t.startswith('No landmark data here yet') or re.search(r'\[(?:DATA_|HTTP_|CAPABILITY_|LOCATION_)[A-Z_]*\]',t))),None)
    if error:break
    time.sleep(.5)
   if found:break
-  if request==0 and error and any(t=='Retry' for t in labels()) and ('[OVERPASS_BUSY]' in error or '[HTTP_' in error):
-   receipt['realOverpassRetryReason']=error;save();capture('aime-real-overpass-retry')
-   time.sleep(30);click(lambda t:t=='Retry')
-  else:raise RuntimeError('Real Overpass lookup did not complete: '+str(error))
+  if request==0 and error and any(t=='Retry' for t in labels()) and ('[DATA_' in error or '[HTTP_' in error):
+   receipt['realLandmarksRetryReason']=error;save();capture('aime-real-landmarks-retry')
+   time.sleep(10);click(lambda t:t=='Retry')
+  else:raise RuntimeError('Real landmark lookup did not complete: '+str(error))
  assert found,'No named landmarks after bounded retry'
- receipt['realOverpass']=found;receipt['realOverpassAttempts']=request+1;save()
- capture('aime-real-overpass');click(lambda t:t=='Cancel')
- done('Real module: injected fix → estimated viewpoint → live Overpass returns named landmarks')
+ receipt['realLandmarks']=found;receipt['realLandmarksAttempts']=request+1;save()
+ capture('aime-real-landmarks');click(lambda t:t=='Cancel')
+ done('Real module: injected fix → estimated viewpoint → live aime-data cells return named landmarks')
  receipt['complete']=True
 except Exception as e:
  receipt['error']=str(e)

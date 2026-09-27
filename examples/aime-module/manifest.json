@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "dev.construct.aime",
   "name": "Aimé",
-  "version": "0.1.2",
+  "version": "0.1.7",
   "description": "Tap something in your photo to see which named landmarks it could be. Calibrate by marking a landmark you know; no cloud vision, the photo stays on your phone. Requires Construct API 0.12.",
   "constructApi": {
     "min": "0.12.0",
@@ -31,9 +31,9 @@
     },
     {
       "id": "net.http",
-      "reason": "Fetch named map features around your photo position and map tiles.",
+      "reason": "Download landmark data for the map area around your photo (whole cells of about 110 × 70 km, never your exact position) and map tiles.",
       "origins": [
-        "https://overpass-api.de",
+        "https://aime-data.pages.dev",
         "https://tile.openstreetmap.org"
       ]
     },

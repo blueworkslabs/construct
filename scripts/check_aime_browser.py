@@ -50,7 +50,7 @@ def main():
         page.goto("http://aime.test/index.html")
         page.wait_for_function("!state.busy && state.items.length===1")
         page.evaluate(
-            """async()=>{state.store={photo1:AimeCore.newSidecar({...SyntheticAime.viewer,accuracyM:10,timestamp:Date.now()})};await openPhoto('photo1');const f=AimeCore.parseOverpass(SyntheticAime.overpass()).features.find(f=>f.name==='Synthetic Tower A');await update(s=>({...s,marks:[AimeCore.markFrom(f,SyntheticAime.taps.markA.x,SyntheticAime.taps.markA.y)]}));}"""
+            """async()=>{state.store={photo1:AimeCore.newSidecar({...SyntheticAime.viewer,accuracyM:10,timestamp:Date.now()})};await openPhoto('photo1');const f=AimeCore.parseCell(AimeCore.parseIndex(SyntheticAime.index()),'46_9',SyntheticAime.cell('46_9')).find(f=>f.name==='Synthetic Tower A');await update(s=>({...s,marks:[AimeCore.markFrom(f,SyntheticAime.taps.markA.x,SyntheticAime.taps.markA.y)]}));}"""
         )
         # A cached lookup opens synchronously enough for pointerup -> click
         # retargeting on touch WebViews. At 2x text a candidate lies under the tap.
@@ -79,7 +79,7 @@ def main():
         print("PASS touch tap opens candidates without selecting one at 2x text")
         # A delayed feature response while the visible Photos control leaves the photo.
         page.evaluate(
-            """()=>{const old=call;window.originalCall=call;call=(m,p)=>m==='net.http'?new Promise(r=>window.releaseFetch=()=>r({status:200,text:SyntheticAime.overpass()})):old(m,p);state.features.clear();window.pendingWhat=task(()=>whatsThat(.7,.4));}"""
+            """()=>{const old=call;window.originalCall=call;const gate=new Promise(r=>window.releaseFetch=r);call=(m,p)=>m==='net.http'?gate.then(()=>SyntheticAime.answer(p.url)):old(m,p);state.features.clear();state.data=AimeCore.landmarkData(dataGet);window.pendingWhat=task(()=>whatsThat(.7,.4));}"""
         )
         page.click("#back")
         page.evaluate("releaseFetch()")
@@ -138,6 +138,19 @@ def main():
         print("PASS navigation cancellation and moving-pinch anchor")
         if page.evaluate("typeof AimeMap !== 'undefined'"):
             page.evaluate("call=window.originalCall")
+            # Partial coverage must remain visible in each result surface.
+            page.evaluate("async()=>{const data=await features();data.partialCoverage=true;await openMarkDialog()}")
+            assert "Partial coverage" in page.locator("#fetch-status").inner_text()
+            page.evaluate("$('mark-dialog').close()")
+            page.evaluate("whatsThat(SyntheticAime.taps.whatB.x,SyntheticAime.taps.whatB.y)")
+            assert "Partial coverage" in page.locator("#candidates-note").inner_text()
+            page.locator("#candidates button").first.click()
+            assert "Partial landmark coverage" in page.locator("#map-legend").inner_text()
+            # A real UI selection replaces a legacy observation of that point.
+            page.evaluate("""async()=>{showPane('photo');const m=current().marks[0];const {kind,dataset,...old}=m;await update(s=>({...s,marks:[{...old,osmType:'node',osmId:123}]}));state.pendingTap={x:.4,y:.5};pick({...m,p:m.positionM});}""")
+            page.wait_for_function("!state.busy")
+            assert page.evaluate("current().marks.length===1 && current().marks[0].x===.4 && !!current().marks[0].kind"), "Legacy selection duplicated a calibration mark"
+            print("PASS partial coverage in mark search, candidates and map; legacy mark replacement")
             page.evaluate(
                 "whatsThat(SyntheticAime.taps.whatB.x,SyntheticAime.taps.whatB.y)"
             )

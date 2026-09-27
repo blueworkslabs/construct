@@ -74,7 +74,7 @@
               ><button id="map-zoom-out" aria-label="Zoom map out">−</button
               ><button id="map-fit" aria-label="Fit map">⤢</button>
             </div>
-            <span class="attribution">© OpenStreetMap contributors · openstreetmap.org/copyright</span>
+            <span class="attribution" id="map-attribution">© OpenStreetMap contributors, Overture Maps Foundation · ODbL 1.0 · openstreetmap.org/copyright</span>
           </div>
           <p id="map-status" role="status"></p>
           <ul id="map-legend" class="construct-list" aria-label="What the map shows"></ul>
@@ -108,13 +108,18 @@
         </p>
         <h2>What leaves the phone</h2>
         <p>
-          Only the confirmed viewpoint and the selected radius go to Overpass
-          (overpass-api.de) to fetch named peaks, towers, churches, castles,
-          viewpoints and airfields. Never the photo, your marks or your taps.
-          Viewpoints and marks are saved in this module’s storage; after a
-          photo is deleted, its data is cleaned up the next time Aimé can read
-          its library and storage.
+          Landmarks (named peaks, towers, churches, castles and other
+          structures) come as pre-built map cells of about 110 × 70 km from
+          Aimé’s data host (aime-data.pages.dev). Only the names of the cells
+          around the confirmed viewpoint go there; map tiles come from
+          OpenStreetMap. Your exact viewpoint and radius are not sent explicitly,
+          but the requested cells and tiles can reveal your approximate area and
+          search extent. Photos, marks and taps stay on the phone. Landmark data covers Germany and Austria
+          for now. Viewpoints and marks are saved in this module’s storage;
+          after a photo is deleted, its data is cleaned up the next time Aimé
+          can read its library and storage.
         </p>
+        <p id="data-attribution">Landmark data © OpenStreetMap contributors, Overture Maps Foundation, ODbL 1.0.</p>
         <p>Map data © OpenStreetMap contributors, ODbL 1.0.</p>
       </details>
       <footer>Aimé · __VERSION__</footer>
@@ -123,11 +128,7 @@
       <h2>Which landmark did you tap?</h2>
       <p id="fetch-status" role="status"></p>
       <button id="retry-fetch" hidden>Retry</button>
-      <p id="incomplete" class="note" hidden>
-        Incomplete: Overpass returned its 400-feature limit, so some landmarks
-        are missing. <button id="smaller-radius" class="quiet">Use a smaller radius</button>
-      </p>
-      <label>Search<input id="search" type="search" autocomplete="off" placeholder="Name or OSM id, e.g. node/123" /></label>
+      <label>Search<input id="search" type="search" autocomplete="off" placeholder="Name, e.g. Feldberg" /></label>
       <ul id="results" class="construct-list" aria-label="Nearby landmarks, nearest first"></ul>
       <div class="actions"><button id="cancel-mark">Cancel</button></div>
     </dialog>

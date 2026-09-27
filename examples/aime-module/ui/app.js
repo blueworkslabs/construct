@@ -21,9 +21,9 @@ const state = {
   lastTap: null,
   lastList: null, // {rows, wedge, bearing} from the last What's that?
   pane: "photo",
-  features: new Map(), // cacheKey → {features, incomplete}
+  features: new Map(), // cacheKey → {features, dataset, cells}
   fetching: new Map(), // cacheKey → Promise
-  fetchProblem: null,
+  data: null, // landmark index and cells for this session (aime-core.js `landmarkData`)
   lastLocationAt: -Infinity,
   busy: false,
   photoGeneration: 0,
@@ -52,6 +52,18 @@ async function locate(respectSpacing) {
     return { fix: null, error };
   }
 }
+// Landmark data from the aime-data host: HTTP failures become "unavailable".
+async function dataGet(url) {
+  let response;
+  try {
+    response = await call("net.http", { op: "get", url, format: "json" });
+  } catch (error) {
+    throw C.httpProblem(error);
+  }
+  if (response.status !== 200) throw C.httpProblem(null, response.status);
+  return response.text;
+}
+state.data = C.landmarkData(dataGet);
 // Persistence: an index of up to 16 slots plus one bounded record per photo,
 // each written in its own request (aime-core.js `persistence`).
 const db = C.persistence({ get: (key) => call("storage.kv", { op: "get", key }), set: (key, value) => call("storage.kv", { op: "set", key, value }) });
@@ -401,7 +413,7 @@ function render() {
     "marks",
     s.marks.map((m, i) => [
       m.name,
-      `${m.osmType}/${m.osmId}${v ? " · " + C.km(S.distance(v, m)) + " · " + Math.round(S.bearing(v, m)) + "°" : ""}${state.cal ? " · residual " + C.signed(S.diff(S.bearingAt(state.cal, m.x, m.y), S.bearing(state.cal.viewer, m))) : ""}`,
+      `${C.kindLabel(m)}${v ? " · " + C.km(S.distance(v, m)) + " · " + Math.round(S.bearing(v, m)) + "°" : ""}${state.cal ? " · residual " + C.signed(S.diff(S.bearingAt(state.cal, m.x, m.y), S.bearing(state.cal.viewer, m))) : ""}`,
       (x) => ({ ...x, marks: x.marks.filter((_, j) => j !== i) }),
     ]),
     "None yet.",
@@ -671,43 +683,44 @@ async function features() {
   if (state.features.has(key)) return state.features.get(key);
   if (!state.fetching.has(key)) {
     const job = (async () => {
-      let response;
-      try {
-        response = await call("net.http", { op: "get", url: C.overpassUrl(s.viewer.lat, s.viewer.lon, s.radiusKm), format: "json" });
-      } catch (error) {
-        throw Object.assign(new Error(C.httpProblem(error).message), { problem: C.httpProblem(error) });
-      }
-      if (response.status !== 200) throw Object.assign(new Error(C.httpProblem(null, response.status).message), { problem: C.httpProblem(null, response.status) });
-      const parsed = C.parseOverpass(response.text);
-      state.features.set(key, parsed);
-      return parsed;
+      const found = await state.data.features(s.viewer, s.radiusKm);
+      showAttribution(state.data.index);
+      state.features.set(key, found);
+      return found;
     })();
     state.fetching.set(key, job);
     job.catch(() => {}).finally(() => state.fetching.delete(key));
   }
   return state.fetching.get(key);
 }
+// Licence and attribution as the index states them, in the help and on the map.
+function showAttribution(index) {
+  if (!index) return;
+  const licence = index.license.replace(/-/g, " ");
+  $("data-attribution").textContent = `Landmark data ${index.attribution}, ${licence}.`;
+  $("map-attribution").textContent = `${index.attribution} · ${licence} · openstreetmap.org/copyright`;
+}
+// Outside coverage is a state, not a failure; everything else names its gate.
+const fetchMessage = (error) => (error.code === "OUTSIDE_COVERAGE" ? error.message : `[${error.code || "ERROR"}] ${error.message}`);
 let markRequest = 0;
 async function openMarkDialog() {
   const request = ++markRequest, generation = state.photoGeneration;
   const dialog = $("mark-dialog");
   $("search").value = "";
   $("results").replaceChildren();
-  $("incomplete").hidden = true;
   $("retry-fetch").hidden = true;
   if (!dialog.open) dialog.showModal();
   say("fetch-status", `Looking up named landmarks within ${current().radiusKm} km…`);
   try {
     const data = await features();
     if (!dialog.open || request !== markRequest || generation !== state.photoGeneration) return;
-    say("fetch-status", data.features.length ? `${data.features.length} landmarks within ${current().radiusKm} km. Nearest first.` : `No named landmarks found within ${current().radiusKm} km. Try a larger radius.`);
-    $("incomplete").hidden = !data.incomplete;
-    $("smaller-radius").hidden = current().radiusKm === 10;
+    const note = C.coverageNote(data);
+    say("fetch-status", (data.features.length ? `${data.features.length} landmarks within ${current().radiusKm} km. Nearest first.` : `No named landmarks found within ${current().radiusKm} km. Try a larger radius.`) + (note ? " " + note : ""), note ? "attention" : undefined);
     renderResults();
   } catch (error) {
     if (!dialog.open || request !== markRequest || generation !== state.photoGeneration) return;
-    say("fetch-status", `[${(error.problem && error.problem.code) || error.code || "ERROR"}] ${error.message}`, "error");
-    $("retry-fetch").hidden = !(error.problem ? error.problem.retry : true);
+    say("fetch-status", fetchMessage(error), error.code === "OUTSIDE_COVERAGE" ? "attention" : "error");
+    $("retry-fetch").hidden = error.retry === false;
   }
 }
 function renderResults() {
@@ -720,7 +733,7 @@ function renderResults() {
       b = document.createElement("button"),
       small = document.createElement("small");
     b.textContent = f.name;
-    small.textContent = `${C.kindLabel(f)} · ${C.km(distanceM / 1000)} · ${f.osmType}/${f.osmId}`;
+    small.textContent = [C.kindLabel(f), C.km(distanceM / 1000), C.sizeLabel(f)].filter(Boolean).join(" · ");
     b.append(small);
     b.onclick = () => pick(f);
     li.append(b);
@@ -741,7 +754,7 @@ function pick(feature) {
   state.pendingTap = null;
   task(async () => {
     const mark = C.markFrom(feature, tap.x, tap.y);
-    await update((s) => ({ ...s, marks: [...s.marks.filter((m) => !(m.osmType === mark.osmType && m.osmId === mark.osmId)), mark] }));
+    await update((s) => ({ ...s, marks: [...s.marks.filter((m) => !C.sameFeature(m, mark)), mark] }));
     if (state.calError) say("photo-status", "Mark saved, but calibration failed: " + state.calError, "attention");
     else if (current().marks.length === 1) {
       say("photo-status", `Calibrated on ${mark.name}. Mark another to fit the lens, or tap What’s that?`);
@@ -758,7 +771,7 @@ async function whatsThat(x, y) {
     data = await features();
   } catch (error) {
     if (generation !== state.photoGeneration) return;
-    say("photo-status", `[${(error.problem && error.problem.code) || error.code || "ERROR"}] ${error.message}`, "error");
+    say("photo-status", fetchMessage(error), error.code === "OUTSIDE_COVERAGE" ? "attention" : "error");
     return;
   }
   if (generation !== state.photoGeneration) return;
@@ -767,9 +780,9 @@ async function whatsThat(x, y) {
     ol = $("candidates");
   ol.replaceChildren();
   const wedge = ranked.length ? ranked[0].wedgeSigmaDeg : S.uncertainty(state.cal, x, y);
-  state.lastList = { rows: list.rows, wedge, bearing: S.bearingAt(state.cal, x, y) };
+  state.lastList = { rows: list.rows, wedge, bearing: S.bearingAt(state.cal, x, y), partialCoverage: data.partialCoverage };
   $("candidates-title").textContent = list.anyClose ? "Could be" : "No close match";
-  $("candidates-note").textContent = `Your tap points ${Math.round(S.bearingAt(state.cal, x, y))}° (${C.compass(S.bearingAt(state.cal, x, y))}), direction ±${wedge.toFixed(1)}°.` + (list.anyClose ? "" : " Nearest two shown greyed.");
+  $("candidates-note").textContent = `Your tap points ${Math.round(S.bearingAt(state.cal, x, y))}° (${C.compass(S.bearingAt(state.cal, x, y))}), direction ±${wedge.toFixed(1)}°.` + (list.anyClose ? "" : " Nearest two shown greyed.") + (data.partialCoverage ? " " + C.coverageNote(data) : "");
   let positionNote = false;
   list.rows.forEach((r, i) => {
     const li = document.createElement("li"),
@@ -795,7 +808,6 @@ async function whatsThat(x, y) {
   }
   const extra = [];
   if (positionNote) extra.push("Some candidates are close by, so your position matters more: their ±σ is wider than the direction.");
-  if (data.incomplete) extra.push("Incomplete: the 400-feature limit was reached. A smaller radius may show more nearby landmarks.");
   $("candidates-extra").textContent = extra.join(" ");
   $("candidates-dialog").showModal();
   say("photo-status", list.anyClose ? `Closest: ${list.rows[0].candidate.feature.name}, ±${list.rows[0].sigmaDeg.toFixed(1)}°.` : "No close match for that tap.");
@@ -919,6 +931,7 @@ function renderMap(fit, focus = null) {
     item(`Ring: ${v.corrected ? "your corrected" : v.review ? "estimated (please confirm)" : "your estimated"} viewpoint`, `±${Math.round(v.accuracyM || 20)} m accuracy, shown as the shaded circle`);
     if (fitted) item("Dot: viewpoint fitted from your marks", `${Math.round(S.distance(v, fitted) * 1000)} m from the ring; your saved viewpoint is unchanged`);
   }
+  if (list && list.partialCoverage) item("Partial landmark coverage", C.coverageNote(list));
   if (v && list) item(`Wedge: your tap points ${Math.round(list.bearing)}° (${C.compass(list.bearing)})`, `±${list.wedge.toFixed(1)}° (1σ), fainter band to ±${(2 * list.wedge).toFixed(1)}° (2σ); nearby candidates can have a wider ±σ of their own`);
   s.marks.forEach((m) => item(`Green pin: ${m.name}`, v ? `landmark you marked · ${C.km(S.distance(v, m))} · ${Math.round(S.bearing(v, m))}°` : "landmark you marked"));
   candidates.forEach((c, i) => {
@@ -970,15 +983,6 @@ $("radius").onchange = () =>
   });
 $("search").oninput = renderResults;
 $("retry-fetch").onclick = openMarkDialog;
-$("smaller-radius").onclick = () => {
-  const smaller = C.RADII.filter((r) => r < current().radiusKm).pop();
-  if (!smaller) return;
-  $("radius").value = String(smaller);
-  task(async () => {
-    await update((s) => ({ ...s, radiusKm: smaller }));
-    await openMarkDialog();
-  });
-};
 $("cancel-mark").onclick = () => {
   $("mark-dialog").close();
 };

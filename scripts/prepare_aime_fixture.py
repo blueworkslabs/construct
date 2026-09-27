@@ -2,8 +2,9 @@
 """Signed Aimé package plus the Synthetic Aimé acceptance fixture.
 
 Synthetic Aimé is the real module UI with scripts/aime-fixture/synthetic-aime.js
-loaded before app.js: a fixed viewpoint, a fixed Overpass feature set and a
-rendered scene replace those host answers so taps have known answers. Capture,
+loaded before app.js: a fixed viewpoint, a synthetic aime-data index with
+landmark cells for a fixed feature set and a rendered scene replace those host
+answers so taps have known answers. Capture,
 list, delete, storage and grants stay real. Disposable acceptance only; never
 promote the fixture as production Aimé.
 """

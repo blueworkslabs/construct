@@ -276,7 +276,10 @@ depends on it, not on Overture directly. Summary:
   without a valid `p`, is rejected as unavailable.
 - What leaves the phone: **the ids of the 1° cells** the radius touches (about
   110 × 70 km each) to the data host, and tile coordinates to OpenStreetMap.
-  Never the viewpoint, the radius, the photo, the marks or the taps.
+  The exact viewpoint and radius are not sent explicitly, but the requested
+  cell and tile set can reveal the approximate area and search extent. Photos,
+  marks and taps stay on the phone. If only some search-area cells are covered,
+  mark search, candidate results and the map explicitly warn of partial coverage.
 - Attribution "© OpenStreetMap contributors, Overture Maps Foundation" and the
   ODbL licence from `index.json` appear in the module's help and on the map.
 - **Sidecar per photo** (`storage.kv`, key `photos`, a map from stable photo
@@ -288,6 +291,12 @@ depends on it, not on Overture directly. Summary:
   are bounded (80 chars), marks to 6 and horizon taps to 2 per photo so eight
   sidecars fit 64 KiB. Retain each mark's positional estimate on reopen, rather
   than accidentally replacing a way/relation's estimate with the node default.
+- **Pilot rollback boundary (0.1.3):** old OSM marks survive the forward update.
+  Cell-based marks do not work in 0.1.2 or earlier: those versions omit them
+  when reading a photo and can erase them on the next save. Do not roll back
+  to those versions after marking with 0.1.3. This is separate from the host's
+  stable photo-ID guarantee; photo identity remains unchanged. The hardware
+  handoff must state this boundary; no fake OSM IDs are assigned to new marks.
 - **Consent text** (manifest reasons): `location.read` "Read an estimated viewpoint for your photo, shown with fix age
   and accuracy for you to confirm or correct before looking up landmarks."
   `storage.kv` "Save each photo's estimated viewpoint, the landmarks and horizon
