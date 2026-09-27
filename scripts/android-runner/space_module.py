@@ -11,8 +11,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_space_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.space-watch package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.space-watch-fixture package digest')
-p.add_argument('--version',default='0.1.3')
-p.add_argument('--real-fix',default='52.37648,9.73848',help='lat,lon injected for the real-module landmark data check (Hannover, inside the DE/AT coverage)')
+p.add_argument('--version',default='0.1.4')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -231,8 +230,9 @@ try:
  permission('Allow Android location access');reopen()
  adb('shell','cmd','location','set-location-enabled','true')
  for _ in range(3):adb('emu','geo','fix','13.405','52.52');time.sleep(1)
- # A denied download was previously spaced, so use explicit refresh (not automatic).
- contains('Your location',45);click('Refresh orbit data')
+ # Grant-denied attempts never reached the provider: reopening must fetch
+ # automatically, with no compensating manual refresh.
+ contains('Your location',45)
  reach_text('CelesTrak');end=time.monotonic()+45
  while time.monotonic()<end:
   if any(re.match(r'^Orbit data .+ old · CelesTrak',t or '') for t in labels()):break

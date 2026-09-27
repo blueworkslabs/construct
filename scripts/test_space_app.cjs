@@ -13,7 +13,7 @@ const LAUNCH = JSON.stringify([
   {NORAD_CAT_ID: 29507, OBJECT_TYPE: 'R/B', OBJECT_NAME: 'CZ-4B R/B', OBJECT_ID: '2006-046C'},
 ]);
 const WIKI = JSON.stringify({query: {pages: [{title: 'Long March 4B', extract: 'The Long March 4B is a Chinese launch vehicle.', fullurl: 'https://en.wikipedia.org/wiki/Long_March_4B'}]}});
-function rig({saved = {}, error = null, gpStatus = 200, pendingHttp = false, clock = START, launchBody = LAUNCH, pendingLocation = false} = {}) {
+function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, pendingLocation = false} = {}) {
   const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [];
   const storage = structuredClone(saved);
   let now = clock;
@@ -55,8 +55,9 @@ function rig({saved = {}, error = null, gpStatus = 200, pendingHttp = false, clo
       }
       if (method === 'net.http') {
         const u = params.url;
+        if (netError) throw Object.assign(new Error(netError), {code: netError});
         const result = u.includes('gp.php') ? (gpStatus === 200 ? {status: 200, text: ELEMENTS} : {status: gpStatus})
-          : u.includes('GROUP=visual') ? {status: 200, text: SATCAT}
+          : u.includes('GROUP=visual') ? (satcatStatus === 200 ? {status: 200, text: SATCAT} : {status: satcatStatus})
           : u.includes('INTDES=') ? {status: 200, text: launchBody}
           : u.startsWith('https://en.wikipedia.org/') ? {status: 200, text: WIKI} : {status: 404};
         if (typeof pendingHttp === "function" ? pendingHttp(u) : pendingHttp) return new Promise(resolve => held.push(() => resolve(result)));
@@ -174,6 +175,23 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   assert.equal(r.el('wiki').textContent, 'Read on Wikipedia', 'old lookup must not mark new view loaded');
   const newWiki = r.el('wiki').onclick(); r.finishHttp(); await newWiki;
   assert.match(r.el('info-body').text, /Chinese launch vehicle/);
+
+  // Grant denial never contacted CelesTrak: reopening after grant must download now.
+  r = rig({netError: 'CAPABILITY_DENIED'}); await flush(8);
+  assert.match(r.el('data-status').textContent, /Enable the requested capability/);
+  const deniedState = r.storage;
+  r = rig({saved: deniedState, clock: START + 1000}); await flush(8);
+  assert.equal(r.http().filter(u => u.includes('gp.php')).length, 1, 'grant change must not wait 15 minutes');
+  assert.match(r.el('counts').textContent, /visible/);
+
+  // Catalog throttling uses the two-hour provider backoff too.
+  for (const status of [403, 429]) {
+    r = rig({satcatStatus: status}); await flush(8);
+    r.advance(16 * 60000); r.tick(60); await flush(8);
+    assert.equal(r.http().filter(u => u.includes('/satcat/')).length, 1, 'catalog provider backoff');
+    r.advance(2 * HOUR); r.tick(60); await flush(8);
+    assert.equal(r.http().filter(u => u.includes('/satcat/')).length, 2);
+  }
 
   // CelesTrak failure: a clear message, a remembered back-off, no hammering.
   r = rig({gpStatus: 503}); await flush(8);

@@ -21,7 +21,7 @@
     objects = [],
     satcat = new Map(),
     meta = { elements: 0, satcat: 0 },
-    fetchState = { last: 0, until: 0, satcatLast: 0 },
+    fetchState = { last: 0, until: 0, satcatLast: 0, satcatUntil: 0 },
     prefs = { startWithLocation: true, red: false },
     selected = null,
     offset = 0,
@@ -152,7 +152,7 @@
     }
     const f = await kvGet("fetch-state");
     if (f && typeof f === "object")
-      for (const k of ["last", "until", "satcatLast"])
+      for (const k of ["last", "until", "satcatLast", "satcatUntil"])
         if (Number.isFinite(f[k])) fetchState[k] = Math.max(0, Math.min(now() + 86400000, f[k]));
     applyRed();
     $("start-with-location").checked = prefs.startWithLocation;
@@ -216,6 +216,7 @@
       frame();
       await saveRows("elements", rows, t, ELEMENT_CHUNKS);
     } catch (e) {
+      if (e.code === "CAPABILITY_DENIED") fetchState.last = previous;
       if (e.code === "RUN_PAUSED") {
         // An attempt the menu interrupted does not count toward the spacing.
         fetchState.last = previous;
@@ -235,14 +236,21 @@
     fetchState.satcatLast = t;
     try {
       const r = await getJson(C.SATCAT_URL);
+      if (r.status === 403 || r.status === 429) fetchState.satcatUntil = t + BACKOFF;
       if (r.status !== 200) return;
       const rows = C.parseSatcat(r.text);
-      if (rows.length < 10) return;
+      if (rows.length < 10) {
+        fetchState.satcatUntil = t + BACKOFF;
+        return;
+      }
       satcat = C.index(rows);
       meta.satcat = t;
+      fetchState.satcatUntil = 0;
       described.clear();
       await saveRows("satcat", rows, t, SATCAT_CHUNKS);
     } catch (e) {
+      if (e.code === "CAPABILITY_DENIED") fetchState.satcatLast = previous;
+      if (e.code === "HTTP_DATA" || e.code === "HTTP_SIZE") fetchState.satcatUntil = t + BACKOFF;
       if (e.code === "RUN_PAUSED") {
         fetchState.satcatLast = previous;
         throw e;
@@ -277,6 +285,7 @@
       const covered = objects.filter((o) => satcat.has(o.id)).length;
       if (
         objects.length &&
+        t >= fetchState.satcatUntil &&
         (covered < objects.length * 0.9 || t - meta.satcat > SATCAT_TTL) &&
         t - fetchState.satcatLast > RETRY
       )

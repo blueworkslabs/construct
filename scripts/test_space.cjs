@@ -78,6 +78,13 @@ test("ISS pass over Berlin on 28 Sep 2026 matches Heavens-Above", () => {
   const l = O.look(iss, ob, at("2026-09-28T17:51:33Z"));
   assert.ok(l.altKm > 400 && l.altKm < 430 && l.speedKms > 7.6 && l.speedKms < 7.7);
 });
+test("pass countdown ends when morning twilight starts", () => {
+  const t = at('2026-09-28T17:50:40Z');
+  const end = O.passEnd(byId(25544), ob, t, ms => ms < t + 30000 ? -20 : -6);
+  assert.equal(end.reason, 'daylight');
+  assert.equal(end.inS, 29);
+  assert.match(K.ending(end), /sky.*bright/i);
+});
 test("visibility needs sunlight on the object, a dark sky and height", () => {
   const iss = byId(25544);
   const twilight = at("2026-09-28T17:51:00Z");
@@ -198,7 +205,7 @@ test("same-launch lookups and Wikipedia stay on fixed, encoded URLs", () => {
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
   assert.equal(m.id, "dev.construct.space-watch");
-  assert.equal(m.version, "0.1.3");
+  assert.equal(m.version, "0.1.4");
   assert.deepEqual(m.constructApi, { min: "0.9.0", target: "0.9.0" });
   const caps = Object.fromEntries(m.capabilities.map((c) => [c.id, c]));
   assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "storage.kv"]);
@@ -223,7 +230,7 @@ test("package: manifest, capabilities, scripts and no location in any URL", () =
   for (const shared of ["construct-ui.css", "bridge.js"])
     assert.equal(fs.readFileSync(root + "ui/" + shared, "utf8"), fs.readFileSync("examples/sky-watch-module/ui/" + shared, "utf8"), shared);
   const docs = fs.readFileSync("docs/space-watch.md", "utf8");
-  assert.match(docs, /Space Watch \*\*0\.1\.3\*\*/);
+  assert.match(docs, /Space Watch \*\*0\.1\.4\*\*/);
   // Vendored libraries are pinned by hash in the doc.
   for (const f of ["satellite.min.js", "astronomy.min.js"]) {
     const sha = crypto.createHash("sha256").update(fs.readFileSync(root + "ui/vendor/" + f)).digest("hex");

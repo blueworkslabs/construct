@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.1.3** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
+Space Watch **0.1.4** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
 alpha26** and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -61,7 +61,7 @@ view, not a map.
   - "Heading toward the north, climbing."
   - "Sunlit · should be visible. Gets too low to spot in 4:45, in the north." A
     pass can also end with "Fades into Earth's shadow in 1:40, 4 fists up in the
-    east". The end is refined to the second.
+    east". Morning twilight can end visibility too. The end is refined to the second.
   - Height, speed and distance.
 - **Rewind** (0 to −5 min in 10 s steps) redraws the dome, list and spot card for
   the recent past, for something you just saw. **Back to now** returns.
@@ -80,8 +80,8 @@ view, not a map.
     launcher articles for rocket stages, "Kosmos N"). Otherwise it falls back to
     a one-result search, which is labelled "Closest match: …". Wikipedia is
     listed in the normal install consent; there is no extra prompt.
-- **Red mode** turns every colour, including the canvas and the slider, into dim
-  reds to keep dark-adapted eyes dark.
+- **Red mode** uses dim red text, canvas marks and slider colours to reduce
+  glare. Native controls and a few borders retain their normal colours.
 - **Notes** explain empty skies: "The sky is too bright…" in daylight, and
   "Nothing sunlit high enough right now: the objects above you are in Earth's
   shadow or low." late at night.

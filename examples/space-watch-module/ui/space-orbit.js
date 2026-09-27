@@ -209,19 +209,19 @@ const SpaceOrbit = (() => {
     for (let s = 5; s <= limitS; s += 5) {
       const l = look(o, ob, ms + s * 1000);
       if (!l) return null;
-      if (l.el < VISIBLE_EL || !l.sunlit) {
+      if (state(l, sunAltAt(ms + s * 1000)) !== "visible") {
         // Refine to the last whole second still visible: where it vanishes.
         let t = lastT;
         for (let u = lastT + 1; u < s; u++) {
           const q = look(o, ob, ms + u * 1000);
-          if (!q || q.el < VISIBLE_EL || !q.sunlit) break;
+          if (state(q, sunAltAt(ms + u * 1000)) !== "visible") break;
           last = q;
           t = u;
         }
         return {
           atMs: ms + t * 1000,
           inS: t,
-          reason: l.el < VISIBLE_EL ? "sets" : "shadow",
+          reason: l.el < VISIBLE_EL ? "sets" : !l.sunlit ? "shadow" : "daylight",
           az: last.az,
           el: last.el,
         };

@@ -4,8 +4,9 @@
 Synthetic Space Watch is the real module UI with scripts/space-fixture/synthetic-space.js
 loaded before app.js: a pinned clock (2026-09-28 17:50:40 UTC, running), a fixed
 Berlin viewpoint and a captured CelesTrak subset replace those answers so the dome
-and the pointing words have known values. Storage, grants, same-launch lookups and
-Wikipedia stay real. Disposable acceptance only; never promote the fixture as
+and the pointing words have known values. Storage, same-launch lookups and Wikipedia use the real host. Synthetic
+location and orbit answers bypass those native gates; test grants with the real
+module, not this fixture. Disposable acceptance only; never promote the fixture as
 production Space Watch.
 """
 import argparse

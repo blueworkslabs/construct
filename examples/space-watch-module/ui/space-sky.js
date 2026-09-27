@@ -174,6 +174,7 @@ const SpaceSky = (() => {
   }
   function ending(end) {
     if (!end) return "";
+    if (end.reason === "daylight") return `The sky becomes too bright in ${clock(end.inS)}.`;
     if (end.reason === "long") return "Visible for 20+ min.";
     return end.reason === "shadow"
       ? `Fades into Earth’s shadow in ${clock(end.inS)}, ${height(end.el)} in the ${dir8(end.az)}.`
