@@ -159,3 +159,27 @@ def dark_fraction(pixels, threshold=8):
 def secure_blackout(pixels):
     """FLAG_SECURE screenshots arrive black; any real UI has lit pixels."""
     return dark_fraction(pixels) >= 0.995
+
+
+def screenshot_content_bounds(width, height, nodes):
+    """Exclude only recognized, edge-aligned Android system bars, never app UI.
+
+    The green privacy indicator stays capturable over a correctly secured camera.
+    Ignore full-window SystemUI containers and retain raw evidence separately.
+    """
+    top, bottom = 0, height
+    for n in nodes:
+        if n.get('package') != 'com.android.systemui':
+            continue
+        key = n.get('resource-id', '').split('/')[-1]
+        if key not in ('status_bar', 'navigation_bar', 'navigation_bar_frame'):
+            continue
+        bounds = list(map(int, re.findall(r'-?\d+', n.get('bounds', ''))))
+        if len(bounds) != 4:
+            continue
+        x1, y1, x2, y2 = bounds
+        if x1 != 0 or x2 != width or not 0 < y2 - y1 <= height / 10:
+            continue
+        if y1 == 0: top = max(top, y2)
+        if y2 == height: bottom = min(bottom, y1)
+    return (0, top, width, bottom)

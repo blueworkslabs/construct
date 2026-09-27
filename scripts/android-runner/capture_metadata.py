@@ -8,7 +8,7 @@ Pure checks live in capture_checks.py (unit-tested without a device).
 import argparse,datetime,fcntl,hashlib,io,json,os,re,subprocess,time,uuid
 from pathlib import Path
 from config import CONFIG,SERIAL,require_runner,catalog
-from capture_checks import acceleration,check_result,check_zoom_pair,level_readout,parse_result,readout_matches,secure_blackout
+from capture_checks import acceleration,check_result,check_zoom_pair,level_readout,parse_result,readout_matches,secure_blackout,screenshot_content_bounds
 p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.add_argument('--sha',required=True)
 p.add_argument('--catalog',required=True);p.add_argument('--legacy-sha',required=True,help='0.1.0 package digest (API 0.12)')
 p.add_argument('--module-sha',required=True,help='0.2.0 package digest (API 0.13)')
@@ -24,7 +24,7 @@ from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':{'0.1.0':a.legacy_sha,'0.2.0':a.module_sha},
- 'recents':'Actual Recents screenshot captured with module screenshots enabled; requires visual review alongside ScreenCaptureTest','checks':[],'captures':[]}
+ 'recents':'Not captured yet','checks':[],'captures':[]}
 started=False
 name='Capture metadata probe';heading=name+' · 0.1.0'
 def save():(run/'result.json').write_text(json.dumps(receipt,indent=2)+'\n')
@@ -40,7 +40,10 @@ def capture(name):
 def screenshot_black(name):
  from PIL import Image
  raw=adb('exec-out','screencap','-p',binary=True);(run/(name+'-adb.png')).write_bytes(raw)
- image=Image.open(io.BytesIO(raw)).convert('RGB');image.thumbnail((270,600))
+ image=Image.open(io.BytesIO(raw)).convert('RGB')
+ crop=screenshot_content_bounds(*image.size,[dict(n.attrib) for n in nodes()])
+ receipt.setdefault('screenshotRegions',{})[name]=list(crop);save()
+ image=image.crop(crop);image.save(run/(name+'-app.png'));image.thumbnail((270,600))
  return secure_blackout(list(image.getdata()))
 def status():
  import re
@@ -176,13 +179,16 @@ try:
  require(parse_result(labels())=={'saved':True} and 'ID listed: not provided' in labels(),'API 0.12 result shape changed')
  done('API 0.12 keeps the exact {op} request and {saved} result; no level or zoom controls')
 
- opened();tap('Construct menu');tap('Mark working');install('0.2.0',a.module_sha);opened()
+ # The successful legacy capture returns to the already-open module. Starting
+ # MainActivity here only brings its task forward; it does not close the module.
+ tap('Construct menu');tap('Mark working');install('0.2.0',a.module_sha);opened()
  require(screenshot_black('module-switch-off'),'Pixel-bearing module screen is capturable with the switch off')
  module_access()
  require(switch('Allow screenshots',True)=='false','Allow screenshots must default to off')
  require(any(t and 'Off by default.' in t for t in labels()),'Missing Allow screenshots copy')
  reopen();require(not screenshot_black('module-switch-on'),'Module screen still black with Allow screenshots on')
  adb('shell','input','keyevent','KEYCODE_APP_SWITCH');time.sleep(1.5);capture('recents-switch-on')
+ receipt['recents']='Captured with screenshot opt-in enabled; visual review required';save()
  # Backgrounding ends ModuleActivity's session; return to the host, then
  # reopen explicitly after the process restart instead of expecting old controls.
  adb('shell','input','keyevent','KEYCODE_BACK')

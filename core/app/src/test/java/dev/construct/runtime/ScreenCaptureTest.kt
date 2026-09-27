@@ -36,6 +36,21 @@ class ScreenCaptureTest {
         }
     }
 
+    @Test fun screenshotOptInDoesNotExposeAnUnfocusedLiveRecentsSurface() {
+        val optedIn = ScreenCapturePolicy.decide(listOf("image.read"), true, 33)
+        assertFalse(ScreenCapturePolicy.secureWindow(optedIn, true, true))
+        assertTrue("focus loss before pause", ScreenCapturePolicy.secureWindow(optedIn, true, false))
+        assertTrue("paused activity", ScreenCapturePolicy.secureWindow(optedIn, false, false))
+        assertTrue("focus alone before resume", ScreenCapturePolicy.secureWindow(optedIn, false, true))
+        assertFalse("foreground again", ScreenCapturePolicy.secureWindow(optedIn, true, true))
+        val optedOut = ScreenCapturePolicy.decide(listOf("image.read"), false, 35)
+        assertTrue(ScreenCapturePolicy.secureWindow(optedOut, true, true))
+        val older = ScreenCapturePolicy.decide(listOf("image.read"), true, 32)
+        assertFalse("older Android retains documented behavior", ScreenCapturePolicy.secureWindow(older, false, false))
+        val cameraOnly = ScreenCapturePolicy.decide(listOf("camera.photo"), false, 35)
+        assertFalse(ScreenCapturePolicy.secureWindow(cameraOnly, false, false))
+    }
+
     @Test fun copySaysWhatHappensToTheRecentsThumbnail() {
         assertTrue(ScreenCapturePolicy.copy(33).contains("Recents thumbnail stays hidden"))
         assertTrue(ScreenCapturePolicy.copy(35).contains("Recents thumbnail stays hidden"))

@@ -140,6 +140,28 @@ class ModuleActivity : ComponentActivity() {
         }
     }
 
+    private var screenCapture = ScreenCapturePolicy.Decision(secure = true, hideRecents = false)
+    private var screenResumed = false
+
+    private fun applyScreenCapture() {
+        if (ScreenCapturePolicy.secureWindow(screenCapture, screenResumed, hasWindowFocus()))
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        applyScreenCapture()
+    }
+
+    override fun onResume() {
+        super.onResume(); screenResumed = true; applyScreenCapture()
+    }
+
+    override fun onPause() {
+        screenResumed = false; applyScreenCapture(); super.onPause()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Never resurrect a stopped runtime after process death. Rotation is handled in-place.
@@ -163,7 +185,8 @@ class ModuleActivity : ComponentActivity() {
                     // Pixel-bearing modules stay secure unless this module's "Allow screenshots" switch is on.
                     val screen = ScreenCapturePolicy.decide(module.manifest.capabilities.map { it.id }, module.allowScreenshots,
                         android.os.Build.VERSION.SDK_INT)
-                    if (screen.secure) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    screenCapture = screen
+                    applyScreenCapture()
                     if (screen.hideRecents && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
                         setRecentsScreenshotEnabled(false)
                     selected = module

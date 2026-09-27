@@ -3,7 +3,7 @@ import json
 import math
 import unittest
 from capture_checks import (G, acceleration, check_result, check_zoom_pair, dark_fraction, level_readout,
-                            parse_result, readout_matches, secure_blackout, zoomed)
+                            parse_result, readout_matches, secure_blackout, screenshot_content_bounds, zoomed)
 
 
 def vector(value):
@@ -106,6 +106,15 @@ class ReadoutAndResultTest(unittest.TestCase):
 
 
 class ScreenshotTest(unittest.TestCase):
+    def test_system_bars_excluded_without_masking_module_or_fullscreen_containers(self):
+        def node(key, bounds, package='com.android.systemui'):
+            return {'package':package,'resource-id':'com.android.systemui:id/'+key,'bounds':bounds}
+        bars=[node('status_bar','[0,0][720,36]'),node('navigation_bar_frame','[0,1244][720,1280]')]
+        self.assertEqual((0,36,720,1244),screenshot_content_bounds(720,1280,bars))
+        self.assertEqual((0,0,720,1280),screenshot_content_bounds(720,1280,[
+            node('status_bar','[0,0][720,1280]'), node('status_bar','[0,0][720,80]','dev.construct.runtime'),
+            node('app','[0,0][720,90]'),node('status_bar','[5,0][715,80]')]))
+
     def test_secure_blackout_detection(self):
         black = [(0, 0, 0, 255)] * 1000
         ui = [(0, 0, 0, 255)] * 900 + [(230, 240, 234, 255)] * 100

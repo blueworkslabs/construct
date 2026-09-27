@@ -395,6 +395,11 @@ internal object ScreenCapturePolicy {
         !allowScreenshots -> Decision(secure = true, hideRecents = false)
         else -> Decision(secure = false, hideRecents = sdk >= RECENTS_API)
     }
+    // The Recents API suppresses stored snapshots, but launcher live tiles can still
+    // show an unfocused activity surface. Opt-in only relaxes the secure window
+    // while actively resumed AND focused, then protects the surface on focus loss.
+    fun secureWindow(decision: Decision, resumed: Boolean, focused: Boolean): Boolean =
+        decision.secure || (decision.hideRecents && (!resumed || !focused))
     fun copy(sdk: Int): String = "Off by default. When on, screenshots and screen recordings of this module work, and " +
         "anything recording your screen can see its photos. " +
         (if (sdk >= RECENTS_API) "The Recents thumbnail stays hidden."
