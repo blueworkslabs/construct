@@ -377,7 +377,16 @@ try:
  adb('shell','cmd','location','set-location-enabled','true')
  for _ in range(3):adb('emu','geo','fix',lon,lat);time.sleep(1)
  to_library();shoot('2×',measured=True);contains('Estimated viewpoint',60)
- for chip in ('2× zoom','Level measured','Lens from camera'):reach_text(chip)
+ for chip in ('2× zoom','Level measured','Lens from camera'):
+  try:reach_text(chip)
+  except Exception as error:
+   receipt['missingRealCaptureChip']=chip;save()
+   # Retain the actual omission explanation; never count absence as a pass.
+   try:
+    click(lambda t:t=='Calibration details');capture('aime-real-missing-measurement')
+    receipt['realMissingMeasurementDetails']=[t for t in labels() if t];save()
+   except Exception:pass
+   raise RuntimeError('Real capture missing required chip: '+chip) from error
  capture('aime-real-measured')
  receipt['realCaptureChips']=[chip for chip in ('Level measured','Lens from camera','Compass hint','2× zoom') if any(chip in (t or '') for t in labels())];save()
  click('Mark landmark');tap_photo({'x':.5,'y':.5})
