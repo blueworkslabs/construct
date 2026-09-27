@@ -52,9 +52,34 @@ def main():
         page.evaluate(
             """async()=>{state.store={photo1:AimeCore.newSidecar({...SyntheticAime.viewer,accuracyM:10,timestamp:Date.now()})};await openPhoto('photo1');const f=AimeCore.parseOverpass(SyntheticAime.overpass()).features.find(f=>f.name==='Synthetic Tower A');await update(s=>({...s,marks:[AimeCore.markFrom(f,SyntheticAime.taps.markA.x,SyntheticAime.taps.markA.y)]}));}"""
         )
+        # A cached lookup opens synchronously enough for pointerup -> click
+        # retargeting on touch WebViews. At 2x text a candidate lies under the tap.
+        page.set_viewport_size({"width": 360, "height": 604})
+        page.evaluate("document.documentElement.style.fontSize='32px';setMode('what')")
+        page.locator("#stage").scroll_into_view_if_needed()
+        page.evaluate("features()")
+        r = page.locator("#stage").bounding_box()
+        x, y = r["x"] + r["width"] * 0.66, r["y"] + r["height"] * 0.42
+        cdp = page.context.new_cdp_session(page)
+        cdp.send(
+            "Input.dispatchTouchEvent",
+            {"type": "touchStart", "touchPoints": [{"x": x, "y": y, "id": 1}]},
+        )
+        cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+        page.wait_for_timeout(500)
+        assert page.locator(
+            "#candidates-dialog"
+        ).is_visible(), "Photo tap clicked through candidate dialog"
+        assert page.evaluate(
+            "state.pane === 'photo'"
+        ), "Same touch selected a candidate"
+        page.locator("#close-candidates").click()
+        page.set_viewport_size({"width": 420, "height": 900})
+        page.evaluate("document.documentElement.style.fontSize=''")
+        print("PASS touch tap opens candidates without selecting one at 2x text")
         # A delayed feature response while the visible Photos control leaves the photo.
         page.evaluate(
-            """()=>{const old=call;call=(m,p)=>m==='net.http'?new Promise(r=>window.releaseFetch=()=>r({status:200,text:SyntheticAime.overpass()})):old(m,p);state.features.clear();window.pendingWhat=task(()=>whatsThat(.7,.4));}"""
+            """()=>{const old=call;window.originalCall=call;call=(m,p)=>m==='net.http'?new Promise(r=>window.releaseFetch=()=>r({status:200,text:SyntheticAime.overpass()})):old(m,p);state.features.clear();window.pendingWhat=task(()=>whatsThat(.7,.4));}"""
         )
         page.click("#back")
         page.evaluate("releaseFetch()")
@@ -111,6 +136,34 @@ def main():
             new,
         )
         print("PASS navigation cancellation and moving-pinch anchor")
+        if page.evaluate("typeof AimeMap !== 'undefined'"):
+            page.evaluate("call=window.originalCall")
+            page.evaluate(
+                "whatsThat(SyntheticAime.taps.whatB.x,SyntheticAime.taps.whatB.y)"
+            )
+            page.locator("#close-candidates").click()
+            assert page.evaluate("state.lastList.rows.length > 0")
+            page.evaluate("update(s=>({...s, marks: []}))")
+            page.evaluate("showPane('map',true)")
+            assert page.evaluate(
+                "state.lastList === null && map.scene.wedge === null && map.scene.candidates.length === 0"
+            ), "Old ranking survived calibration change"
+            page.evaluate(
+                "window.dispatchEvent(new CustomEvent('constructvisibilitychange',{detail:{visible:false}}))"
+            )
+            assert page.evaluate("!map.visible"), "Host menu did not pause map tiles"
+            page.evaluate(
+                "window.dispatchEvent(new CustomEvent('constructvisibilitychange',{detail:{visible:true}}))"
+            )
+            assert page.evaluate("map.visible"), "Map failed to resume after host menu"
+            page.evaluate(
+                "db.put=async()=>{throw new Error('Synthetic storage failure')};map.scene.viewer={lat:0,lon:0};map.cb.onViewer({lat:0,lon:0,mPerPx:1})"
+            )
+            page.wait_for_function("!state.busy")
+            assert page.evaluate(
+                "map.scene.viewer.lat === current().viewer.lat && map.scene.viewer.lon === current().viewer.lon"
+            ), "Failed write left an unsaved viewer ring"
+            print("PASS map invalidation, menu pause/resume and failed correction")
         assert not errors, errors
         b.close()
 

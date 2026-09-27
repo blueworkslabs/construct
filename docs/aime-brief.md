@@ -65,6 +65,9 @@ for slice 1. Orientation capture stays a later, optional aid.
    viewfinder wait requires viewpoint confirmation/correction before querying.
    A photo with no usable fix stays
    unlocated: no query, no ranking, a clear "set your viewpoint" prompt.
+   Implemented thresholds (`aime-core.js`): a kept fix older than 120 s at the
+   shutter (the host's cached-fix limit) or a viewfinder wait over 60 s sets
+   `viewer.review`; only an explicit confirm or a map correction clears it.
    Associate the sidecar only when a successful before/after `list` comparison
    yields exactly one new stable id. Ambiguous or interrupted captures remain
    unlocated, never assigned by list position; a fix without a photo is discarded.
@@ -92,8 +95,12 @@ for slice 1. Orientation capture stays a later, optional aid.
    the tap and that candidate's comparison ±σ. When no result has `close:true`
    (within its own 2σ), the sheet says "no
    close match" and shows the nearest two greyed. Tapping a candidate opens the
-   **map view**: fitted viewer dot, tap ray as a wedge of total width 2×direction
-   σ (±1σ, not a 95% region), marks as solid pins, candidates as numbered pins.
+   **map view**: fitted viewer dot, tap ray as a wedge drawn from the fitted
+   viewpoint with an inner band at ±1 direction σ and a fainter outer band out
+   to ±2 direction σ (not a guaranteed 95% region), marks as
+   solid pins, candidates as numbered pins.
+   Candidate comparisons use their own σ, which can be wider; a nearby candidate
+   offered by the sheet can therefore still lie outside the direction bands.
    Keep the reported/confirmed viewpoint and its accuracy visible separately
    when the fit moves it. Preserve that input in storage; do not overwrite it
    with the fit or quietly centre later feature queries on a derived position.

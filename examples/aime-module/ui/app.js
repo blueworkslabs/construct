@@ -19,6 +19,8 @@ const state = {
   horizonExplained: false,
   pendingTap: null,
   lastTap: null,
+  lastList: null, // {rows, wedge, bearing} from the last What's that?
+  pane: "photo",
   features: new Map(), // cacheKey → {features, incomplete}
   fetching: new Map(), // cacheKey → Promise
   fetchProblem: null,
@@ -26,6 +28,7 @@ const state = {
   busy: false,
   photoGeneration: 0,
   refreshPending: false,
+  visible: true,
   view: { scale: 1, x: 0, y: 0 },
 };
 
@@ -273,6 +276,7 @@ async function openPhoto(id) {
   state.selectedId = id;
   state.image = { url: data.url, width: data.width, height: data.height };
   state.lastTap = null;
+  state.lastList = null;
   state.pendingTap = null;
   state.view = { scale: 1, x: 0, y: 0 };
   $("library").hidden = true;
@@ -283,10 +287,10 @@ async function openPhoto(id) {
   setMode(s.marks.length ? "what" : "mark");
   say("photo-status", "");
   recalibrate();
-  layout();
-  render();
+  showPane(s.viewer ? "photo" : "map", true);
 }
 function showLibrary() {
+  map.pause(true);
   state.photoGeneration++;
   $("photo").hidden = true;
   $("library").hidden = false;
@@ -309,8 +313,12 @@ function recalibrate() {
 async function update(change) {
   const next = C.cleanSidecar(change(structuredClone(current())));
   await putSidecar(state.selectedId, next);
+  // A changed calibration/radius invalidates every previously ranked result.
+  state.lastList = null;
+  state.lastTap = null;
   recalibrate();
   render();
+  if (state.pane === "map") renderMap(false);
 }
 function setMode(mode) {
   state.mode = mode;
@@ -319,8 +327,8 @@ function setMode(mode) {
 }
 function hint() {
   const s = current();
-  if (!s.viewer) return "This photo has no usable viewpoint, so Aimé cannot look up landmarks yet. Setting the viewpoint on the map arrives with the map view.";
-  if (s.viewer.review) return "Check the estimated viewpoint above before looking up landmarks.";
+  if (!s.viewer) return "This photo has no usable viewpoint. Set where you stood on the map before marking landmarks.";
+  if (s.viewer.review) return "Check the estimated viewpoint: confirm it, or drag it on the map to where you stood.";
   if (state.mode === "mark") return s.marks.length ? `Tap another landmark you know to fit the lens (optional). ${s.marks.length}/${C.MAX_MARKS} marked.` : "Tap a landmark you know, like a church tower or summit, then pick it from the list.";
   if (state.mode === "horizon") return `Tap a true level horizon: ${s.horizon.length}/${C.MAX_HORIZON} points.`;
   return state.cal ? "Tap anything to see what it could be." : "Mark a landmark you know first.";
@@ -405,6 +413,7 @@ function render() {
   );
   drawOverlay();
   drawRuler();
+  $("mode-mark").title = $("mode-horizon").title = v ? "" : "Set the viewpoint on the map first";
 }
 
 // ---- Stage geometry, zoom and taps ---------------------------------------------
@@ -456,8 +465,10 @@ function normalised(clientX, clientY) {
   const stage = $("stage"),
     pointers = new Map();
   let drag = null,
-    pinch = null;
+    pinch = null,
+    completedTap = null;
   stage.addEventListener("pointerdown", (e) => {
+    completedTap = null;
     if (e.target.closest(".zoom")) return;
     stage.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -507,11 +518,18 @@ function normalised(clientX, clientY) {
     drag = null;
     if (tap) {
       const p = normalised(e.clientX, e.clientY);
-      if (p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1) onTap(p.x, p.y);
+      if (p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1) completedTap = p;
     }
   };
   stage.addEventListener("pointerup", release);
   stage.addEventListener("pointercancel", release);
+  stage.addEventListener("click", () => {
+    // A modal opened on pointerup can receive the compatibility click from
+    // that same touch. Activate only during click, whose target is now fixed.
+    const p = completedTap;
+    completedTap = null;
+    if (p) onTap(p.x, p.y);
+  });
   stage.addEventListener(
     "wheel",
     (e) => {
@@ -532,7 +550,7 @@ function normalised(clientX, clientY) {
 function onTap(x, y) {
   if (state.busy) return;
   const s = current();
-  if (!s.viewer) return say("photo-status", "This photo has no usable viewpoint yet.", "attention");
+  if (!s.viewer) return say("photo-status", "Set this photo’s viewpoint on the map first.", "attention");
   if (s.viewer.review) return say("photo-status", "Confirm the estimated viewpoint first.", "attention");
   if (state.mode === "mark") {
     if (s.marks.length >= C.MAX_MARKS) return say("photo-status", `At most ${C.MAX_MARKS} marks per photo. Remove one first.`, "attention");
@@ -749,18 +767,25 @@ async function whatsThat(x, y) {
     ol = $("candidates");
   ol.replaceChildren();
   const wedge = ranked.length ? ranked[0].wedgeSigmaDeg : S.uncertainty(state.cal, x, y);
+  state.lastList = { rows: list.rows, wedge, bearing: S.bearingAt(state.cal, x, y) };
   $("candidates-title").textContent = list.anyClose ? "Could be" : "No close match";
   $("candidates-note").textContent = `Your tap points ${Math.round(S.bearingAt(state.cal, x, y))}° (${C.compass(S.bearingAt(state.cal, x, y))}), direction ±${wedge.toFixed(1)}°.` + (list.anyClose ? "" : " Nearest two shown greyed.");
   let positionNote = false;
-  list.rows.forEach((r) => {
+  list.rows.forEach((r, i) => {
     const li = document.createElement("li"),
+      b = document.createElement("button"),
       small = document.createElement("small"),
       f = r.candidate.feature;
     li.className = r.greyed ? "greyed" : "";
-    li.textContent = `${r.greyed ? "" : "Could be "}${f.name}`;
+    b.textContent = `${r.greyed ? "" : "Could be "}${f.name}`;
     small.textContent = `${C.kindLabel(f)} · ${C.km(r.distanceKm)} · ${C.signed(r.deltaDeg)} from your tap · ±${r.sigmaDeg.toFixed(1)}°${r.close ? "" : " · not close"}`;
     if (C.positionMatters(r)) positionNote = true;
-    li.append(small);
+    b.append(small);
+    b.onclick = () => {
+      $("candidates-dialog").close();
+      showPane("map", true, i);
+    };
+    li.append(b);
     ol.append(li);
   });
   if (!list.rows.length) {
@@ -776,8 +801,149 @@ async function whatsThat(x, y) {
   say("photo-status", list.anyClose ? `Closest: ${list.rows[0].candidate.feature.name}, ±${list.rows[0].sigmaDeg.toFixed(1)}°.` : "No close match for that tap.");
 }
 
+// ---- Map view ------------------------------------------------------------------------
+async function tileImage(url) {
+  const r = await call("net.http", { op: "get", url, format: "image" });
+  if (r.status !== 200 || typeof r.dataUrl !== "string") throw Object.assign(new Error("Map tile unavailable"), { code: "HTTP_STATUS" });
+  return r.dataUrl;
+}
+const map = new AimeMap($("map"), {
+  getImage: tileImage,
+  onViewer: (point) => {
+    if (state.busy) return renderMap(false);
+    task(async () => {
+      try { await setViewpoint(point); }
+      finally { renderMap(false); } // Restore the saved ring if persistence failed.
+    });
+  },
+  onError: (error) =>
+    say("map-status", !error ? "" : error.code === "CAPABILITY_DENIED" ? "Map tiles need internet access for Aimé (Construct menu → Module access)." : "Map tiles unavailable. The list below still describes the map.", error ? "attention" : ""),
+});
+map.pause(true);
+window.addEventListener("constructvisibilitychange", (event) => {
+  state.visible = event.detail?.visible !== false;
+  map.pause(!state.visible || $("photo").hidden || state.pane !== "map");
+});
+// A dragged or placed viewpoint is the user's input: corrected, confirmed, with
+// the placement precision of the current map scale as its accuracy.
+async function setViewpoint(point) {
+  const before = current().viewer;
+  await update((s) => ({
+    ...s,
+    viewer: {
+      lat: point.lat,
+      lon: point.lon,
+      accuracyM: Math.max(5, Math.round(point.mPerPx * 12)),
+      timestamp: before ? before.timestamp : null,
+      approximate: false,
+      corrected: true,
+      review: false,
+    },
+  }));
+  state.lastTap = null;
+  state.lastList = null;
+  say("photo-status", `Viewpoint ${before ? "corrected" : "set"}. Landmarks are looked up around it when needed.`);
+  renderMap(false);
+}
+function showPane(pane, fit = false, focus = null) {
+  state.pane = pane;
+  $("photo-pane").hidden = pane !== "photo";
+  $("map-pane").hidden = pane !== "map";
+  $("show-photo").setAttribute("aria-pressed", String(pane === "photo"));
+  $("show-map").setAttribute("aria-pressed", String(pane === "map"));
+  map.pause(!state.visible || pane !== "map");
+  if (pane === "photo") {
+    layout();
+    render();
+  } else {
+    render();
+    renderMap(fit, focus);
+  }
+}
+// Other photos' viewpoints are a starting centre for placing an unlocated one.
+function knownCentre() {
+  const v = Object.values(state.store || {}).map((s) => s.viewer).filter(Boolean);
+  return v.length ? v[v.length - 1] : null;
+}
+function renderMap(fit, focus = null) {
+  if ($("map-pane").hidden) return;
+  const s = current(),
+    v = s.viewer,
+    list = state.lastList,
+    cal = state.cal,
+    fitted = cal && v && S.distance(v, cal.viewer) * 1000 > 1 ? { lat: cal.viewer.lat, lon: cal.viewer.lon } : null;
+  const candidates = list ? list.rows.map((r, i) => ({ lat: r.candidate.point.lat, lon: r.candidate.point.lon, n: i + 1, greyed: r.greyed, name: r.candidate.feature.name })) : [];
+  const lengthKm = Math.max(s.radiusKm, ...candidates.map((c) => S.distance(fitted || v || c, c) * 1.1));
+  map.placing = !v;
+  map.editable = !!v;
+  map.setScene(
+    {
+      viewer: v ? { lat: v.lat, lon: v.lon, accuracyM: v.accuracyM || 20 } : null,
+      fitted,
+      wedge: v && list ? { bearing: list.bearing, sigma: list.wedge, lengthKm } : null,
+      marks: s.marks.map((m) => ({ lat: m.lat, lon: m.lon, name: m.name })),
+      candidates,
+      focus: focus !== null && candidates[focus] ? focus : null,
+    },
+    false,
+  );
+  if (fit) {
+    if (v) map.fit();
+    else {
+      const c = knownCentre();
+      map.center = c ? { lat: c.lat, lon: c.lon } : { lat: 47, lon: 8 };
+      map.zoom = c ? 13 : 4;
+    }
+    map.draw();
+  }
+  $("map-hint").textContent = !v
+    ? "Set your viewpoint: tap the map where you stood when taking this photo. Pan and zoom first to place it precisely."
+    : v.review
+      ? "Drag the ring to where you stood, or confirm the estimated viewpoint above."
+      : "Drag the ring to correct where you stood. The wedge shows your last tap’s direction: ±1σ, fainter out to ±2σ.";
+  $("locate-start").hidden = !!v;
+  const legend = $("map-legend");
+  legend.replaceChildren();
+  const item = (label, detail) => {
+    const li = document.createElement("li"),
+      span = document.createElement("span"),
+      small = document.createElement("small");
+    span.textContent = label;
+    small.textContent = detail;
+    span.append(small);
+    li.append(span);
+    legend.append(li);
+  };
+  if (!v) item("No viewpoint yet", "Tap the map to set where you stood.");
+  else {
+    item(`Ring: ${v.corrected ? "your corrected" : v.review ? "estimated (please confirm)" : "your estimated"} viewpoint`, `±${Math.round(v.accuracyM || 20)} m accuracy, shown as the shaded circle`);
+    if (fitted) item("Dot: viewpoint fitted from your marks", `${Math.round(S.distance(v, fitted) * 1000)} m from the ring; your saved viewpoint is unchanged`);
+  }
+  if (v && list) item(`Wedge: your tap points ${Math.round(list.bearing)}° (${C.compass(list.bearing)})`, `±${list.wedge.toFixed(1)}° (1σ), fainter band to ±${(2 * list.wedge).toFixed(1)}° (2σ); nearby candidates can have a wider ±σ of their own`);
+  s.marks.forEach((m) => item(`Green pin: ${m.name}`, v ? `landmark you marked · ${C.km(S.distance(v, m))} · ${Math.round(S.bearing(v, m))}°` : "landmark you marked"));
+  candidates.forEach((c, i) => {
+    const r = list.rows[i];
+    item(`Pin ${c.n}: ${c.name}${i === focus ? " (selected)" : ""}`, `${r.greyed ? "not close · " : "could be · "}${C.km(r.distanceKm)} · ${C.signed(r.deltaDeg)} ±${r.sigmaDeg.toFixed(1)}°`);
+  });
+}
+
 // ---- Wiring ---------------------------------------------------------------------
 $("take").onclick = () => task(takePhoto);
+$("show-photo").onclick = () => showPane("photo");
+$("show-map").onclick = () => showPane("map", true);
+$("map-zoom-in").onclick = () => map.zoomBy(1);
+$("map-zoom-out").onclick = () => map.zoomBy(-1);
+$("map-fit").onclick = () => renderMap(true);
+$("locate-start").onclick = () =>
+  task(async () => {
+    say("map-status", "Reading your current location to centre the map…");
+    const { fix, error } = await locate(true);
+    if (!fix) return say("map-status", describe(error || { code: "LOCATION_DATA" }, "Location"), "error");
+    map.center = { lat: fix.lat, lon: fix.lon };
+    map.zoom = 15;
+    map.draw();
+    say("map-status", "Centred on where you are now. Tap where you stood when you took the photo.");
+  });
 $("back").onclick = showLibrary;
 $("mode-mark").onclick = () => setMode("mark");
 $("mode-what").onclick = () => setMode("what");
