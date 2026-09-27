@@ -509,6 +509,53 @@ check("lens source and the calibration details panel (raw capture, used or why n
   assert.equal(C.precision({}), "");
 });
 
+check("outside-your-marks hint: beyond the leftmost/rightmost mark, or far from a single mark; out-of-frame pins by side", () => {
+  const two = [0.3, 0.6];
+  assert.equal(C.marksHint([], 0.9), null, "no marks: nothing to say");
+  assert.equal(C.marksHint(two, 0.45), null, "between the marks");
+  assert.equal(C.marksHint(two, 0.605), null, "within 1 % of the rightmost");
+  assert.deepEqual(C.marksHint(two, 0.95), { side: "right", text: "Outside your marks: add one on the right for better precision." });
+  assert.deepEqual(C.marksHint([0.6, 0.3, 0.5], 0.1), { side: "left", text: "Outside your marks: add one on the left for better precision." });
+  for (const side of ["left", "behind-left"]) assert.equal(C.marksHint(two, 0, side).side, "left");
+  for (const side of ["right", "behind-right"]) assert.equal(C.marksHint(two, 1, side).side, "right");
+  assert.equal(C.marksHint(two, 0.45, "above"), null, "above/below use the anchor column");
+  const one = C.marksHint([0.4], 0.46);
+  assert.deepEqual(one, { side: "second", text: "Add a second mark on the other side of your target for better precision." });
+  assert.equal(C.marksHint([0.4], 0.44), null, "within 5 % of a single mark");
+  assert.equal(C.marksHint([0.4], 0.4, "behind-left").side, "second");
+  // Fable's 2× case: both marks left of the target.
+  assert.equal(C.marksHint([0.1, 0.6], 0.95).side, "right");
+});
+
+check("newer data for a saved mark: same name and kind within 200 m, different position or p; update keeps the tap and is undoable", () => {
+  const r1 = { x: 0.31, y: 0.52, kind: "tower", name: "Telemoritz", lat: 52.36544, lon: 9.74212, positionM: 60, dataset: "2026-09-23.1-r1" };
+  const feature = (extra = {}) => ({ name: "Telemoritz", kind: "tower", lat: 52.36571, lon: 9.74190, positionM: 8, p: 8, e: 282, w: 1.8, dataset: "2026-09-23.1-r2", ...extra });
+  const n = C.newerMark(r1, "2026-09-23.1-r2", [feature({ name: "Other" }), feature()]);
+  assert.ok(n && n.fromM === 60 && n.toM === 8 && Math.abs(n.moveM - C.metres(r1, feature())) < 1e-9 && n.moveM > 30 && n.moveM < 40, JSON.stringify(n));
+  assert.equal(C.newerText(n), `newer data: ±60 m → ±8 m, moved ${Math.round(n.moveM)} m`);
+  assert.equal(C.newerText({ fromM: 60, toM: 16, moveM: 0 }), "newer data: ±60 m → ±16 m");
+  assert.equal(C.newerMark(r1, "2026-09-23.1-r1", [feature()]), null, "same dataset: nothing newer");
+  assert.equal(C.newerMark(r1, "2026-09-23.1-r2", [feature({ kind: "mast" })]), null, "kind must match");
+  assert.equal(C.newerMark(r1, "2026-09-23.1-r2", [feature({ lat: 52.3674 })]), null, "beyond 200 m is another landmark");
+  assert.equal(C.newerMark(r1, "2026-09-23.1-r2", [feature({ lat: r1.lat, lon: r1.lon, positionM: 60 })]), null, "unchanged position and p");
+  assert.ok(C.newerMark(r1, "2026-09-23.1-r2", [feature({ lat: r1.lat, lon: r1.lon, positionM: 16 })]), "p alone changed");
+  assert.ok(C.newerMark({ ...r1, dataset: "" }, "2026-09-23.1-r2", [feature()]), "unknown dataset (0.1.3–0.1.x marks) counts as older");
+  assert.equal(C.newerMark(legacyMark(1), "2026-09-23.1-r2", [feature({ name: "Mark 1" })]), null, "legacy OSM marks have no kind to match");
+  assert.equal(C.newerMark(r1, null, [feature()]), null, "no index yet");
+  // The two nearest candidates: the closer one wins.
+  assert.equal(C.newerMark(r1, "2026-09-23.1-r2", [feature({ lat: 52.3665 }), feature()]).feature.lat, 52.36571);
+  const updated = C.refreshMark(r1, n.feature);
+  assert.deepEqual(updated, { x: 0.31, y: 0.52, kind: "tower", name: "Telemoritz", lat: 52.36571, lon: 9.7419, positionM: 8, dataset: "2026-09-23.1-r2" });
+  assert.equal(C.newerMark(updated, "2026-09-23.1-r2", [feature()]), null, "nothing newer after the update");
+  const sidecar = C.cleanSidecar({ viewer: { lat: 52.37648, lon: 9.73848, accuracyM: 10 }, marks: [r1, mark(2)] });
+  const step = C.undoStep("pA", sidecar, "updating Telemoritz"),
+    after = C.cleanSidecar({ ...sidecar, marks: sidecar.marks.map((k, i) => (i === 0 ? C.refreshMark(k, n.feature) : k)) });
+  assert.deepEqual(C.undone(after, step).marks, sidecar.marks, "undo restores the old position and p");
+  // The panel shows it under the mark, with the update action.
+  const panel = C.calibrationDetails({ capture: null, width: 4000, height: 3000, cal: null, viewer: sidecar.viewer, marks: [{ name: "Telemoritz", kind: "tower", positionM: 60, residualDeg: null, distanceKm: 1, newer: n }] });
+  assert.deepEqual(panel[2].rows[1], ["", C.newerText(n), { action: "update", index: 0 }]);
+});
+
 check("landmark search orders by direction from the tap (in 2σ steps), then nearest; plain nearest first otherwise", () => {
   const ix = C.parseIndex(F.index());
   const features = F.cells.flatMap((c) => C.parseCell(ix, c, F.cell(c)));
@@ -970,6 +1017,51 @@ checkAsync("features() returns the viewpoint cell's declination; declinationAt u
     got = await plain.features({ lat: 46.5, lon: 9.5 }, 10);
   assert.equal(got.features.length, 1);
   assert.equal(got.declination, null);
+});
+
+checkAsync("declination regression (0.2.1 hardware): a saved photo's viewpoint cell comes from the current index, without a lookup, whatever dataset its marks are from", async () => {
+  // Index r2 now; the photo's marks were picked from r1. Its cell has a declination.
+  const r2 = { ...INDEX, revision: 2, dataset: "2026-09-23.1-r2", path: "2026-09-23.1-r2/cells/", cells: ["52_9", "52_10", "51_9"] };
+  const ix2 = C.parseIndex(JSON.stringify(r2)),
+    cell = (name, extra) => JSON.stringify({ schema: 1, release: r2.release, revision: 2, cell: name.split("_").map(Number), f: [], ...extra });
+  const files = { [C.INDEX_URL]: JSON.stringify(r2), [C.cellUrl(ix2, "52_9")]: cell("52_9", { declination: 4.1 }), [C.cellUrl(ix2, "52_10")]: cell("52_10", { declination: 4.2 }), [C.cellUrl(ix2, "51_9")]: cell("51_9") };
+  const host = dataHost(files),
+    data = C.landmarkData(host.get),
+    viewer = { lat: 52.37648, lon: 9.73848 };
+  const saved = C.cleanSidecar({ viewer: { ...viewer, accuracyM: 10 }, marks: [mark(1, { dataset: "2026-09-23.1-r1", lat: 52.4, lon: 9.8 })], capture: { ...FULL, zoomRatio: 2 } });
+  // The bug: calibration of a saved photo needs no lookup, so nothing was downloaded.
+  assert.equal(data.declinationAt(viewer), null);
+  assert.equal(C.measuredInputs(saved.capture, 4000, 3000, data.declinationAt(viewer)).skipped.compass, "declination");
+  // The fix: fetch just the viewpoint's cell from the current index.
+  assert.equal(await data.declinationFor(viewer), 4.1);
+  assert.deepEqual(host.log, [C.INDEX_URL, C.cellUrl(ix2, "52_9")], "one cell, from r2, not the marks' r1");
+  assert.equal(data.declinationAt(viewer), 4.1);
+  const m = C.measuredInputs(saved.capture, 4000, 3000, data.declinationAt(viewer));
+  assert.equal(m.used.compass, true);
+  assert.equal(m.input.declination, 4.1);
+  // A later lookup reuses that cell.
+  host.log.length = 0;
+  await data.features(viewer, 10);
+  assert.ok(!host.log.includes(C.cellUrl(ix2, "52_9")));
+  // Unlisted cell, a cell without the field, bad input → null; a failure rejects (the app retries later).
+  assert.equal(await data.declinationFor({ lat: 40.4, lon: -3.7 }), null);
+  assert.equal(await data.declinationFor({ lat: 51.5, lon: 9.5 }), null);
+  assert.equal(await data.declinationFor(null), null);
+  const down = C.landmarkData(dataHost(files, { fail: (url) => (url.endsWith("52_9.json") ? C.httpProblem(null, 503) : null) }).get);
+  await assert.rejects(down.declinationFor(viewer), { code: "DATA_STATUS" });
+});
+
+checkAsync("updating a saved mark to newer data is one record write", async () => {
+  const kv = host(),
+    db = C.persistence(kv);
+  await db.load();
+  const r1 = { x: 0.31, y: 0.52, kind: "tower", name: "Telemoritz", lat: 52.36544, lon: 9.74212, positionM: 60, dataset: "2026-09-23.1-r1" };
+  await db.put("pA", C.cleanSidecar({ viewer: { lat: 52.37648, lon: 9.73848 }, marks: [r1] }));
+  const writes = kv.log.length,
+    newer = C.newerMark(r1, "2026-09-23.1-r2", [{ name: "Telemoritz", kind: "tower", lat: 52.36571, lon: 9.7419, positionM: 8, dataset: "2026-09-23.1-r2" }]);
+  await db.put("pA", { ...db.store.pA, marks: db.store.pA.marks.map((k) => C.refreshMark(k, newer.feature)) });
+  assert.deepEqual(kv.log.slice(writes).map((w) => w.key), [C.recordKey(0)]);
+  assert.equal(db.store.pA.marks[0].positionM, 8);
 });
 
 checkAsync("a dragged point is written once on release, never per move; unmoved or cancelled drags write nothing", async () => {

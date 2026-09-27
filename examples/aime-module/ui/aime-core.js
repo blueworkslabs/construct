@@ -498,12 +498,24 @@ const AimeCore = (() => {
       const c = index && viewer && latLon(viewer.lat, viewer.lon) && cells.get(cellKey(index, Math.floor(viewer.lat) + "_" + Math.floor(viewer.lon)));
       return c ? c.declination : null;
     };
+    // Declination for a viewpoint whose cell may not be downloaded yet: a saved
+    // photo is calibrated from its stored marks without any lookup, so fetch
+    // just the current index's cell containing the viewpoint (cached like any
+    // cell). Independent of the dataset the photo's marks came from. → degrees
+    // east, or null when the index does not list that cell or it has none.
+    async function declinationFor(viewer) {
+      if (!viewer || !latLon(viewer.lat, viewer.lon)) return null;
+      const ix = await loadIndex(),
+        name = Math.floor(viewer.lat) + "_" + Math.floor(viewer.lon);
+      return ix.cells.has(name) ? (await cell(ix, name)).declination : null;
+    }
     return {
       get index() {
         return index;
       },
       loadIndex,
       declinationAt,
+      declinationFor,
       // → {features, dataset, cells, partialCoverage, declination (the
       // viewpoint cell's, or null)}; outside coverage throws OUTSIDE_COVERAGE.
       async features(viewer, radiusKm) {
@@ -735,11 +747,52 @@ const AimeCore = (() => {
   const pinText = (loc, name = "Pin") =>
     `${name}: ${loc.inFrame ? "in the photo" : WHERE[loc.side]} · ${range(loc.distanceKm, loc.bearing)}${loc.inFrame ? ` · band ±${(2 * loc.sigmaDeg).toFixed(1)}° (2σ)` : ""}`;
 
+  // ---- Precision hints ----------------------------------------------------------
+  // Directions are interpolated between marks and extrapolated beyond them, where
+  // a small lens error grows. For a "What's that?" tap or a pin shown in the
+  // photo (image x in [0, 1], or `side` for a pin out of frame): beyond the
+  // leftmost or rightmost mark (by more than 1 % of the width) → "left"/"right";
+  // with a single mark, more than 5 % of the width from it → "second".
+  const OUTSIDE_TOLERANCE = 0.01,
+    SINGLE_MARK_GAP = 0.05;
+  function marksHint(markXs, x, side = null) {
+    if (!markXs.length) return null;
+    const lr = side && /left$/.test(side) ? "left" : side && /right$/.test(side) ? "right" : null;
+    if (markXs.length === 1) {
+      if (!lr && !(Math.abs(x - markXs[0]) > SINGLE_MARK_GAP)) return null;
+      return { side: "second", text: "Add a second mark on the other side of your target for better precision." };
+    }
+    const where = lr || (x < Math.min(...markXs) - OUTSIDE_TOLERANCE ? "left" : x > Math.max(...markXs) + OUTSIDE_TOLERANCE ? "right" : null);
+    return where ? { side: where, text: `Outside your marks: add one on the ${where} for better precision.` } : null;
+  }
+
+  // ---- Newer landmark data for a saved mark ------------------------------------
+  // A mark keeps the position and p of the dataset it was picked from. When the
+  // current dataset differs and has the same landmark (same name and kind within
+  // 200 m) at another position or p, offer it; never apply it automatically.
+  const REFRESH_RADIUS_M = 200;
+  function newerMark(mark, dataset, features) {
+    if (!mark || !isKind(mark.kind) || !dataset || mark.dataset === dataset) return null;
+    let best = null;
+    for (const f of features || []) {
+      if (f.name !== mark.name || f.kind !== mark.kind) continue;
+      const moveM = metres(mark, f);
+      if (moveM <= REFRESH_RADIUS_M && (!best || moveM < best.moveM)) best = { feature: f, moveM };
+    }
+    if (!best) return null;
+    const f = best.feature;
+    if (f.lat.toFixed(5) === mark.lat.toFixed(5) && f.lon.toFixed(5) === mark.lon.toFixed(5) && f.positionM === mark.positionM) return null;
+    return { feature: f, moveM: best.moveM, fromM: mark.positionM, toM: f.positionM };
+  }
+  // The mark with the newer data's position, p and dataset; its tap (x, y), name and kind stay.
+  const refreshMark = (mark, feature) => cleanMark({ ...mark, lat: feature.lat, lon: feature.lon, positionM: feature.positionM, dataset: feature.dataset });
+  const newerText = (n) => `newer data: ±${Math.round(n.fromM)} m → ±${Math.round(n.toM)} m` + (n.moveM >= 1 ? `, moved ${Math.round(n.moveM)} m` : "");
+
   // ---- Calibration details (one screen, for a screenshot of the error budget) ----
   // `d`: {capture, width, height, declination, measured (measuredInputs), cal,
   // calError, viewer (sidecar viewer), viewpoint: {offsetM, sigmaM} of the fit,
-  // marks: [{name, kind, positionM, residualDeg, distanceKm}]} →
-  // [{title, rows: [[label, value]]}]. Angles in degrees, one decimal.
+  // marks: [{name, kind, positionM, residualDeg, distanceKm, newer?}]} →
+  // [{title, rows: [[label, value, action?]]}]. Angles in degrees, one decimal.
   const d1 = (v) => (Math.round(v * 10) / 10).toFixed(1) + "°",
     sgn = (v, k = 1) => (Math.round(v * 10 ** k) >= 0 ? "+" : "−") + Math.abs(v).toFixed(k) + "°",
     ms = (v) => Math.round(v) + " ms";
@@ -778,9 +831,13 @@ const AimeCore = (() => {
       fit.push(["Heading", `${d1(d.cal.heading)} ±${d1(d.cal.sigma.heading)}${m.used.compass ? " · compass hint used" : ""}`]);
       if (!num(c.zoomRatio)) fit.push(["Zoom", "1× (assumed)"]);
     }
-    const marks = d.marks.map((k, i) => [
-      `${i + 1} ${k.name}`,
-      `${k.kind} · ±${Math.round(k.positionM)} m` + (num(k.residualDeg) ? ` · residual ${sgn(k.residualDeg, 2)} ≈ ${Math.round((Math.abs(k.residualDeg) * Math.PI * k.distanceKm * 1000) / 180)} m at ${km(k.distanceKm)}` : ""),
+    // A mark with newer data gets a second row carrying an "update" action.
+    const marks = d.marks.flatMap((k, i) => [
+      [
+        `${i + 1} ${k.name}`,
+        `${k.kind} · ±${Math.round(k.positionM)} m` + (num(k.residualDeg) ? ` · residual ${sgn(k.residualDeg, 2)} ≈ ${Math.round((Math.abs(k.residualDeg) * Math.PI * k.distanceKm * 1000) / 180)} m at ${km(k.distanceKm)}` : ""),
+      ],
+      ...(k.newer ? [["", newerText(k.newer), { action: "update", index: i }]] : []),
     ]);
     const v = d.viewer;
     const view = v
@@ -880,6 +937,13 @@ const AimeCore = (() => {
     lensFit,
     calibrationExtras,
     calibrationDetails,
+    OUTSIDE_TOLERANCE,
+    SINGLE_MARK_GAP,
+    marksHint,
+    REFRESH_RADIUS_M,
+    newerMark,
+    refreshMark,
+    newerText,
     compassHeading,
     calibrationInput,
     candidatesOf,

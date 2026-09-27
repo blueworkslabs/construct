@@ -309,6 +309,7 @@ async function openPhoto(id) {
   setMode(s.marks.length ? "what" : "mark");
   say("photo-status", "");
   recalibrate();
+  ensureDeclination();
   showPane(s.viewer ? "photo" : "map", true);
 }
 function showLibrary() {
@@ -324,6 +325,26 @@ function showLibrary() {
 }
 // The viewpoint cell's declination, once its landmark cell is downloaded.
 const declination = (s) => state.data.declinationAt(s.viewer);
+// The compass hint needs that declination, but a saved photo is calibrated from
+// its stored marks without any landmark lookup (0.2.1 on hardware: "no
+// declination for this area yet" until a lookup ran). Fetch just the viewpoint
+// cell for a photo with a compass reading, then refit. Failures stay silent:
+// the hint simply waits for the next lookup.
+function ensureDeclination() {
+  const s = current(),
+    id = state.selectedId;
+  if (!s.capture || s.capture.headingDeg == null || !C.queryable(s.viewer) || declination(s) != null) return;
+  state.data
+    .declinationFor(s.viewer)
+    .then((d) => {
+      if (d == null || id !== state.selectedId || state.preview) return;
+      showAttribution(state.data.index);
+      recalibrate();
+      render();
+      if (state.pane === "map") renderMap(false);
+    })
+    .catch(() => {});
+}
 function recalibrate() {
   const s = current();
   state.cal = null;
@@ -345,6 +366,8 @@ async function update(change) {
   recalibrate();
   render();
   if (state.pane === "map") renderMap(false);
+  // A confirmed or corrected viewpoint may lie in another cell.
+  ensureDeclination();
 }
 // Point edits (add, move, remove) keep one undo step, recorded once the write succeeded.
 async function edit(label, change) {
@@ -372,13 +395,26 @@ function openDetails() {
   const s = current(),
     cal = state.cal,
     from = cal ? cal.viewer : s.viewer;
+  // Newer landmark data for saved marks, from the current dataset's lookup.
+  const index = state.data.index,
+    lookup = s.viewer ? state.features.get(currentKey()) : null;
   const marks = s.marks.map((m) => ({
     name: m.name,
     kind: C.kindLabel(m),
     positionM: m.positionM,
     residualDeg: cal ? S.diff(S.bearingAt(cal, m.x, m.y), S.bearing(cal.viewer, m)) : null,
     distanceKm: from ? S.distance(from, m) : 0,
+    newer: lookup && index ? C.newerMark(m, index.dataset, lookup.features) : null,
   }));
+  // Without a lookup yet, run one (as marking would) and refresh the panel.
+  if (!lookup && s.marks.length && C.queryable(s.viewer)) {
+    const id = state.selectedId;
+    features()
+      .then(() => {
+        if ($("details-dialog").open && id === state.selectedId && state.features.has(currentKey())) openDetails();
+      })
+      .catch(() => {});
+  }
   const sections = C.calibrationDetails({
     capture: s.capture,
     width: state.image ? state.image.width : 0,
@@ -397,16 +433,36 @@ function openDetails() {
     const h = document.createElement("h3"),
       dl = document.createElement("dl");
     h.textContent = section.title;
-    for (const [label, value] of section.rows) {
+    for (const [label, value, action] of section.rows) {
       const dt = document.createElement("dt"),
         dd = document.createElement("dd");
       dt.textContent = label;
       dd.textContent = value;
+      if (action && action.action === "update") {
+        const b = document.createElement("button");
+        b.className = "quiet update";
+        b.textContent = "Update";
+        b.setAttribute("aria-label", `Update ${s.marks[action.index].name} to the newer landmark data`);
+        b.onclick = () => task(() => refreshSavedMark(action.index));
+        dd.append(" ", b);
+      }
       dl.append(dt, dd);
     }
     box.append(h, dl);
   }
   if (!$("details-dialog").open) $("details-dialog").showModal();
+}
+
+// Replace a saved mark's position, p and dataset with the current data's (its
+// tap stays): one storage write, undoable like any point edit.
+async function refreshSavedMark(index) {
+  const m = current().marks[index],
+    lookup = state.features.get(currentKey()),
+    newer = m && lookup && state.data.index && C.newerMark(m, state.data.index.dataset, lookup.features);
+  if (!newer) return;
+  await edit("updating " + m.name, (s) => ({ ...s, marks: s.marks.map((k, i) => (i === index ? C.refreshMark(k, newer.feature) : k)) }));
+  say("photo-status", `${m.name} now uses the current landmark data (±${Math.round(newer.toM)} m).${state.calError ? " Calibration failed: " + state.calError : ""}`);
+  if ($("details-dialog").open) openDetails();
 }
 
 // ---- Map pin in the photo -------------------------------------------------------
@@ -423,7 +479,10 @@ function pinStatus() {
   const p = state.pin,
     name = p.name || "Pin",
     o = origin();
-  if (state.pinLoc) return C.pinText(state.pinLoc, name);
+  if (state.pinLoc) {
+    const hint = C.marksHint(current().marks.map((m) => m.x), state.pinLoc.anchor.x, state.pinLoc.inFrame ? null : state.pinLoc.side);
+    return C.pinText(state.pinLoc, name) + (hint ? ". " + hint.text : "");
+  }
   const where = o ? ` · ${C.range(S.distance(o.point, p.point), S.bearing(o.point, p.point))}` : "";
   return `${name}${where}. Mark a landmark you know in the photo first; then the photo shows where it lies.`;
 }
@@ -1201,11 +1260,13 @@ async function whatsThat(x, y) {
     li.textContent = "No named landmarks fetched for this radius.";
     ol.append(li);
   }
-  const extra = [];
+  const extra = [],
+    hint = C.marksHint(current().marks.map((m) => m.x), x);
+  if (hint) extra.push(hint.text);
   if (positionNote) extra.push("Some candidates are close by, so your position matters more: their ±σ is wider than the direction.");
   $("candidates-extra").textContent = extra.join(" ");
   $("candidates-dialog").showModal();
-  say("photo-status", list.anyClose ? `Closest: ${list.rows[0].candidate.feature.name}, ±${list.rows[0].sigmaDeg.toFixed(1)}°.` : "No close match for that tap.");
+  say("photo-status", (list.anyClose ? `Closest: ${list.rows[0].candidate.feature.name}, ±${list.rows[0].sigmaDeg.toFixed(1)}°.` : "No close match for that tap.") + (hint ? " " + hint.text : ""), hint ? "attention" : "");
 }
 
 // ---- Map view ------------------------------------------------------------------------

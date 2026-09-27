@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aimé acceptance (0.2.1, Construct API 0.13) on a disposable synthetic-camera emulator.
+"""Aimé acceptance (0.2.2, Construct API 0.13) on a disposable synthetic-camera emulator.
 
 Synthetic Aimé (dev.construct.aime-fixture) proves the flow and the ranking on a
 known scene: grants denied/granted, capture → viewpoint, injected landmark data
@@ -21,7 +21,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_aime_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.aime package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.aime-fixture package digest')
-p.add_argument('--version',default='0.2.1')
+p.add_argument('--version',default='0.2.2')
 p.add_argument('--real-fix',default='52.37648,9.73848',help='lat,lon injected for the real-module landmark data check (Hannover, inside the DE/AT coverage)')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
@@ -260,13 +260,15 @@ try:
  # 2. Capture → estimated viewpoint saved with the photo (second fix after the 15 s spacing).
  shoot();contains('Estimated viewpoint · ±10 m',60);capture('aime-captured')
  reach_text('Level measured');reach_text('Lens from camera')
- # No landmark cell is downloaded yet, so the compass waits for its declination.
- click(lambda t:t=='Calibration details');reach_text('h 66.0° v 51.9° ±1.0° — used');reach_text('no declination for this area yet')
+ # Opening a photo with a compass reading fetches just the viewpoint's cell for its
+ # declination (0.2.2; 0.2.1 waited for a landmark lookup and showed none).
+ click(lambda t:t=='Calibration details');reach_text('h 66.0° v 51.9° ±1.0° — used');reach_text('+3.0° E (viewpoint cell) → true 30.0°')
  capture('aime-details-captured');click(lambda t:t=='Close')
  done('API 0.13 capture with level indicator and zoom chips opens the photo with its viewpoint and stored camera measurements')
 
  # 3. Landmark data offline and HTTP 503: unavailable, never an empty list; one manual retry.
- # Nothing is downloaded before this step, so neither failure is served from the session cache.
+ # Only the viewpoint's own cell (declination) is downloaded before this step; the
+ # other listed cells are not, so neither failure is served from the session cache.
  to_library();fixture('next data offline');open_first_photo()
  tap_photo(F['markA']);contains('[HTTP_UNAVAILABLE] Landmark data unavailable: the data host could not be reached');absent('landmarks within')
  capture('aime-offline');click(lambda t:t=='Cancel')
@@ -296,6 +298,8 @@ try:
 
  # 6. What's that? → candidates with own ±σ → map.
  reveal('What’s that?');rows=what(F['whatB'],'Synthetic Peak B','B')
+ # One mark and a tap well away from it: the sheet suggests a second mark.
+ reach_text('Add a second mark on the other side of your target')
  assert any('±' in r and 'from your tap' in r for r in labels() if r),'Candidates need offset and ±σ'
  capture('aime-candidates');click(lambda t:t.startswith('Could be Synthetic Peak B'))
  reach_text('Pin 1: Synthetic Peak B (selected)');reach_text('Wedge: your tap points');reach_text('Green pin: Synthetic Tower A')

@@ -309,6 +309,12 @@ select:focus-visible {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+#details dd .update {
+  min-height: 32px;
+  padding: 2px 10px;
+  margin-top: 2px;
+  font-size: 0.8rem;
+}
 #details dd {
   margin: 0;
   overflow-wrap: anywhere;

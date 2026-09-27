@@ -417,6 +417,55 @@ def main():
             page.evaluate("name=>{current().marks[0].name=name;openDetails()}", original_name)
             page.locator("#close-details").click()
             print("PASS calibration details panel, lens-not-measured note, zoom-aware lens prior, ±m in search")
+            # Regression (0.2.1 on hardware): a saved, already calibrated photo
+            # opened in a fresh session never looked landmarks up, so the
+            # viewpoint cell's declination never arrived and the compass hint
+            # stayed "no declination for this area yet".
+            page.evaluate("state.data=AimeCore.landmarkData(dataGet);state.features.clear();showLibrary()")
+            idle()
+            page.evaluate("openPhoto('photo2')")
+            page.wait_for_function("state.selectedId==='photo2' && !state.busy")
+            page.wait_for_function("state.measured && state.measured.used.compass", timeout=5000)
+            page.locator("#details-open").click()
+            details = page.locator("#details").inner_text()
+            assert "Declination\n+3.0° E (viewpoint cell) → true 30.0°" in details and "Compass\n27.0° magnetic ±10.0° · 40 ms — used" in details, details
+            page.locator("#close-details").click()
+            print("PASS a saved photo gets its viewpoint cell's declination without a landmark lookup")
+            # Precision hint: one mark, a tap well away from it; two marks, a tap beyond them.
+            page.evaluate("whatsThat(SyntheticAime.taps.whatB.x,SyntheticAime.taps.whatB.y)")
+            page.wait_for_function("$('candidates-dialog').open")
+            assert "Add a second mark on the other side of your target for better precision." in page.locator("#candidates-extra").inner_text()
+            page.locator("#close-candidates").click()
+            assert "Add a second mark" in page.locator("#photo-status").inner_text()
+            page.evaluate("(async()=>{const fs=AimeCore.parseCell(AimeCore.parseIndex(SyntheticAime.index()),'46_9',SyntheticAime.cell('46_9'));const g=fs.find(f=>f.name==='Synthetic Chapel G');await update(s=>({...s,marks:[...s.marks,AimeCore.markFrom(g,SyntheticAime.at.G.x,SyntheticAime.at.G.y)]}))})()")
+            idle()
+            page.evaluate("whatsThat(SyntheticAime.taps.whatD.x,SyntheticAime.taps.whatD.y)")
+            page.wait_for_function("$('candidates-dialog').open")
+            assert "Outside your marks: add one on the right for better precision." in page.locator("#candidates-extra").inner_text()
+            page.locator("#close-candidates").click()
+            page.evaluate("setPin({point:SyntheticAime.features.find(f=>f.letter==='F'),name:'Synthetic Monument F',positionM:60})")
+            assert page.locator("#pin-status").inner_text().endswith("Outside your marks: add one on the right for better precision."), page.locator("#pin-status").inner_text()
+            page.evaluate("setPin(null)")
+            # A saved mark from older data: the panel offers the newer position; Update is one write and undoable.
+            page.evaluate("(async()=>{await update(s=>({...s,marks:s.marks.map((m,i)=>i?m:{...m,lat:m.lat+0.0003,positionM:60,dataset:'synthetic-1-r0'})}))})()")
+            idle()
+            before = page.evaluate("JSON.stringify(current().marks[0])")
+            writes = page.evaluate("mock.sets.length")
+            page.locator("#details-open").click()
+            page.wait_for_function("document.querySelector('#details .update')")
+            details = page.locator("#details").inner_text()
+            assert "newer data: ±60 m → ±8 m, moved 33 m" in details, details
+            page.locator("#details .update").click()
+            page.wait_for_function("!state.busy && !document.querySelector('#details .update')")
+            mark = page.evaluate("current().marks[0]")
+            assert mark["positionM"] == 8 and mark["dataset"] == "synthetic-1-r1" and mark["x"] == page.evaluate("SyntheticAime.taps.markA.x"), mark
+            assert page.evaluate("mock.sets.slice(" + str(writes) + ")") == ["photo.1"], page.evaluate("mock.sets.slice(" + str(writes) + ")")
+            page.locator("#close-details").click()
+            assert page.locator("#undo").inner_text() == "Undo updating Synthetic Tower A"
+            page.locator("#undo").click()
+            idle()
+            assert page.evaluate("JSON.stringify(current().marks[0])") == before, "Undo did not restore the saved mark"
+            print("PASS outside-your-marks hint in the sheet, status and pin; newer mark data offered, updated in one write, undoable")
             page.evaluate("openPhoto('photo1')")
             idle()
             page.evaluate(
