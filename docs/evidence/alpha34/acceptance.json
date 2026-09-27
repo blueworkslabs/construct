@@ -1,7 +1,7 @@
 {
   "complete": true,
   "stopped": true,
-  "apkSha256": "2036f59f5de643430649aa4133b04d07ad02a4df59c1047412e3100e8b4d0743",
+  "apkSha256": "990f178d0516f4d0797b98d12c62da3813d665087e725a464ec7300851b65dbc",
   "moduleSha256": {
     "0.1.0": "af3fb19913bcc4a440e91bf75630618777f1db3e7ca59198211a02b3412c0583",
     "0.2.2": "4c4f3268e66b528b316c141ec91de4f08695634ea3f81b43243ea0146773b95e"
@@ -30,7 +30,7 @@
       },
       "result": {
         "saved": true,
-        "id": "pH0QXJ0TDVBHKHMmOBizhYAAA",
+        "id": "pGtLANnwpyhhEWhh-LAQC5UbC",
         "capture": {
           "zoomRatio": 1,
           "fovDeg": {
@@ -42,12 +42,12 @@
             "pitchDeg": 9.97,
             "rollDeg": -0.02,
             "sigmaDeg": 1.02,
-            "ageMs": 185
+            "ageMs": 194
           },
           "headingDeg": 0,
           "headingRef": "magnetic",
           "headingAccuracyDeg": 0,
-          "headingAgeMs": 185
+          "headingAgeMs": 194
         }
       },
       "problems": [],
@@ -65,7 +65,7 @@
       },
       "result": {
         "saved": true,
-        "id": "pBs1l1vB4nYIKRnDXPlxCd7a7",
+        "id": "pt7RnBr_cZpZbMTixEOdZS2cR",
         "capture": {
           "zoomRatio": 2,
           "fovDeg": {
@@ -77,12 +77,12 @@
             "pitchDeg": -10.03,
             "rollDeg": -0.02,
             "sigmaDeg": 1.02,
-            "ageMs": 153
+            "ageMs": 220
           },
           "headingDeg": 0,
           "headingRef": "magnetic",
           "headingAccuracyDeg": 0,
-          "headingAgeMs": 153
+          "headingAgeMs": 220
         }
       },
       "problems": [],
@@ -100,38 +100,7 @@
       },
       "result": {
         "saved": true,
-        "id": "pWXUimqV6Gas7txkkXl0PDTIk",
-        "capture": {
-          "zoomRatio": 1,
-          "fovDeg": {
-            "h": 39.97,
-            "v": 51.73
-          },
-          "fovSigmaDeg": 1,
-          "headingDeg": 357.9,
-          "headingRef": "magnetic",
-          "headingAccuracyDeg": 0,
-          "headingAgeMs": 297
-        }
-      },
-      "problems": [
-        "tilt missing or malformed None"
-      ],
-      "attempt": 1
-    },
-    {
-      "injected": {
-        "pitch": 0,
-        "roll": 10
-      },
-      "zoom": "1\u00d7",
-      "readout": {
-        "Pitch": -0.0,
-        "Roll": 10.0
-      },
-      "result": {
-        "saved": true,
-        "id": "pILcfVOZAFjEarbA2ZXSwSIBk",
+        "id": "pM2_BCjCdQNDBW9aSrXpXDAZW",
         "capture": {
           "zoomRatio": 1,
           "fovDeg": {
@@ -143,16 +112,16 @@
             "pitchDeg": -0.04,
             "rollDeg": 9.98,
             "sigmaDeg": 1,
-            "ageMs": 199
+            "ageMs": 187
           },
           "headingDeg": 357.9,
           "headingRef": "magnetic",
           "headingAccuracyDeg": 0,
-          "headingAgeMs": 199
+          "headingAgeMs": 187
         }
       },
       "problems": [],
-      "attempt": 2
+      "attempt": 1
     },
     {
       "injected": {
@@ -166,7 +135,7 @@
       },
       "result": {
         "saved": true,
-        "id": "pnmnYt_evMhnic9_SYUtvyWAM",
+        "id": "p6DcWcyAEeTWLWtO8u6SUbdBk",
         "capture": {
           "zoomRatio": 2,
           "fovDeg": {
@@ -178,12 +147,12 @@
             "pitchDeg": -0.02,
             "rollDeg": -10.02,
             "sigmaDeg": 1,
-            "ageMs": 250
+            "ageMs": 205
           },
           "headingDeg": 2,
           "headingRef": "magnetic",
           "headingAccuracyDeg": 0,
-          "headingAgeMs": 250
+          "headingAgeMs": 205
         }
       },
       "problems": [],
@@ -201,7 +170,7 @@
       },
       "result": {
         "saved": true,
-        "id": "pM9DxvOnOj8007L_hn43_k7Xp",
+        "id": "p_9Cn5yQCWj7WxV5Kj5zYpOoT",
         "capture": {
           "zoomRatio": 1,
           "fovDeg": {
@@ -213,12 +182,12 @@
             "pitchDeg": -0.03,
             "rollDeg": -0.02,
             "sigmaDeg": 1,
-            "ageMs": 214
+            "ageMs": 161
           },
           "headingDeg": 0,
           "headingRef": "magnetic",
           "headingAccuracyDeg": 0,
-          "headingAgeMs": 214
+          "headingAgeMs": 161
         }
       },
       "problems": [],
@@ -274,18 +243,9 @@
     ]
   },
   "zoomPair": "fov follows 2\u00b7atan(tan(fov1/2)/2)",
-  "retakes": [
-    {
-      "pitch": 0,
-      "roll": 10,
-      "attempt": 1,
-      "reason": "Tilt omitted; heading age exceeds the 250 ms tilt bound",
-      "headingAgeMs": 297
-    }
-  ],
   "fovDiagnostics": [
     {
-      "time": "2026-09-27T19:40:26.663692Z",
+      "time": "2026-09-27T20:07:54.934411Z",
       "hostVersion": "0.1.0-alpha34",
       "phase": "camera",
       "code": "CAPTURE_FOV",
@@ -297,7 +257,7 @@
       "previousDigest": "af3fb19913bcc4a440e91bf75630618777f1db3e7ca59198211a02b3412c0583"
     },
     {
-      "time": "2026-09-27T19:40:47.469819Z",
+      "time": "2026-09-27T20:08:19.577787Z",
       "hostVersion": "0.1.0-alpha34",
       "phase": "camera",
       "code": "CAPTURE_FOV",
@@ -309,7 +269,7 @@
       "previousDigest": "af3fb19913bcc4a440e91bf75630618777f1db3e7ca59198211a02b3412c0583"
     },
     {
-      "time": "2026-09-27T19:41:09.027002Z",
+      "time": "2026-09-27T20:08:43.073439Z",
       "hostVersion": "0.1.0-alpha34",
       "phase": "camera",
       "code": "CAPTURE_FOV",
@@ -321,19 +281,7 @@
       "previousDigest": "af3fb19913bcc4a440e91bf75630618777f1db3e7ca59198211a02b3412c0583"
     },
     {
-      "time": "2026-09-27T19:41:33.450019Z",
-      "hostVersion": "0.1.0-alpha34",
-      "phase": "camera",
-      "code": "CAPTURE_FOV",
-      "moduleId": "dev.construct.capture-metadata",
-      "moduleVersion": "0.2.2",
-      "message": "fov-source: capture-result; still-result=tied logical=false focalLengths=1 resultFocal=3.299999952316284 activePhysical=none crop=true resultZoom=1.0",
-      "source": "host",
-      "packageDigest": "4c4f3268e66b528b316c141ec91de4f08695634ea3f81b43243ea0146773b95e",
-      "previousDigest": "af3fb19913bcc4a440e91bf75630618777f1db3e7ca59198211a02b3412c0583"
-    },
-    {
-      "time": "2026-09-27T19:41:55.178669Z",
+      "time": "2026-09-27T20:09:14.301889Z",
       "hostVersion": "0.1.0-alpha34",
       "phase": "camera",
       "code": "CAPTURE_FOV",
@@ -345,7 +293,7 @@
       "previousDigest": "af3fb19913bcc4a440e91bf75630618777f1db3e7ca59198211a02b3412c0583"
     },
     {
-      "time": "2026-09-27T19:42:14.988527Z",
+      "time": "2026-09-27T20:09:34.147400Z",
       "hostVersion": "0.1.0-alpha34",
       "phase": "camera",
       "code": "CAPTURE_FOV",
@@ -357,37 +305,54 @@
       "previousDigest": "af3fb19913bcc4a440e91bf75630618777f1db3e7ca59198211a02b3412c0583"
     }
   ],
-  "runId": "20260927T193519Z-capture-metadata-f9c0e25b",
-  "sourceCommit": "af57ff9b962049de3a5b8e17cbccf872a82d36be",
+  "runId": "20260927T200243Z-capture-metadata-9252f045",
+  "sourceCommit": "e1318303cbb64e43360a2807b81c3beebb5806c6",
   "runnerCommit": "af57ff9b962049de3a5b8e17cbccf872a82d36be",
-  "visualReview": "passed: foreground restoration, screenshot on/off, protected native windows, all five poses and settled module/dialog Recents",
-  "hardwareVerified": false,
   "unitTests": 243,
   "runnerHelperTests": 89,
   "lint": "passed",
-  "supersededRun": {
-    "runId": "20260927T191555Z-capture-metadata-0c0a11dc",
-    "status": "blocked_manual_privacy_review",
-    "reason": "Recents live module and dialog surfaces visible; never distributed"
-  },
+  "hardwareVerified": false,
+  "visualReview": "passed: all five poses, protected windows, settled module/dialog Recents, foreground restoration",
   "limitations": [
-    "Pixel logical multi-camera still-result availability is not established by this single-camera emulator.",
-    "Settled Recents tested; all transient/slow/cancelled gesture frames remain phone checks.",
-    "One positive-roll retake after stale tilt omission; both attempts retained.",
+    "Pixel logical multi-camera still-result availability remains a phone check.",
+    "Bounded arrival-time correlation is not proof against callbacks outside the observation window.",
+    "Settled Recents tested; slow/cancelled gesture frames remain phone checks.",
     "No public release or merge."
+  ],
+  "apks": {
+    "arm64-v8a": {
+      "sha256": "b87217671df8029f2420e7883b34f4c5501d97fd79d1770b78bf265422f66ed2",
+      "bytes": 23855482,
+      "signer": "Signer #1 certificate SHA-256 digest: c066034d20f4f9f625b5b2bda525a5b94f32961583f837d0e3437746013443cb"
+    },
+    "x86_64": {
+      "sha256": "990f178d0516f4d0797b98d12c62da3813d665087e725a464ec7300851b65dbc",
+      "bytes": 26739067,
+      "signer": "Signer #1 certificate SHA-256 digest: c066034d20f4f9f625b5b2bda525a5b94f32961583f837d0e3437746013443cb"
+    }
+  },
+  "supersededRuns": [
+    {
+      "id": "20260927T191555Z-capture-metadata-0c0a11dc",
+      "status": "blocked_manual_privacy_review"
+    },
+    {
+      "id": "20260927T193519Z-capture-metadata-f9c0e25b",
+      "status": "8 passed; superseded by timing fix e131830"
+    }
   ],
   "reviewedImages": [
     {
       "file": "recents-module.png",
-      "sha256": "767e1b9f2ff0e2b6d0b8ed4e14b725fb5e5196dcd47c706b0e08e9b9239c3e0c"
+      "sha256": "11a9940ac9c0f5a357cbe5a63b9d9f4ed7e95c3071de97a34aba36beefcf3fda"
     },
     {
       "file": "recents-dialog.png",
-      "sha256": "115f25304cfade13157a43fd4df4a8f4855014beef8a6c85bdc579424b33427f"
+      "sha256": "f9dba09f1f4b2546f9133d54251bff1b04ea72cefc3e75ad0c4339ecc997cb58"
     },
     {
       "file": "level.png",
-      "sha256": "cedce17b93c117e0d5867be1c5c4db22158a5d8c68e49b6c92c33fed91114bcc"
+      "sha256": "f6ca32a59ebc8784cf78d9dc1808cd120b31259fe67dac2a72cafd06fd2d8215"
     },
     {
       "file": "module-restarted.png",
@@ -398,16 +363,9 @@
       "sha256": "0d4fb1da0e4be92aac0ba93189ca61ece932d999f1f95767f445b65cd0a58f35"
     }
   ],
-  "apks": {
-    "arm64-v8a": {
-      "sha256": "a7cc744382723a1abae391d5a2ded5beb174ca65e9913773de470d3355ae17aa",
-      "bytes": 23855482,
-      "signer": "Signer #1 certificate SHA-256 digest: c066034d20f4f9f625b5b2bda525a5b94f32961583f837d0e3437746013443cb"
-    },
-    "x86_64": {
-      "sha256": "2036f59f5de643430649aa4133b04d07ad02a4df59c1047412e3100e8b4d0743",
-      "bytes": 26739067,
-      "signer": "Signer #1 certificate SHA-256 digest: c066034d20f4f9f625b5b2bda525a5b94f32961583f837d0e3437746013443cb"
-    }
+  "shutdown": {
+    "stopped": true,
+    "cleanExit": false,
+    "detail": "All eight checks finished before requested shutdown; emulator process aborted during teardown (systemd core-dump/SIGABRT). No emulator remained running. Not an app crash."
   }
 }

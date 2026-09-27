@@ -1,30 +1,28 @@
-# Alpha34 — capture-result lens geometry
+# Alpha34 — camera-result geometry and privacy
 
-**8/8 Android checks passed on the final APK**, run `20260927T193519Z-capture-metadata-f9c0e25b`, complete/stopped true. One disclosed stale-tilt retake. Exact images reviewed; phone candidate, not physical-camera validation.
+**8/8 Android checks passed on the final APK**, run `20260927T200243Z-capture-metadata-9252f045`, complete/stopped true. Actual captures reviewed. 243 JVM tests, lint, 89 runner-helper checks, APK size/alignment and signatures pass.
 
-Native host change: bounded camera acquisition now associates a still capture result with the saved image, considers its focal length, active physical camera, crop and zoom, and logs a camera-only CAPTURE_FOV source/omission explanation. Ordinary module calibration UI and solver remain downloaded Aimé code.
+## Artifacts
 
-Reviewed source `1f20448` corrects the off-centre crop finding. The current API has no principal-point offset; unsupported asymmetric crops therefore omit FOV, tilt and heading, including characteristics fallback. Centred crops retain their previous behavior. Two-pixel rounding in the regression is tolerated; four pixels exceed the 0.05° bound. This is a conservative omission contract, not a promise all phones provide a measured lens.
+Host source `e1318303cbb64e43360a2807b81c3beebb5806c6`; runner `af57ff9`. Both ABIs retain alpha33's signer and the pinned module publisher.
 
-243 JVM tests and lint pass. Both optimized APKs retain the established signer, pinned publisher key and 16 KiB alignment/size checks. Build operator inputs and cached checkout were restored after completion.
+- ARM64 SHA256 `b87217671df8029f2420e7883b34f4c5501d97fd79d1770b78bf265422f66ed2`.
+- x86-64 executed SHA256 `990f178d0516f4d0797b98d12c62da3813d665087e725a464ec7300851b65dbc`.
 
-- ARM64 SHA256: a7cc744382723a1abae391d5a2ded5beb174ca65e9913773de470d3355ae17aa
-- x86-64 SHA256: 2036f59f5de643430649aa4133b04d07ad02a4df59c1047412e3100e8b4d0743
+[Receipt](evidence/alpha34/acceptance.json) · [Phone checklist](alpha34-hardware-check.md).
 
-Final APK source and runner `af57ff9` requires measured centred emulator FOV at 1× and 2×, correct tilt signs, stable photo IDs, legacy API compatibility, screenshot opt-in persistence and secure viewfinder/dialog/Recents evidence. It records native FOV diagnostics. Physical logical multi-camera capture remains a Pixel hardware check; emulator success does not establish that the Pixel supplies an active physical camera ID.
+## Findings and corrections
 
-Aimé 0.2.2 is staged separately on the exact same APK. Data revision r3 remains held for classification/deduplication defects; existing r2 is unchanged. No public release, catalog promotion or merge is implied.
+The initial alpha34 run exposed live module and native-dialog contents in Recents. This code was shared with alpha33: earlier black-frame evidence did not establish reliable protection. `af57ff9` adds opaque non-focusable covers to actual activity/dialog windows, controlled by lifecycle and each window's own focus. No confirmation is approved/cancelled by hiding it. Foreground content is restored and dying windows retain their cover. Snapshot suppression and secure flags remain separately enforced. Actual settled Recents images on the final APK hide contents; all transient gesture frames remain a phone check.
 
-## Recents correction discovered during acceptance
+Still-frame lens metadata now uses focal length, crop, zoom and active-camera facts when compatible. Unsupported off-centre crops omit FOV and axis-dependent tilt/heading, without a fallback escape. The late fix `e131830` waits through the complete bounded 500 ms observation window before deciding none/one/several still results. This runs on the capture worker and does not block the UI; it adds approximately 500 ms to metadata-enabled captures. Arrival-time correlation does not prove identity against arbitrarily late callbacks. Pixel logical-camera behavior remains unverified until hardware testing.
 
-The first 1f20448 APK completed automated camera checks but failed manual privacy review: actual settled Recents showed both the module and native photo-confirmation contents. The raw run is preserved as blocked, not accepted. Earlier alpha33 black-frame evidence does not prove this was reliable: its ModuleActivity privacy code is identical. The new camera path itself returned tied capture-result FOVs; three bounded stale-tilt retakes were recorded in that superseded diagnostic run.
+Earlier attempts remain separate: the first was manually blocked despite automatic checks; the privacy-fixed second passed 8/8 but was superseded by the timing correction. Only this receipt clears the final host bytes. Aimé acceptance is separately identified in its receipt; no cross-run stitching.
 
-`af57ff9` adds opaque, non-focusable drawable covers to actual activity and native-dialog windows. Direct lifecycle and per-window focus events cover live surfaces, with foreground restoration; hiding never approves, cancels or dismisses a confirmation. Dying windows retain their cover through final disposal. Screenshot flags and snapshot suppression remain enabled separately. Four event-order tests cover delayed pause/focus, per-dialog focus, leave-hint latching and older-platform lifecycle fallback. Runner assertions examine the actual Recents tile and retain lifecycle/window dumps.
+## Observations
 
-Source reasoning does not guarantee every transient gesture frame. Final settled-Recents images and restoration behavior must be checked on the exact rebuilt APK, with physical-phone gesture behavior still part of the phone test.
+Legacy API, stable library IDs, both pitch and roll signs, near-zero level, 1×/2× crop formula, foreground screenshot opt-in/persistence/off and protected native windows pass. Actual module/dialog Recents and foreground restoration were reviewed. No separate viewfinder-Recents test, landscape camera layout or physical sensor accuracy pass is claimed.
 
-## Final run
+Recorded retakes: []. Raw capture entries preserve every attempt. The emulator's capture-result FOV path is exercised, but this is not a logical multi-camera. Dataset remains r2, r3 held. No merge, public release or production promotion.
 
-All five poses returned valid tilt; positive roll needed one retake after a 297 ms sample correctly omitted tilt. Valid ages 153–250 ms. The FOV source was `capture-result` for every measured capture; 1× 39.97°×51.73°, 2× 20.61°×27.25°. Stable IDs, legacy API, screenshot default/off/on/persistence and foreground restoration pass. Both actual settled Recents images hide private contents. Native viewfinder and photo confirmation remain screenshot-protected. No separate viewfinder-Recents test is claimed. Only the known emulator Bluetooth boot abort appears in the crash buffer.
-
-[Receipt](evidence/alpha34/acceptance.json) · [Phone checklist](alpha34-hardware-check.md). Earlier alpha33 claims of reliable Recents privacy are superseded by this finding and correction; earlier evidence is retained, not rewritten.
+Shutdown caveat: all eight checks completed before the requested stop, and no emulator remained running, but the emulator process aborted during teardown (systemd core-dump/SIGABRT). This is not recorded as a clean emulator exit or a Construct crash. The guest crash buffer contains only its known Bluetooth boot abort.
