@@ -70,7 +70,8 @@ const SpaceOrbit = (() => {
       NORAD_CAT_ID: id,
       OBJECT_NAME: name,
       OBJECT_ID: intdes,
-      EPOCH: Number.isFinite(epoch) ? new Date(epoch).toISOString() : null,
+      EPOCH: Number.isFinite(epoch) && Math.abs(epoch) <= 8640000000000000
+        ? new Date(epoch).toISOString() : null,
       MEAN_MOTION: r[4],
       ECCENTRICITY: r[5],
       INCLINATION: r[6],

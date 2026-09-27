@@ -134,7 +134,8 @@
       if (!c || c.g !== m.at || !Array.isArray(c.r)) return { at: 0, rows: [] };
       for (const r of c.r) {
         const v = check(r);
-        if (v) out.push(v);
+        if (!v) return { at: 0, rows: [] };
+        out.push(v);
       }
     }
     return { at: m.at, rows: out };
@@ -542,20 +543,21 @@
   async function loadLaunch(o, section) {
     const url = C.launchUrl(o.intdes);
     if (!url) return;
-    let v = launches.get(o.intdes.slice(0, 8));
-    if (!v) {
+    let body = launches.get(o.intdes.slice(0, 8));
+    if (!body) {
       section.append(element("p", "Looking up the rest of its launch…", "note"));
       try {
         const r = await getJson(url);
         if (r.status !== 200) throw new Error(`HTTP ${r.status}`);
-        v = C.parseLaunch(r.text, o.id);
-        launches.set(o.intdes.slice(0, 8), v);
+        body = r.text;
+        launches.set(o.intdes.slice(0, 8), body);
       } catch (_) {
         if (infoTarget === o) section.replaceChildren(element("p", "Launch details unavailable right now.", "note"));
         return;
       }
     }
     if (infoTarget !== o) return;
+    const v = C.parseLaunch(body, o.id);
     section.replaceChildren(element("h3", "Same launch"));
     if (!v.total) return section.append(element("p", "Nothing else is catalogued from this launch.", "note"));
     if (v.payloads.length)

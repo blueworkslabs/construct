@@ -13,7 +13,7 @@ const LAUNCH = JSON.stringify([
   {NORAD_CAT_ID: 29507, OBJECT_TYPE: 'R/B', OBJECT_NAME: 'CZ-4B R/B', OBJECT_ID: '2006-046C'},
 ]);
 const WIKI = JSON.stringify({query: {pages: [{title: 'Long March 4B', extract: 'The Long March 4B is a Chinese launch vehicle.', fullurl: 'https://en.wikipedia.org/wiki/Long_March_4B'}]}});
-function rig({saved = {}, error = null, gpStatus = 200, pendingHttp = false, clock = START} = {}) {
+function rig({saved = {}, error = null, gpStatus = 200, pendingHttp = false, clock = START, launchBody = LAUNCH} = {}) {
   const elements = new Map(), events = {}, timers = [], calls = [], held = [];
   const storage = structuredClone(saved);
   let now = clock;
@@ -55,7 +55,7 @@ function rig({saved = {}, error = null, gpStatus = 200, pendingHttp = false, clo
         const u = params.url;
         const result = u.includes('gp.php') ? (gpStatus === 200 ? {status: 200, text: ELEMENTS} : {status: gpStatus})
           : u.includes('GROUP=visual') ? {status: 200, text: SATCAT}
-          : u.includes('INTDES=') ? {status: 200, text: LAUNCH}
+          : u.includes('INTDES=') ? {status: 200, text: launchBody}
           : u.startsWith('https://en.wikipedia.org/') ? {status: 200, text: WIKI} : {status: 404};
         if (pendingHttp) return new Promise(resolve => held.push(() => resolve(result)));
         return result;
@@ -65,9 +65,12 @@ function rig({saved = {}, error = null, gpStatus = 200, pendingHttp = false, clo
   sandbox.window = sandbox;
   const context = vm.createContext(sandbox);
   const scripts = ['vendor/satellite.min.js', 'vendor/astronomy.min.js', 'space-stars.js', 'space-orbit.js', 'space-sky.js', 'space-catalog.js', 'space-dome.js', 'app.js'];
-  for (const f of scripts) vm.runInContext(fs.readFileSync(root + f, 'utf8'), context, {filename: f});
+  for (const f of scripts) {
+    if (f === 'app.js') vm.runInContext('SpaceDome = class extends SpaceDome { constructor(c, cb) { super(c, cb); window.selectObject = cb; } }', context);
+    vm.runInContext(fs.readFileSync(root + f, 'utf8'), context, {filename: f});
+  }
   const http = () => calls.filter(c => c.method === 'net.http').map(c => c.params.url);
-  return {el, calls, storage, classes, http,
+  return {el, calls, storage, classes, http, select: id => sandbox.selectObject(id),
     finishHttp: () => held.splice(0).forEach(f => f()),
     tick: (n = 1, ms = 1000) => { for (let i = 0; i < n; i++) { now += ms; timers.forEach(f => f()); } },
     advance: ms => { now += ms; },
@@ -136,6 +139,28 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   const torn = structuredClone(saved); torn['elements.0'].g = 1;
   r = rig({saved: torn, clock: START + HOUR}); await flush(8);
   assert.equal(r.http().filter(u => u.includes('gp.php')).length, 1);
+
+  // Corrupt numeric epochs must invalidate the cache, not abort startup.
+  const corrupt = structuredClone(saved); corrupt['elements.0'].r[0][3] = 1e100;
+  r = rig({saved: corrupt, clock: START + HOUR}); await flush(8);
+  assert(!r.el('workspace').hidden, 'bad cached epoch must not strand startup');
+  assert.equal(r.http().filter(u => u.includes('gp.php')).length, 1);
+
+  // The same launch can contain several selectable payloads. Each excludes itself.
+  const launchPair = JSON.stringify([
+    {NORAD_CAT_ID: 25544, OBJECT_TYPE: 'PAY', OBJECT_NAME: 'FIRST', OBJECT_ID: '1998-067A'},
+    {NORAD_CAT_ID: 48274, OBJECT_TYPE: 'PAY', OBJECT_NAME: 'SECOND', OBJECT_ID: '1998-067B'},
+  ]);
+  const paired = structuredClone(saved);
+  for (const key of Object.keys(paired)) if (/^elements\.\d$/.test(key) && paired[key])
+    for (const row of paired[key].r) if (row[0] === 48274) row[2] = '1998-067B';
+  r = rig({saved: paired, launchBody: launchPair}); await flush(8);
+  // Select via the real dome callback even when the other payload is below horizon.
+  r.select(25544); r.el('details').click(); await flush(4);
+  assert.match(r.el('info-body').text, /Launched with: SECOND/);
+  r.el('close-info').click(); r.select(48274); r.el('details').click(); await flush(4);
+  assert.match(r.el('info-body').text, /Launched with: FIRST/);
+  assert.doesNotMatch(r.el('info-body').text, /Launched with: SECOND/);
 
   // CelesTrak failure: a clear message, a remembered back-off, no hammering.
   r = rig({gpStatus: 503}); await flush(8);
