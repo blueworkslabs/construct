@@ -48,3 +48,7 @@ Real Aimé returned **807 landmarks within 30 km on the first attempt**, after e
 ![landscape](images/aime-0.1.9/landscape.png)
 ![large-text](images/aime-0.1.9/large-text.png)
 ![live-landmarks](images/aime-0.1.9/live-landmarks.png)
+
+## Tracked non-blocking wide-area precision edge case
+
+[Issue #43](https://github.com/blueworkslabs/construct/issues/43): dropped-pin placement uncertainty currently uses map-centre latitude instead of pin latitude. The pin coordinate and bearing line are unchanged, but the band width can be inaccurate over large latitude differences. For a Hannover-centred map and targets within 60 km, this scale term differs by about ±1.3%; the local controls pilot is cleared, not general wide-area uncertainty accuracy. The next immutable module update should correct this and test far-apart latitudes.

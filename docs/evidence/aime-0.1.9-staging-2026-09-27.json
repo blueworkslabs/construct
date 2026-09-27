@@ -173,7 +173,8 @@
     "Phone touch/accuracy feedback for these new controls remains pending.",
     "No screenshot switch, native level or capture zoom: those require the separate API 0.13 host candidate.",
     "A projected bearing line does not predict object elevation or exact image pixel.",
-    "Do not roll back to 0.1.2 or earlier after saving cell-based marks."
+    "Do not roll back to 0.1.2 or earlier after saving cell-based marks.",
+    "Wide-area dropped-pin uncertainty uses map-centre latitude; local pilot only, tracked in https://github.com/blueworkslabs/construct/issues/43."
   ],
   "dataset": {
     "release": "2026-09-23.1",

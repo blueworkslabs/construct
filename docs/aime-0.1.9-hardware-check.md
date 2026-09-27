@@ -10,7 +10,7 @@ https://raw.githubusercontent.com/blueworkslabs/construct/5489c34095e0597a127bf7
 1. Open a calibrated photo. Hold on the photo until the magnifier appears, move for precise placement, then release. Check that placement feels right and occurs only once.
 2. Drag an existing landmark and a horizon point. Undo each move; check that the original position and fit return. Reopen the photo to confirm saved edits persist.
 3. On the map enable Ruler, tap two points, and check distance/bearing. Drag to pan, including near your viewpoint ring: this must not move the saved viewpoint while ruler mode is on.
-4. Long-press the map away from the viewpoint ring to drop a pin. Choose Show pin in photo. Check its labelled bearing line/band; a known off-screen target should show an edge arrow or behind-you message. Clear it.
+4. Keep the map centred on your viewpoint and test local targets (within 60 km). A known wide-area pin-uncertainty issue is tracked in [#43](https://github.com/blueworkslabs/construct/issues/43). Long-press the map away from the viewpoint ring to drop a pin. Choose Show pin in photo. Check its labelled bearing line/band; a known off-screen target should show an edge arrow or behind-you message. Clear it.
 5. Tap a landmark in the photo, then choose Show in photo from its candidate row. Check the same target is indicated, including in a slightly rolled photo. This is a bearing line, not an exact height/pixel prediction.
 6. Try landscape and larger system text. Report missed/duplicate touches, clipped labels, confusing controls, and whether known targets are plausible.
 
