@@ -69,6 +69,18 @@ The migration also requires live exact-artifact Android checks and a separate
 synthetic, signed module-only update demonstration on the same APK. JVM/Node tests
 alone are not a completed migration or physical-phone acceptance.
 
+## Space Watch
+
+Run `node scripts/test_space.cjs` for the shipped module's orbit, sky-word and
+catalogue logic, including the Heavens-Above ISS pass regression and the package
+and vendored-library checks. Run `node scripts/test_space_app.cjs` for the
+controller against a bounded host/DOM double: start, no coordinates in URLs or
+storage, selection, details, rewind, red mode, cache expiry and CelesTrak back-off.
+`python scripts/prepare_space_fixture.py --output DIR` signs Space Watch plus the
+disposable Synthetic Space Watch (pinned clock, Berlin viewpoint, captured orbits).
+Regenerate the star table with `python scripts/space_watch_stars.py bsc5-short.json`.
+See [Space Watch](space-watch.md). These are not layout or on-sky tests.
+
 ## Retired capability transition (alpha28 candidate)
 
 The configured disposable runner can execute `retirement.py --old OLD_APK

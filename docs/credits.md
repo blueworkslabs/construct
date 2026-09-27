@@ -24,3 +24,10 @@ API 0.9 transport uses [OkHttp 4.12.0](https://square.github.io/okhttp/) and its
 Okio dependency under Apache-2.0. Their upstream dependency metadata/notices remain
 applicable. Aircraft/data-provider attribution and reuse limits are recorded in
 [Sky Watch](sky-watch.md); software licenses do not relicense provider databases.
+
+The Space Watch module bundles unmodified MIT builds of
+[satellite.js](https://github.com/shashwatak/satellite-js) 6.0.2 and
+[Astronomy Engine](https://github.com/cosinekitty/astronomy) 2.1.19, with their
+licence texts in the package, and a star table generated from the Yale Bright Star
+Catalog. CelesTrak and Wikipedia (CC BY-SA 4.0) attribution, versions and hashes
+are recorded in [Space Watch](space-watch.md).

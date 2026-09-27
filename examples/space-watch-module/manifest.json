@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "dev.construct.space-watch",
+  "name": "Space Watch",
+  "version": "0.1.0",
+  "description": "What's passing overhead: a sky dome of the brightest satellites and rocket stages with plain-language pointing, rewind and details. Positions are computed on the phone; your location is never sent. Requires Construct alpha26 or later.",
+  "constructApi": {
+    "min": "0.9.0",
+    "target": "0.9.0"
+  },
+  "runtime": {
+    "kind": "webview-js"
+  },
+  "entry": "ui/index.html",
+  "capabilities": [
+    {
+      "id": "net.http",
+      "reason": "Download the public orbit list and catalog of bright objects from CelesTrak, and, only when you ask, a short Wikipedia description of the selected object. No location is sent.",
+      "origins": [
+        "https://celestrak.org",
+        "https://en.wikipedia.org"
+      ]
+    },
+    {
+      "id": "location.read",
+      "reason": "Optionally take one foreground location fix when the module opens or when you tap Use my location, to draw the sky from where you are. The fix stays on this phone.",
+      "optional": true
+    },
+    {
+      "id": "storage.kv",
+      "reason": "Save your start choice, red mode and a few hours of downloaded orbit data, not your location."
+    }
+  ],
+  "themeColor": "#0B1410"
+}
