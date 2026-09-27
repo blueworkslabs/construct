@@ -8,7 +8,7 @@ Pure checks live in capture_checks.py (unit-tested without a device).
 import argparse,datetime,fcntl,hashlib,io,json,os,re,subprocess,time,uuid
 from pathlib import Path
 from config import CONFIG,SERIAL,require_runner,catalog
-from capture_checks import acceleration,check_result,check_zoom_pair,level_readout,parse_result,readout_matches,secure_blackout,screenshot_content_bounds
+from capture_checks import acceleration,check_result,check_zoom_pair,level_readout,parse_result,readout_matches,secure_blackout,screenshot_content_bounds,zoom_chip_selected
 p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.add_argument('--sha',required=True)
 p.add_argument('--catalog',required=True);p.add_argument('--legacy-sha',required=True,help='0.1.0 package digest (API 0.12)')
 p.add_argument('--module-sha',required=True,help='0.2.1 package digest (API 0.13)')
@@ -121,7 +121,7 @@ def zoom(label):
  tap_node(find('Zoom '+label))
  until=time.monotonic()+15
  while time.monotonic()<until:
-  if any(n.get('content-desc')=='Zoom '+label and n.get('selected')=='true' for n in nodes()):return
+  if zoom_chip_selected(nodes(),label):return
   time.sleep(.3)
  raise RuntimeError('Zoom chip not selected: '+label)
 def measured(pitch,roll,ratio):

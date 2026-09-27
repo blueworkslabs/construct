@@ -183,3 +183,22 @@ def screenshot_content_bounds(width, height, nodes):
         if y1 == 0: top = max(top, y2)
         if y2 == height: bottom = min(bottom, y1)
     return (0, top, width, bottom)
+
+
+def zoom_chip_selected(nodes, label):
+    """Read selection on the labelled chip or its nearest checkable ancestor.
+
+    Compose exposes FilterChip as a checkable parent with a separate label node;
+    another selected chip elsewhere must never satisfy this check.
+    """
+    parents = {child: parent for parent in nodes for child in parent}
+    for node in nodes:
+        if node.get('content-desc') != 'Zoom ' + label:
+            continue
+        while node is not None:
+            if node.get('checkable') == 'true':
+                return node.get('checked') == 'true'
+            if node.get('selected') == 'true':
+                return True
+            node = parents.get(node)
+    return False

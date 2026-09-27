@@ -3,7 +3,7 @@ import json
 import math
 import unittest
 from capture_checks import (G, acceleration, check_result, check_zoom_pair, dark_fraction, level_readout,
-                            parse_result, readout_matches, secure_blackout, screenshot_content_bounds, zoomed)
+                            parse_result, readout_matches, secure_blackout, screenshot_content_bounds, zoom_chip_selected, zoomed)
 
 
 def vector(value):
@@ -103,6 +103,17 @@ class ReadoutAndResultTest(unittest.TestCase):
         self.assertEqual([], check_zoom_pair(one, good))
         self.assertEqual(2, len(check_zoom_pair(one, naive)))
         self.assertTrue(check_zoom_pair(result(fovDeg=None), good))
+
+
+class ZoomChipTest(unittest.TestCase):
+    def test_compose_checked_parent_is_used_only_for_its_own_label(self):
+        import xml.etree.ElementTree as ET
+        root=ET.fromstring('<root><chip checkable="true" checked="false"><label content-desc="Zoom 1×" selected="false"/></chip><chip checkable="true" checked="true"><label content-desc="Zoom 2×" selected="false"/></chip></root>')
+        self.assertTrue(zoom_chip_selected(list(root.iter()),'2×'))
+        self.assertFalse(zoom_chip_selected(list(root.iter()),'1×'))
+        self.assertFalse(zoom_chip_selected(list(root.iter()),'3×'))
+        root[1].set('checked','false')
+        self.assertFalse(zoom_chip_selected(list(root.iter()),'2×'))
 
 
 class ScreenshotTest(unittest.TestCase):
