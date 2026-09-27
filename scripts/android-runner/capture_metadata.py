@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """API 0.13 capture metadata and screenshot-switch acceptance on a disposable synthetic-camera emulator.
 Ties every observation to one APK and two signed fixture versions of dev.construct.capture-metadata:
-0.1.0 (API 0.12: exact {op} request, {saved} result) and 0.2.0 (API 0.13).
+0.1.0 (API 0.12: exact {op} request, {saved} result) and 0.2.1 (API 0.13).
 Both tilt signs are injected with `adb emu sensor set acceleration` on a portrait-locked display.
 Pure checks live in capture_checks.py (unit-tested without a device).
 """
@@ -11,7 +11,7 @@ from config import CONFIG,SERIAL,require_runner,catalog
 from capture_checks import acceleration,check_result,check_zoom_pair,level_readout,parse_result,readout_matches,secure_blackout,screenshot_content_bounds
 p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.add_argument('--sha',required=True)
 p.add_argument('--catalog',required=True);p.add_argument('--legacy-sha',required=True,help='0.1.0 package digest (API 0.12)')
-p.add_argument('--module-sha',required=True,help='0.2.0 package digest (API 0.13)')
+p.add_argument('--module-sha',required=True,help='0.2.1 package digest (API 0.13)')
 a=p.parse_args();require_runner();catalog(a.catalog)
 if hashlib.sha256(a.apk.read_bytes()).hexdigest()!=a.sha:raise SystemExit('APK checksum mismatch')
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -23,7 +23,7 @@ import ui
 from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
-receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':{'0.1.0':a.legacy_sha,'0.2.0':a.module_sha},
+receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':{'0.1.0':a.legacy_sha,'0.2.1':a.module_sha},
  'recents':'Not captured yet','checks':[],'captures':[]}
 started=False
 name='Capture metadata probe';heading=name+' · 0.1.0'
@@ -181,7 +181,7 @@ try:
 
  # The successful legacy capture returns to the already-open module. Starting
  # MainActivity here only brings its task forward; it does not close the module.
- tap('Construct menu');tap('Mark working');install('0.2.0',a.module_sha);opened()
+ tap('Construct menu');tap('Mark working');install('0.2.1',a.module_sha);opened()
  require(screenshot_black('module-switch-off'),'Pixel-bearing module screen is capturable with the switch off')
  module_access()
  require(switch('Allow screenshots',True)=='false','Allow screenshots must default to off')
@@ -194,6 +194,12 @@ try:
  adb('shell','input','keyevent','KEYCODE_BACK')
  adb('shell','am','force-stop','dev.construct.runtime');opened()
  require(not screenshot_black('module-switch-on-restart'),'Screenshot choice was lost on restart')
+ act('Open photo confirmation',wait=False);find('Delete this private photo?')
+ require(screenshot_black('photo-confirmation-switch-on'),'Native photo confirmation exposed private pixels')
+ capture('photo-confirmation-secure')
+ adb('shell','input','keyevent','KEYCODE_APP_SWITCH');time.sleep(1.5);capture('recents-photo-confirmation')
+ adb('shell','input','keyevent','KEYCODE_BACK');adb('shell','am','force-stop','dev.construct.runtime');opened()
+
  before=viewfinder('Capture plain');require(screenshot_black('viewfinder-switch-on'),'Native viewfinder dropped FLAG_SECURE')
  tap('Cancel capture');require(result(before,60)=='Capture canceled.','Cancel did not finish');find('Capture plain')
  done('Allow screenshots is off by default, drops FLAG_SECURE for this module only, and the viewfinder stays secure')

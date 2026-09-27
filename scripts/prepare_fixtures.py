@@ -69,7 +69,18 @@ def prepare_capture_metadata(output, key):
     with tempfile.TemporaryDirectory() as tmp:
         probe=Path(tmp)/'capture-metadata'; shutil.copytree(ROOT/'examples/fixtures/capture-metadata',probe)
         manifest=json.loads((probe/'manifest.json').read_text())
-        for version,api in [('0.1.0','0.12.0'),('0.2.0','0.13.0')]:
+        for version,api in [('0.1.0','0.12.0'),('0.2.0','0.13.0'),('0.2.1','0.13.0')]:
+            # Extend only a NEW signed fixture version; published 0.1.0/0.2.0 stay byte-identical.
+            if version == '0.2.1':
+                html=probe/'ui/index.html'
+                html.write_text(html.read_text().replace('<p id="status"', '<button id="confirmation">Open photo confirmation</button><p id="status"'))
+                js=probe/'ui/app.js'
+                js.write_text(js.read_text()+'''\n$('confirmation').onclick=task(async()=>{
+  const photos=(await call('photos.library',{op:'list'})).photos;
+  if(!photos.length)return 'No photos.';
+  const r=await call('photos.library',{op:'delete',ref:photos[0].ref});
+  return r.deleted?'Deleted.':'Delete canceled.';
+});\n''')
             (probe/'manifest.json').write_text(json.dumps({**manifest,'version':version,'constructApi':dict(min=api,target=api)}))
             publish(output/'capture-metadata-registry',*build(probe,key),fixture=True)
 

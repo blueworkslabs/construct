@@ -295,6 +295,9 @@ class ModuleActivity : ComponentActivity() {
             }
         }
         photoConfirmation?.let { confirmation -> AlertDialog(
+            // This is a separate native window containing private pixels. It must
+            // not inherit a temporarily relaxed module screenshot preference.
+            properties = androidx.compose.ui.window.DialogProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
             onDismissRequest = { finishPhotoConfirmation(false) },
             title = { Text(if (confirmation.op == "delete") "Delete this private photo?" else "Save this photo to phone gallery?") },
             text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -308,6 +311,7 @@ class ModuleActivity : ComponentActivity() {
             dismissButton = { TextButton(onClick = { finishPhotoConfirmation(false) }) { Text("Cancel") } }
         ) }
         if (diagnosticsOpen) AlertDialog(onDismissRequest = { closeDiagnostics() },
+            properties = androidx.compose.ui.window.DialogProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
             title = { Text("Diagnostics") },
             text = { Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
                 Text("Local technical report. Review before sharing; module messages may contain data.", style = MaterialTheme.typography.bodySmall)
