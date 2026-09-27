@@ -298,7 +298,7 @@ select:focus-visible {
 }
 #details dl {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: 1px 10px;
   margin: 0;
   font-size: 12.5px;
@@ -307,6 +307,7 @@ select:focus-visible {
 }
 #details dt {
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 #details dd {
   margin: 0;

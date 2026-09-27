@@ -404,6 +404,17 @@ def main():
             details = page.locator("#details").inner_text()
             assert "Lens\nnot reported by the camera" in details and ("(prior 38.6° ±5.3°)" in details or "(prior: default for 2×, 38.6° ±5.3°)" in details), details
             assert abs(page.evaluate("state.cal.fov") - 70) > 20, "2× photo still fitted near the 1× default"
+            # Valid long landmark labels must not squeeze residuals off-screen.
+            original_name = page.evaluate("current().marks[0].name")
+            for name in ("Evangelisch-lutherische Marktkirche St. Georgii et Jacobi", "W" * 80):
+                page.evaluate("name=>{current().marks[0].name=name;openDetails()}", name)
+                layout = page.evaluate("""(()=>{const el=$('details');return {
+                  width:el.clientWidth,scroll:el.scrollWidth,
+                  values:[...el.querySelectorAll('dd')].map(d=>({width:d.getBoundingClientRect().width,right:d.getBoundingClientRect().right})),
+                  right:el.getBoundingClientRect().right};})()""")
+                assert layout["scroll"] <= layout["width"] + 1, layout
+                assert all(v["width"] >= 150 and v["right"] <= layout["right"] + 1 for v in layout["values"]), layout
+            page.evaluate("name=>{current().marks[0].name=name;openDetails()}", original_name)
             page.locator("#close-details").click()
             print("PASS calibration details panel, lens-not-measured note, zoom-aware lens prior, ±m in search")
             page.evaluate("openPhoto('photo1')")
