@@ -8,12 +8,13 @@
         {
           "id": "dev.construct.aime",
           "name": "Aim\u00e9",
-          "version": "0.1.8",
-          "artifact": "dev.construct.aime-0.1.8.zip",
-          "sha256": "9eae00d89b23b6f9154e93b5108c773b7e5850251ba0791ee909a83f7de2287b",
-          "signature": "MhjdB1qbMQFddtGubYsz60GRCp20aTFRDDBVnBdVDwHFkPJ5ZqeNv74J+i9qY3CNZUJKW/XVoR1GuxsXHB4HQIZ22+xwVyZLnP9owH5q0av7scqnvlBmqmw/c4XWis0c9uxZhvtKN+M4wGX/77hkH/kwToQGJRAoZZW4YjDCmpLCmSNnKHVotQ/1yKipgCGRT1QvpeEO/M1RWYZ8FAbc6QlCYHXMdXWDPJBjjUUtyo8/Otohl9zQC52nmvC+pm18M2rYjzQNHExCkfzASAoohIMQ4pZLmJxq61DnsUfTU+of/GS0Grqn1jafLWW1IP11UmPnN+1dUgadQZX4oDHsVQ=="
+          "version": "0.1.9",
+          "artifact": "dev.construct.aime-0.1.9.zip",
+          "sha256": "f1f4cdf2e1ae425d2dfd338234db170b4d866db4b5d3133dc2532207b3e274cc",
+          "signature": "Ro/kSaX4upNGwUUgx4CtPqijq2rmvfuDo/Py/j65kV+Mz1nxX/72l+pV8CCHJGMKcaoQiHGL0KK9DrhGo25csu5k42tqQuKG3VyGj8D5Phl9AOScp92pXBL6pBT4vUAG9XiUq7wVlrzLyPvAEYZj3HyRpTFuN/b0m6XsloZe+ZYqvCqp74XimDM2IIuPpPclau2vPhboEXgVUx+ggAdi7QBzTBd7SXQl/sJGuH9XvSPJs/04jc62lJdxCY8rwZ0twfC5eaZPeW7OTH5OcAbuE8Ff69v3JfvunfSoWD11cYIGomSidssC0W1yI9jBZC3a/rzgU6DAXDf1nVlGoOLI4g=="
         }
-      ]
+      ],
+      "latest": "0.1.9"
     },
     {
       "id": "dev.construct.aime-fixture",
@@ -22,13 +23,14 @@
         {
           "id": "dev.construct.aime-fixture",
           "name": "Synthetic Aim\u00e9",
-          "version": "0.1.8",
-          "artifact": "dev.construct.aime-fixture-0.1.8.zip",
-          "sha256": "967f7f551d6e75bd0573e77692c7ca3782c91bf2712f9ca14994beb3b91d01df",
-          "signature": "a2zq4et3Y9tR609aMcz/CD9JgA/iRWudyH793suAR0ugS3AW3OlavsPjliAqY0zQDwtBk42utWnLeyQIb5fYvy0kSaX5GECvCJFRT2b8U/ti41ZYZcPEbvi9PERbn0sAhDphX47hGBDbUau86ecTuejjPwTIPR8KDvnbH+/nr6O2Lc1S+xo0ipLUE5FziHlQNoBy++EVyRBtWFfJJt1Hicp6ywTnqLi87C+WcQxTeRUIVTZusektor1VMZFjS05K/Q49aZ6b/Wbk5UUt7k/fWVlhiVInRHS5y17dDTJgBwQsTNHerFyngidYOrmoNqNGVb7Krr256qC9RWgMCDjENA==",
+          "version": "0.1.9",
+          "artifact": "dev.construct.aime-fixture-0.1.9.zip",
+          "sha256": "b6604c9f7ce6554ff5c418ed969da1df100efe4c93a71a5659ab3abca898727a",
+          "signature": "BHJezjsRz9R4fgUK36gqz7XRI+cwM0I6zzEx+HTwzhVxk2Kn3uQjiwKuMlHi4J44dLQPa0q9YHi8nPRFn5FAvzZWeFYIyV22IEX32uvE7kNzqDGWcg0gb4gkNt5YHbRprW1QiFaMxsJXM2jCUGUOvbtArfauCqKt9TxQEzfqhH4aLt/TuwI6qJLB4Yb1CjkdhO9m9IK4zlkTuKPX9fIyH7TilWNKOUkO2CVWoxe2O/NJHXFXjf84Jjk6SlBWnAfX6P/te3N94m6/D00FizhNtiDUptAH5W3Vsf5aZwUbxnkcPRD5/PBQflKuS/Ug9WMI0h1JyEsJQ5BDJFu+MX91dg==",
           "testFixture": true
         }
-      ]
+      ],
+      "latest": "0.1.9"
     }
   ]
 }
