@@ -5,7 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult as Camera2CaptureResult
+import android.hardware.camera2.TotalCaptureResult
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
 import android.media.ExifInterface
@@ -16,6 +20,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraInfo
@@ -74,6 +79,8 @@ class PhotoCaptureActivity : ComponentActivity() {
     private var capture: ImageCapture? = null
     private var camera: Camera? = null
     private var lens: LensState? = null
+    /** Still-capture results (arrival time, lens facts) from Camera2 interop; cleared before each shutter. */
+    private val stillResults = java.util.Collections.synchronizedList(mutableListOf<Pair<Long, StillResult>>())
     private var options = CaptureOptions()
     private var sensors: CaptureSensors? = null
     private var zoomRequest = 0
@@ -163,8 +170,10 @@ class PhotoCaptureActivity : ComponentActivity() {
                 val selector = if ((front && selfie) || !back) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
                 val resolution = ResolutionSelector.Builder().setResolutionStrategy(
                     ResolutionStrategy(android.util.Size(1280, 960), ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER)).build()
-                val image = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                    .setJpegQuality(85).setResolutionSelector(resolution).setTargetRotation(view.display?.rotation ?: android.view.Surface.ROTATION_0).build()
+                val builder = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                    .setJpegQuality(85).setResolutionSelector(resolution).setTargetRotation(view.display?.rotation ?: android.view.Surface.ROTATION_0)
+                if (options.metadata) observeStillResults(builder)
+                val image = builder.build()
                 val surface = Preview.Builder().build().also { it.setSurfaceProvider(view.surfaceProvider) }
                 val camera = p.bindToLifecycle(this, selector, surface, image)
                 camera.cameraInfo.cameraState.observe(this) { state ->
@@ -211,6 +220,43 @@ class PhotoCaptureActivity : ComponentActivity() {
         level = if (!options.level || !rearCamera || up == null) null
             else CaptureTilt.angles(up[0], up[1], up[2], capture?.targetRotation ?: android.view.Surface.ROTATION_0)
     }
+    /**
+     * Lens facts of the still frames themselves: every completed request goes through this
+     * callback (preview too), but only still-capture intents are kept, with their arrival time.
+     */
+    @androidx.annotation.OptIn(ExperimentalCamera2Interop::class)
+    private fun observeStillResults(builder: ImageCapture.Builder) {
+        Camera2Interop.Extender(builder).setSessionCaptureCallback(object : CameraCaptureSession.CaptureCallback() {
+            override fun onCaptureCompleted(session: CameraCaptureSession, request: CaptureRequest, result: TotalCaptureResult) {
+                val intent = result.get(Camera2CaptureResult.CONTROL_CAPTURE_INTENT) ?: request.get(CaptureRequest.CONTROL_CAPTURE_INTENT)
+                if (intent != CameraMetadata.CONTROL_CAPTURE_INTENT_STILL_CAPTURE &&
+                    intent != CameraMetadata.CONTROL_CAPTURE_INTENT_ZERO_SHUTTER_LAG) return
+                runCatching { stillResults.add(SystemClock.elapsedRealtimeNanos() to stillResult(result)) }
+            }
+        })
+    }
+    private fun stillResult(result: TotalCaptureResult): StillResult {
+        val physical = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
+            result.get(Camera2CaptureResult.LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID) else null
+        val zoom = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
+            result.get(Camera2CaptureResult.CONTROL_ZOOM_RATIO)?.toDouble() else null
+        val crop = result.get(Camera2CaptureResult.SCALER_CROP_REGION)?.let { listOf(it.left, it.top, it.right, it.bottom) }
+        return StillResult(result.get(Camera2CaptureResult.LENS_FOCAL_LENGTH)?.toDouble(), physical, crop, zoom)
+    }
+    /**
+     * The one still result delivered since [startNs], waiting briefly because it can trail the
+     * saved image. None or several cannot be tied to the saved frame, so the caller falls back.
+     */
+    private fun tiedStill(startNs: Long): Pair<StillResult?, String> {
+        val deadline = SystemClock.elapsedRealtime() + 500
+        var tied: List<StillResult>
+        while (true) {
+            tied = synchronized(stillResults) { stillResults.filter { it.first >= startNs }.map { it.second } }
+            if (tied.isNotEmpty() || SystemClock.elapsedRealtime() >= deadline) break
+            Thread.sleep(20)
+        }
+        return when (tied.size) { 1 -> tied[0] to "tied"; 0 -> null to "none"; else -> null to "several" }
+    }
     /** Published characteristics of the bound camera. Only [Camera2CameraInfo.getCameraId] needs interop. */
     @androidx.annotation.OptIn(ExperimentalCamera2Interop::class)
     private fun lensState(info: CameraInfo, back: Boolean): LensState {
@@ -218,13 +264,25 @@ class PhotoCaptureActivity : ComponentActivity() {
         val characteristics = manager.getCameraCharacteristics(Camera2CameraInfo.from(info).cameraId)
         val logical = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
             ?.contains(CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA) == true
-        val physical = if (!logical) emptyList() else characteristics.physicalCameraIds.map { id ->
-            runCatching { lensSpec(manager.getCameraCharacteristics(id)) }.getOrNull()
-        }
+        val physicalIds = if (!logical) emptyList() else characteristics.physicalCameraIds.toList()
+        val physicalCharacteristics = physicalIds.associateWith { id -> runCatching { manager.getCameraCharacteristics(id) }.getOrNull() }
+        val physical = physicalIds.map { id -> physicalCharacteristics[id]?.let { runCatching { lensSpec(it) }.getOrNull() } }
+        val physicalById = physicalCharacteristics.mapValues { (_, c) -> if (c == null) CameraLens(null, emptyList()) else cameraLens(c) }
         // Distortion correction (default for stills where supported) can change the saved crop slightly.
         val correction = characteristics.get(CameraCharacteristics.DISTORTION_CORRECTION_AVAILABLE_MODES)
             ?.any { it != CameraMetadata.DISTORTION_CORRECTION_MODE_OFF } == true
-        return LensState(lensSpec(characteristics), logical, physical, back, cropMayChange = correction)
+        val own = cameraLens(characteristics)
+        return LensState(lensSpec(characteristics), logical, physical, back, cropMayChange = correction,
+            geometry = own.geometry, focalLengths = own.focalLengths, physicalById = physicalById)
+    }
+    private fun cameraLens(c: CameraCharacteristics): CameraLens {
+        val focal = c.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)?.map { it.toDouble() }.orEmpty()
+        val size = c.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
+        val pixels = c.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)
+        val active = c.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
+        val geometry = if (size == null || pixels == null || active == null) null else SensorGeometry(size.width.toDouble(),
+            size.height.toDouble(), pixels.width, pixels.height, active.width(), active.height()).takeIf { it.valid }
+        return CameraLens(geometry, focal)
     }
     private fun lensSpec(c: CameraCharacteristics): LensSpec? {
         // Several focal lengths mean the lens actually used is unknown: omit rather than guess.
@@ -246,9 +304,16 @@ class PhotoCaptureActivity : ComponentActivity() {
             ExifInterface.ORIENTATION_TRANSVERSE, ExifInterface.ORIENTATION_ROTATE_270)
         val mirrored = orientation in setOf(ExifInterface.ORIENTATION_FLIP_HORIZONTAL, ExifInterface.ORIENTATION_FLIP_VERTICAL,
             ExifInterface.ORIENTATION_TRANSPOSE, ExifInterface.ORIENTATION_TRANSVERSE)
-        return CaptureResult.describe(ShutterState(zoom, lensAtShutter, rotation, sensorRotation,
+        val (still, tie) = window?.let { tiedStill(it.startNs) } ?: (null to "none")
+        val (capture, fov) = CaptureResult.explain(ShutterState(zoom, lensAtShutter, rotation, sensorRotation,
             if (transposed) bounds.outHeight else bounds.outWidth, if (transposed) bounds.outWidth else bounds.outHeight, mirrored,
-            window, gravity, sensors?.accelerometerFallback ?: false, rotationVector))
+            window, gravity, sensors?.accelerometerFallback ?: false, rotationVector, still))
+        // Camera facts only (no image, location or sensor values), so testers can see why FOV is missing.
+        val facts = "still-result=$tie logical=${lensAtShutter?.logical} focalLengths=${lensAtShutter?.focalLengths?.size ?: 0}" +
+            (still?.let { " resultFocal=${it.focalMm} activePhysical=${it.activePhysicalId ?: "none"} crop=${it.cropRegion != null} resultZoom=${it.zoomRatio}" } ?: "")
+        runCatching { store.log("camera", "CAPTURE_FOV", installed.manifest,
+            (if (fov.omitted != null) "fov-omitted: ${fov.omitted}" else "fov-source: ${fov.source}") + "; " + facts) }
+        return capture
     }
     private fun shoot() {
         if (busy || !ready || zoomPending) return
@@ -274,6 +339,7 @@ class PhotoCaptureActivity : ComponentActivity() {
                         checkAccess()
                         // Exposure starts after this instant and before onCaptureStarted arrives
                         // (or, without that callback, before the image is saved).
+                        stillResults.clear()
                         val windowStart = SystemClock.elapsedRealtimeNanos()
                         var windowEnd: Long? = null
                         image.takePicture(ImageCapture.OutputFileOptions.Builder(temp).build(), ContextCompat.getMainExecutor(this),

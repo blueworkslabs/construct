@@ -229,13 +229,26 @@ measured after their own delivery (clock mismatch), with unreliable or no-contac
 status, or with non-finite values are never used.
 
 - `zoomRatio`: the ratio CameraX reports as applied when the shutter is pressed.
-- `fovDeg`: from the lens focal length, physical sensor size, active-array crop,
-  the saved image's aspect (largest centred crop of the active array) and the zoom.
-  Zoom is a digital crop: `fov(z) = 2·atan(tan(fov(1)/2)/z)`; the angle is never
-  divided by the ratio. `h` is across the image as opened, so portrait photos have
-  `h < v`. Omitted when the camera lists more than one focal length or its sensor
-  geometry is missing, and on a logical multi-camera when the step may be served by
-  another lens (below 1×, or a narrower lens that covers the requested view).
+- `fovDeg`: from the still frame's own lens. The host reads the saved frame's
+  Camera2 capture result (a still-capture request completed after the shutter; exactly
+  one, or the result is not used): its focal length, active physical camera (API 29+),
+  crop region and applied zoom ratio (API 30+). With the physical camera's sensor size,
+  pixel and active arrays, the output region is the crop region reduced by the zoom
+  ratio, and the saved image is the largest centred crop of it with the output aspect.
+  Angles are measured from the active-array centre, so for a centred digital crop
+  `fov(z) = 2·atan(tan(fov(1)/2)/z)`; the angle is never divided by the ratio. `h` is
+  across the image as opened, so portrait photos have `h < v`. On a logical
+  multi-camera (for example main + ultrawide) the crop region is in the logical
+  camera's coordinates, so it is applied only when the active physical camera is the
+  unique one with the logical camera's sensor geometry and the result's focal length
+  is one it lists; a different active lens omits the FOV. Without a usable result
+  (none or several still results, API 28, or no active physical ID) the published
+  characteristics apply: one focal length only, and no possible lens switch (below 1×,
+  or a narrower lens that could cover the view). Each capture writes one host
+  diagnostic line, `CAPTURE_FOV`, with the FOV source or `fov-omitted: <reason>`
+  (`multiple-focal-lengths`, `physical-unknown`, `lens-switch-possible`,
+  `no-geometry`, `focal-mismatch`, `crop-region-invalid`) and camera facts only: no
+  image, location or sensor values.
   Distortion correction and lens tolerances are not modelled; `fovSigmaDeg` (always
   present with `fovDeg`, at least 0.5°) is 1° by default and 2° when the camera
   advertises distortion correction, which can change the saved crop. This host never
