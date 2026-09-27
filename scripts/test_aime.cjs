@@ -160,6 +160,9 @@ check("index validation: schema 1 only, dataset = release-rN with its path, list
   bad({ cells: "46_9" });
   bad({ kinds: { peak: { placementM: 8 } } });
   bad({ kinds: [] });
+  bad({ kinds: ["peak", 7] });
+  bad({ kinds: ["peak", "Tower"] });
+  bad({ kinds: ["peak", null] });
   assert.throws(() => C.parseIndex("<html>404</html>"), { code: "DATA_INVALID" });
   for (const invalid of ["x", 7, "1000_1", "90_1", "46_180", "046_9", "-0_9"]) bad({ cells: ["46_9", invalid] });
   assert.deepEqual(C.cellPlan(ix, { lat: 46.8, lon: 9.2 }, 30).sort(), ["46_9", "47_9"], "only listed cells");

@@ -301,7 +301,9 @@ const AimeCore = (() => {
   function parseIndex(body) {
     const x = readJson(body, "The landmark index");
     if (!x || x.schema !== 1) throw unavailable("the landmark index has an unsupported schema.");
-    const kinds = new Set(Array.isArray(x.kinds) ? x.kinds.filter(isKind) : []);
+    if (!Array.isArray(x.kinds) || !x.kinds.length || !x.kinds.every(isKind))
+      throw unavailable("the landmark index contains invalid kinds.");
+    const kinds = new Set(x.kinds);
     // dataset = <release>-r<revision>; its cells live under <dataset>/cells/.
     const dataset = isRelease(x.release) && Number.isInteger(x.revision) && x.revision >= 1 ? `${x.release}-r${x.revision}` : null;
     if (!dataset || x.dataset !== dataset || !isRelease(x.dataset) || x.path !== dataset + "/cells/" || !Array.isArray(x.cells) || !x.cells.every(validCell) || !kinds.size)
