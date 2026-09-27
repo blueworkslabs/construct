@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "id": "dev.construct.aime",
+  "name": "Aimé",
+  "version": "0.1.0",
+  "description": "Tap something in your photo to see which named landmarks it could be. Calibrate by marking a landmark you know; no cloud vision, the photo stays on your phone. Requires Construct API 0.12.",
+  "constructApi": {
+    "min": "0.12.0",
+    "target": "0.12.0"
+  },
+  "runtime": {
+    "kind": "webview-js"
+  },
+  "entry": "ui/index.html",
+  "capabilities": [
+    {
+      "id": "camera.photo",
+      "reason": "Open the visible native viewfinder; only you can press the shutter to save a private photo."
+    },
+    {
+      "id": "photos.library",
+      "reason": "Browse this module’s private photos, including older captures, and request individually confirmed deletion."
+    },
+    {
+      "id": "image.read",
+      "reason": "Display bounded image pixels from your selection or this module’s separately granted private album."
+    },
+    {
+      "id": "location.read",
+      "reason": "Read an estimated viewpoint for your photo, shown with fix age and accuracy for you to confirm or correct before looking up landmarks."
+    },
+    {
+      "id": "net.http",
+      "reason": "Fetch named map features around your photo position and map tiles.",
+      "origins": [
+        "https://overpass-api.de",
+        "https://tile.openstreetmap.org"
+      ]
+    },
+    {
+      "id": "storage.kv",
+      "reason": "Save each photo's estimated viewpoint, the landmarks and horizon you marked, and the fitted direction. After photo deletion, metadata is cleaned up when this module can next access its library and storage."
+    }
+  ],
+  "themeColor": "#0B1410"
+}
