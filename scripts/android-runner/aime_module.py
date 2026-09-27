@@ -283,7 +283,12 @@ try:
  reach_text(', initial bearing ');capture('aime-ruler')
  click(lambda t:t=='Clear ruler');click(lambda t:t=='Ruler');absent(', initial bearing ')
  done('Map ruler: two taps show the great-circle distance and initial bearing; it clears')
- m=bounds(reveal('Map of your viewpoint'));x=str(round(m[0]+(m[2]-m[0])*.3));y=str(round(m[1]+(m[3]-m[1])*.25))
+ # The canvas may be vertically clipped after scrolling the ruler controls.
+ # In this fixed scene its viewer ring is in the visible upper-left; hold well
+ # to the right, away from that intentionally non-pin-dropping hit target.
+ m=bounds(reveal('Map of your viewpoint'));x=str(round(m[0]+(m[2]-m[0])*.75));y=str(round(m[1]+(m[3]-m[1])*.35))
+ capture('before-map-pin')
+ (run/'map-pin-touch.json').write_text(json.dumps({'visibleMap':m,'press':[int(x),int(y)]}))
  adb('shell','input','swipe',x,y,x,y,'900');time.sleep(.8)
  click(lambda t:t=='Show pin in photo');reach_text('Clear pin');capture('aime-map-pin')
  click(lambda t:t=='Clear pin');absent('Show pin in photo')
