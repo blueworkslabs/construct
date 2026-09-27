@@ -1,8 +1,8 @@
 "use strict";
 // Aimé module logic without DOM or host calls: per-photo sidecars keyed by the
 // API 0.12 stable photo id, capture association, orphan reconciliation, the
-// landmark cells (aime-data contract, schema 1), local name search and the
-// candidates shortlist.
+// landmark cells (aime-data contract, schema 1), local name search, the
+// candidates shortlist, point editing with one-step undo and the magnifier.
 // Global `AimeCore` in the module, CommonJS under Node for scripts/test_aime.cjs.
 const AimeCore = (() => {
   const RADII = [10, 30, 60],
@@ -31,8 +31,9 @@ const AimeCore = (() => {
     MESSAGE_BUDGET = 7600;
   const num = (x) => typeof x === "number" && Number.isFinite(x);
   // Control/format characters are dropped: they carry no name and would expand
-  // the storage request when escaped.
-  const text = (s, max = NAME_MAX) => (typeof s === "string" ? s.replace(/[\p{Cc}\p{Cf}\p{Cs}]/gu, "").trim().slice(0, max) : "");
+  // the storage request when escaped. `max` counts code points, as the data
+  // contract does, so an astral character at the limit is never split.
+  const text = (s, max = NAME_MAX) => (typeof s === "string" ? [...s.replace(/[\p{Cc}\p{Cf}\p{Cs}]/gu, "").trim()].slice(0, max).join("").trim() : "");
   const inUnit = (v) => num(v) && v >= 0 && v <= 1;
   const latLon = (lat, lon) => num(lat) && num(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
   const OSM_TYPES = ["node", "way", "relation"];
@@ -295,6 +296,10 @@ const AimeCore = (() => {
       for (let o = lon0; o <= lon1; o++) out.add(a + "_" + ((((o + 180) % 360) + 360) % 360 - 180));
     return [...out];
   }
+  // Licence and attribution exactly as published: a plain bounded string with
+  // no control characters or padding, else null. Never a default: the module
+  // shows only what the dataset states.
+  const legal = (v, max) => (typeof v === "string" && v !== "" && text(v, max) === v ? v : null);
   // index.json text → {release, revision, dataset, path, cells (Set), kinds (Set),
   // coverage, license, attribution}. Anything but schema 1 in the expected shape
   // is unavailable. Kinds only validate records; they carry no position values.
@@ -308,6 +313,9 @@ const AimeCore = (() => {
     const dataset = isRelease(x.release) && Number.isInteger(x.revision) && x.revision >= 1 ? `${x.release}-r${x.revision}` : null;
     if (!dataset || x.dataset !== dataset || !isRelease(x.dataset) || x.path !== dataset + "/cells/" || !Array.isArray(x.cells) || !x.cells.every(validCell) || !kinds.size)
       throw unavailable("the landmark index is incomplete.");
+    const license = legal(x.license, 40),
+      attribution = legal(x.attribution, 120);
+    if (!license || !attribution) throw unavailable("the landmark index has no valid licence or attribution.");
     return {
       release: x.release,
       revision: x.revision,
@@ -316,8 +324,8 @@ const AimeCore = (() => {
       cells: new Set(x.cells),
       kinds,
       coverage: Array.isArray(x.coverage) ? x.coverage.filter((c) => typeof c === "string") : [],
-      license: text(x.license, 40) || "ODbL-1.0",
-      attribution: text(x.attribution, 120) || "© OpenStreetMap contributors, Overture Maps Foundation",
+      license,
+      attribution,
     };
   }
   const cellUrl = (index, cell) => DATA_ORIGIN + "/v1/" + index.path + cell + ".json";
@@ -330,8 +338,11 @@ const AimeCore = (() => {
   // not match the index, or without a feature array, is unavailable (never
   // empty). Missing or invalid position uncertainty makes the entire cell
   // unavailable: never cache incomplete data as a successful empty lookup.
-  // `p` is the feature's positionM, with no kind-level fallback.
-  function parseCell(index, cell, body) {
+  // `p` is the feature's positionM, with no kind-level fallback. The optional,
+  // additive `declination` (degrees east, WMM at the cell centre) is kept when
+  // it is a finite number in [-180, 180], else treated as absent: never a cell
+  // error, so older cells without it stay valid. → {features, declination|null}
+  function readCell(index, cell, body) {
     const x = readJson(body, "Landmark cell " + cell),
       m = cell.match(CELL);
     if (!x || x.schema !== 1 || x.release !== index.release || x.revision !== index.revision) throw unavailable(`landmark cell ${cell} does not match the index dataset (release and revision).`);
@@ -357,8 +368,9 @@ const AimeCore = (() => {
       if (TERRAIN.has(f.kind)) f.maxKm = 100;
       features.push(f);
     }
-    return features;
+    return { features, declination: num(x.declination) && Math.abs(x.declination) <= 180 ? x.declination : null };
   }
+  const parseCell = (index, cell, body) => readCell(index, cell, body).features;
   // Identity of a landmark: name, kind and position to 5 decimals (no OSM ids).
   const featureKey = (f) => [f.name, f.kind || "", f.lat.toFixed(5), f.lon.toFixed(5)].join("|");
   const sameFeature = (a, b) => {
@@ -435,32 +447,41 @@ const AimeCore = (() => {
           .finally(() => (indexJob = null));
       return indexJob;
     }
+    // Cached per dataset and cell as {features, declination}.
     function cell(ix, name) {
       const key = cellKey(ix, name);
       if (cells.has(key)) return Promise.resolve(cells.get(key));
       if (!jobs.has(key))
         jobs.set(key, limit(() => get(cellUrl(ix, name)))
           .then((body) => {
-            const f = parseCell(ix, name, body);
-            cells.set(key, f);
-            return f;
+            const c = readCell(ix, name, body);
+            cells.set(key, c);
+            return c;
           })
           .finally(() => jobs.delete(key)));
       return jobs.get(key);
     }
+    // Declination of the downloaded cell containing the viewpoint, or null
+    // (not downloaded, not listed, or the cell carries none).
+    const declinationAt = (viewer) => {
+      const c = index && viewer && latLon(viewer.lat, viewer.lon) && cells.get(cellKey(index, Math.floor(viewer.lat) + "_" + Math.floor(viewer.lon)));
+      return c ? c.declination : null;
+    };
     return {
       get index() {
         return index;
       },
       loadIndex,
-      // → {features, dataset, cells}; outside coverage throws OUTSIDE_COVERAGE.
+      declinationAt,
+      // → {features, dataset, cells, partialCoverage, declination (the
+      // viewpoint cell's, or null)}; outside coverage throws OUTSIDE_COVERAGE.
       async features(viewer, radiusKm) {
         const ix = await loadIndex(),
           plan = cellPlan(ix, viewer, radiusKm);
         if (!plan.length) throw dataError("OUTSIDE_COVERAGE", outsideMessage(ix.coverage), false);
         const lists = await Promise.all(plan.map((c) => cell(ix, c)));
-        return { features: within(lists.flat(), viewer, radiusKm), dataset: ix.dataset, cells: plan.length,
-          partialCoverage: plan.length < cellsAround(viewer.lat, viewer.lon, radiusKm).length };
+        return { features: within(lists.flatMap((c) => c.features), viewer, radiusKm), dataset: ix.dataset, cells: plan.length,
+          partialCoverage: plan.length < cellsAround(viewer.lat, viewer.lon, radiusKm).length, declination: declinationAt(viewer) };
       },
     };
   }
@@ -505,11 +526,111 @@ const AimeCore = (() => {
   // wider than the direction σ.
   const positionMatters = (row) => row.sigmaDeg > 2 * row.wedgeSigmaDeg && row.sigmaDeg - row.wedgeSigmaDeg > 2;
 
+  // ---- Point editing: hit test, drag, one-step undo --------------------------
+  // Gesture thresholds in CSS pixels and milliseconds (Pocket Measure's values).
+  const HIT_PX = 26,
+    TAP_SLOP = 8,
+    HOLD_MS = 350,
+    LOUPE_MAGNIFICATION = 2.5;
+  const unit = (v) => Math.max(0, Math.min(1, v));
+  // Nearest mark or horizon point within `maxPx` of (x, y) on a photo shown
+  // `w` × `h` pixels → {list: "marks"|"horizon", index}, or null. Marks win ties.
+  function hitPoint(sidecar, x, y, w, h, maxPx = HIT_PX) {
+    let best = null;
+    for (const list of ["marks", "horizon"])
+      sidecar[list].forEach((p, index) => {
+        const d = Math.hypot((p.x - x) * w, (p.y - y) * h);
+        if (d <= maxPx && (!best || d < best.d)) best = { list, index, d };
+      });
+    return best && { list: best.list, index: best.index };
+  }
+  // The sidecar with one point moved (clamped to the photo); nothing else changes.
+  const movePoint = (sidecar, hit, x, y) => ({ ...sidecar, [hit.list]: sidecar[hit.list].map((p, i) => (i === hit.index ? { ...p, x: unit(x), y: unit(y) } : p)) });
+  const pointName = (sidecar, hit) => (hit.list === "marks" ? sidecar.marks[hit.index].name : "horizon point " + (hit.index + 1));
+  // A drag previews in memory only; `release(commit)` hands the moved sidecar
+  // to `commit` once, and only when the point actually moved.
+  function pointDrag(sidecar, hit) {
+    let preview = sidecar,
+      open = true;
+    return {
+      hit,
+      get preview() {
+        return preview;
+      },
+      get moved() {
+        return preview !== sidecar;
+      },
+      move(x, y) {
+        if (open) preview = movePoint(sidecar, hit, x, y);
+        return preview;
+      },
+      cancel() {
+        open = false;
+        preview = sidecar;
+      },
+      async release(commit) {
+        if (!open) return false;
+        open = false;
+        const p = preview[hit.list][hit.index],
+          q = sidecar[hit.list][hit.index];
+        if (p.x === q.x && p.y === q.y) return false;
+        await commit(preview);
+        return true;
+      },
+    };
+  }
+  // One undo step: the photo's marks and horizon before its last add, move or
+  // delete. Undo restores both lists and leaves viewpoint and radius alone.
+  const undoStep = (id, sidecar, label) => ({ id, label, marks: sidecar.marks.map((m) => ({ ...m })), horizon: sidecar.horizon.map((h) => ({ ...h })) });
+  const undone = (sidecar, step) => cleanSidecar({ ...sidecar, marks: step.marks, horizon: step.horizon });
+
+  // ---- Magnifier geometry (Pocket Measure's loupe) ----------------------------
+  // Crop for a photo point: source rectangle in image pixels plus where it lands
+  // inside the loupe, so edge crops stay centred on the point.
+  function loupe(point, width, height, fitWidth, diameter, magnification = LOUPE_MAGNIFICATION) {
+    if (!inUnit(point.x) || !inUnit(point.y) || !(width > 0 && height > 0 && fitWidth > 0 && diameter > 0 && magnification > 0)) throw new Error("Magnifier needs a photo point.");
+    const half = (diameter / 2 / magnification) * (width / fitWidth),
+      cx = point.x * width,
+      cy = point.y * height,
+      x = Math.max(0, cx - half),
+      y = Math.max(0, cy - half),
+      scale = diameter / (half * 2);
+    return { x, y, w: Math.max(0, Math.min(width, cx + half) - x), h: Math.max(0, Math.min(height, cy + half) - y), scale, dx: (x - (cx - half)) * scale, dy: (y - (cy - half)) * scale };
+  }
+  // Loupe centre: lifted above the finger, flipped below near the top, clamped inside the view.
+  function loupePlacement(finger, width, height, diameter, lift) {
+    const r = diameter / 2,
+      clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    return { x: clamp(finger.x, r, Math.max(r, width - r)), y: clamp(finger.y - lift - r >= 0 ? finger.y - lift : finger.y + lift, r, Math.max(r, height - r)), r };
+  }
+
+  // ---- Map pin in the photo (Resection.locate) -------------------------------
+  // locate result → what the photo overlay draws. In frame: the bearing line and
+  // the ±2σ band as frame-clipped polygons from the reference solver. Out of frame: an arrow on the matching
+  // edge, pointing out (degrees, 0 = right, 90 = down), kept off the corners.
+  const ARROW = { left: 180, right: 0, above: -90, below: 90, "behind-left": 180, "behind-right": 0 };
+  function pinOverlay(loc) {
+    if (loc.inFrame) {
+      return { line: loc.line, bands: loc.bandPolygons, anchor: loc.anchor, arrow: null };
+    }
+    const a = loc.anchor,
+      inset = (v) => Math.max(0.06, Math.min(0.94, v)),
+      vertical = loc.side === "above" || loc.side === "below";
+    return { line: [], bands: [], anchor: a, arrow: { x: vertical ? inset(a.x) : a.x, y: vertical ? a.y : inset(a.y), angle: ARROW[loc.side] } };
+  }
+  const WHERE = { left: "out of frame to the left", right: "out of frame to the right", above: "above the photo", below: "below the photo", "behind-left": "behind you, to the left", "behind-right": "behind you, to the right" };
+  // "Synthetic Peak B: in the photo · 18 km · 42° NE · band ±7.2° (2σ)".
+  const pinText = (loc, name = "Pin") =>
+    `${name}: ${loc.inFrame ? "in the photo" : WHERE[loc.side]} · ${range(loc.distanceKm, loc.bearing)}${loc.inFrame ? ` · band ±${(2 * loc.sigmaDeg).toFixed(1)}° (2σ)` : ""}`;
+
   // ---- Formatting ---------------------------------------------------------
   const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
   const compass = (deg) => COMPASS[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
   const km = (d) => (d < 1 ? Math.round(d * 1000) + " m" : d < 10 ? d.toFixed(1) + " km" : Math.round(d) + " km");
   const signed = (d) => (d >= 0 ? "+" : "−") + Math.abs(d).toFixed(1) + "°";
+  // Distance and bearing as the photo, the sheets and the map show them: "12 km · 47° NE".
+  const degrees = (b) => ((Math.round(b) % 360) + 360) % 360;
+  const range = (distanceKm, bearingDeg) => km(distanceKm) + " · " + degrees(bearingDeg) + "° " + compass(bearingDeg);
   function age(ms) {
     if (!num(ms) || ms < 0) return "unknown age";
     const s = Math.round(ms / 1000);
@@ -561,6 +682,7 @@ const AimeCore = (() => {
     cellKey,
     cellPlan,
     parseCell,
+    readCell,
     featureKey,
     sameFeature,
     coverageNote,
@@ -576,9 +698,25 @@ const AimeCore = (() => {
     candidatesOf,
     shortlist,
     positionMatters,
+    HIT_PX,
+    TAP_SLOP,
+    HOLD_MS,
+    LOUPE_MAGNIFICATION,
+    hitPoint,
+    movePoint,
+    pointName,
+    pointDrag,
+    undoStep,
+    undone,
+    loupe,
+    loupePlacement,
+    pinOverlay,
+    pinText,
     compass,
     km,
     signed,
+    degrees,
+    range,
     age,
     kindLabel,
     sizeLabel,

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Aimé late-result and moving-pinch regressions using Playwright Chromium.
+"""Aimé late-result, moving-pinch, magnifier, point-drag/undo, map-ruler and
+map-pin-in-photo regressions using Playwright Chromium.
 Install playwright and its Chromium browser in an isolated Python environment.
 This uses synthetic pixels and a fake bridge; it does not test host permissions.
 """
@@ -45,13 +46,27 @@ def main():
 
         page.route("http://aime.test/**", route)
         page.add_init_script(
-            """window.mock={store:{},photos:[{id:'photo1',ref:'ref1'}]};window.construct={postMessage(raw){let q=JSON.parse(raw),result=null;if(q.method==='storage.kv'){if(q.params.op==='get')result=mock.store[q.params.key]??null;else mock.store[q.params.key]=q.params.value;}else if(q.method==='photos.library'){if(q.params.op==='list')result={photos:mock.photos,limit:8};else if(q.params.op==='open')result={url:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',width:1,height:1};}queueMicrotask(()=>construct.onmessage({data:JSON.stringify({id:q.id,result})}));}};"""
+            """window.mock={store:{},sets:[],photos:[{id:'photo1',ref:'ref1'}]};window.construct={postMessage(raw){let q=JSON.parse(raw),result=null;if(q.method==='storage.kv'){if(q.params.op==='get')result=mock.store[q.params.key]??null;else{mock.store[q.params.key]=q.params.value;mock.sets.push(q.params.key);}}else if(q.method==='photos.library'){if(q.params.op==='list')result={photos:mock.photos,limit:8};else if(q.params.op==='open')result={url:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',width:1,height:1};}queueMicrotask(()=>construct.onmessage({data:JSON.stringify({id:q.id,result})}));}};"""
         )
         page.goto("http://aime.test/index.html")
         page.wait_for_function("!state.busy && state.items.length===1")
         page.evaluate(
             """async()=>{state.store={photo1:AimeCore.newSidecar({...SyntheticAime.viewer,accuracyM:10,timestamp:Date.now()})};await openPhoto('photo1');const f=AimeCore.parseCell(AimeCore.parseIndex(SyntheticAime.index()),'46_9',SyntheticAime.cell('46_9')).find(f=>f.name==='Synthetic Tower A');await update(s=>({...s,marks:[AimeCore.markFrom(f,SyntheticAime.taps.markA.x,SyntheticAime.taps.markA.y)]}));}"""
         )
+        # A WebView may omit the compatibility click after a long press.
+        # Hiding the module during the fallback delay must cancel placement.
+        page.evaluate("setMode('horizon');state.horizonExplained=true;$('stage').addEventListener('click',e=>e.stopImmediatePropagation(),{capture:true,once:true})")
+        page.locator('#stage').scroll_into_view_if_needed()
+        r = page.locator('#stage').bounding_box()
+        cdp0 = page.context.new_cdp_session(page)
+        cdp0.send('Input.dispatchTouchEvent', {'type':'touchStart','touchPoints':[{'x':r['x']+r['width']*.7,'y':r['y']+r['height']*.6,'id':1}]})
+        page.wait_for_timeout(450)
+        cdp0.send('Input.dispatchTouchEvent', {'type':'touchEnd','touchPoints':[]})
+        page.evaluate("window.dispatchEvent(new CustomEvent('constructvisibilitychange',{detail:{visible:false}}))")
+        page.wait_for_timeout(400)
+        assert page.evaluate('current().horizon.length === 0'), 'Deferred hold saved a horizon point after module was hidden'
+        page.evaluate("window.dispatchEvent(new CustomEvent('constructvisibilitychange',{detail:{visible:true}}));setMode('what')")
+        print('PASS hiding module cancels deferred hold placement')
         # A cached lookup opens synchronously enough for pointerup -> click
         # retargeting on touch WebViews. At 2x text a candidate lies under the tap.
         page.set_viewport_size({"width": 360, "height": 604})
@@ -136,6 +151,125 @@ def main():
             new,
         )
         print("PASS navigation cancellation and moving-pinch anchor")
+        # Slice 2a: magnifier on hold, point drag with live fit and one write, undo.
+        page.evaluate(
+            "state.view={scale:1,x:0,y:0};applyView();state.horizonExplained=true"
+        )
+        page.locator("#stage").scroll_into_view_if_needed()
+
+        def at(p):
+            r = page.locator("#stage").bounding_box()
+            return (
+                r["x"] + 1 + p["x"] * (r["width"] - 2),
+                r["y"] + 1 + p["y"] * (r["height"] - 2),
+            )
+
+        def touch(kind, *points):
+            cdp.send(
+                "Input.dispatchTouchEvent",
+                {
+                    "type": kind,
+                    "touchPoints": [
+                        {"x": x, "y": y, "id": i + 1} for i, (x, y) in enumerate(points)
+                    ],
+                },
+            )
+
+        def idle():
+            page.wait_for_function("!state.busy")
+
+        def sets():
+            return page.evaluate("mock.sets.length")
+
+        # A long press in What's that? shows the loupe; release places the tap
+        # under the finger and the same touch selects no candidate.
+        page.evaluate("setMode('what')")
+        target = page.evaluate("SyntheticAime.taps.whatD")
+        touch("touchStart", at(target))
+        page.wait_for_timeout(500)
+        assert page.evaluate("!$('loupe').hidden"), "No loupe on hold"
+        assert not page.locator("#candidates-dialog").is_visible(), "Placed while holding"
+        touch("touchEnd")
+        page.wait_for_timeout(500)
+        assert page.evaluate("$('loupe').hidden"), "Loupe left after release"
+        assert page.locator("#candidates-dialog").is_visible(), "Hold release placed nothing"
+        assert page.evaluate("state.pane === 'photo'"), "Hold release selected a candidate"
+        placed = page.evaluate("state.lastTap")
+        assert abs(placed["x"] - target["x"]) < 0.005 and abs(placed["y"] - target["y"]) < 0.005, (placed, target)
+        page.locator("#close-candidates").click()
+        # Horizon: hold and slide places at the final finger; a short tap adds the second.
+        page.evaluate("setMode('horizon')")
+        h0, h1 = page.evaluate("SyntheticAime.taps.horizon")
+        (x0, y0), (x1, y1) = at({"x": h0["x"] - 0.05, "y": h0["y"]}), at(h0)
+        before = sets()
+        touch("touchStart", (x0, y0))
+        page.wait_for_timeout(450)
+        for i in range(1, 6):
+            touch("touchMove", (x0 + (x1 - x0) * i / 5, y0 + (y1 - y0) * i / 5))
+        assert sets() == before, "Storage written while holding"
+        touch("touchEnd")
+        page.wait_for_timeout(400)
+        idle()
+        touch("touchStart", at(h1))
+        touch("touchEnd")
+        page.wait_for_timeout(300)
+        idle()
+        horizon = page.evaluate("current().horizon")
+        assert len(horizon) == 2 and abs(horizon[0]["x"] - h0["x"]) < 0.004 and abs(horizon[0]["y"] - h0["y"]) < 0.004, horizon
+        assert page.locator("#undo").inner_text() == "Undo adding horizon point 2"
+        print("PASS hold shows the loupe and release places; short taps still act at once")
+        # Dragging a horizon point refits live, writes once on release; undo restores it.
+        row = page.evaluate("S.horizonRow(state.cal,.5)")
+        before = sets()
+        x, y = at(horizon[0])
+        touch("touchStart", (x, y))
+        rows = []
+        for i in range(1, 9):
+            touch("touchMove", (x, y + i * 5))
+            page.wait_for_timeout(40)
+            rows.append(page.evaluate("S.horizonRow(state.cal,.5)"))
+        assert page.evaluate("state.preview !== null && !$('loupe').hidden"), "No live preview"
+        assert abs(rows[-1] - row) > 0.005 and len({round(r, 5) for r in rows}) > 3, ("Fit not live", rows)
+        assert sets() == before, "Storage written on pointermove"
+        touch("touchEnd")
+        page.wait_for_timeout(100)
+        idle()
+        assert page.evaluate("mock.sets.slice(" + str(before) + ")") == ["photo.0"], "Not one write on release"
+        assert page.evaluate("current().horizon[0].y") > horizon[0]["y"] + 0.03
+        assert page.locator("#undo").inner_text() == "Undo moving horizon point 1"
+        page.locator("#undo").click()
+        idle()
+        assert page.evaluate("current().horizon") == horizon, "Undo did not restore the point"
+        assert page.evaluate("$('undo').disabled"), "Undo is one step"
+        # A mark drag refits the direction; a second finger cancels a drag without a write.
+        mark = page.evaluate("current().marks[0]")
+        bearing = page.evaluate("S.bearingAt(state.cal,.5,.5)")
+        x, y = at(mark)
+        touch("touchStart", (x, y))
+        for i in range(1, 7):
+            touch("touchMove", (x + i * 6, y))
+            page.wait_for_timeout(30)
+        assert abs(page.evaluate("S.diff(S.bearingAt(state.cal,.5,.5)," + str(bearing) + ")")) > 0.5, "Direction fit not live"
+        touch("touchEnd")
+        page.wait_for_timeout(100)
+        idle()
+        assert page.evaluate("current().marks[0].x") > mark["x"] + 0.02
+        page.locator("#undo").click()
+        idle()
+        assert page.evaluate("current().marks[0]") == mark
+        before = sets()
+        touch("touchStart", (x, y))
+        touch("touchMove", (x + 30, y))
+        touch("touchMove", (x + 30, y), (x + 100, y + 60))
+        touch("touchEnd")
+        page.wait_for_timeout(100)
+        idle()
+        assert sets() == before and page.evaluate("current().marks[0]") == mark, "Cancelled drag changed the mark"
+        assert page.evaluate("state.preview === null")
+        page.evaluate("update(s=>({...s,horizon:[]}))")
+        idle()
+        page.evaluate("setMode('what')")
+        print("PASS point drags refit live, write once on release, undo; pinch cancels a drag")
         if page.evaluate("typeof AimeMap !== 'undefined'"):
             page.evaluate("call=window.originalCall")
             # Partial coverage must remain visible in each result surface.
@@ -151,6 +285,63 @@ def main():
             page.wait_for_function("!state.busy")
             assert page.evaluate("current().marks.length===1 && current().marks[0].x===.4 && !!current().marks[0].kind"), "Legacy selection duplicated a calibration mark"
             print("PASS partial coverage in mark search, candidates and map; legacy mark replacement")
+            # Map ruler: two taps, the first snapped to the viewpoint; clearable.
+            page.evaluate("showPane('map',true)")
+            page.locator("#map-ruler").click()
+            page.locator("#map-wrap").scroll_into_view_if_needed()
+            box = page.locator("#map").bounding_box()
+            v = page.evaluate("map.xy(map.scene.viewer)")
+            for point in ((box["x"] + v["x"] + 6, box["y"] + v["y"] + 4), (box["x"] + 60, box["y"] + 50)):
+                touch("touchStart", point)
+                touch("touchEnd")
+            page.wait_for_timeout(100)
+            ruler = page.evaluate(
+                "({pts:map.ruler.points,m:AimeMap.measure(map.ruler.points[0],map.ruler.points[1]),text:$('map-ruler-status').textContent,v:current().viewer})"
+            )
+            assert ruler["pts"][0] == {"lat": ruler["v"]["lat"], "lon": ruler["v"]["lon"]}, "Ruler did not snap to the viewpoint"
+            assert ruler["text"].startswith("Ruler: ") and "initial bearing" in ruler["text"], ruler["text"]
+            assert 270 < ruler["m"]["bearing"] < 360, ruler
+            page.locator("#map-ruler-clear").click()
+            assert page.evaluate("map.ruler.points.length === 0 && $('map-ruler-clear').disabled")
+            page.locator("#map-ruler").click()
+            assert page.evaluate("map.ruler === null && $('map-ruler-status').textContent === ''")
+            page.evaluate("showPane('photo')")
+            print("PASS map ruler measures, snaps to the viewpoint and clears")
+            # Candidate "Show in photo": locate's line and ±2σ band in the photo.
+            page.evaluate("whatsThat(SyntheticAime.taps.whatB.x,SyntheticAime.taps.whatB.y)")
+            page.wait_for_function("$('candidates-dialog').open")
+            first = page.evaluate("state.lastList.rows[0].candidate.feature.name")
+            page.locator("#candidates li button.show").first.click()
+            shown = page.evaluate(
+                "({pane:state.pane,dialog:$('candidates-dialog').open,pin:state.pin,inFrame:state.pinLoc&&state.pinLoc.inFrame,status:$('pin-status').textContent,band:$('overlay').querySelectorAll('polygon').length})"
+            )
+            assert shown["pane"] == "photo" and not shown["dialog"] and shown["pin"]["name"] == first, shown
+            assert shown["inFrame"] and shown["band"] == 1 and shown["status"].startswith(first + ": in the photo · "), shown
+            # Behind the camera: edge arrow and "behind you" wording.
+            page.evaluate("setPin({point:SyntheticAime.features.find(f=>f.letter==='F'),name:'Synthetic Monument F',positionM:60})")
+            behind = page.evaluate("({side:state.pinLoc.side,status:$('pin-status').textContent,texts:[...$('overlay').querySelectorAll('text')].map(t=>t.textContent)})")
+            assert behind["side"] == "behind-right" and behind["status"].startswith("Synthetic Monument F: behind you, to the right"), behind
+            assert "Behind you, to the right" in behind["texts"], behind
+            # Map long-press drops a pin, adds no ruler point, keeps the viewpoint; clearable.
+            page.evaluate("setPin(null);showPane('map',true)")
+            viewer = page.evaluate("JSON.stringify(current().viewer)")
+            page.locator("#map-ruler").click()
+            page.locator("#map-wrap").scroll_into_view_if_needed()
+            box = page.locator("#map").bounding_box()
+            touch("touchStart", (box["x"] + 80, box["y"] + 90))
+            page.wait_for_timeout(700)
+            touch("touchEnd")
+            page.wait_for_timeout(100)
+            dropped = page.evaluate("({pin:state.pin,scene:!!map.scene.pin,ruler:map.ruler.points.length,tools:!$('pin-tools').hidden})")
+            assert dropped["pin"] and dropped["scene"] and dropped["tools"] and dropped["ruler"] == 0, dropped
+            assert page.evaluate("JSON.stringify(current().viewer)") == viewer, "Long-press moved the viewpoint"
+            assert page.evaluate("$('map-legend').textContent.includes(pinStatus())"), "Map legend retained the previous pin details"
+            page.locator("#map-ruler").click()
+            page.locator("#pin-show").click()
+            assert page.evaluate("state.pane === 'photo' && !!state.pinLoc")
+            page.locator("#pin-clear").click()
+            assert page.evaluate("$('pin-tools').hidden && state.pin === null && map.scene.pin === null")
+            print("PASS map pin and candidate shown in the photo; behind-you arrow; clear")
             page.evaluate(
                 "whatsThat(SyntheticAime.taps.whatB.x,SyntheticAime.taps.whatB.y)"
             )
