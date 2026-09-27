@@ -325,7 +325,7 @@ check("capture metadata: validated per field group, rounded, optional; sidecars 
 
 check("measured inputs map to the solver: fov = h across the opened image, tilt in the solver's signs, heading only with a declination", () => {
   const m = C.measuredInputs(FULL, F.width, F.height, 3);
-  assert.deepEqual(m.input, { tilt: { pitch: 4, roll: 1.5, sigma: 1 }, fov: 66, fovSigma: 1, heading: 27, headingRef: "magnetic", declination: 3, headingSigma: 10 });
+  assert.deepEqual(m.input, { tilt: { pitch: 4, roll: 1.5, sigma: 1 }, fov: 66, fovSigma: 1, heading: 27, headingRef: "magnetic", declination: 3, headingSigma: 12 });
   assert.deepEqual(m.used, { level: true, lens: true, compass: true });
   // Sign: true = magnetic + declination east. The solver's compass-only fit
   // lands on the scene's true heading (30°), not 24° (magnetic − declination).
@@ -362,6 +362,18 @@ check("measured inputs map to the solver: fov = h across the opened image, tilt 
   // The contract's 2× example (portrait 3:4): h 33.6°, v 43.9° agree with 3000 × 4000.
   assert.equal(C.measuredInputs({ fovDeg: { h: 33.6, v: 43.9 }, fovSigmaDeg: 1 }, 3000, 4000).input.fov, 33.6);
   assert.equal(C.measuredInputs({ tilt: { pitchDeg: 1, rollDeg: 1, sigmaDeg: 0.5, ageMs: 1 } }, 4, 3).input.tilt.sigma, 1, "σ never below 1°");
+});
+
+check("host boundary metadata survives storage without precision loss or false omission", () => {
+  const raw = { ...FULL, zoomRatio: 1.0010000467300415, headingAccuracyDeg: 0 };
+  const stored = C.cleanSidecar(C.newSidecar(F.viewer, 30, raw)).capture;
+  assert.equal(stored.zoomRatio, raw.zoomRatio);
+  assert.equal(stored.headingAccuracyDeg, 0);
+  const inputs = C.measuredInputs(stored, F.width, F.height, 3);
+  assert.equal(inputs.used.compass, true);
+  assert.ok(inputs.input.headingSigma >= 12, "solver keeps the conservative compass floor");
+  assert.doesNotThrow(() => R.calibrate({ viewer: F.viewer, marks: [], width: F.width, height: F.height, ...inputs.input }));
+  assert.deepEqual(C.compassHeading(stored, 3), { bearing: 30, sigmaDeg: 12 });
 });
 
 check("measured tilt and lens keep the synthetic ranking and tighten the fit without horizon taps", () => {
@@ -697,7 +709,7 @@ function host({ failGet = () => false, failSet = () => false } = {}) {
   };
 }
 const nasty = (n) => ('"\\').repeat(n).slice(0, n);
-const WORST_CAPTURE = { zoomRatio: 9.99, fovDeg: { h: 178.12345, v: 178.12345 }, fovSigmaDeg: 29.99, tilt: { pitchDeg: -179.99, rollDeg: -179.99, sigmaDeg: 89.99, ageMs: 3599999 }, headingDeg: 359.99, headingRef: "magnetic", headingAccuracyDeg: 179.99, headingAgeMs: 3599999 };
+const WORST_CAPTURE = { zoomRatio: 0.10000000000000002, fovDeg: { h: 178.12345, v: 178.12345 }, fovSigmaDeg: 29.99, tilt: { pitchDeg: -179.99, rollDeg: -179.99, sigmaDeg: 89.99, ageMs: 3599999 }, headingDeg: 359.99, headingRef: "magnetic", headingAccuracyDeg: 179.99, headingAgeMs: 3599999 };
 const fullSidecar = (salt = 0) =>
   C.cleanSidecar({
     capture: WORST_CAPTURE,
@@ -722,7 +734,7 @@ check("control characters are dropped from names; worst-case record and index fi
   const newest = C.cleanSidecar({ ...fullSidecar(), marks: fullSidecar().marks.map((m) => ({ ...m, kind: "communication_tower", dataset: "9".repeat(40) })) });
   assert.ok(C.envelopeLength(C.recordKey(15), C.recordValue(longId(1), newest)) <= C.MESSAGE_BUDGET, "six current-shape marks");
   // The worst record now includes the largest valid capture metadata (API 0.13).
-  assert.equal(JSON.stringify(fullSidecar().capture).length < 260, true);
+  assert.equal(JSON.stringify(fullSidecar().capture).length < 280, true);
   const { capture, ...withoutCapture } = fullSidecar();
   assert.ok(C.envelopeLength(C.recordKey(15), C.recordValue(longId(1), fullSidecar())) - C.envelopeLength(C.recordKey(15), C.recordValue(longId(1), withoutCapture)) < 280, "capture costs under 280 characters per record");
   const record = C.envelopeLength(C.recordKey(15), C.recordValue(longId(1), fullSidecar()));

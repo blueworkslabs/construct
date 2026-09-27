@@ -98,7 +98,7 @@ const AimeCore = (() => {
   function cleanCapture(c) {
     if (!c || typeof c !== "object") return null;
     const out = {};
-    if (inRange(c.zoomRatio, 0.1, 10)) out.zoomRatio = round(c.zoomRatio);
+    if (inRange(c.zoomRatio, 0.1, 10)) out.zoomRatio = c.zoomRatio;
     const f = c.fovDeg;
     if (f && inRange(f.h, 1, 179) && inRange(f.v, 1, 179) && inRange(c.fovSigmaDeg, 0.1, 30)) {
       out.fovDeg = { h: round(f.h), v: round(f.v) };
@@ -107,7 +107,7 @@ const AimeCore = (() => {
     const t = c.tilt;
     if (t && inRange(t.pitchDeg, -180, 180) && inRange(t.rollDeg, -180, 180) && inRange(t.sigmaDeg, 0.1, 90) && inRange(t.ageMs, 0, 3600000))
       out.tilt = { pitchDeg: round(t.pitchDeg), rollDeg: round(t.rollDeg), sigmaDeg: round(t.sigmaDeg), ageMs: Math.round(t.ageMs) };
-    if (inRange(c.headingDeg, 0, 360) && c.headingRef === "magnetic" && inRange(c.headingAccuracyDeg, 0.1, 180) && inRange(c.headingAgeMs, 0, 3600000))
+    if (inRange(c.headingDeg, 0, 360) && c.headingRef === "magnetic" && inRange(c.headingAccuracyDeg, 0, 180) && inRange(c.headingAgeMs, 0, 3600000))
       Object.assign(out, { headingDeg: round(c.headingDeg), headingRef: "magnetic", headingAccuracyDeg: round(c.headingAccuracyDeg), headingAgeMs: Math.round(c.headingAgeMs) });
     return Object.keys(out).length ? out : null;
   }
@@ -572,7 +572,7 @@ const AimeCore = (() => {
       if (c.headingAgeMs > HEADING_MAX_AGE_MS || c.headingAccuracyDeg > 45) skipped.compass = "unreliable";
       else if (!inRange(declination, -180, 180)) skipped.compass = "declination";
       else
-        Object.assign(input, { heading: c.headingDeg, headingRef: "magnetic", declination, headingSigma: c.headingAccuracyDeg }), (used.compass = true);
+        Object.assign(input, { heading: c.headingDeg, headingRef: "magnetic", declination, headingSigma: Math.max(12, c.headingAccuracyDeg) }), (used.compass = true);
     }
     return { input, used, skipped };
   }

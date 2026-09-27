@@ -372,6 +372,14 @@ def main():
             assert "Compass hint" not in page.locator("#chips").inner_text()
             page.evaluate("features()")
             page.wait_for_function("$('chips').textContent.includes('Compass hint')")
+            # First-mark search must use the same tilted ray as calibration,
+            # without promoting a compass-only hint to a marked calibration.
+            tilted = page.evaluate("""(()=>{const s=current(), before=s.capture;
+              s.capture={...before,tilt:{pitchDeg:60,rollDeg:0,sigmaDeg:1,ageMs:1}};
+              recalibrate();const d=tapDirection({x:.9,y:.9});const marked=state.cal;
+              s.capture=before;recalibrate();return {d,marked};})()""")
+            assert abs(tilted["d"]["bearing"] - 102.625) < 2, tilted
+            assert tilted["d"]["sigmaDeg"] > 12 and tilted["marked"] is None, tilted
             print("PASS 0.13 capture: level and zoom requested, id used, metadata stored, measured inputs shown, direction-sorted search")
             page.evaluate("openPhoto('photo1')")
             idle()

@@ -1046,9 +1046,15 @@ function tapDirection(tap) {
     const s = current(),
       compass = C.compassHeading(s.capture, declination(s));
     if (!compass) return null;
-    const { width, height } = state.image,
-      fov = (state.measured && state.measured.input.fov) || S.defaultFov(width, height);
-    d = { bearing: S.wrap(compass.bearing + S.columnAngle(tap.x, fov)), sigmaDeg: compass.sigmaDeg, source: "compass" };
+    // Use the full ray (including tap height and captured tilt), with the
+    // solver's uncertainty for any missing measurements. This is only a
+    // search hint: it must not turn an unmarked photo into a calibration.
+    try {
+      const hint = S.calibrate(C.calibrationInput(s, state.image.width, state.image.height, declination(s)));
+      d = { bearing: S.bearingAt(hint, tap.x, tap.y), sigmaDeg: S.uncertainty(hint, tap.x, tap.y), source: "compass" };
+    } catch (_) {
+      return null;
+    }
   }
   return { ...d, stepDeg: Math.max(2, Math.ceil(2 * d.sigmaDeg)) };
 }

@@ -33,6 +33,7 @@ os.environ['CONSTRUCT_RESULTS']=str(run)
 import ui
 from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from keyboard_prompt import gboard_contacts_denial
+from capture_checks import acceleration, level_readout, readout_matches, zoom_chip_selected
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'fixtureSha256':a.fixture_sha,'version':a.version,
@@ -175,14 +176,23 @@ def reopen():tap_node(reach_native('Reopen module'));find('Take photo')
 def install(name,digest):
  library();select_after(name+' · '+a.version,('Review & install',));tap('Allow & install');installed_status()
  assert any(e.get('code')=='INSTALLED_TRIAL' and e.get('packageDigest')==digest for e in diagnostics()),'Wrong signed module '+name
-def shoot(zoom=None):
+def shoot(zoom=None, measured=False):
+ if measured:adb('emu','sensor','set','acceleration',acceleration(10,0))
  click('Take photo');end=time.monotonic()+60
  while time.monotonic()<end and not any((t or '').startswith('Camera preview ready.') for t in labels()):time.sleep(.3)
  # API 0.13 viewfinder: Aimé requests the level indicator and 1×/2× chips.
  seen=labels()
  assert any(t and (t.startswith('Pitch ') or t=='Level unavailable') for t in seen),'Level indicator missing'
  assert find('Zoom 1×') is not None and find('Zoom 2×') is not None,'Zoom chips missing'
- if zoom:tap_node(find('Zoom '+zoom));time.sleep(.8)
+ if zoom:
+  tap_node(find('Zoom '+zoom));time.sleep(.8)
+  assert zoom_chip_selected(nodes(),zoom),'Zoom was not selected'
+ if measured:
+  until=time.monotonic()+20
+  while time.monotonic()<until:
+   if readout_matches(level_readout(labels()),10,0):break
+   time.sleep(.3)
+  else:raise RuntimeError('Real capture level failed to settle')
  capture_native_shutter()
 def capture_native_shutter():
  # The native viewfinder's shutter; the module WebView is behind the capture activity.
@@ -234,7 +244,7 @@ try:
 
  # 1. Fresh grants are off: nothing is listed or captured.
  open_module(FIXTURE);contains('[CAPABILITY_DENIED]')
- click('Take photo');contains('[CAPABILITY_DENIED] Photo library access is off')
+ click('Take photo');contains('[CAPABILITY_DENIED] Camera access is off')
  note=contains('Synthetic fixture. Mark Synthetic Tower A at ')
  m=re.search(r'at (\d+) % across, (\d+) % down; horizon at (\d+) % across, (\d+) % down and (\d+) % across, (\d+) % down; B at (\d+) % across, (\d+) % down',note)
  assert m,note
@@ -354,7 +364,9 @@ try:
  permission('Allow Android location access');reopen()
  adb('shell','cmd','location','set-location-enabled','true')
  for _ in range(3):adb('emu','geo','fix',lon,lat);time.sleep(1)
- to_library();shoot('2×');contains('Estimated viewpoint',60);reach_text('2× zoom')
+ to_library();shoot('2×',measured=True);contains('Estimated viewpoint',60)
+ for chip in ('2× zoom','Level measured','Lens from camera'):reach_text(chip)
+ capture('aime-real-measured')
  receipt['realCaptureChips']=[t for t in labels() if t in ('Level measured','Lens from camera','Compass hint','2× zoom')];save()
  click('Mark landmark');tap_photo({'x':.5,'y':.5})
  # The loading sentence also contains "landmarks within 30 km". Only a
@@ -378,6 +390,14 @@ try:
  assert found,'No named landmarks after bounded retry'
  receipt['realLandmarks']=found;receipt['realLandmarksAttempts']=request+1;save()
  capture('aime-real-landmarks');click(lambda t:t=='Cancel')
+ reach_text('Compass hint')
+ receipt['realCaptureChipsAfterData']=[t for t in labels() if t in ('Level measured','Lens from camera','Compass hint','2× zoom')];save()
+ # Open the same second real photo after a process restart. Its capture groups
+ # must survive storage; the cell is fetched again to restore declination.
+ adb('shell','am','force-stop','dev.construct.runtime');open_module(REAL)
+ click(lambda t:t.startswith('Photo 2.'));contains('Estimated viewpoint',30)
+ for chip in ('2× zoom','Level measured','Lens from camera'):reach_text(chip)
+ capture('aime-real-measured-restart')
  done('Real module: injected fix → estimated viewpoint → live aime-data cells return named landmarks')
  receipt['complete']=True
 except Exception as e:
