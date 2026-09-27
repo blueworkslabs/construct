@@ -322,8 +322,9 @@ const AimeCore = (() => {
   const TERRAIN = new Set(["peak", "hill", "volcano"]);
   // Cell text → features. A cell whose schema, release, revision or corner does
   // not match the index, or without a feature array, is unavailable (never
-  // empty); single malformed records (including a missing or invalid `p`) are
-  // skipped. `p` is the feature's positionM, with no kind-level fallback.
+  // empty). Missing or invalid position uncertainty makes the entire cell
+  // unavailable: never cache incomplete data as a successful empty lookup.
+  // `p` is the feature's positionM, with no kind-level fallback.
   function parseCell(index, cell, body) {
     const x = readJson(body, "Landmark cell " + cell),
       m = cell.match(CELL);
@@ -331,6 +332,7 @@ const AimeCore = (() => {
     if (!m || !Array.isArray(x.cell) || x.cell.length !== 2 || x.cell[0] !== Number(m[1]) || x.cell[1] !== Number(m[2]) || !Array.isArray(x.f)) throw unavailable(`landmark cell ${cell} is malformed.`);
     const features = [];
     for (const r of x.f) {
+      if (!Array.isArray(r) || !isP(r[6])) throw unavailable(`landmark cell ${cell} contains invalid position uncertainty.`);
       if (!Array.isArray(r) || r.length !== 7 || typeof r[0] !== "string" || !index.kinds.has(r[1]) || !latLon(r[2], r[3]) || !isP(r[6])) continue;
       const name = text(r[0]);
       if (!name) continue;

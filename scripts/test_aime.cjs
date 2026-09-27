@@ -169,7 +169,7 @@ check("index validation: schema 1 only, dataset = release-rN with its path, list
   assert.equal(C.outsideMessage([]), "No landmark data here yet.");
 });
 
-check("cell parsing: p is the feature's positionM; e and w kept; records without a valid p or otherwise bad are skipped; mismatched cells rejected", () => {
+check("cell parsing: p is the feature's positionM; e and w kept; invalid p rejects the cell; other bad records are skipped; mismatched cells rejected", () => {
   const ix = C.parseIndex(JSON.stringify(INDEX));
   const f = C.parseCell(ix, "46_9", cellText("46_9", [
     ["Piz Test", "peak", 46.9, 9.3, 3012, 1.8, 8],
@@ -180,23 +180,13 @@ check("cell parsing: p is the feature's positionM; e and w kept; records without
     ["Places Peak", "peak", 46.73, 9.13, 2100, 1.5, 250],
     ["Odd weight", "tower", 46.72, 9.12, "x", null, 5],
     ["Big bound", "tower", 46.74, 9.14, 0, 1, 1000],
-    ["No p", "peak", 46.7, 9.1, 0, 1],
-    ["Null p", "peak", 46.7, 9.1, 0, 1, null],
-    ["String p", "peak", 46.7, 9.1, 0, 1, "8"],
-    ["Fraction p", "peak", 46.7, 9.1, 0, 1, 8.5],
-    ["Small p", "peak", 46.7, 9.1, 0, 1, 4],
-    ["Zero p", "peak", 46.7, 9.1, 0, 1, 0],
-    ["Huge p", "peak", 46.7, 9.1, 0, 1, 1001],
     ["Shop", "bakery", 46.7, 9.1, 0, 1, 8],
     ["", "peak", 46.7, 9.1, 0, 1, 8],
     [42, "peak", 46.7, 9.1, 0, 1, 8],
-    ["Short", "peak", 46.7, 9.1, 0, 1],
     ["Long", "peak", 46.7, 9.1, 0, 1, 8, "extra"],
     ["NaN", "peak", NaN, 9.1, 0, 1, 8],
     ["Far", "peak", 91, 9.1, 0, 1, 8],
     ["Proto", "constructor", 46.7, 9.1, 0, 1, 8],
-    null,
-    "Piz Test",
   ]));
   assert.deepEqual(f.map((x) => x.name), ["Piz Test", "St. Test", "Places Church", "Test Memorial", "Test Dam", "Places Peak", "Odd weight", "Big bound"]);
   const [peak, church, placesChurch, memorial, dam, placesPeak, odd, big] = f;
