@@ -184,6 +184,22 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   assert.match(r.el('info-body').text, /Launched with: FIRST/);
   assert.doesNotMatch(r.el('info-body').text, /Launched with: SECOND/);
 
+  // Empty/malformed catalog replies are unavailable, never a cached no-siblings verdict.
+  for (const launchBody of ['[]', '{"error":"unavailable"}', '[{"broken":true}]']) {
+    r = rig({saved, launchBody}); await flush(8);
+    r.select(29507); r.el('details').click(); await flush(4);
+    assert.match(r.el('info-body').text, /Launch details unavailable right now/);
+    assert.doesNotMatch(r.el('info-body').text, /Nothing else is catalogued/);
+    r.el('close-info').click(); r.el('details').click(); await flush(4);
+    assert.equal(r.http().filter(u => u.includes('INTDES=')).length, 2, 'invalid reply must not poison the session cache');
+  }
+  // A valid catalog containing only this object does establish no other entries.
+  r = rig({saved, launchBody: JSON.stringify([JSON.parse(LAUNCH)[1]])}); await flush(8);
+  r.select(29507); r.el('details').click(); await flush(4);
+  assert.match(r.el('info-body').text, /Nothing else is catalogued/);
+  r.el('close-info').click(); r.el('details').click(); await flush(4);
+  assert.equal(r.http().filter(u => u.includes('INTDES=')).length, 1);
+
   // Closing and reopening the same object creates a new lookup view.
   r = rig({saved, pendingHttp: u => u.includes('wikipedia')}); await flush(8);
   r.select(29507); r.el('details').click(); await flush(4);

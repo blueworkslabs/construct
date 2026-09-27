@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.1.5** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
+Space Watch **0.1.6** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
 alpha26** and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -205,21 +205,22 @@ view, not a map.
   exercises the error path. In it, the ISS is low in the south-west and sets at
   about 17:53:10. The "Long March 4B rocket stage" is **EAST · 1½ fists up**, one
   fist above Saturn.
-- **Android acceptance** (staging VM, Astra) is still to do. It should cover:
-  - install with both grants, and without location;
-  - the dome and list on the fixture, and tap selection on the canvas;
-  - details, Wikipedia on request, and red mode across reopen;
-  - rewind, and a menu pause during a download;
-  - offline behaviour;
-  - rotation and 200% text;
-  - a real-network run of the real module.
+- **Android acceptance:** the standalone runner is
+  `scripts/android-runner/space_module.py`. The exact signed candidate, native
+  grant checks, live/offline results and original Android screenshots are tracked
+  in the [0.1.6 staging report](space-watch-0.1.6-staging.md).
+  The synthetic fixture exercises UI; the real package separately verifies native
+  location/internet gates and live CelesTrak. Menu pause/resume is exercised on
+  cached data; in-flight cancellation is covered by controller regressions.
 
-  Hardware checks, including the look-up test at dusk, follow on real devices.
+  [Real-device checks](space-watch-0.1.6-hardware-check.md), including spotting
+  at dusk, remain the next step; emulator acceptance is not physical sky validation.
 
 ## Screenshots (browser preview of Synthetic Space Watch, not Android)
 
 Desktop Chromium at 412 × 915 CSS px, with the fixture clock and a preview host
-double. Android screenshots follow from acceptance.
+double. These are the original concept previews, not the final Android evidence;
+see the staging report above for actual emulator captures.
 
 ![Dome and list](images/space-watch-0.1.0/dome.jpg)
 ![Spot card for the Long March 4B stage](images/space-watch-0.1.0/spot.jpg)

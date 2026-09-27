@@ -569,6 +569,7 @@
         const r = await getJson(url);
         if (r.status !== 200) throw new Error(`HTTP ${r.status}`);
         rows = C.parseSatcat(r.text);
+        if (!rows.length) throw new Error("No usable launch records");
         launches.set(o.intdes.slice(0, 8), rows);
       } catch (_) {
         if (infoTarget === o && generation === infoGeneration) section.replaceChildren(element("p", "Launch details unavailable right now.", "note"));
