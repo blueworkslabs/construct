@@ -1,6 +1,6 @@
 # Alpha34 phone check
 
-Install **ARM64 over alpha33**, without uninstalling or clearing storage. Verify existing photos and Aimé marks remain. Source af57ff9; signer unchanged. Host 8/8 emulator checks passed, 243 JVM tests and lint passed, with one recorded stale-tilt retake.
+Install **ARM64 over alpha33**, without uninstalling or clearing storage. Verify existing photos and Aimé marks remain. Source e131830; signer unchanged. Host 8/8 emulator checks passed, 243 JVM tests and lint passed, with retakes (if any) listed in the exact-run receipt.
 
 ## Privacy
 
