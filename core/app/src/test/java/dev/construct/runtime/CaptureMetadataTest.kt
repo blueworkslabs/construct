@@ -160,9 +160,8 @@ class CaptureMetadataTest {
         assertEquals(zoomed.h, viaCrop.h, 1e-9); assertEquals(zoomed.v, viaCrop.v, 1e-9)
         // No crop and no ratio in the result: the applied CameraX zoom is the only crop information.
         assertEquals(zoomed, CaptureGeometry.fromResult(mainGeometry, 4.38, null, null, 2.0, 960, 1280))
-        // Off-centre crop: angles are measured from the active-array centre, not halved.
-        val side = CaptureGeometry.fromResult(mainGeometry, 4.38, listOf(2000, 0, 4000, 3000), 1.0, 1.0, 2000, 3000)!!
-        assertEquals(deg(atan(2.8 / 4.38)), side.v, 1e-9) // sensor x becomes the portrait image's vertical
+        // Off-centre crops cannot be a centred FOV: rejected (see offCentreCrops… below).
+        assertNull(CaptureGeometry.fromResult(mainGeometry, 4.38, listOf(2000, 0, 4000, 3000), 1.0, 1.0, 2000, 3000))
         // A crop outside the active array, or zoom below 1 on it, is not a real frame.
         assertNull(CaptureGeometry.fromResult(mainGeometry, 4.38, listOf(0, 0, 4100, 3000), 1.0, 1.0, 960, 1280))
         assertNull(CaptureGeometry.fromResult(mainGeometry, 4.38, full, 0.5, 1.0, 960, 1280))
@@ -195,6 +194,55 @@ class CaptureMetadataTest {
         val twins = logicalCamera(mapOf("2" to CameraLens(mainGeometry, listOf(4.38)), "4" to CameraLens(mainGeometry, listOf(8.76))), listOf(4.38, 8.76))
         assertEquals(FovDecision.LENS_SWITCH_POSSIBLE, CaptureGeometry.decide(twins, StillResult(4.38, "2", full, 2.0), 960, 1280, 2.0).omitted)
         assertEquals(FovDecision.NO_GEOMETRY, CaptureGeometry.decide(null, StillResult(4.38, "2", full, 2.0), 960, 1280, 2.0).omitted)
+    }
+
+    /** Astra's reproduction: 4000×3000 array, 5.6×4.2 mm, f 4.38 mm, crop [1000,0,4000,3000], zoom 1, image 1280×960. */
+    private val offCentre = StillResult(4.38, null, listOf(1000, 0, 4000, 3000), 1.0)
+
+    @Test fun offCentreCropsOmitFovTiltAndHeadingBecauseTheContractAssumesACentredAxis() {
+        // The rejected output would have been h 50.3152° while the true centre ray sits at +9.0801°.
+        assertEquals(9.0801, CropCentre.offsetDeg(mainGeometry, 4.38, offCentre.cropRegion!!)!!, 1e-4)
+        assertNull(CaptureGeometry.fromResult(mainGeometry, 4.38, offCentre.cropRegion, 1.0, 1.0, 1280, 960))
+        val plain = LensState(lens, false, emptyList(), true)
+        assertEquals(FovDecision.CROP_OFF_CENTRE, CaptureGeometry.decide(plain, offCentre, 1280, 960, 1.0).omitted)
+        val explained = CaptureResult.explain(state(lensState = plain, still = offCentre, width = 1280, height = 960, sensorRotation = 0))
+        assertEquals(FovDecision.CROP_OFF_CENTRE, explained.fov.omitted)
+        assertEquals(FovDecision.CROP_OFF_CENTRE, explained.axisOmitted)
+        assertEquals(setOf("zoomRatio"), explained.json.keys().asSequence().toSet())
+    }
+
+    @Test fun centredCropsAtOneAndTwoTimesAreUnchangedAndSmallRoundingIsTolerated() {
+        val plain = LensState(lens, false, emptyList(), true)
+        for ((crop, zoom) in listOf(full to 1.0, listOf(1000, 750, 3000, 2250) to 2.0)) {
+            val decision = CaptureGeometry.decide(plain, StillResult(4.38, null, crop, null), 1280, 960, zoom)
+            val expected = CaptureGeometry.fieldOfView(lens, 1280, 960, zoom)!!
+            assertEquals(expected.h, decision.fov!!.h, 1e-9); assertEquals(expected.v, decision.fov!!.v, 1e-9)
+            val explained = CaptureResult.explain(state(lensState = plain, still = StillResult(4.38, null, crop, null), width = 1280, height = 960, sensorRotation = 0))
+            assertNull(explained.axisOmitted)
+            assertEquals(all, explained.json.keys().asSequence().toSet())
+        }
+        // 2 px of integer rounding on 1.4 µm pixels behind 4.38 mm: 0.037° of axis offset, kept.
+        val rounded = StillResult(4.38, null, listOf(1002, 750, 3002, 2250), null)
+        assertTrue(CropCentre.offsetDeg(mainGeometry, 4.38, rounded.cropRegion!!)!! < CropCentre.MAX_OFFSET_DEG)
+        assertNotNull(CaptureGeometry.decide(plain, rounded, 1280, 960, 2.0).fov)
+        assertEquals(all, CaptureResult.describe(state(lensState = plain, still = rounded, width = 1280, height = 960, sensorRotation = 0)).keys().asSequence().toSet())
+        // 4 px (0.073°) is beyond the tolerance.
+        val shifted = StillResult(4.38, null, listOf(1000, 754, 3000, 2254), null)
+        assertEquals(FovDecision.CROP_OFF_CENTRE, CaptureGeometry.decide(plain, shifted, 1280, 960, 2.0).omitted)
+    }
+
+    @Test fun fallbackNeverReintroducesFovAfterAnOffCentreResult() {
+        // Logical camera without an active physical ID (API 28 path) would otherwise use characteristics.
+        val single = LensState(lens, true, listOf(lens, wideGeometry.lens(2.0)), true)
+        assertEquals(FovDecision.FROM_CHARACTERISTICS, CaptureGeometry.decide(single, null, 1280, 960, 1.0).source)
+        assertEquals(FovDecision.CROP_OFF_CENTRE, CaptureGeometry.decide(single, offCentre, 1280, 960, 1.0).omitted)
+        assertEquals(FovDecision.CROP_OFF_CENTRE, CaptureGeometry.decide(single, offCentre.copy(focalMm = null), 1280, 960, 1.0).omitted)
+        assertEquals(FovDecision.CROP_OFF_CENTRE, CaptureGeometry.decide(logicalCamera(), offCentre.copy(activePhysicalId = "2"), 1280, 960, 1.0).omitted)
+        assertEquals(FovDecision.CROP_OFF_CENTRE, CaptureGeometry.decide(logicalCamera(), offCentre, 1280, 960, 1.0).omitted)
+        // A crop that cannot be checked (no sensor geometry) is not trusted for the axis either.
+        val blind = LensState(null, false, emptyList(), true)
+        assertEquals(FovDecision.CROP_UNVERIFIABLE, CaptureResult.explain(state(lensState = blind, still = offCentre)).axisOmitted)
+        assertNull(CaptureResult.explain(state(lensState = blind, still = null)).axisOmitted)
     }
 
     @Test fun missingActivePhysicalIdFallsBackToTheCharacteristicsRule() {
