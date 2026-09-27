@@ -300,7 +300,7 @@ const AimeCore = (() => {
   // is unavailable. Kinds only validate records; they carry no position values.
   function parseIndex(body) {
     const x = readJson(body, "The landmark index");
-    if (!x || x.schema !== 1) throw unavailable("the landmark index has an unsupported schema.");
+    if (!x || x.schema !== 1 || x.cellDeg !== 1) throw unavailable("the landmark index has an unsupported schema.");
     if (!Array.isArray(x.kinds) || !x.kinds.length || !x.kinds.every(isKind))
       throw unavailable("the landmark index contains invalid kinds.");
     const kinds = new Set(x.kinds);
@@ -339,10 +339,15 @@ const AimeCore = (() => {
     const features = [];
     for (const r of x.f) {
       if (!Array.isArray(r) || !isP(r[6])) throw unavailable(`landmark cell ${cell} contains invalid position uncertainty.`);
-      if (!Array.isArray(r) || r.length !== 7 || typeof r[0] !== "string" || !index.kinds.has(r[1]) || !latLon(r[2], r[3]) || !isP(r[6])) continue;
-      const name = text(r[0]);
-      if (!name) continue;
-      const f = { name, kind: r[1], lat: r[2], lon: r[3], e: num(r[4]) ? r[4] : 0, w: num(r[5]) ? Math.min(2, Math.max(0.5, r[5])) : 1, p: r[6], positionM: r[6], dataset: index.dataset };
+      // Reject the whole response, not just the bad row: neither a partial
+      // shortlist nor invented ranking metadata may be cached as success.
+      if (r.length !== 7 || typeof r[0] !== "string" || !r[0].trim() || [...r[0]].length > NAME_MAX || r[0].normalize("NFC") !== r[0] ||
+          !index.kinds.has(r[1]) || !latLon(r[2], r[3]) ||
+          r[2] < x.cell[0] || r[2] >= x.cell[0] + 1 || r[3] < x.cell[1] || r[3] >= x.cell[1] + 1 ||
+          [r[2], r[3]].some((v) => Math.abs(v * 1e5 - Math.round(v * 1e5)) > 1e-8) ||
+          !Number.isInteger(r[4]) || !num(r[5]) || r[5] < 0.5 || r[5] > 2 || Math.abs(r[5] * 10 - Math.round(r[5] * 10)) > 1e-4)
+        throw unavailable(`landmark cell ${cell} contains an invalid feature.`);
+      const f = { name: r[0], kind: r[1], lat: r[2], lon: r[3], e: r[4], w: r[5], p: r[6], positionM: r[6], dataset: index.dataset };
       // Peaks may count beyond the solver's default 40 km.
       if (TERRAIN.has(f.kind)) f.maxKm = 100;
       features.push(f);
