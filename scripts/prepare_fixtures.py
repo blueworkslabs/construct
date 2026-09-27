@@ -60,8 +60,6 @@ def prepare_photo_identity(output, key):
         probe=Path(tmp)/'photo-identity'; shutil.copytree(ROOT/'examples/fixtures/photo-identity',probe)
         manifest=json.loads((probe/'manifest.json').read_text())
         for version,api in [('0.1.0','0.11.0'),('0.2.0','0.12.0'),('0.3.0','0.12.0')]:
-            if version == '0.2.2':
-                js=probe/'ui/app.js';js.write_text(js.read_text().replace('r.deleted?', 'r.completed?'))
             (probe/'manifest.json').write_text(json.dumps({**manifest,'version':version,'constructApi':dict(min=api,target=api)}))
             publish(output/'photo-identity-registry',*build(probe,key),fixture=True)
 
