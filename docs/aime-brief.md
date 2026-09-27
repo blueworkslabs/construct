@@ -387,8 +387,13 @@ distances and a map ruler, and working screenshots.
   the saved image as the module opens it (after EXIF orientation), sampled at
   the shutter. `id` is the new photo's stable id, which replaces the
   before/after list association. `fovDeg` comes from the camera
-  characteristics (focal length, physical sensor size, the active-array crop
-  to the output aspect) divided by the zoom ratio.
+  characteristics and the actual capture crop (focal length, physical sensor
+  size, active-array crop, output aspect and zoom). Do not divide an angle by
+  the zoom ratio: for a pure digital crop, `fov(z) = 2 atan(tan(fov(1)/2)/z)`.
+  These are estimates, not an exact lens calibration; lens switching,
+  stabilization and distortion correction must be accounted for or the host
+  must omit unavailable/unreliable measurements. The synthetic ±0.5° lens
+  scenario below is a test assumption, not a hardware accuracy promise.
 - **Tilt signs follow the solver** (`basis()` in `docs/aime/resection.js`):
   `pitchDeg > 0` when the camera looks below the horizon; `rollDeg > 0` when
   the camera's right side points down, so the horizon appears higher on the
@@ -400,12 +405,12 @@ distances and a map ruler, and working screenshots.
   No location is added to capture metadata.
 - **Screenshots:** today every module with `image.read` and the viewfinder run
   with the secure-window flag, which is why screenshots come out black.
-  Proposal: a per-module **Allow screenshots** switch in Module access, off by
+  Confirmed choice: a per-module **Allow screenshots** switch in Module access, off by
   default. When on, that module's session drops the flag; on Android 13+ the
   Recents thumbnail stays hidden (`setRecentsScreenshotEnabled(false)`). On
   older Android the thumbnail follows the flag, and the switch's copy says so.
-  The native viewfinder keeps the flag. Shape of the switch (per module or
-  global) is the project owner's decision.
+  The native viewfinder keeps the flag. The project owner selected the
+  per-module switch on 2026-09-27; no global override is planned.
 
 **2c, module adopts 2b:** request `level: true, zoom: [1, 2]`; store
 `capture` in the photo's sidecar; calibrate with `fov` (`fovSigma` 1°) and
