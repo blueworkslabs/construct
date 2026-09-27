@@ -85,11 +85,14 @@ def stage():
    s=next((n for n in nodes() if text_of(n).startswith(label) and visible(n)),None)
    if s is not None:
     b=bounds(s);w=web()
-    if b[1]>=w[1] and b[3]<=w[3]:
+    # Accessibility clips image bounds to the viewport; being inside it
+    # does not prove the whole image is visible. The fixture is 1024x768.
+    full_image=not heading.startswith(FIXTURE) or abs((b[3]-b[1])-((b[2]-b[0]-2)*.75+2))<=5
+    if b[1]>=w[1] and b[3]<=w[3] and full_image:
      time.sleep(.5)
      settled=next((n for n in nodes() if text_of(n).startswith(label) and bounds(n)==b),None)
      if settled is not None:return b
-    direction='down' if b[3]>w[3] else 'up'
+    direction='down' if b[3]>=w[3]-2 else 'up'
    scroll(direction)
  raise RuntimeError('Photo stage not fully visible')
 def tap_photo(point,checkpoint=None):
@@ -102,21 +105,27 @@ def tap_photo(point,checkpoint=None):
  adb('shell','input','tap',str(x),str(y));time.sleep(.6)
 def reach_native(label,checkable=False):
  for attempt in range(24):
-  matches=[n for n in nodes() if label in (n.get('text'),n.get('content-desc')) and n.get('package')=='dev.construct.runtime' and (not checkable or n.get('checkable')=='true')]
-  if matches:return matches[0]
+  tree=nodes()
+  viewport=next((bounds(n) for n in tree if n.get('class')=='android.widget.ScrollView'),[0,132,720,1244])
+  matches=[n for n in tree if label in (n.get('text'),n.get('content-desc')) and n.get('package')=='dev.construct.runtime' and (not checkable or n.get('checkable')=='true') and visible(n) and bounds(n)[1]>=viewport[1] and bounds(n)[3]<=viewport[3]]
+  if matches:
+   before=bounds(matches[0]);time.sleep(.5)
+   settled=[n for n in nodes() if label in (n.get('text'),n.get('content-desc')) and bounds(n)==before and (not checkable or n.get('checkable')=='true')]
+   if settled:return settled[0]
   start,end=('450','1050') if attempt<8 else ('1000','500')
   adb('shell','input','swipe','360',start,'360',end,'250');time.sleep(.3)
  raise RuntimeError('Native control not reachable: '+label)
 def switch(label,checked=True):
- node=reach_native(label,checkable=True)
- assert node.get('checkable')=='true','Native grant must be a checkable control: '+label
- if (node.get('checked')=='true')==checked:return
- tap_node(node)
- if not checked:tap('Turn off')
- until=time.monotonic()+10
- while time.monotonic()<until:
-  if any(n.get('content-desc')==label and n.get('checkable')=='true' and n.get('checked')==('true' if checked else 'false') for n in nodes()):return
-  time.sleep(.25)
+ for attempt in range(3):
+  node=reach_native(label,checkable=True)
+  if (node.get('checked')=='true')==checked:return
+  print('Native grant tap:',label,bounds(node),'attempt',attempt+1,flush=True)
+  tap_node(node)
+  if not checked:tap('Turn off')
+  until=time.monotonic()+4
+  while time.monotonic()<until:
+   if any(n.get('content-desc')==label and n.get('checkable')=='true' and n.get('checked')==('true' if checked else 'false') for n in nodes()):return
+   time.sleep(.25)
  raise RuntimeError('Switch did not change: '+label)
 def permission(button):
  tap_node(reach_native(button))
