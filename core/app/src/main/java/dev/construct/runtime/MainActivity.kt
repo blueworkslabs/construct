@@ -236,6 +236,18 @@ class MainActivity : ComponentActivity() {
                             if (module.manifest.capabilities.any { it.id == "photos.library" }) Text("Private-photo access exposes all photos previously captured for this module, including older versions, as bounded pixels. Delete and gallery-copy requests need your confirmation in Construct. Other granted storage or internet access may retain or send delivered pixels. Revocation cannot erase delivered copies.")
                             if (module.manifest.capabilities.any { it.id == "image.analyze" }) Text("Local analysis returns face regions or estimated object labels, boxes and scores to module code. No face identity or emotion detection; results can be wrong. Models run on this phone.")
                             if (module.manifest.capabilities.any { it.id == "image.read" }) Text("Selected image pixels reach this module. Other granted storage or diagnostics may retain copies; approved internet sources may receive them. Revocation cannot erase copies already delivered. You choose external images in Android’s picker. A separately granted private-photo library also permits this module to read its own saved photos; no broad phone-gallery access.")
+                            if (ScreenCapturePolicy.sensitive(module.manifest.capabilities.map { it.id })) {
+                                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                    Text("Allow screenshots", Modifier.weight(1f))
+                                    Switch(checked = module.allowScreenshots, enabled = !busy,
+                                        modifier = Modifier.semantics { contentDescription = "Allow screenshots" },
+                                        onCheckedChange = { allowed -> work {
+                                            store.setScreenshots(module.manifest.id, allowed);
+                                            { status = if (allowed) "Allow screenshots: on." else "Allow screenshots: off." }
+                                        } })
+                                }
+                                Text(ScreenCapturePolicy.copy(android.os.Build.VERSION.SDK_INT), style = MaterialTheme.typography.bodySmall)
+                            }
                             if (module.manifest.capabilities.any { it.id == "location.read" }) {
                                 Text("Android location access: " + if (androidLocation) "allowed" else "not allowed")
                                 Text("This permits an allowed module to receive foreground coordinates and accuracy. Approximate location works. With internet access the module can send that data to its approved sources; stored copies are not erased by revocation.")

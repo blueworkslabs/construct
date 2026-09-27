@@ -66,23 +66,28 @@ class ModuleActivity : ComponentActivity() {
     private var captureReturned = false
     private var captureSaved = false
     private var captureClosed = false
-    private var captureCompletion: ((Boolean) -> Unit)? = null
+    private var captureId: String? = null
+    private var captureMetadata: String? = null
+    private var captureOptions = CaptureOptions()
+    private var captureCompletion: ((org.json.JSONObject?, ConstructError?) -> Unit)? = null
     private data class PhotoConfirmation(val op: String, val image: android.graphics.Bitmap, val done: (Boolean) -> Unit)
     private var photoConfirmation by mutableStateOf<PhotoConfirmation?>(null)
     private val photoCapture = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         captureSaved = result.resultCode == RESULT_OK && result.data?.getBooleanExtra("saved", false) == true
         captureClosed = result.data?.getBooleanExtra("closed", false) == true
+        captureId = result.data?.getStringExtra("id")
+        captureMetadata = result.data?.getStringExtra("capture")
         captureReturned = true
     }
-    private fun capturePhoto(done: (Boolean) -> Unit) {
+    private fun capturePhoto(options: CaptureOptions, done: (org.json.JSONObject?, ConstructError?) -> Unit) {
         checkRule(!ending && !pickingImage && !capturingPhoto && !menu && !diagnosticsOpen && photoConfirmation == null,
             "CAMERA_BUSY", "Capture is unavailable")
         val module = selected ?: throw ConstructError("RUN_STALE", "Module closed")
         store.withCapability(module, "camera.photo") { }
         checkRule(PhotoCaptureActivity.hasPermission(this), "ANDROID_PERMISSION_DENIED", "Allow Android camera access in Module access first")
-        capturingPhoto = true; captureCompletion = done
+        capturingPhoto = true; captureCompletion = done; captureOptions = options
         webView?.pauseForPicker()
-        try { photoCapture.launch(PhotoCaptureActivity.intent(this, module)) }
+        try { photoCapture.launch(PhotoCaptureActivity.intent(this, module, options)) }
         catch (e: Exception) {
             capturingPhoto = false; captureCompletion = null; webView?.setMenuPaused(false)
             throw ConstructError("CAMERA_UNAVAILABLE", "Could not open camera capture")
@@ -121,7 +126,10 @@ class ModuleActivity : ComponentActivity() {
             val done = captureCompletion; captureCompletion = null
             if (captureClosed) { finishSession(); return }
             webView?.setMenuPaused(false)
-            done?.invoke(captureSaved)
+            val metadata = captureMetadata?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
+            val id = captureId; captureId = null; captureMetadata = null
+            try { done?.invoke(CaptureResult.forModule(captureOptions.metadata, captureSaved, id, metadata), null) }
+            catch (e: ConstructError) { done?.invoke(null, e) }
         }
         if (pickerReturned && !ending) {
             pickerReturned = false; pickingImage = false
@@ -152,8 +160,12 @@ class ModuleActivity : ComponentActivity() {
                     val style = if (dark) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
                         else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
                     enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
-                    if (module.manifest.capabilities.any { it.id == "image.read" })
-                        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    // Pixel-bearing modules stay secure unless this module's "Allow screenshots" switch is on.
+                    val screen = ScreenCapturePolicy.decide(module.manifest.capabilities.map { it.id }, module.allowScreenshots,
+                        android.os.Build.VERSION.SDK_INT)
+                    if (screen.secure) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    if (screen.hideRecents && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
+                        setRecentsScreenshotEnabled(false)
                     selected = module
                 } }
             } catch (error: Exception) {
@@ -175,7 +187,7 @@ class ModuleActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        if (selected?.manifest?.api in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0"))
+        if (selected?.manifest?.api in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0"))
             webView?.settings?.textZoom = (newConfig.fontScale * 100).toInt().coerceIn(50, 300)
     }
 

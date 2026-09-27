@@ -36,6 +36,7 @@ def prepare(output):
     prepare_transport(output, key)
     prepare_sensitive(output, key)
     prepare_photo_identity(output, key)
+    prepare_capture_metadata(output, key)
     print('Prepared complete JVM fixtures plus home/test catalogs under the selected output.')
 
 def prepare_sensitive(output, key):
@@ -61,6 +62,16 @@ def prepare_photo_identity(output, key):
         for version,api in [('0.1.0','0.11.0'),('0.2.0','0.12.0'),('0.3.0','0.12.0')]:
             (probe/'manifest.json').write_text(json.dumps({**manifest,'version':version,'constructApi':dict(min=api,target=api)}))
             publish(output/'photo-identity-registry',*build(probe,key),fixture=True)
+
+def prepare_capture_metadata(output, key):
+    # 0.1.0 is the same UI on API 0.12 (exact {op} request, {saved} result); 0.2.0 is
+    # API 0.13 so the runner proves both the unchanged legacy shape and the metadata.
+    with tempfile.TemporaryDirectory() as tmp:
+        probe=Path(tmp)/'capture-metadata'; shutil.copytree(ROOT/'examples/fixtures/capture-metadata',probe)
+        manifest=json.loads((probe/'manifest.json').read_text())
+        for version,api in [('0.1.0','0.12.0'),('0.2.0','0.13.0')]:
+            (probe/'manifest.json').write_text(json.dumps({**manifest,'version':version,'constructApi':dict(min=api,target=api)}))
+            publish(output/'capture-metadata-registry',*build(probe,key),fixture=True)
 
 def prepare_transport(output, key):
     # Signed scopes exercise expansion, removal/reintroduction and rollback.

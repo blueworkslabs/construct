@@ -190,6 +190,15 @@ scripts (they refuse an occupied emulator and preserve incomplete receipts):
   restart, ID rejected as ref, signed update/rollback, grant revocation, damaged
   identity storage, deletion/recapture and native clear-all. Cross-module
   non-correlation is a JVM check only (`PhotoIdentityTest`).
+- `capture_metadata.py --apk APK --sha APK_SHA --catalog HTTPS_FIXTURE_INDEX_URL
+  --legacy-sha CAPTURE_METADATA_0_1_0_SHA --module-sha CAPTURE_METADATA_0_2_0_SHA`:
+  API 0.13 capture metadata using the `capture-metadata-registry` fixtures (0.1.0 on
+  API 0.12, 0.2.0 on API 0.13). Covers the unchanged 0.12 request/result, both
+  pitch and roll signs injected with `adb emu sensor set acceleration` on a
+  portrait-locked display, the level readout, 1×/2× steps and their FOV relation,
+  the returned `id` against the library list, and the per-module Allow screenshots
+  switch (module screen black when off, capturable when on, viewfinder always
+  black). The Android 13+ Recents thumbnail is a JVM decision check only.
 
 The synthetic runner injects licensed fixtures only into an asserted empty
 per-module directory on the disposable userdebug emulator. It restores unprivileged

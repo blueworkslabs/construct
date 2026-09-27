@@ -8,10 +8,13 @@ API 0.9 adds bounded transport and one-shot location. API 0.10 adds
 [bounded image selection and marker detection](module-images.md). API 0.11 adds
 [bounded capture, private-photo access and still-image inference](module-photos.md).
 API 0.12 (source candidate, unreleased) adds a [stable private-photo `id`](module-photos.md#stable-photo-identity--api-012-source-candidate) to library listings.
+API 0.13 (source candidate, unreleased) adds [capture options and metadata](module-photos.md#capture-metadata--api-013-source-candidate)
+to `camera.photo`: a level indicator, fixed zoom steps, and the new photo's `id`,
+zoom, field of view, tilt and a weak heading hint.
 Unrestricted WebView networking/geolocation and general native rendering remain unavailable.
 
 The current host accepts exact `constructApi.min == constructApi.target` versions
-0.1.0 through 0.12.0. Module versions are three numeric components. See the
+0.1.0 through 0.13.0. Module versions are three numeric components. See the
 [manifest schema](../schemas/module-manifest.schema.json) and runnable
 [examples](../examples); the native validator is authoritative.
 
@@ -73,6 +76,8 @@ a granted module can retain data it has read; revocation is not retroactive eras
 - **`contacts.read` (0.3+):** bounded native provider search/details, below.
 - **`camera.photo`, `photos.library`, `image.analyze` (0.11):** bounded acquisition,
   private-photo access and reusable inference; [contracts](module-photos.md).
+  0.12 adds stable library IDs; 0.13 adds `camera.photo` `level`/`zoom` options and
+  capture metadata. Earlier API callers keep their exact request and result shapes.
 - **`camera.capture` (historical 0.4+):** retired in the alpha31 candidate; below.
 
 Denials are structured errors, not permission prompts initiated by JavaScript.

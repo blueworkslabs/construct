@@ -29,6 +29,17 @@ class PublisherTest(unittest.TestCase):
         (self.source/'manifest.json').write_text(json.dumps(self.manifest))
         build(self.source,self.key)
 
+    def test_api013_photo_modules_publish_and_mismatched_targets_fail(self):
+        self.manifest['capabilities']=[dict(id=c,reason='Capture metadata') for c in ('camera.photo','photos.library','image.read','location.read')]
+        def attempt(api):
+            self.manifest['constructApi']=api
+            (self.source/'manifest.json').write_text(json.dumps(self.manifest))
+            return build(self.source,self.key)
+        attempt(dict(min='0.13.0',target='0.13.0'))
+        attempt(dict(min='0.12.0',target='0.12.0'))
+        for bad in [dict(min='0.12.0',target='0.13.0'), dict(min='0.14.0',target='0.14.0')]:
+            with self.assertRaises(ValueError): attempt(bad)
+
     def test_http_sources_are_signed_exact_origins_and_require_api09(self):
         self.manifest['capabilities']=[dict(id='net.http',reason='Public data',origins=['https://example.org'])]
         def attempt():
