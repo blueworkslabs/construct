@@ -63,7 +63,8 @@ def web():
  if w is None:raise RuntimeError('No module WebView')
  return bounds(w)
 def scroll(direction,distance=None):
- x1,y1,x2,y2=web();x=x1+6;lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
+ dialogs=[n for n in nodes() if n.get('class')=='android.app.AlertDialog' and visible(n)]
+ x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=x1+max(12,(x2-x1)//5);lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
  if distance is not None:lo=hi-max(24,min(hi-lo,round(distance)))
  adb('shell','input','swipe',str(x),str(hi if direction=='down' else lo),str(x),str(lo if direction=='down' else hi),'300');time.sleep(.35)
 def reveal(match):
@@ -160,7 +161,7 @@ try:
  done('Fixture stage list selection gives EAST, 1½ fists up and Saturn anchor')
  click(lambda t:t=='Details');contains('NORAD 29507 · 2006-046C')
  contains('Carried:',45);capture('space-details')
- click('Read on Wikipedia');contains('CC BY-SA 4.0',45);capture('space-wikipedia')
+ click('Read on Wikipedia');contains('Wikipedia loaded',45);reach_text('CC BY-SA 4.0');capture('space-wikipedia')
  done('Real same-launch lookup and explicit Wikipedia request render attributed results')
  click(lambda t:t=='Close');click(lambda t:t=='Red mode')
  # Rewind via the actual accessible range control.
@@ -188,10 +189,10 @@ try:
  reach_text('ISS (Zarya)');reach_text('International Space Station · crewed');capture('space-canvas-selected')
  done('Canvas touch selects the ISS, independently of the list')
  adb('shell','settings','put','system','user_rotation','1');time.sleep(3)
- reveal('Sky dome:');capture('space-landscape');click('Details');contains('NORAD 25544');capture('space-landscape-details');click(lambda t:t=='Close')
+ reveal('Sky dome:');capture('space-landscape');click('Details');reach_text('NORAD 25544');capture('space-landscape-details');click(lambda t:t=='Close')
  done('Landscape dome and selected-object details remain operable')
  adb('shell','settings','put','system','user_rotation','0');adb('shell','settings','put','system','font_scale','2.0');time.sleep(3)
- click('Details');contains('NORAD 25544');capture('space-large-text-details');click(lambda t:t=='Close');reveal('Sky dome:');capture('space-large-text')
+ click('Details');reach_text('NORAD 25544');capture('space-large-text-details');click(lambda t:t=='Close');reveal('Sky dome:');capture('space-large-text')
  done('200% Android text: dome, scrolling details and close controls remain operable')
  adb('shell','settings','put','system','font_scale','1.0');time.sleep(2)
  # Native menu pause/resume on retained data, then real module gates.
