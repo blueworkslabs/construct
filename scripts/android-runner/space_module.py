@@ -83,6 +83,14 @@ def reveal(match):
  raise RuntimeError('Module control not reachable: '+str(match))
 def click(match):tap_node(reveal(match))
 def reach_text(fragment):return text_of(reveal(lambda t:fragment in t))
+def full_dome():
+ reveal('Sky dome:')
+ for _ in range(12):
+  c=next(n for n in nodes() if text_of(n).startswith('Sky dome:') and visible(n))
+  b=bounds(c);w=web();size=b[2]-b[0]
+  if abs(size-(b[3]-b[1]))<=6 and b[1]>=w[1] and b[3]<=w[3]:return c
+  scroll('down',min(300,max(30,size-(b[3]-b[1])+16)))
+ raise RuntimeError('Whole square dome not visible after scrolling')
 def reach_native(label,checkable=False):
  for attempt in range(24):
   tree=nodes()
@@ -195,10 +203,10 @@ try:
  reach_text('ISS (Zarya)');reach_text('International Space Station · crewed');capture('space-canvas-selected')
  done('Canvas touch selects the ISS, independently of the list')
  adb('shell','settings','put','system','user_rotation','1');time.sleep(3)
- reveal('Sky dome:');capture('space-landscape');click('Details');reach_text('NORAD 25544');capture('space-landscape-details');click(lambda t:t=='Close')
+ full_dome();capture('space-landscape');click('Details');reach_text('NORAD 25544');capture('space-landscape-details');click(lambda t:t=='Close')
  done('Landscape dome and selected-object details remain operable')
  adb('shell','settings','put','system','user_rotation','0');adb('shell','settings','put','system','font_scale','2.0');time.sleep(3)
- click('Details');reach_text('NORAD 25544');capture('space-large-text-details');click(lambda t:t=='Close');reveal('Sky dome:');capture('space-large-text')
+ click('Details');reach_text('NORAD 25544');capture('space-large-text-details');click(lambda t:t=='Close');full_dome();capture('space-large-text')
  done('200% Android text: dome, scrolling details and close controls remain operable')
  adb('shell','settings','put','system','font_scale','1.0');time.sleep(2)
  # Native menu pause/resume on retained data, then real module gates.
@@ -212,7 +220,11 @@ try:
  assert len(edits)==2,'Coordinate inputs missing'
  ui._device(className='android.widget.EditText',instance=0).set_text('52.52')
  ui._device(className='android.widget.EditText',instance=1).set_text('13.405')
- adb('shell','input','keyevent','KEYCODE_BACK');click('Show sky')
+ # set_text does not necessarily show a keyboard; an unconditional Back opens
+ # Construct's menu instead. Dismiss only an actually exposed IME.
+ if any(n.get('package') in ('com.google.android.inputmethod.latin','com.android.inputmethod.latin') for n in nodes()):
+  adb('shell','input','keyevent','KEYCODE_BACK')
+ click('Show sky')
  reach_text('Enable the requested capability');capture('space-real-internet-denied')
  done('Real manual-place flow works without location, but ungranted HTTP stays denied')
  module_access();switch('Allow approved internet sources',True);switch('Allow reading phone location',True)
