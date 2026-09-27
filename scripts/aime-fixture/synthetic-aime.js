@@ -85,6 +85,9 @@ const SyntheticAime = (() => {
       release,
       revision,
       cell: name.split("_").map(Number),
+      // Additive field (degrees east, WMM at the cell centre): a plausible
+      // synthetic value per cell, so the viewpoint cell's can be checked.
+      declination: Math.round((3 + (Number(name.split("_")[0]) - 46) * 0.2 + (Number(name.split("_")[1]) - 9) * 0.3) * 10) / 10,
       f: features
         .filter((f) => cellOf(f) === name)
         .sort((a, b) => b.w - a.w || a.name.localeCompare(b.name))

@@ -202,7 +202,8 @@ select:focus-visible {
   transform-origin: 0 0;
 }
 #picture,
-#overlay {
+#overlay,
+#loupe {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -211,7 +212,27 @@ select:focus-visible {
 }
 #overlay {
   overflow: visible;
+}
+/* The stage handles every gesture; a long press never opens the image menu. */
+#picture,
+#overlay,
+#loupe {
   pointer-events: none;
+  -webkit-touch-callout: none;
+}
+#loupe[hidden] {
+  display: none;
+}
+#edit-actions {
+  margin: 4px 0;
+}
+#ruler-tools {
+  margin: 8px 0 4px;
+}
+#map-ruler[aria-pressed="true"] {
+  background: var(--jade);
+  color: var(--jade-ink);
+  border-color: var(--jade);
 }
 .zoom {
   position: absolute;
@@ -293,6 +314,20 @@ dialog .actions {
 }
 #candidates li {
   margin: 8px 0;
+}
+#candidates li button.show {
+  width: auto;
+  margin: 2px 0 0;
+  padding: 4px 10px;
+  border-color: var(--border);
+  font-size: 0.85rem;
+}
+#pin-tools {
+  margin: 6px 0;
+}
+#pin-status {
+  margin: 0 0 4px;
+  color: #8cf0c4;
 }
 #candidates li.greyed {
   color: var(--muted);

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "dev.construct.aime",
   "name": "Aimé",
-  "version": "0.1.7",
+  "version": "0.1.9",
   "description": "Tap something in your photo to see which named landmarks it could be. Calibrate by marking a landmark you know; no cloud vision, the photo stays on your phone. Requires Construct API 0.12.",
   "constructApi": {
     "min": "0.12.0",
