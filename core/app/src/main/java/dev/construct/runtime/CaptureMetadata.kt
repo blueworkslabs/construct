@@ -26,6 +26,7 @@ private fun round(value: Double, places: Int): Double {
  */
 internal data class CaptureOptions(val level: Boolean = false, val zoom: List<Double> = emptyList(), val metadata: Boolean = false) {
     companion object {
+        const val METADATA_DISCLOSURE = "Each saved capture also sends its photo ID, zoom and available lens, tilt and magnetic-heading estimates to this module, even when the level indicator is off. Granted storage or internet access can retain or send these measurements. No location is included; revocation cannot erase delivered copies."
         const val MAX_ZOOM_CHOICES = 4
         const val MIN_ZOOM_RATIO = 0.1
         const val MAX_ZOOM_RATIO = 10.0
@@ -269,7 +270,7 @@ internal object CaptureResult {
         tilt?.let { result.put("tilt", JSONObject().put("pitchDeg", round(it.pitchDeg, 2)).put("rollDeg", round(it.rollDeg, 2))
             .put("sigmaDeg", round(it.sigmaDeg, 2))) }
         heading?.let { h ->
-            result.put("headingDeg", round(h.headingDeg, 1)).put("headingRef", "magnetic")
+            result.put("headingDeg", (round(h.headingDeg, 1) % 360.0 + 360.0) % 360.0).put("headingRef", "magnetic")
             h.accuracyDeg?.let { result.put("headingAccuracyDeg", round(it, 1)) }
         }
         return result

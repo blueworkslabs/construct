@@ -305,6 +305,13 @@ class CaptureMetadataTest {
         denied("CAMERA_CAPTURE") { CaptureResult.forModule(true, true, "pAbc", null) }
     }
 
+    @Test fun headingRoundingStaysInNormalizedRange() {
+        for ((input, expected) in listOf(359.96 to 0.0, 359.94 to 359.9, 0.04 to 0.0)) {
+            val result = CaptureResult.capture(1.0, null, null, Heading(input, 5.0))
+            assertEquals(expected, result.getDouble("headingDeg"), 1e-9)
+        }
+    }
+
     // ---- API version gating ----
 
     private fun manifest(api: String, vararg caps: String, target: String = api): ByteArray = JSONObject().put("schemaVersion", 1)

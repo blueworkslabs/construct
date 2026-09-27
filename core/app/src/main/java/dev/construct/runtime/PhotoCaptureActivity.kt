@@ -360,6 +360,7 @@ class PhotoCaptureActivity : ComponentActivity() {
                 Text(installed.manifest.name, style = MaterialTheme.typography.bodySmall)
                 Text(status, style = MaterialTheme.typography.bodyMedium)
                 Text("Only this shutter saves a private photo. No live frames reach the module.", style = MaterialTheme.typography.bodySmall)
+                if (options.metadata) Text(CaptureOptions.METADATA_DISCLOSURE, style = MaterialTheme.typography.bodySmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Button(enabled = ready && !busy && !zoomPending, onClick = ::shoot) { Text("Take photo") }
                     OutlinedButton(enabled = canSwitch && !busy, onClick = {

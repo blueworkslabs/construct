@@ -264,6 +264,7 @@ class MainActivity : ComponentActivity() {
                             if (module.manifest.capabilities.any { it.id == "camera.photo" }) {
                                 Text("Android camera access: " + if (androidCamera) "allowed" else "not allowed")
                                 Text("Opens a visible native camera. Only you can press the shutter. Photos stay in this module's private storage; No live frames reach JavaScript. Private album pixels require separate photo-library and image grants.")
+                                if (CaptureOptions.metadataApi(module.manifest.api)) Text(CaptureOptions.METADATA_DISCLOSURE)
                                 Button(enabled = !busy && !androidCamera, onClick = { cameraPermission.launch(android.Manifest.permission.CAMERA) }) { Text("Allow Android camera access") }
                                 TextButton(onClick = { startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName"))) }) { Text("Android app settings") }
                             }
@@ -450,6 +451,7 @@ class MainActivity : ComponentActivity() {
                     }
                     Text("Existing access choices are kept unless you change them. New sensitive capabilities start off. You can change access later in Module access.")
                     if (verified.manifest.capabilities.any { it.id == "camera.photo" }) Text("Camera also needs Android permission through Module access. The visible native shutter saves privately. Separate photo-library and image grants are needed to read those photos in module code. No microphone or general file access.")
+                    if (verified.manifest.capabilities.any { it.id == "camera.photo" } && CaptureOptions.metadataApi(verified.manifest.api)) Text(CaptureOptions.METADATA_DISCLOSURE)
                     if (verified.manifest.capabilities.any { it.id == "contacts.read" }) Text("Contacts also need Android permission. After installing, open Module access to allow Android contacts access. This does not grant any module automatically.")
                     if (verified.manifest.capabilities.any { it.id == "contacts.read" } && verified.manifest.capabilities.any { it.id == "storage.kv" }) Text("This module can save contact data on this phone when both contacts and saved-data access are allowed. Revoking contacts access does not erase data it already saved.")
                     if (verified.manifest.capabilities.any { it.id == "net.http" }) Text("Approved internet access lets this module send data to the exact sources above, which see your IP address. New sources need new consent. Other granted data, including location or contacts, can be sent to those sources. Raster responses may be cached; revocation does not erase previously received data.")
