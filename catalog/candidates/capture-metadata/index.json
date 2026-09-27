@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.capture-metadata",
+      "name": "Capture metadata probe",
+      "versions": [
+        {
+          "id": "dev.construct.capture-metadata",
+          "name": "Capture metadata probe",
+          "version": "0.1.0",
+          "artifact": "dev.construct.capture-metadata-0.1.0.zip",
+          "sha256": "af3fb19913bcc4a440e91bf75630618777f1db3e7ca59198211a02b3412c0583",
+          "signature": "c1TWHxAocI3fUHN+28ycF6HXiVkH/QNXetsaBLg2zvEHinKjXFlluZmgvOMD6e4CeZJFXKTyWpkS5a8jQHNeam/aG0QALAPjztKCXXBfb2lLW9WBjGSTSlS6LQavKh630aZVqjljXDHNb4SQtJgUxsfgh33cAUokD4GGhchCFiFYkeLjXuTVU+DijPwqaBDq2yUtdqYX1CMhzS5MxrNqt5SoPvA0OhJMDJzjLfteFEU13TVEwtpTWsbARW4xFAG9pyzHoX/Lidbdtjs0axN2X9r6t9KKGIeeaFGdGkWVwWAnVQH80G44ucuC+l1Wb4eF9MOL31dQwkXCCXvK20w93w==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.capture-metadata",
+          "name": "Capture metadata probe",
+          "version": "0.2.0",
+          "artifact": "dev.construct.capture-metadata-0.2.0.zip",
+          "sha256": "8394f3e47ae67589c5fac4d564a51647f4af019617bca29040d15f6239fb5913",
+          "signature": "jtks8yGX0z0iyzPNBcoqbajF3GXzKqavEithOIXlgfpQ1z4EBREronYPSjr21EdmZWMMWfN18Zhe/z2+/WVrAbNx+VX1Ja60emyPbsCwjxgvdF6LVN59flXgduCoa8Rxag6PqtnXwS66Rv7aU93MOQtbvUw3074TDpuTURHE2PE+ZkTEXWPk2VpxpIowecCxut8I4op5IURStykOmv3EzbAKBUIX0mzcMEaFwjTi7HPlet7SyIjp/+6FNVelJrZmtNLIzkt+QX7KDSCUvv6CS+zkihDIBQ+IwklSfTho+kBFnC62o8ak4BrJu/XNa9xXhiF12j9dmw7Alu9eJhhecw==",
+          "testFixture": true
+        }
+      ]
+    }
+  ]
+}

@@ -5,7 +5,7 @@ Ties every observation to one APK and two signed fixture versions of dev.constru
 Both tilt signs are injected with `adb emu sensor set acceleration` on a portrait-locked display.
 Pure checks live in capture_checks.py (unit-tested without a device).
 """
-import argparse,datetime,fcntl,hashlib,io,json,os,subprocess,time,uuid
+import argparse,datetime,fcntl,hashlib,io,json,os,re,subprocess,time,uuid
 from pathlib import Path
 from config import CONFIG,SERIAL,require_runner,catalog
 from capture_checks import acceleration,check_result,check_zoom_pair,level_readout,parse_result,readout_matches,secure_blackout
@@ -24,7 +24,7 @@ from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':{'0.1.0':a.legacy_sha,'0.2.0':a.module_sha},
- 'recents':'Android 13+ Recents thumbnail is not observed here; JVM covers the decision (ScreenCaptureTest)','checks':[],'captures':[]}
+ 'recents':'Actual Recents screenshot captured with module screenshots enabled; requires visual review alongside ScreenCaptureTest','checks':[],'captures':[]}
 started=False
 name='Capture metadata probe';heading=name+' · 0.1.0'
 def save():(run/'result.json').write_text(json.dumps(receipt,indent=2)+'\n')
@@ -63,27 +63,35 @@ def act(label,wait=True,timeout=40):
 def launch():adb('shell','am','start','-n','dev.construct.runtime/.MainActivity');host_ready()
 def opened():launch();library();select_after(heading,('Open',));find('Capture plain')
 def module_access():tap('Construct menu');tap('Module access');find('Module access')
-def reach_native(label):
+def bounds(n):return list(map(int,re.findall(r'-?\d+',n.get('bounds',''))))
+def visible(n):
+ b=bounds(n);return len(b)==4 and b[2]>b[0] and b[3]-b[1]>=8
+def reach_native(label,checkable=False):
  for attempt in range(24):
-  matches=[n for n in nodes() if label in (n.get('text'),n.get('content-desc')) and n.get('package')=='dev.construct.runtime']
-  if matches:return matches[0]
+  tree=nodes()
+  viewport=next((bounds(n) for n in tree if n.get('class')=='android.widget.ScrollView'),[0,132,720,1244])
+  matches=[n for n in tree if label in (n.get('text'),n.get('content-desc')) and n.get('package')=='dev.construct.runtime' and (not checkable or n.get('checkable')=='true') and visible(n) and bounds(n)[1]>=viewport[1] and bounds(n)[3]<=viewport[3]]
+  if matches:
+   before=bounds(matches[0]);time.sleep(.5)
+   settled=[n for n in nodes() if label in (n.get('text'),n.get('content-desc')) and bounds(n)==before and (not checkable or n.get('checkable')=='true')]
+   if settled:return settled[0]
   start,end=('450','1050') if attempt<8 else ('1000','500')
   adb('shell','input','swipe','360',start,'360',end,'250');time.sleep(.3)
  raise RuntimeError('Native control not reachable: '+label)
 def reopen():tap_node(reach_native('Reopen module'));find('Capture plain')
 def switch(label,checked,confirm=None):
- for _ in range(12):
-  matches=[n for n in nodes() if n.get('content-desc')==label and n.get('checkable')=='true']
-  if matches:break
-  adb('shell','input','swipe','360','1000','360','500','250');time.sleep(.3)
- require(len(matches)==1,'Missing switch: '+label)
- if (matches[0].get('checked')=='true')==checked:return matches[0].get('checked')
- before=matches[0].get('checked');tap_node(matches[0])
- if confirm:tap(confirm)
- until=time.monotonic()+10
- while time.monotonic()<until:
-  if any(n.get('content-desc')==label and n.get('checkable')=='true' and n.get('checked')==('true' if checked else 'false') for n in nodes()):return before
-  time.sleep(.25)
+ initial=None
+ for attempt in range(3):
+  node=reach_native(label,checkable=True)
+  if initial is None:initial=node.get('checked')
+  if (node.get('checked')=='true')==checked:return initial
+  print('Native switch tap:',label,bounds(node),'attempt',attempt+1,flush=True)
+  tap_node(node)
+  if confirm:tap(confirm)
+  until=time.monotonic()+4
+  while time.monotonic()<until:
+   if any(n.get('content-desc')==label and n.get('checkable')=='true' and n.get('checked')==('true' if checked else 'false') for n in nodes()):return initial
+   time.sleep(.25)
  raise RuntimeError('Switch did not change: '+label)
 def install(version,digest,choice='Review & install'):
  global heading
@@ -174,8 +182,14 @@ try:
  require(switch('Allow screenshots',True)=='false','Allow screenshots must default to off')
  require(any(t and 'Off by default.' in t for t in labels()),'Missing Allow screenshots copy')
  reopen();require(not screenshot_black('module-switch-on'),'Module screen still black with Allow screenshots on')
- viewfinder('Capture plain');require(screenshot_black('viewfinder-switch-on'),'Native viewfinder dropped FLAG_SECURE')
- tap('Cancel capture');find('Capture plain')
+ adb('shell','input','keyevent','KEYCODE_APP_SWITCH');time.sleep(1.5);capture('recents-switch-on')
+ # Backgrounding ends ModuleActivity's session; return to the host, then
+ # reopen explicitly after the process restart instead of expecting old controls.
+ adb('shell','input','keyevent','KEYCODE_BACK')
+ adb('shell','am','force-stop','dev.construct.runtime');opened()
+ require(not screenshot_black('module-switch-on-restart'),'Screenshot choice was lost on restart')
+ before=viewfinder('Capture plain');require(screenshot_black('viewfinder-switch-on'),'Native viewfinder dropped FLAG_SECURE')
+ tap('Cancel capture');require(result(before,60)=='Capture canceled.','Cancel did not finish');find('Capture plain')
  done('Allow screenshots is off by default, drops FLAG_SECURE for this module only, and the viewfinder stays secure')
 
  first=measured(10,0,'1×');done('Pitch +10° (looking down) reports pitchDeg > 0 at 1× with a listed stable id')
