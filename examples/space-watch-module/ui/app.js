@@ -208,6 +208,8 @@
         throw new Error("CelesTrak sent no usable orbit data.");
       }
       objects = O.build(rows);
+      described.clear();
+      listKey = "";
       meta.elements = t;
       fetchState.until = 0;
       passes.clear();
@@ -247,6 +249,7 @@
       meta.satcat = t;
       fetchState.satcatUntil = 0;
       described.clear();
+      listKey = "";
       await saveRows("satcat", rows, t, SATCAT_CHUNKS);
     } catch (e) {
       if (e.code === "CAPABILITY_DENIED") fetchState.satcatLast = previous;

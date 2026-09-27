@@ -13,7 +13,7 @@ const LAUNCH = JSON.stringify([
   {NORAD_CAT_ID: 29507, OBJECT_TYPE: 'R/B', OBJECT_NAME: 'CZ-4B R/B', OBJECT_ID: '2006-046C'},
 ]);
 const WIKI = JSON.stringify({query: {pages: [{title: 'Long March 4B', extract: 'The Long March 4B is a Chinese launch vehicle.', fullurl: 'https://en.wikipedia.org/wiki/Long_March_4B'}]}});
-function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, pendingLocation = false} = {}) {
+function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false} = {}) {
   const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [];
   const storage = structuredClone(saved);
   let now = clock;
@@ -56,7 +56,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, netE
       if (method === 'net.http') {
         const u = params.url;
         if (netError) throw Object.assign(new Error(netError), {code: netError});
-        const result = u.includes('gp.php') ? (gpStatus === 200 ? {status: 200, text: ELEMENTS} : {status: gpStatus})
+        const result = u.includes('gp.php') ? (gpStatus === 200 ? {status: 200, text: elementsBody} : {status: gpStatus})
           : u.includes('GROUP=visual') ? (satcatStatus === 200 ? {status: 200, text: SATCAT} : {status: satcatStatus})
           : u.includes('INTDES=') ? {status: 200, text: launchBody}
           : u.startsWith('https://en.wikipedia.org/') ? {status: 200, text: WIKI} : {status: 404};
@@ -138,6 +138,24 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   // A manual refresh inside two hours explains instead of re-downloading.
   r.el('refresh').click(); await flush();
   assert.equal(r.http().length, 1); assert.match(r.el('data-status').textContent, /nothing newer yet/);
+
+  // Refresh must invalidate name-derived descriptions even with a fresh SATCAT.
+  const renamed = JSON.parse(ELEMENTS);
+  renamed.find(o => o.NORAD_CAT_ID === 29507).OBJECT_NAME = 'CZ-4C R/B';
+  const aged = structuredClone(saved), oldDownload = START - 3 * HOUR;
+  aged['elements.meta'].at = oldDownload;
+  for (const [key, value] of Object.entries(aged))
+    if (/^elements\.\d$/.test(key) && value) value.g = oldDownload;
+  r = rig({saved: aged, elementsBody: JSON.stringify(renamed)}); await flush(8);
+  r.select(29507);
+  assert.equal(r.el('spot-title').textContent, 'Long March 4B rocket stage');
+  r.el('refresh').click(); await flush(8);
+  assert.deepEqual(r.http(), ['https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=json']);
+  assert.equal(r.el('spot-title').textContent, 'Long March 4C rocket stage');
+  assert.match(r.el('list').children.find(b => b.dataset.id === '29507').text, /Long March 4C rocket stage/);
+  r.el('details').click(); await flush(4);
+  await r.el('wiki').onclick(); await flush(4);
+  assert.match(r.http().at(-1), /titles=Long%20March%204C$/);
 
   // A torn cache (chunk from another generation) is ignored, not half-used.
   const torn = structuredClone(saved); torn['elements.0'].g = 1;

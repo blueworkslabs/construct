@@ -205,7 +205,7 @@ test("same-launch lookups and Wikipedia stay on fixed, encoded URLs", () => {
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
   assert.equal(m.id, "dev.construct.space-watch");
-  assert.equal(m.version, "0.1.4");
+  assert.equal(m.version, "0.1.5");
   assert.deepEqual(m.constructApi, { min: "0.9.0", target: "0.9.0" });
   const caps = Object.fromEntries(m.capabilities.map((c) => [c.id, c]));
   assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "storage.kv"]);
@@ -230,7 +230,7 @@ test("package: manifest, capabilities, scripts and no location in any URL", () =
   for (const shared of ["construct-ui.css", "bridge.js"])
     assert.equal(fs.readFileSync(root + "ui/" + shared, "utf8"), fs.readFileSync("examples/sky-watch-module/ui/" + shared, "utf8"), shared);
   const docs = fs.readFileSync("docs/space-watch.md", "utf8");
-  assert.match(docs, /Space Watch \*\*0\.1\.4\*\*/);
+  assert.match(docs, /Space Watch \*\*0\.1\.5\*\*/);
   // Vendored libraries are pinned by hash in the doc.
   for (const f of ["satellite.min.js", "astronomy.min.js"]) {
     const sha = crypto.createHash("sha256").update(fs.readFileSync(root + "ui/vendor/" + f)).digest("hex");
