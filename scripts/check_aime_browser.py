@@ -52,6 +52,31 @@ def main():
         page.evaluate(
             """async()=>{state.store={photo1:AimeCore.newSidecar({...SyntheticAime.viewer,accuracyM:10,timestamp:Date.now()})};await openPhoto('photo1');const f=AimeCore.parseOverpass(SyntheticAime.overpass()).features.find(f=>f.name==='Synthetic Tower A');await update(s=>({...s,marks:[AimeCore.markFrom(f,SyntheticAime.taps.markA.x,SyntheticAime.taps.markA.y)]}));}"""
         )
+        # A cached lookup opens synchronously enough for pointerup -> click
+        # retargeting on touch WebViews. At 2x text a candidate lies under the tap.
+        page.set_viewport_size({"width": 360, "height": 604})
+        page.evaluate("document.documentElement.style.fontSize='32px';setMode('what')")
+        page.locator("#stage").scroll_into_view_if_needed()
+        page.evaluate("features()")
+        r = page.locator("#stage").bounding_box()
+        x, y = r["x"] + r["width"] * 0.66, r["y"] + r["height"] * 0.42
+        cdp = page.context.new_cdp_session(page)
+        cdp.send(
+            "Input.dispatchTouchEvent",
+            {"type": "touchStart", "touchPoints": [{"x": x, "y": y, "id": 1}]},
+        )
+        cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+        page.wait_for_timeout(500)
+        assert page.locator(
+            "#candidates-dialog"
+        ).is_visible(), "Photo tap clicked through candidate dialog"
+        assert page.evaluate(
+            "state.pane === 'photo'"
+        ), "Same touch selected a candidate"
+        page.locator("#close-candidates").click()
+        page.set_viewport_size({"width": 420, "height": 900})
+        page.evaluate("document.documentElement.style.fontSize=''")
+        print("PASS touch tap opens candidates without selecting one at 2x text")
         # A delayed feature response while the visible Photos control leaves the photo.
         page.evaluate(
             """()=>{const old=call;window.originalCall=call;call=(m,p)=>m==='net.http'?new Promise(r=>window.releaseFetch=()=>r({status:200,text:SyntheticAime.overpass()})):old(m,p);state.features.clear();window.pendingWhat=task(()=>whatsThat(.7,.4));}"""

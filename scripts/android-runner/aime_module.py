@@ -17,7 +17,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_aime_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.aime package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.aime-fixture package digest')
-p.add_argument('--version',default='0.1.1')
+p.add_argument('--version',default='0.1.2')
 p.add_argument('--real-fix',default='47.34953,8.49154',help='lat,lon injected for the real-module Overpass check (public viewpoint)')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'

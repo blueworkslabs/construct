@@ -465,8 +465,10 @@ function normalised(clientX, clientY) {
   const stage = $("stage"),
     pointers = new Map();
   let drag = null,
-    pinch = null;
+    pinch = null,
+    completedTap = null;
   stage.addEventListener("pointerdown", (e) => {
+    completedTap = null;
     if (e.target.closest(".zoom")) return;
     stage.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -516,11 +518,18 @@ function normalised(clientX, clientY) {
     drag = null;
     if (tap) {
       const p = normalised(e.clientX, e.clientY);
-      if (p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1) onTap(p.x, p.y);
+      if (p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1) completedTap = p;
     }
   };
   stage.addEventListener("pointerup", release);
   stage.addEventListener("pointercancel", release);
+  stage.addEventListener("click", () => {
+    // A modal opened on pointerup can receive the compatibility click from
+    // that same touch. Activate only during click, whose target is now fixed.
+    const p = completedTap;
+    completedTap = null;
+    if (p) onTap(p.x, p.y);
+  });
   stage.addEventListener(
     "wheel",
     (e) => {
