@@ -364,6 +364,15 @@ class CaptureMetadataTest {
     private val headingKeys = setOf("headingDeg", "headingRef", "headingAccuracyDeg", "headingAgeMs")
     private val fovKeys = setOf("fovDeg", "fovSigmaDeg")
 
+    @Test fun describesTheSameAppliedZoomUsedForLensGeometryWithoutQuantizing() {
+        val applied = 1.001f.toDouble() // CameraX reports Float precision.
+        val capture = CaptureResult.describe(state(zoom = applied))
+        assertEquals(applied, capture.getDouble("zoomRatio"), 0.0)
+        val expected = CaptureGeometry.fieldOfView(lens, 960, 1280, applied)!!
+        assertEquals(expected.h, capture.getJSONObject("fovDeg").getDouble("h"), 0.01)
+        assertEquals(expected.v, capture.getJSONObject("fovDeg").getDouble("v"), 0.01)
+    }
+
     @Test fun describeReportsEveryReliableMeasurementWithItsUncertaintyAndAge() {
         val capture = CaptureResult.describe(state())
         assertEquals(all, capture.keys().asSequence().toSet())

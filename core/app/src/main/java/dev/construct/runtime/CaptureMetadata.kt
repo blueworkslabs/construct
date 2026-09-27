@@ -358,7 +358,7 @@ internal object CaptureResult {
     }
 
     fun capture(zoomRatio: Double, fov: FieldOfView?, fovSigmaDeg: Double, tilt: Tilt?, heading: Heading?): JSONObject {
-        val result = JSONObject().put("zoomRatio", round(zoomRatio, 2))
+        val result = JSONObject().put("zoomRatio", zoomRatio)
         fov?.let { result.put("fovDeg", JSONObject().put("h", round(it.h, 2)).put("v", round(it.v, 2)))
             .put("fovSigmaDeg", round(max(0.5, fovSigmaDeg), 2)) }
         tilt?.let { result.put("tilt", JSONObject().put("pitchDeg", round(it.pitchDeg, 2)).put("rollDeg", round(it.rollDeg, 2))
