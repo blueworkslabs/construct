@@ -1,7 +1,8 @@
 "use strict";
 // Aimé controller: library, capture with viewpoint fixes, photo view with taps,
 // a magnifier on hold, movable marks and horizon points with one-step undo,
-// bearing ruler, candidates and the map with its distance ruler. Maths lives in
+// bearing ruler, candidates, the map with its distance ruler and a map pin (or
+// a candidate) shown in the photo. Maths lives in
 // resection.js (unchanged reference solver), bookkeeping in aime-core.js.
 const $ = (id) => document.getElementById(id);
 const C = AimeCore,
@@ -22,6 +23,8 @@ const state = {
   lastTap: null,
   preview: null, // sidecar with a point being dragged; stored only on release
   undo: null, // {id, label, marks, horizon} before the last point edit
+  pin: null, // {point, name?, positionM?}: map long-press or a candidate's "Show in photo"
+  pinLoc: null, // Resection.locate(cal, pin) for the current calibration
   lastList: null, // {rows, wedge, bearing} from the last What's that?
   pane: "photo",
   features: new Map(), // cacheKey → {features, dataset, cells}
@@ -296,6 +299,7 @@ async function openPhoto(id) {
   state.lastList = null;
   state.pendingTap = null;
   state.undo = null;
+  state.pin = null;
   gestures.cancel();
   map.setRuler(false);
   renderRuler();
@@ -361,6 +365,35 @@ function origin() {
   if (!v) return null;
   const fitted = state.cal && S.distance(v, state.cal.viewer) * 1000 > 1;
   return { point: fitted ? state.cal.viewer : v, fitted };
+}
+// ---- Map pin in the photo -------------------------------------------------------
+// Where the pin lies in the photo, or null without a pin or a calibration.
+function pinLocation() {
+  if (!state.pin || !state.cal) return null;
+  try {
+    return S.locate(state.cal, { point: state.pin.point, positionM: state.pin.positionM });
+  } catch {
+    return null;
+  }
+}
+function pinStatus() {
+  const p = state.pin,
+    name = p.name || "Pin",
+    o = origin();
+  if (state.pinLoc) return C.pinText(state.pinLoc, name);
+  const where = o ? ` · ${C.range(S.distance(o.point, p.point), S.bearing(o.point, p.point))}` : "";
+  return `${name}${where}. Mark a landmark you know in the photo first; then the photo shows where it lies.`;
+}
+function renderPin() {
+  $("pin-tools").hidden = !state.pin;
+  if (!state.pin) return;
+  $("pin-status").textContent = pinStatus();
+  $("pin-show").hidden = state.pane === "photo";
+}
+function setPin(pin) {
+  state.pin = pin;
+  if (state.pane === "map") renderMap(false);
+  render();
 }
 function setMode(mode) {
   state.mode = mode;
@@ -458,6 +491,8 @@ function render() {
     "None. Optional: levels tilted photos.",
   );
   renderUndo();
+  state.pinLoc = pinLocation();
+  renderPin();
   drawOverlay();
   drawRuler();
   $("mode-mark").title = $("mode-horizon").title = v ? "" : "Set the viewpoint on the map first";
@@ -644,12 +679,19 @@ const gestures = (() => {
   };
   stage.addEventListener("pointerup", release);
   stage.addEventListener("pointercancel", release);
-  // Some Android WebViews end a touch without pointercancel or drop capture.
-  stage.addEventListener("touchcancel", () => {
+  // Navigation, a hidden module or a touchcancel ends every touch. A WebView
+  // may never send the matching pointer events, so pointers and pinch go too.
+  function reset() {
+    for (const id of pointers.keys())
+      try {
+        stage.releasePointerCapture(id);
+      } catch {}
     pointers.clear();
     pinch = null;
     cancel();
-  });
+  }
+  // Some Android WebViews end a touch without pointercancel or drop capture.
+  stage.addEventListener("touchcancel", reset);
   stage.addEventListener("lostpointercapture", (e) => {
     if (g && g.id === e.pointerId && pointers.has(e.pointerId)) {
       pointers.delete(e.pointerId);
@@ -676,7 +718,7 @@ const gestures = (() => {
     state.view = { scale: 1, x: 0, y: 0 };
     applyView();
   };
-  return { cancel };
+  return { cancel: reset };
 })();
 // Stage pixel → photo point.
 function normalisedLocal(f) {
@@ -756,10 +798,48 @@ function drawOverlay() {
     }
     o.append(svg("polyline", { points: pts.join(" "), fill: "none", stroke: state.cal.level === "fitted" ? "#5FD3A0" : "#E9C46A", "stroke-width": px(2), "stroke-dasharray": state.cal.level === "fitted" ? "none" : `${px(8)} ${px(6)}` }));
   }
+  drawPin(o, H, px);
   s.horizon.forEach((p) => dot(p.x, p.y, "#E9C46A", "", true));
   s.marks.forEach((m, i) => dot(m.x, m.y, "#5FD3A0", `${i + 1} ${m.name}`));
   if (state.pendingTap) dot(state.pendingTap.x, state.pendingTap.y, "#8CF0C4", "", true);
   if (state.lastTap) dot(state.lastTap.x, state.lastTap.y, "#F08A7E", "?", true);
+}
+// The pin's bearing line with its ±2σ band, or an arrow on the frame edge.
+function drawPin(o, H, px) {
+  const loc = state.pinLoc;
+  if (!loc) return;
+  const view = C.pinOverlay(loc),
+    name = state.pin.name || "Pin",
+    pts = (list) => list.map((q) => `${q.x * 1000},${q.y * H}`).join(" "),
+    label = (x, y, t, anchor) => {
+      const e = svg("text", { x, y, fill: "#8CF0C4", stroke: "#000", "stroke-width": px(3), "paint-order": "stroke", "font-size": px(14), "font-family": "system-ui, sans-serif", "text-anchor": anchor });
+      e.textContent = t;
+      o.append(e);
+    };
+  if (view.band.length) o.append(svg("polygon", { points: pts(view.band), fill: "#8CF0C42e", stroke: "#8CF0C480", "stroke-width": px(1) }));
+  if (view.line.length) {
+    o.append(svg("polyline", { points: pts(view.line), fill: "none", stroke: "#06110B99", "stroke-width": px(5) }));
+    o.append(svg("polyline", { points: pts(view.line), fill: "none", stroke: "#8CF0C4", "stroke-width": px(2) }));
+    // Labelled at the top of the line, clear of the mark labels near the horizon.
+    const top = view.line[0],
+      right = top.x > 0.5;
+    label(top.x * 1000 + px(right ? -8 : 8), top.y * H + px(34), `${name} · ${C.km(loc.distanceKm)}`, right ? "end" : "start");
+  }
+  if (view.arrow) {
+    const a = view.arrow,
+      r = (a.angle * Math.PI) / 180,
+      ux = Math.cos(r),
+      uy = Math.sin(r),
+      tx = a.x * 1000 - ux * px(3),
+      ty = a.y * H - uy * px(3),
+      bx = tx - ux * px(20),
+      by = ty - uy * px(20),
+      w = px(11);
+    o.append(svg("polygon", { points: `${tx},${ty} ${bx - uy * w},${by + ux * w} ${bx + uy * w},${by - ux * w}`, fill: "#8CF0C4", stroke: "#06110B", "stroke-width": px(2) }));
+    const text = loc.side.startsWith("behind") ? (loc.side === "behind-left" ? "Behind you, to the left" : "Behind you, to the right") : `${name} · ${C.km(loc.distanceKm)}`,
+      anchor = Math.abs(ux) > 0.5 ? (ux < 0 ? "start" : "end") : a.x < 0.3 ? "start" : a.x > 0.7 ? "end" : "middle";
+    label(bx - ux * px(6), by - uy * px(10) + (Math.abs(uy) > 0.5 ? 0 : px(5)) + (uy < -0.5 ? px(14) : 0), text, anchor);
+  }
 }
 function drawRuler() {
   const canvas = $("ruler-canvas"),
@@ -1019,7 +1099,16 @@ async function whatsThat(x, y) {
       $("candidates-dialog").close();
       showPane("map", true, i);
     };
-    li.append(b);
+    const show = document.createElement("button");
+    show.className = "show";
+    show.textContent = "Show in photo";
+    show.setAttribute("aria-label", `Show ${f.name} in the photo`);
+    show.onclick = () => {
+      $("candidates-dialog").close();
+      showPane("photo");
+      setPin({ point: r.candidate.point, name: f.name, positionM: f.positionM });
+    };
+    li.append(b, show);
     ol.append(li);
   });
   if (!list.rows.length) {
@@ -1052,6 +1141,9 @@ const map = new AimeMap($("map"), {
   onError: (error) =>
     say("map-status", !error ? "" : error.code === "CAPABILITY_DENIED" ? "Map tiles need internet access for Aimé (Construct menu → Module access)." : "Map tiles unavailable. The list below still describes the map.", error ? "attention" : ""),
   onRuler: () => renderRuler(),
+  // A dropped pin keeps a snapped landmark's estimate, else the placement
+  // precision of the map scale (as for a placed viewpoint).
+  onPin: (p, mPerPx) => setPin({ point: { lat: p.lat, lon: p.lon }, name: p.name, positionM: p.positionM || Math.max(5, Math.round(mPerPx * 12)) }),
   rulerLabel: (m) => C.range(m.km, m.bearing),
 });
 // Map ruler: two taps → great-circle distance and initial bearing from the first.
@@ -1123,7 +1215,7 @@ function renderMap(fit, focus = null) {
     list = state.lastList,
     cal = state.cal,
     fitted = cal && v && S.distance(v, cal.viewer) * 1000 > 1 ? { lat: cal.viewer.lat, lon: cal.viewer.lon } : null;
-  const candidates = list ? list.rows.map((r, i) => ({ lat: r.candidate.point.lat, lon: r.candidate.point.lon, n: i + 1, greyed: r.greyed, name: r.candidate.feature.name })) : [];
+  const candidates = list ? list.rows.map((r, i) => ({ lat: r.candidate.point.lat, lon: r.candidate.point.lon, n: i + 1, greyed: r.greyed, name: r.candidate.feature.name, positionM: r.candidate.positionM })) : [];
   const lengthKm = Math.max(s.radiusKm, ...candidates.map((c) => S.distance(fitted || v || c, c) * 1.1));
   map.placing = !v; // While the ruler is on, taps measure instead.
   map.editable = !!v;
@@ -1132,9 +1224,10 @@ function renderMap(fit, focus = null) {
       viewer: v ? { lat: v.lat, lon: v.lon, accuracyM: v.accuracyM || 20 } : null,
       fitted,
       wedge: v && list ? { bearing: list.bearing, sigma: list.wedge, lengthKm } : null,
-      marks: s.marks.map((m) => ({ lat: m.lat, lon: m.lon, name: m.name })),
+      marks: s.marks.map((m) => ({ lat: m.lat, lon: m.lon, name: m.name, positionM: m.positionM })),
       candidates,
       focus: focus !== null && candidates[focus] ? focus : null,
+      pin: state.pin ? { ...state.pin.point, name: state.pin.name } : null,
     },
     false,
   );
@@ -1153,7 +1246,7 @@ function renderMap(fit, focus = null) {
       : "Set your viewpoint: tap the map where you stood when taking this photo. Pan and zoom first to place it precisely."
     : v.review
       ? "Drag the ring to where you stood, or confirm the estimated viewpoint above."
-      : "Drag the ring to correct where you stood. The wedge shows your last tap’s direction: ±1σ, fainter out to ±2σ.";
+      : "Drag the ring to correct where you stood. Long-press the map to drop a pin and see where it lies in the photo. The wedge shows your last tap’s direction: ±1σ, fainter out to ±2σ.";
   $("locate-start").hidden = !!v;
   const legend = $("map-legend");
   legend.replaceChildren();
@@ -1180,6 +1273,7 @@ function renderMap(fit, focus = null) {
     const r = list.rows[i];
     item(`Pin ${c.n}: ${c.name}${i === focus ? " (selected)" : ""}`, `${r.greyed ? "not close · " : "could be · "}${C.range(r.distanceKm, r.bearing)} · ${C.signed(r.deltaDeg)} ±${r.sigmaDeg.toFixed(1)}°`);
   });
+  if (state.pin) item(`Light pin: ${state.pin.name || "your dropped pin"}`, pinStatus());
   if (v && (s.marks.length || candidates.length)) item("Distances and bearings", `from ${from.fitted ? "the fitted viewpoint (dot)" : "your viewpoint (ring)"}`);
 }
 
@@ -1198,6 +1292,11 @@ $("map-ruler").onclick = () => {
 $("map-ruler-clear").onclick = () => {
   map.clearRuler();
   renderRuler();
+};
+$("pin-show").onclick = () => showPane("photo");
+$("pin-clear").onclick = () => {
+  map.clearPin();
+  setPin(null);
 };
 $("undo").onclick = () =>
   task(async () => {

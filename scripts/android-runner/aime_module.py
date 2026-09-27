@@ -5,7 +5,7 @@ Synthetic Aimé (dev.construct.aime-fixture) proves the flow and the ranking on 
 known scene: grants denied/granted, capture → viewpoint, injected landmark data
 offline/HTTP 503 with a single retry, mark → calibrated ruler, horizon → level
 line, dragging a horizon point and undoing it, tap → candidates → map, the map
-ruler, rotation, 2× text, a viewpoint outside the data coverage, delete →
+ruler, a long-press map pin and a candidate shown in the photo, rotation, 2× text, a viewpoint outside the data coverage, delete →
 stored record reconciled.
 The real Aimé package (dev.construct.aime) then proves the real location and
 internet gates: location off → unlocated photo opens on the map; with an injected
@@ -272,13 +272,20 @@ try:
  reach_text(', initial bearing ');capture('aime-ruler')
  click(lambda t:t=='Clear ruler');click(lambda t:t=='Ruler');absent(', initial bearing ')
  done('Map ruler: two taps show the great-circle distance and initial bearing; it clears')
+ m=bounds(reveal('Map of your viewpoint'));x=str(round(m[0]+(m[2]-m[0])*.3));y=str(round(m[1]+(m[3]-m[1])*.25))
+ adb('shell','input','swipe',x,y,x,y,'900');time.sleep(.8)
+ click(lambda t:t=='Show pin in photo');reach_text('Clear pin');capture('aime-map-pin')
+ click(lambda t:t=='Clear pin');absent('Show pin in photo')
+ done('Long-press on the map drops a pin; the photo shows where it lies; it clears')
  click(lambda t:t=='Photo')
 
  # Persisted calibration must survive a real process restart on this exact host.
  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);open_first_photo()
  reach_text('Calibrated · 1 mark');reach_text('Level estimated');reveal('What’s that?')
- what(F['whatB'],'Synthetic Peak B','B-restart');click(lambda t:t=='Close')
- done('Photo viewpoint, landmark and horizon calibration survive process restart with the same ranking')
+ what(F['whatB'],'Synthetic Peak B','B-restart')
+ click(lambda t:t in ('Show Synthetic Peak B in the photo','Show in photo'));reach_text('Synthetic Peak B: in the photo')
+ capture('aime-show-in-photo');click(lambda t:t=='Clear pin')
+ done('Photo viewpoint, landmark and horizon calibration survive process restart with the same ranking; Show in photo draws Peak B in frame')
 
  # 7. Rotation and 2× text keep the flow usable.
  settle('1');capture('aime-landscape');reveal('What’s that?');what(F['whatB'],'Synthetic Peak B','B-landscape');click(lambda t:t=='Close')

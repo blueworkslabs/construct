@@ -54,6 +54,13 @@
           <button id="show-photo" aria-pressed="true">Photo</button
           ><button id="show-map" aria-pressed="false">Map</button>
         </div>
+        <div id="pin-tools" hidden>
+          <p id="pin-status" role="status"></p>
+          <div class="row">
+            <button id="pin-show">Show pin in photo</button
+            ><button id="pin-clear">Clear pin</button>
+          </div>
+        </div>
         <div id="photo-pane">
           <p id="ruler-label" class="note">Mark a landmark you know to calibrate</p>
           <div id="ruler"><canvas id="ruler-canvas" aria-hidden="true"></canvas></div>
@@ -114,7 +121,10 @@
           point. Drag a mark or horizon point to correct it: the fit follows,
           and Undo reverts the last add, move or removal. On the map, the
           Ruler measures the great-circle distance and initial bearing between
-          two taps.
+          two taps. Long-press the map to drop a pin: once a landmark is marked,
+          the photo shows its direction with a ±2σ band, or an arrow when it is
+          out of frame or behind you. “Show in photo” does the same for a
+          candidate.
         </p>
         <h2>Viewpoint</h2>
         <p>

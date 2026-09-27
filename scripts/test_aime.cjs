@@ -1,8 +1,8 @@
 // Aimé module logic: sidecars, capture association, reconciliation, viewpoint
 // choice, landmark cells (cell math, index/cell validation, fetch and cache),
 // radius changes, search, shortlist, point editing (hit test, drag, undo,
-// writes on release), the magnifier geometry, distance/bearing labels and the
-// Synthetic Aimé scene. The solver itself is covered by test_aime_resection.cjs.
+// writes on release), the magnifier geometry, distance/bearing labels, cell
+// declination, the map pin in the photo and the Synthetic Aimé scene. The solver itself is covered by test_aime_resection.cjs.
 const fs = require("node:fs");
 const assert = require("node:assert/strict");
 const C = require("../examples/aime-module/ui/aime-core.js");
@@ -280,6 +280,20 @@ check("#40: names are bounded in code points, so an astral character at the limi
   assert.equal(stored("x".repeat(79) + " 𝔸"), "x".repeat(79), "no trailing space left by the cut");
 });
 
+check("declination: an optional additive cell field, kept when valid, otherwise absent and never a cell error", () => {
+  const ix = C.parseIndex(JSON.stringify(INDEX)),
+    rows = [["Tower", "tower", 46.9, 9.3, 80, 1.3, 8]];
+  const read = (extra) => C.readCell(ix, "46_9", cellText("46_9", rows, extra));
+  assert.equal(read({ declination: 2.4 }).declination, 2.4);
+  assert.equal(read({}).declination, null, "older cells have none");
+  for (const d of [180, -180, 0, -3.1]) assert.equal(read({ declination: d }).declination, d);
+  for (const d of [null, "2.4", 180.1, -181, 1e9, [], {}, true]) assert.equal(read({ declination: d }).declination, null, JSON.stringify(d));
+  assert.deepEqual(read({ declination: "x" }).features, read({ declination: 2.4 }).features, "features are unaffected either way");
+  assert.deepEqual(C.parseCell(ix, "46_9", cellText("46_9", rows, { declination: 2.4 })), read({}).features, "parseCell still returns the feature list");
+  const fx = C.parseIndex(F.index());
+  assert.deepEqual(F.cells.map((c) => C.readCell(fx, c, F.cell(c)).declination), [2.7, 3, 3.2], "every fixture cell carries one");
+});
+
 check("kind labels cover every contract kind with a fallback", () => {
   for (const kind of CONTRACT_KINDS) {
     const label = C.kindLabel({ kind });
@@ -483,6 +497,47 @@ check("distance and bearing labels: one format for marks, candidates, search and
   assert.equal(C.range(R.distance(v, p), R.bearing(v, p)), "18 km · 42° NE");
 });
 
+check("map pin in the photo: locate's line and ±2σ band, edge arrows off frame, behind-you wording", () => {
+  const ix = C.parseIndex(F.index());
+  const features = F.cells.flatMap((c) => C.parseCell(ix, c, F.cell(c)));
+  const byName = (n) => features.find((f) => f.name === n);
+  const tower = byName("Synthetic Tower A");
+  const s = C.cleanSidecar({ viewer: { lat: F.viewer.lat, lon: F.viewer.lon, accuracyM: 10 }, marks: [C.markFrom(tower, F.taps.markA.x, F.taps.markA.y)], horizon: F.taps.horizon });
+  const cal = R.calibrate(C.calibrationInput(s, F.width, F.height));
+  const locate = (f) => R.locate(cal, { point: { lat: f.lat, lon: f.lon }, positionM: f.positionM });
+  // In frame: the line and one closed band polygon.
+  const b = locate(byName("Synthetic Peak B")),
+    ov = C.pinOverlay(b);
+  assert.equal(b.inFrame, true);
+  // One mark, lens assumed: Peak B's true pixel lies inside the band, on the horizon row.
+  assert.ok(Math.abs(R.diff(R.bearingAt(cal, F.taps.whatB.x, F.taps.whatB.y), b.bearing)) <= 2 * b.sigmaDeg && Math.abs(b.anchor.y - F.taps.whatB.y) < 0.02);
+  assert.equal(ov.line, b.line);
+  assert.equal(ov.arrow, null);
+  assert.equal(ov.band.length, b.band[0].length + b.band[1].length);
+  assert.deepEqual([ov.band[0], ov.band.at(-1)], [b.band[0][0], b.band[1][0]], "down one edge, back up the other");
+  assert.match(C.pinText(b, "Synthetic Peak B"), /^Synthetic Peak B: in the photo · 18 km · 42° NE · band ±\d+\.\d° \(2σ\)$/);
+  // A band edge beyond the frame follows the frame edge on its side.
+  const wide = C.pinOverlay({ ...b, band: [[], b.band[1]] });
+  assert.deepEqual(wide.band.slice(0, 2), [{ x: 0, y: 0 }, { x: 0, y: 1 }]);
+  assert.deepEqual(C.pinOverlay({ ...b, band: [b.band[0], []] }).band.slice(-2), [{ x: 1, y: 1 }, { x: 1, y: 0 }]);
+  // Out of frame to the left, in front of the camera.
+  const left = R.locate(cal, { point: R.destination(F.viewer, F.pose.heading - 50, 5) });
+  assert.equal(left.side, "left");
+  assert.deepEqual(C.pinOverlay(left).arrow, { x: 0, y: Math.max(0.06, Math.min(0.94, left.anchor.y)), angle: 180 });
+  assert.match(C.pinText(left), /^Pin: out of frame to the left · 5\.0 km · 340° NNW$/);
+  // Behind the camera, on either side.
+  const behind = locate(byName("Synthetic Monument F"));
+  assert.equal(behind.side, "behind-right");
+  assert.deepEqual(C.pinOverlay(behind).arrow, { x: 1, y: 0.5, angle: 0 });
+  assert.match(C.pinText(behind, "Synthetic Monument F"), /^Synthetic Monument F: behind you, to the right · 4\.0 km · 200° SSW$/);
+  assert.equal(locate(byName("Synthetic Far Peak Z")).side, "behind-left");
+  assert.match(C.pinText(locate(byName("Synthetic Far Peak Z"))), /behind you, to the left/);
+  // Above and below point up and down, kept off the corners.
+  assert.deepEqual(C.pinOverlay({ inFrame: false, side: "above", anchor: { x: 0.99, y: 0 } }).arrow, { x: 0.94, y: 0, angle: -90 });
+  assert.deepEqual(C.pinOverlay({ inFrame: false, side: "below", anchor: { x: 0.3, y: 1 } }).arrow, { x: 0.3, y: 1, angle: 90 });
+  assert.match(C.pinText({ inFrame: false, side: "below", distanceKm: 2, bearing: 90 }), /below the photo · 2\.0 km · 90° E/);
+});
+
 check("Synthetic Aimé: one mark plus horizon ranks the tapped landmarks first", () => {
   const ix = C.parseIndex(F.index());
   const features = C.within(F.cells.flatMap((c) => C.parseCell(ix, c, F.cell(c))), F.viewer, 30);
@@ -665,6 +720,23 @@ checkAsync("denied or failed reads leave storage unavailable and nothing is writ
     assert.deepEqual(await db.release([]), [], "no reconciliation without readable storage");
     assert.equal(denied.log.length, 0, "no write was attempted");
   }
+});
+
+checkAsync("features() returns the viewpoint cell's declination; declinationAt uses the downloaded cell; absent is null", async () => {
+  const data = C.landmarkData(async (url) => F.answer(url).text);
+  assert.equal(data.declinationAt(F.viewer), null, "nothing downloaded yet");
+  const found = await data.features(F.viewer, 30);
+  assert.equal(found.declination, 3, "46_9");
+  assert.equal(data.declinationAt(F.viewer), 3);
+  assert.equal(data.declinationAt({ lat: 47.2, lon: 9.3 }), 3.2, "another downloaded cell");
+  assert.equal(data.declinationAt({ lat: 50.5, lon: 9.3 }), null, "a cell never downloaded");
+  assert.equal(data.declinationAt(null), null);
+  // Cells without the field (older data) load and report none.
+  const old = dataHost({ [C.INDEX_URL]: indexWith(["46_9"]), ...cellFiles(["46_9"], () => [["T", "tower", 46.5, 9.5, 0, 1, 8]]) });
+  const plain = C.landmarkData(old.get),
+    got = await plain.features({ lat: 46.5, lon: 9.5 }, 10);
+  assert.equal(got.features.length, 1);
+  assert.equal(got.declination, null);
 });
 
 checkAsync("a dragged point is written once on release, never per move; unmoved or cancelled drags write nothing", async () => {

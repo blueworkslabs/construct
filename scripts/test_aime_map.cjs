@@ -1,17 +1,17 @@
 // Aimé map class: projection, viewer drag/placement callbacks, pan vs. drag,
-// wedge geometry, tile failure handling and the distance ruler. Pixels/tiles
+// wedge geometry, tile failure handling, the distance ruler and the long-press pin. Pixels/tiles
 // remain Android work.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 const ui = "examples/aime-module/ui/";
-const context = vm.createContext({ ResizeObserver: class { observe() {} }, Date, Map, Set, Promise, Math, Number, Image: class {}, devicePixelRatio: 2 });
+const context = vm.createContext({ ResizeObserver: class { observe() {} }, Date, Map, Set, Promise, Math, Number, Image: class {}, devicePixelRatio: 2, setTimeout, clearTimeout });
 vm.runInContext(fs.readFileSync(ui + "resection.js", "utf8") + fs.readFileSync(ui + "aime-map.js", "utf8") + "\nglobalThis.TestMap = AimeMap; globalThis.R = Resection;", context);
 const { TestMap, R } = context;
 const tick = () => new Promise((r) => setImmediate(r));
 function rig(getImage = () => new Promise(() => {})) {
   const listeners = {},
-    events = { viewer: [], pans: 0, errors: [], ruler: [] };
+    events = { viewer: [], pans: 0, errors: [], ruler: [], pins: [] };
   const canvas = {
     width: 0,
     height: 0,
@@ -22,7 +22,7 @@ function rig(getImage = () => new Promise(() => {})) {
     },
     getContext: () => new Proxy({}, { get: (_, k) => (k === "measureText" ? () => ({ width: 40 }) : () => {}), set: () => true }),
   };
-  const map = new TestMap(canvas, { getImage, onViewer: (p) => events.viewer.push(p), onPan: () => events.pans++, onError: (e) => events.errors.push(e), onRuler: (pts) => events.ruler.push(JSON.parse(JSON.stringify(pts))) });
+  const map = new TestMap(canvas, { getImage, onViewer: (p) => events.viewer.push(p), onPan: () => events.pans++, onError: (e) => events.errors.push(e), onRuler: (pts) => events.ruler.push(JSON.parse(JSON.stringify(pts))), onPin: (p, mPerPx) => events.pins.push({ ...JSON.parse(JSON.stringify(p)), mPerPx }) });
   const fire = (type, x, y, id = 1) => listeners[type]({ type, pointerId: id, clientX: x, clientY: y, preventDefault() {}, deltaY: 0 });
   map.setScene({ viewer: { lat: 46.8, lon: 9.2, accuracyM: 10 } }, false);
   map.center = { lat: 46.8, lon: 9.2 };
@@ -246,6 +246,76 @@ const ok = (name) => {
     map.setScene({ viewer: { lat: 46.8, lon: 9.2 } }, false);
     assert.equal(map.ruler.points.length, 2, "a new scene (after an edit) keeps the ruler");
     ok("ruler snaps to the viewer and pins, labels the line through the app's formatter and survives scene updates");
+  }
+  {
+    TestMap.HOLD_MS = 30;
+    const wait = () => new Promise((r) => setTimeout(r, 60));
+    const { map, fire, events } = rig();
+    map.editable = true;
+    map.setScene({ viewer: { lat: 46.8, lon: 9.2, accuracyM: 10 }, marks: [{ lat: 46.81, lon: 9.21, name: "Tower", positionM: 16 }] }, false);
+    const zoom = map.zoom;
+    // Long-press on empty map: one pin there; the release neither zooms nor taps.
+    fire("pointerdown", 60, 60);
+    await wait();
+    fire("pointerup", 60, 60);
+    assert.equal(events.pins.length, 1);
+    const q = map.xy(events.pins[0]);
+    assert.ok(Math.abs(q.x - 60) < 1e-6 && Math.abs(q.y - 60) < 1e-6 && events.pins[0].mPerPx > 0);
+    assert.deepEqual({ ...map.scene.pin }, { lat: events.pins[0].lat, lon: events.pins[0].lon });
+    fire("pointerdown", 60, 60);
+    fire("pointerup", 60, 60);
+    assert.equal(map.zoom, zoom, "the held release did not count towards a double tap");
+    // Near a mark pin: snaps to it with its name and position estimate.
+    const m = map.xy({ lat: 46.81, lon: 9.21 });
+    fire("pointerdown", m.x + 4, m.y - 14);
+    await wait();
+    fire("pointerup", m.x + 4, m.y - 14);
+    assert.deepEqual(events.pins.at(-1), { lat: 46.81, lon: 9.21, name: "Tower", positionM: 16, mPerPx: events.pins.at(-1).mPerPx });
+    // Held on the viewer ring: no pin; the ring still drags.
+    const v = map.xy({ lat: 46.8, lon: 9.2 });
+    fire("pointerdown", v.x, v.y);
+    await wait();
+    fire("pointermove", v.x + 30, v.y);
+    fire("pointerup", v.x + 30, v.y);
+    assert.equal(events.pins.length, 2);
+    assert.equal(events.viewer.length, 1, "the ring drag corrects the viewpoint as before");
+    // A drag or a second finger before the hold ends drops nothing.
+    fire("pointerdown", 200, 200);
+    fire("pointermove", 230, 200);
+    await wait();
+    fire("pointerup", 230, 200);
+    fire("pointerdown", 200, 200, 1);
+    fire("pointerdown", 240, 240, 2);
+    await wait();
+    fire("pointerup", 200, 200, 1);
+    fire("pointerup", 240, 240, 2);
+    assert.equal(events.pins.length, 2);
+    // Ruler on: a long-press pins without adding a ruler point; taps still measure.
+    map.setRuler(true);
+    fire("pointerdown", 250, 250);
+    await wait();
+    fire("pointerup", 250, 250);
+    assert.equal(events.pins.length, 3);
+    assert.equal(map.ruler.points.length, 0);
+    fire("pointerdown", 100, 250);
+    fire("pointerup", 100, 250);
+    assert.equal(map.ruler.points.length, 1);
+    map.setRuler(false);
+    // Placing an unlocated viewpoint: no pins; paused: pending hold dropped.
+    map.placing = true;
+    fire("pointerdown", 120, 120);
+    await wait();
+    fire("pointerup", 120, 120);
+    assert.equal(events.pins.length, 3);
+    map.placing = false;
+    fire("pointerdown", 150, 60);
+    map.pause(true);
+    await wait();
+    assert.equal(events.pins.length, 3);
+    map.pause(false);
+    map.clearPin();
+    assert.equal(map.scene.pin, null);
+    ok("long-press drops a pin (snapping to mark/candidate pins), never on the ring, in placing mode, after a drag or pinch; clearable");
   }
   console.log(`${checks} Aimé map checks passed.`);
 })().catch((e) => {

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Aimé late-result, moving-pinch, magnifier, point-drag/undo and map-ruler
-regressions using Playwright Chromium.
+"""Aimé late-result, moving-pinch, magnifier, point-drag/undo, map-ruler and
+map-pin-in-photo regressions using Playwright Chromium.
 Install playwright and its Chromium browser in an isolated Python environment.
 This uses synthetic pixels and a fake bridge; it does not test host permissions.
 """
@@ -307,6 +307,40 @@ def main():
             assert page.evaluate("map.ruler === null && $('map-ruler-status').textContent === ''")
             page.evaluate("showPane('photo')")
             print("PASS map ruler measures, snaps to the viewpoint and clears")
+            # Candidate "Show in photo": locate's line and ±2σ band in the photo.
+            page.evaluate("whatsThat(SyntheticAime.taps.whatB.x,SyntheticAime.taps.whatB.y)")
+            page.wait_for_function("$('candidates-dialog').open")
+            first = page.evaluate("state.lastList.rows[0].candidate.feature.name")
+            page.locator("#candidates li button.show").first.click()
+            shown = page.evaluate(
+                "({pane:state.pane,dialog:$('candidates-dialog').open,pin:state.pin,inFrame:state.pinLoc&&state.pinLoc.inFrame,status:$('pin-status').textContent,band:$('overlay').querySelectorAll('polygon').length})"
+            )
+            assert shown["pane"] == "photo" and not shown["dialog"] and shown["pin"]["name"] == first, shown
+            assert shown["inFrame"] and shown["band"] == 1 and shown["status"].startswith(first + ": in the photo · "), shown
+            # Behind the camera: edge arrow and "behind you" wording.
+            page.evaluate("setPin({point:SyntheticAime.features.find(f=>f.letter==='F'),name:'Synthetic Monument F',positionM:60})")
+            behind = page.evaluate("({side:state.pinLoc.side,status:$('pin-status').textContent,texts:[...$('overlay').querySelectorAll('text')].map(t=>t.textContent)})")
+            assert behind["side"] == "behind-right" and behind["status"].startswith("Synthetic Monument F: behind you, to the right"), behind
+            assert "Behind you, to the right" in behind["texts"], behind
+            # Map long-press drops a pin, adds no ruler point, keeps the viewpoint; clearable.
+            page.evaluate("setPin(null);showPane('map',true)")
+            viewer = page.evaluate("JSON.stringify(current().viewer)")
+            page.locator("#map-ruler").click()
+            page.locator("#map-wrap").scroll_into_view_if_needed()
+            box = page.locator("#map").bounding_box()
+            touch("touchStart", (box["x"] + 80, box["y"] + 90))
+            page.wait_for_timeout(700)
+            touch("touchEnd")
+            page.wait_for_timeout(100)
+            dropped = page.evaluate("({pin:state.pin,scene:!!map.scene.pin,ruler:map.ruler.points.length,tools:!$('pin-tools').hidden})")
+            assert dropped["pin"] and dropped["scene"] and dropped["tools"] and dropped["ruler"] == 0, dropped
+            assert page.evaluate("JSON.stringify(current().viewer)") == viewer, "Long-press moved the viewpoint"
+            page.locator("#map-ruler").click()
+            page.locator("#pin-show").click()
+            assert page.evaluate("state.pane === 'photo' && !!state.pinLoc")
+            page.locator("#pin-clear").click()
+            assert page.evaluate("$('pin-tools').hidden && state.pin === null && map.scene.pin === null")
+            print("PASS map pin and candidate shown in the photo; behind-you arrow; clear")
             page.evaluate(
                 "whatsThat(SyntheticAime.taps.whatB.x,SyntheticAime.taps.whatB.y)"
             )

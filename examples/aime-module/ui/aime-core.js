@@ -338,8 +338,11 @@ const AimeCore = (() => {
   // not match the index, or without a feature array, is unavailable (never
   // empty). Missing or invalid position uncertainty makes the entire cell
   // unavailable: never cache incomplete data as a successful empty lookup.
-  // `p` is the feature's positionM, with no kind-level fallback.
-  function parseCell(index, cell, body) {
+  // `p` is the feature's positionM, with no kind-level fallback. The optional,
+  // additive `declination` (degrees east, WMM at the cell centre) is kept when
+  // it is a finite number in [-180, 180], else treated as absent: never a cell
+  // error, so older cells without it stay valid. → {features, declination|null}
+  function readCell(index, cell, body) {
     const x = readJson(body, "Landmark cell " + cell),
       m = cell.match(CELL);
     if (!x || x.schema !== 1 || x.release !== index.release || x.revision !== index.revision) throw unavailable(`landmark cell ${cell} does not match the index dataset (release and revision).`);
@@ -365,8 +368,9 @@ const AimeCore = (() => {
       if (TERRAIN.has(f.kind)) f.maxKm = 100;
       features.push(f);
     }
-    return features;
+    return { features, declination: num(x.declination) && Math.abs(x.declination) <= 180 ? x.declination : null };
   }
+  const parseCell = (index, cell, body) => readCell(index, cell, body).features;
   // Identity of a landmark: name, kind and position to 5 decimals (no OSM ids).
   const featureKey = (f) => [f.name, f.kind || "", f.lat.toFixed(5), f.lon.toFixed(5)].join("|");
   const sameFeature = (a, b) => {
@@ -443,32 +447,41 @@ const AimeCore = (() => {
           .finally(() => (indexJob = null));
       return indexJob;
     }
+    // Cached per dataset and cell as {features, declination}.
     function cell(ix, name) {
       const key = cellKey(ix, name);
       if (cells.has(key)) return Promise.resolve(cells.get(key));
       if (!jobs.has(key))
         jobs.set(key, limit(() => get(cellUrl(ix, name)))
           .then((body) => {
-            const f = parseCell(ix, name, body);
-            cells.set(key, f);
-            return f;
+            const c = readCell(ix, name, body);
+            cells.set(key, c);
+            return c;
           })
           .finally(() => jobs.delete(key)));
       return jobs.get(key);
     }
+    // Declination of the downloaded cell containing the viewpoint, or null
+    // (not downloaded, not listed, or the cell carries none).
+    const declinationAt = (viewer) => {
+      const c = index && viewer && latLon(viewer.lat, viewer.lon) && cells.get(cellKey(index, Math.floor(viewer.lat) + "_" + Math.floor(viewer.lon)));
+      return c ? c.declination : null;
+    };
     return {
       get index() {
         return index;
       },
       loadIndex,
-      // → {features, dataset, cells}; outside coverage throws OUTSIDE_COVERAGE.
+      declinationAt,
+      // → {features, dataset, cells, partialCoverage, declination (the
+      // viewpoint cell's, or null)}; outside coverage throws OUTSIDE_COVERAGE.
       async features(viewer, radiusKm) {
         const ix = await loadIndex(),
           plan = cellPlan(ix, viewer, radiusKm);
         if (!plan.length) throw dataError("OUTSIDE_COVERAGE", outsideMessage(ix.coverage), false);
         const lists = await Promise.all(plan.map((c) => cell(ix, c)));
-        return { features: within(lists.flat(), viewer, radiusKm), dataset: ix.dataset, cells: plan.length,
-          partialCoverage: plan.length < cellsAround(viewer.lat, viewer.lon, radiusKm).length };
+        return { features: within(lists.flatMap((c) => c.features), viewer, radiusKm), dataset: ix.dataset, cells: plan.length,
+          partialCoverage: plan.length < cellsAround(viewer.lat, viewer.lon, radiusKm).length, declination: declinationAt(viewer) };
       },
     };
   }
@@ -591,6 +604,28 @@ const AimeCore = (() => {
     return { x: clamp(finger.x, r, Math.max(r, width - r)), y: clamp(finger.y - lift - r >= 0 ? finger.y - lift : finger.y + lift, r, Math.max(r, height - r)), r };
   }
 
+  // ---- Map pin in the photo (Resection.locate) -------------------------------
+  // locate result → what the photo overlay draws. In frame: the bearing line and
+  // the ±2σ band as one closed polygon (a band edge that leaves the frame runs
+  // along the frame edge on its side). Out of frame: an arrow on the matching
+  // edge, pointing out (degrees, 0 = right, 90 = down), kept off the corners.
+  const ARROW = { left: 180, right: 0, above: -90, below: 90, "behind-left": 180, "behind-right": 0 };
+  function pinOverlay(loc) {
+    if (loc.inFrame) {
+      const [lo, hi] = loc.band,
+        edge = (x) => [{ x, y: 0 }, { x, y: 1 }];
+      return { line: loc.line, band: [...(lo.length ? lo : edge(0)), ...(hi.length ? hi : edge(1)).slice().reverse()], anchor: loc.anchor, arrow: null };
+    }
+    const a = loc.anchor,
+      inset = (v) => Math.max(0.06, Math.min(0.94, v)),
+      vertical = loc.side === "above" || loc.side === "below";
+    return { line: [], band: [], anchor: a, arrow: { x: vertical ? inset(a.x) : a.x, y: vertical ? a.y : inset(a.y), angle: ARROW[loc.side] } };
+  }
+  const WHERE = { left: "out of frame to the left", right: "out of frame to the right", above: "above the photo", below: "below the photo", "behind-left": "behind you, to the left", "behind-right": "behind you, to the right" };
+  // "Synthetic Peak B: in the photo · 18 km · 42° NE · band ±7.2° (2σ)".
+  const pinText = (loc, name = "Pin") =>
+    `${name}: ${loc.inFrame ? "in the photo" : WHERE[loc.side]} · ${range(loc.distanceKm, loc.bearing)}${loc.inFrame ? ` · band ±${(2 * loc.sigmaDeg).toFixed(1)}° (2σ)` : ""}`;
+
   // ---- Formatting ---------------------------------------------------------
   const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
   const compass = (deg) => COMPASS[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
@@ -650,6 +685,7 @@ const AimeCore = (() => {
     cellKey,
     cellPlan,
     parseCell,
+    readCell,
     featureKey,
     sameFeature,
     coverageNote,
@@ -677,6 +713,8 @@ const AimeCore = (() => {
     undone,
     loupe,
     loupePlacement,
+    pinOverlay,
+    pinText,
     compass,
     km,
     signed,

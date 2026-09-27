@@ -315,6 +315,20 @@ dialog .actions {
 #candidates li {
   margin: 8px 0;
 }
+#candidates li button.show {
+  width: auto;
+  margin: 2px 0 0;
+  padding: 4px 10px;
+  border-color: var(--border);
+  font-size: 0.85rem;
+}
+#pin-tools {
+  margin: 6px 0;
+}
+#pin-status {
+  margin: 0 0 4px;
+  color: #8cf0c4;
+}
 #candidates li.greyed {
   color: var(--muted);
 }

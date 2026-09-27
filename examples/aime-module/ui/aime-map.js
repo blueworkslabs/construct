@@ -2,8 +2,9 @@
 // Aimé map: derived from Sky Watch's SkyMap (tiles, pan, pinch, wheel and
 // double-tap zoom, scale bar, tile cooldowns). Adds the viewer dot (reported and
 // fitted), the tap wedge (±1 direction σ, fainter band to ±2σ), mark pins, numbered candidate pins,
-// dragging the viewer dot to correct it, tapping to place an unlocated viewpoint
-// and a two-tap ruler (great-circle distance and initial bearing).
+// dragging the viewer dot to correct it, tapping to place an unlocated viewpoint,
+// a two-tap ruler (great-circle distance and initial bearing) and a long-press
+// pin that the photo shows (Resection.locate).
 class AimeMap {
   static projection = {
     x: (lon) => (lon + 180) / 360,
@@ -27,6 +28,8 @@ class AimeMap {
     for (let e = 1; e <= 1e7; e *= 10) for (const s of [1, 2, 5]) if (s * e <= target) best = s * e;
     return { metres: best, pixels: best / mPerPx, text: best >= 1000 ? best / 1000 + " km" : best + " m" };
   }
+  // Long-press that drops a pin, as for a map app's dropped pin.
+  static HOLD_MS = 500;
   static clampZoom(z, fallback = 10) {
     return Math.max(2, Math.min(17, Number.isFinite(z) ? z : fallback));
   }
@@ -42,14 +45,16 @@ class AimeMap {
     return pts;
   }
   // callbacks: {getImage(url) → dataUrl, onViewer(point) when dragged or placed, onPan(), onError(e|null),
-  //   onRuler(points) after a ruler tap, rulerLabel({km, bearing}) → text on the line}
+  //   onRuler(points) after a ruler tap, rulerLabel({km, bearing}) → text on the line,
+  //   onPin({lat, lon, name?, positionM?}, mPerPx) after a long-press}
   constructor(canvas, callbacks) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.cb = callbacks;
     this.center = { lat: 46.8, lon: 9.2 };
     this.zoom = 10;
-    this.scene = { viewer: null, fitted: null, wedge: null, marks: [], candidates: [], focus: null };
+    this.scene = { viewer: null, fitted: null, wedge: null, marks: [], candidates: [], focus: null, pin: null };
+    this.holdTimer = 0;
     this.placing = false; // tap sets the viewpoint
     this.editable = false; // viewer dot can be dragged
     this.ruler = null; // {points: [{lat, lon}]} while the ruler is on; taps then measure
@@ -87,6 +92,7 @@ class AimeMap {
   down(e) {
     this.canvas.setPointerCapture?.(e.pointerId);
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    clearTimeout(this.holdTimer);
     if (this.pointers.size === 2) {
       const [a, b] = [...this.pointers.values()],
         r = this.canvas.getBoundingClientRect();
@@ -96,9 +102,26 @@ class AimeMap {
     }
     const at = this.local(e),
       v = this.scene.viewer && this.xy(this.scene.viewer),
-      onViewer = !this.ruler && this.editable && v && Math.hypot(v.x - at.x, v.y - at.y) < 32;
-    this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, moved: false, viewer: onViewer,
+      nearViewer = v && Math.hypot(v.x - at.x, v.y - at.y) < 32,
+      onViewer = !this.ruler && this.editable && nearViewer;
+    this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, moved: false, viewer: onViewer, held: false,
       original: onViewer ? { viewer: { ...this.scene.viewer }, fitted: this.scene.fitted, wedge: this.scene.wedge } : null };
+    // A still press away from the ring drops a pin; the ring keeps its drag and
+    // the release is consumed, so it never also measures, places or zooms.
+    if (!nearViewer && !this.placing && this.cb.onPin) this.holdTimer = setTimeout(() => this.hold(e.pointerId, at), AimeMap.HOLD_MS);
+  }
+  hold(id, at) {
+    const d = this.drag;
+    if (!d || d.id !== id || d.moved || this.pinch || !this.visible) return;
+    d.held = true;
+    this.lastTap = null;
+    this.scene.pin = this.snap(at, true);
+    this.draw();
+    this.cb.onPin?.({ ...this.scene.pin }, this.metresPerPixel());
+  }
+  clearPin() {
+    this.scene.pin = null;
+    this.draw();
   }
   move(e) {
     const p = this.pointers.get(e.pointerId);
@@ -120,7 +143,10 @@ class AimeMap {
     }
     const d = this.drag;
     if (!d || d.id !== e.pointerId) return;
-    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 7) d.moved = true;
+    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 7) {
+      d.moved = true;
+      clearTimeout(this.holdTimer);
+    }
     if (d.moved) {
       if (d.viewer) {
         const at = this.local(e);
@@ -138,6 +164,7 @@ class AimeMap {
     d.lastY = e.clientY;
   }
   release(e) {
+    clearTimeout(this.holdTimer);
     this.pointers.delete(e.pointerId);
     if (this.pinch) {
       if (this.pointers.size < 2) this.pinch = null;
@@ -153,6 +180,7 @@ class AimeMap {
       this.draw();
       return;
     }
+    if (d.held) return;
     if (d.moved) {
       if (d.viewer) this.cb.onViewer?.({ lat: this.scene.viewer.lat, lon: this.scene.viewer.lon, mPerPx: this.metresPerPixel() });
       return;
@@ -182,10 +210,11 @@ class AimeMap {
     } else this.lastTap = { ...at, time: now };
   }
   // A ruler tap within 24 px of the viewer, fitted dot or a pin measures from
-  // that exact point; elsewhere it is the tapped map point.
-  snap(at) {
+  // that exact point; elsewhere it is the tapped map point. A dropped pin snaps
+  // to mark and candidate pins only, keeping their name and position estimate.
+  snap(at, pin = false) {
     const s = this.scene,
-      targets = [s.viewer, s.fitted, ...s.marks, ...s.candidates].filter(Boolean);
+      targets = (pin ? [...s.marks, ...s.candidates] : [s.viewer, s.fitted, ...s.marks, ...s.candidates]).filter(Boolean);
     let best = null,
       bestD = 24;
     for (const t of targets) {
@@ -194,6 +223,7 @@ class AimeMap {
         d = Math.min(Math.hypot(q.x - at.x, q.y - at.y), t === s.viewer || t === s.fitted ? Infinity : Math.hypot(q.x - at.x, q.y - 16 - at.y));
       if (d < bestD) (best = t), (bestD = d);
     }
+    if (best && pin) return { lat: best.lat, lon: best.lon, ...(best.name ? { name: best.name } : {}), ...(best.positionM > 0 ? { positionM: best.positionM } : {}) };
     return best ? { lat: best.lat, lon: best.lon } : this.geoAt(at.x, at.y);
   }
   // Ruler on/off; turning it off or on clears its points.
@@ -239,9 +269,10 @@ class AimeMap {
   }
   // scene: {viewer: {lat, lon, accuracyM}, fitted: {lat, lon}|null,
   //   wedge: {bearing, sigma, lengthKm}|null, marks: [{lat, lon, name}],
-  //   candidates: [{lat, lon, n, greyed}], focus: index into candidates|null}
+  //   candidates: [{lat, lon, n, greyed}], focus: index into candidates|null,
+  //   pin: {lat, lon, name?}|null}
   setScene(scene, fit = true) {
-    this.scene = { viewer: null, fitted: null, wedge: null, marks: [], candidates: [], focus: null, ...scene };
+    this.scene = { viewer: null, fitted: null, wedge: null, marks: [], candidates: [], focus: null, pin: null, ...scene };
     if (fit) this.fit();
     this.draw();
   }
@@ -252,6 +283,7 @@ class AimeMap {
     if (s.viewer) pts.push(s.viewer);
     if (s.focus !== null && s.candidates[s.focus]) pts.push(s.candidates[s.focus]);
     else pts.push(...s.candidates, ...s.marks);
+    if (s.pin) pts.push(s.pin);
     if (!pts.length) return;
     const m = AimeMap.projection,
       anchor = m.x(pts[0].lon),
@@ -267,6 +299,7 @@ class AimeMap {
   }
   pause(value) {
     this.visible = !value;
+    clearTimeout(this.holdTimer);
     if (value) {
       if (this.drag?.original) Object.assign(this.scene, this.drag.original);
       this.drag = this.pinch = null;
@@ -312,6 +345,7 @@ class AimeMap {
     if (sc.viewer && sc.wedge) this.drawWedge(sc.fitted || sc.viewer, sc.wedge, mpp);
     sc.marks.forEach((p) => this.pin(this.xy(p), "#5FD3A0", "", p.name));
     sc.candidates.forEach((p, i) => this.pin(this.xy(p), p.greyed ? "#9DB3A6" : i === sc.focus ? "#E9C46A" : "#F08A7E", String(p.n), i === sc.focus ? p.name : ""));
+    if (sc.pin) this.pin(this.xy(sc.pin), "#8CF0C4", "", sc.pin.name || "Pin");
     if (sc.viewer) {
       const v = this.xy(sc.viewer);
       if (sc.viewer.accuracyM > 0) {
