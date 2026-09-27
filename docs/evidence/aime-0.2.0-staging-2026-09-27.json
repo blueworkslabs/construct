@@ -1,0 +1,174 @@
+{
+  "complete": true,
+  "stopped": true,
+  "apkSha256": "7d85825695ae7acc418d30c8ab8e5d376c1cb835196c3cca784f4fc08b46a77e",
+  "moduleSha256": "00c213c4e3e9d6cb3000b57c32c8dbc4856353d1a1dc3d65d437ea6c929dc684",
+  "fixtureSha256": "6499ad5692b65f4ce53f6e9eae4deaaff407fb4f52d6347b4f2f3b7515a03c4e",
+  "version": "0.2.0",
+  "scope": "Synthetic Aimé flow/ranking on a known scene plus real-module location/internet gates; not physical-phone accuracy",
+  "checks": [
+    "Fresh install: library and capture are denied until the new grants are on",
+    "Grants and Android camera permission enabled through native Module access",
+    "API 0.13 capture with level indicator and zoom chips opens the photo with its viewpoint and stored camera measurements",
+    "Offline and HTTP 503 are shown as landmark data unavailable with a single retry, never as an empty result",
+    "Marking a known landmark calibrates the bearing ruler",
+    "Long-press release places a horizon point; held magnifier screenshot captured for visual review",
+    "Two true-level horizon taps are combined with the measured level",
+    "Dragging a horizon point moves it; Undo restores it and the level fit",
+    "Tap ranks the known landmark first; a candidate opens the map with wedge, pins and viewer",
+    "Map ruler: two taps show the great-circle distance and initial bearing; it clears",
+    "Long-press on the map drops a pin; the photo shows where it lies; it clears",
+    "Photo viewpoint, landmark and horizon calibration survive process restart with the same ranking; Show in photo draws Peak B in frame",
+    "Landscape keeps the photo tappable and the ranking unchanged",
+    "Two-times text keeps controls reachable and the ranking unchanged",
+    "A viewpoint outside the coverage says so, without a retry or an empty list; a photo without capture metadata shows no measured inputs",
+    "Native-confirmed deletion removes the photo and its stored record",
+    "Real module with location off: the photo stays unlocated and opens on the map; the internet gate is named",
+    "Real module: injected fix → estimated viewpoint → live aime-data cells return named landmarks"
+  ],
+  "candidates": {
+    "B": [
+      "Could be Synthetic Peak B peak · 18 km · 42° NE · −0.0° from your tap · ±1.1°",
+      "Synthetic Mast E mast · 25 km · 45° NE · +3.0° from your tap · ±1.1° · not close",
+      "Synthetic Transmitter H communication tower · 28 km · 36° NE · −6.0° from your tap · ±1.1° · not close",
+      "Synthetic Castle D castle · 11 km · 51° NE · +9.0° from your tap · ±1.1° · not close",
+      "Synthetic Church C church · 3.0 km · 30° NNE · −12.0° from your tap · ±1.1° · not close"
+    ],
+    "B-restart": [
+      "Could be Synthetic Peak B peak · 18 km · 42° NE · −0.0° from your tap · ±1.1°",
+      "Synthetic Mast E mast · 25 km · 45° NE · +3.0° from your tap · ±1.1° · not close",
+      "Synthetic Transmitter H communication tower · 28 km · 36° NE · −6.0° from your tap · ±1.1° · not close",
+      "Synthetic Castle D castle · 11 km · 51° NE · +9.0° from your tap · ±1.1° · not close",
+      "Synthetic Church C church · 3.0 km · 30° NNE · −12.0° from your tap · ±1.1° · not close"
+    ],
+    "B-landscape": [
+      "Could be Synthetic Peak B peak · 18 km · 42° NE · −0.1° from your tap · ±1.1°",
+      "Synthetic Mast E mast · 25 km · 45° NE · +2.9° from your tap · ±1.1° · not close",
+      "Synthetic Transmitter H communication tower · 28 km · 36° NE · −6.1° from your tap · ±1.1° · not close"
+    ],
+    "B-large-text": [
+      "Could be Synthetic Peak B peak · 18 km · 42° NE · −0.0° from your tap · ±1.1°",
+      "Synthetic Mast E mast · 25 km · 45° NE · +3.0° from your tap · ±1.1° · not close",
+      "Synthetic Transmitter H communication tower · 28 km · 36° NE · −6.0° from your tap · ±1.1° · not close"
+    ]
+  },
+  "snapshot": {
+    "avd": "construct-api37",
+    "name": "clean",
+    "loaded": true
+  },
+  "apiLevel": "37",
+  "targets": {
+    "markA": {
+      "x": 0.33,
+      "y": 0.43
+    },
+    "horizon": [
+      {
+        "x": 0.12,
+        "y": 0.44
+      },
+      {
+        "x": 0.88,
+        "y": 0.41
+      }
+    ],
+    "whatB": {
+      "x": 0.66,
+      "y": 0.42
+    }
+  },
+  "realCaptureChips": [],
+  "realLandmarks": "807 landmarks within 30 km.",
+  "realLandmarksAttempts": 1,
+  "realCaptureChipsAfterData": [],
+  "status": "passed_android_acceptance",
+  "checksPassed": 18,
+  "checksPlanned": 18,
+  "runId": "20260927T155622Z-aime-0113e1ea",
+  "moduleSourceCommit": "bac5d1f",
+  "packageCommit": "bcd003bd49e99da1e33e77af8e72678a5265091f",
+  "runnerCommit": "bac5d1f",
+  "apkVersion": "0.1.0-alpha33",
+  "webView": "com.android.webview 155.0.8059.0",
+  "catalog": "https://raw.githubusercontent.com/blueworkslabs/construct/bcd003bd49e99da1e33e77af8e72678a5265091f/catalog/candidates/aime-020/index.json",
+  "reviewedScreenshots": [
+    {
+      "path": "images/aime-0.2.0/measured-calibration.png",
+      "sha256": "08d024cab78e0293e3ac4e3ec19909e0ac4a6ebb9b56d8da07ef325e94996298",
+      "original": "Screenshot_1790524779.png"
+    },
+    {
+      "path": "images/aime-0.2.0/held-loupe.png",
+      "sha256": "2fb76d5ca919ec025a8c670378458d3b845e23f92ecd3d6dca44531cd54f59ed",
+      "original": "Screenshot_1790524791.png"
+    },
+    {
+      "path": "images/aime-0.2.0/map-pin.png",
+      "sha256": "a583eb99fc4d5a70c149c60f095645e3154dfaaec698533e7982f0d8f3afcead",
+      "original": "Screenshot_1790524896.png"
+    },
+    {
+      "path": "images/aime-0.2.0/landscape.png",
+      "sha256": "74bdf00dc1e3578f5e26443f146b510ac0e27e704bf3970b19305f6bb6fca33d",
+      "original": "Screenshot_1790524974.png"
+    },
+    {
+      "path": "images/aime-0.2.0/large-text.png",
+      "sha256": "b05f25729ae0caa36abffa4e20fb0e90998a863f144c35fac74893e062f3065b",
+      "original": "Screenshot_1790525038.png"
+    },
+    {
+      "path": "images/aime-0.2.0/no-metadata.png",
+      "sha256": "aa86374428ea83259616e767f9c875e8ce405652d9430da680f9be4afb1d6246",
+      "original": "Screenshot_1790525080.png"
+    },
+    {
+      "path": "images/aime-0.2.0/real-measured.png",
+      "sha256": "15343e95c84177c216cf9988fa1f880388e0f2282d2dfa6d2b913a3dc1ce7d01",
+      "original": "Screenshot_1790525302.png"
+    },
+    {
+      "path": "images/aime-0.2.0/live-landmarks.png",
+      "sha256": "bcb50152ba6807dd7c111207367da2dac2daa6297a8737b8273bb7fcc220db2b",
+      "original": "Screenshot_1790525310.png"
+    },
+    {
+      "path": "images/aime-0.2.0/real-measured-restart.png",
+      "sha256": "2100018ea3dd56a3d8598e1ee97a7f68d4ab83aa2534b7620d0ba5b2e9a844e3",
+      "original": "Screenshot_1790525341.png"
+    }
+  ],
+  "hardwareAccuracyVerified": false,
+  "limitations": [
+    "Real host fields may be omitted when sensors or lens geometry are unavailable; an omitted input is not measured evidence.",
+    "Physical-phone 1x/2x accuracy and vendor camera geometry require the combined phone check.",
+    "Saving a new photo in 0.1.9 after rollback can discard camera metadata; older than0.1.3 also loses cell-based marks.",
+    "No public APK release, module promotion or merge is implied."
+  ],
+  "dataset": {
+    "dataset": "2026-09-23.1-r2",
+    "publicationCommit": "a9afc6ec1b46c2fefbe32f12b4e050dbceeb02eb",
+    "previousFullAudit": "aime-0.1.9-staging-2026-09-27.json"
+  },
+  "realMeasurementEvidence": {
+    "captureRequired": [
+      "Level measured",
+      "Lens from camera",
+      "2× zoom"
+    ],
+    "afterLiveDataRequired": [
+      "Compass hint"
+    ],
+    "afterRestartRequired": [
+      "Level measured",
+      "Lens from camera",
+      "2× zoom"
+    ],
+    "collectionNote": "The raw exact-label chip lists were empty because Android exposes grouped labels. The runner separately required each chip by substring using reach_text; all assertions passed. Actual capture/restart and compass-sorted live-data screenshots were visually reviewed. Empty raw collector arrays are preserved, not substituted."
+  },
+  "runNotes": [
+    "Single full run; no capture retakes or live-data retries.",
+    "Crash buffer contains the known emulator Bluetooth boot abort, not a Construct crash."
+  ]
+}

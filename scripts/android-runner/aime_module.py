@@ -367,7 +367,7 @@ try:
  to_library();shoot('2×',measured=True);contains('Estimated viewpoint',60)
  for chip in ('2× zoom','Level measured','Lens from camera'):reach_text(chip)
  capture('aime-real-measured')
- receipt['realCaptureChips']=[t for t in labels() if t in ('Level measured','Lens from camera','Compass hint','2× zoom')];save()
+ receipt['realCaptureChips']=[chip for chip in ('Level measured','Lens from camera','Compass hint','2× zoom') if any(chip in (t or '') for t in labels())];save()
  click('Mark landmark');tap_photo({'x':.5,'y':.5})
  # The loading sentence also contains "landmarks within 30 km". Only a
  # completed count is success; wait for it rather than matching that fragment.
@@ -391,7 +391,7 @@ try:
  receipt['realLandmarks']=found;receipt['realLandmarksAttempts']=request+1;save()
  capture('aime-real-landmarks');click(lambda t:t=='Cancel')
  reach_text('Compass hint')
- receipt['realCaptureChipsAfterData']=[t for t in labels() if t in ('Level measured','Lens from camera','Compass hint','2× zoom')];save()
+ receipt['realCaptureChipsAfterData']=[chip for chip in ('Level measured','Lens from camera','Compass hint','2× zoom') if any(chip in (t or '') for t in labels())];save()
  # Open the same second real photo after a process restart. Its capture groups
  # must survive storage; the cell is fetched again to restore declination.
  adb('shell','am','force-stop','dev.construct.runtime');open_module(REAL)
