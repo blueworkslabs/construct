@@ -232,13 +232,23 @@ check("invalid uncertainty rejects both wholly invalid and mixed valid/invalid c
 
 check("malformed feature fields reject mixed cells instead of silently repairing ranking or dropping rows", () => {
   const ix = C.parseIndex(JSON.stringify(INDEX)), valid = ["Valid", "tower", 46.9, 9.3, 80, 1.3, 8];
-  const changes = [[0, ""], [0, " "], [0, 42], [0, "a".repeat(81)], [0, "e\u0301"], [1, "bakery"],
+  const changes = [[0, ""], [0, " "], [0, 42], [0, "a".repeat(81)], [0, "\u202e"], [0, "e\u0301"], [1, "bakery"],
     [2, 47], [2, null], [2, 46.900001], [3, 10], [4, null], [4, "80"], [4, 80.1],
     ...[null, "1", -1, 0.4, 2.1, 1.23].map((v) => [5, v])];
   const invalid = changes.map(([at, value]) => valid.map((v, i) => i === at ? value : v));
   invalid.push([...valid, "extra"]);
   for (const row of invalid) for (const rows of [[row], [valid, row]])
     assert.throws(() => C.parseCell(ix, "46_9", cellText("46_9", rows)), { code: "DATA_INVALID" });
+});
+
+check("feature labels are sanitized before search, identity and saved marks, including published Overture direction marks", () => {
+  const ix = C.parseIndex(JSON.stringify(INDEX));
+  for (const raw of ["Tower\nOther", "Tower\u202eOther", "Tower\ud800Other", "TowerOther\u200e"]) {
+    const f = C.parseCell(ix, "46_9", cellText("46_9", [[raw, "tower", 46.9, 9.3, 80, 1.3, 8]]))[0];
+    assert.equal(f.name, "TowerOther");
+    assert.equal(C.markFrom(f, 0.4, 0.5).name, f.name);
+    assert.equal(C.featureKey(f), "TowerOther|tower|46.90000|9.30000");
+  }
 });
 
 check("kind labels cover every contract kind with a fallback", () => {

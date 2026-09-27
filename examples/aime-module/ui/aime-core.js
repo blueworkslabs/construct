@@ -347,7 +347,12 @@ const AimeCore = (() => {
           [r[2], r[3]].some((v) => Math.abs(v * 1e5 - Math.round(v * 1e5)) > 1e-8) ||
           !Number.isInteger(r[4]) || !num(r[5]) || r[5] < 0.5 || r[5] > 2 || Math.abs(r[5] * 10 - Math.round(r[5] * 10)) > 1e-4)
         throw unavailable(`landmark cell ${cell} contains an invalid feature.`);
-      const f = { name: r[0], kind: r[1], lat: r[2], lon: r[3], e: r[4], w: r[5], p: r[6], positionM: r[6], dataset: index.dataset };
+      // Keep the existing display/sidecar name policy consistent. Published
+      // Overture names can contain harmless directional marks; strip controls
+      // before either rendering or identity matching, never after selection.
+      const name = text(r[0]);
+      if (!name) throw unavailable(`landmark cell ${cell} contains an empty feature name.`);
+      const f = { name, kind: r[1], lat: r[2], lon: r[3], e: r[4], w: r[5], p: r[6], positionM: r[6], dataset: index.dataset };
       // Peaks may count beyond the solver's default 40 km.
       if (TERRAIN.has(f.kind)) f.maxKm = 100;
       features.push(f);

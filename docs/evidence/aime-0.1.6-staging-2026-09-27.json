@@ -1,0 +1,806 @@
+{
+  "complete": true,
+  "stopped": true,
+  "apkSha256": "8c92858b02d6ea5a2a648eca8e9a7d94bb9870cbd6b11edcff708e3b479d3627",
+  "moduleSha256": "7c45463402510a49cf263fab26541386a0f5f6a25f256609c51d31477ccbf020",
+  "fixtureSha256": "91ef286e03456a7bc2f8d0f8851ced9501b06de2d36e227ec158e499863a42ce",
+  "version": "0.1.6",
+  "scope": "Synthetic Aimé flow/ranking on a known scene plus real-module location/internet gates; not physical-phone accuracy",
+  "checks": [
+    "Fresh install: library and capture are denied until the new grants are on",
+    "Grants and Android camera permission enabled through native Module access",
+    "Real shutter capture opens the photo with its estimated viewpoint",
+    "Offline and HTTP 503 are shown as landmark data unavailable with a single retry, never as an empty result",
+    "Marking a known landmark calibrates the bearing ruler",
+    "Two true-level horizon taps level the picture (Level estimated)",
+    "Tap ranks the known landmark first; a candidate opens the map with wedge, pins and viewer",
+    "Photo viewpoint, landmark and horizon calibration survive process restart with the same ranking",
+    "Landscape keeps the photo tappable and the ranking unchanged",
+    "Two-times text keeps controls reachable and the ranking unchanged",
+    "A viewpoint outside the coverage says so, without a retry or an empty list",
+    "Native-confirmed deletion removes the photo and its stored record",
+    "Real module with location off: the photo stays unlocated and opens on the map; the internet gate is named",
+    "Real module: injected fix → estimated viewpoint → live aime-data cells return named landmarks"
+  ],
+  "candidates": {
+    "B": [
+      "Could be Synthetic Peak B peak · 18 km · −1.8° from your tap · ±3.8°",
+      "Could be Synthetic Mast E mast · 25 km · +1.2° from your tap · ±3.8°",
+      "Synthetic Transmitter H communication tower · 28 km · −7.8° from your tap · ±3.8° · not close",
+      "Could be Synthetic Castle D castle · 11 km · +7.2° from your tap · ±3.8°",
+      "Synthetic Church C church · 3.0 km · −13.8° from your tap · ±3.8° · not close"
+    ],
+    "B-restart": [
+      "Could be Synthetic Peak B peak · 18 km · −1.8° from your tap · ±3.8°",
+      "Could be Synthetic Mast E mast · 25 km · +1.2° from your tap · ±3.8°",
+      "Synthetic Transmitter H communication tower · 28 km · −7.8° from your tap · ±3.8° · not close",
+      "Could be Synthetic Castle D castle · 11 km · +7.2° from your tap · ±3.8°",
+      "Synthetic Church C church · 3.0 km · −13.8° from your tap · ±3.8° · not close"
+    ],
+    "B-landscape": [
+      "Could be Synthetic Peak B peak · 18 km · −1.9° from your tap · ±3.8°",
+      "Could be Synthetic Mast E mast · 25 km · +1.1° from your tap · ±3.8°",
+      "Synthetic Transmitter H communication tower · 28 km · −7.9° from your tap · ±3.8° · not close",
+      "Could be Synthetic Castle D castle · 11 km · +7.1° from your tap · ±3.8°",
+      "Synthetic Church C church · 3.0 km · −13.9° from your tap · ±3.8° · not close"
+    ],
+    "B-large-text": [
+      "Could be Synthetic Peak B peak · 18 km · −1.8° from your tap · ±3.8°",
+      "Could be Synthetic Mast E mast · 25 km · +1.2° from your tap · ±3.8°",
+      "Synthetic Transmitter H communication tower · 28 km · −7.8° from your tap · ±3.8° · not close",
+      "Could be Synthetic Castle D castle · 11 km · +7.2° from your tap · ±3.8°"
+    ]
+  },
+  "snapshot": {
+    "avd": "construct-api37",
+    "name": "clean",
+    "loaded": true
+  },
+  "apiLevel": "37",
+  "targets": {
+    "markA": {
+      "x": 0.33,
+      "y": 0.43
+    },
+    "horizon": [
+      {
+        "x": 0.12,
+        "y": 0.44
+      },
+      {
+        "x": 0.88,
+        "y": 0.41
+      }
+    ],
+    "whatB": {
+      "x": 0.66,
+      "y": 0.42
+    }
+  },
+  "realLandmarks": "807 landmarks within 30 km. Nearest first.",
+  "realLandmarksAttempts": 1,
+  "status": "passed_android_acceptance",
+  "checksPassed": 14,
+  "checksPlanned": 14,
+  "runId": "20260927T101856Z-aime-41cc71fe",
+  "moduleSourceCommit": "152e4fc",
+  "packageCommit": "648a1b35a98ae4cc5f84bb71ec06d5067ae966f1",
+  "runnerCommit": "152e4fc",
+  "runnerSha256": "0d6a867ed99be95ed954a06060711c1a1f96ab6d97f59aa4716dd7fb37117ebb",
+  "apkVersion": "0.1.0-alpha32",
+  "apkSourceCommit": "2c132c9eeafd2b7757243c178efb190466bf2c94",
+  "webView": "com.android.webview 155.0.8059.0",
+  "catalog": "https://raw.githubusercontent.com/blueworkslabs/construct/648a1b35a98ae4cc5f84bb71ec06d5067ae966f1/catalog/candidates/aime/index.json",
+  "dataset": {
+    "release": "2026-09-23.1",
+    "cells": 88,
+    "features": 199980,
+    "largestCell": "50_14",
+    "largestBytes": 316045,
+    "dataset": "2026-09-23.1-r1",
+    "pagesCommit": "dc92c619cd45d8e18bb48023cca90c7fa54da901",
+    "maxFetchSeconds": 0.526,
+    "downloadBytes": 11345085,
+    "files": [
+      {
+        "path": "v1/index.json",
+        "bytes": 1298,
+        "seconds": 0.081,
+        "sha256": "66f7d05c489da273ab659394064dd5a969dcf358aab101ffd55621c1e288283b"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/46_9.json",
+        "bytes": 209555,
+        "seconds": 0.279,
+        "sha256": "0e779ec77261a2e08a938e3e3cab731bc7f55b53f0ab58096052657fb2aa893c"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/46_10.json",
+        "bytes": 205822,
+        "seconds": 0.36,
+        "sha256": "284858a5ca0355b3de04b235507152ccb649882ccfbfc10b47286ea412512676"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/46_11.json",
+        "bytes": 244724,
+        "seconds": 0.37,
+        "sha256": "9becc003cf93469c02ccd29805d7c623272e68c77a87cb0a447d8b6746a45b37"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/46_12.json",
+        "bytes": 236689,
+        "seconds": 0.292,
+        "sha256": "9a75c092c6824149db5119dbaf7b70941c3d0757b739ab5b360b7cb119cfc7e1"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/46_13.json",
+        "bytes": 218716,
+        "seconds": 0.34,
+        "sha256": "3f73e9b36a0b90754494a4775e21cb2e6e17a8931fda02ccf19e35ab137dc437"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/46_14.json",
+        "bytes": 243774,
+        "seconds": 0.352,
+        "sha256": "0f0c7505aae8810fe7632de61b703225157dddb1bdb03498e777377816d64a1c"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/46_15.json",
+        "bytes": 193962,
+        "seconds": 0.314,
+        "sha256": "771b2c9f0d23a702951ca64b6b47a9a944f427abe6bd57d7469a3bd5e6e2ea26"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/46_16.json",
+        "bytes": 83167,
+        "seconds": 0.258,
+        "sha256": "4056c7a727ea347ecf23aaaabda6f490782f16507fd0c237bc24488dd63f3a36"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/47_7.json",
+        "bytes": 161319,
+        "seconds": 0.277,
+        "sha256": "ce1c002aa5413529e0a4c17bf32a26cd200b95298d01a27d0607b2dc9cd8f7a2"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/47_8.json",
+        "bytes": 187500,
+        "seconds": 0.282,
+        "sha256": "4e0cb27268155587e70ce9d5d23b9fe63de0d5b58ef8d0c1ebddb1ee45d348da"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/47_9.json",
+        "bytes": 204042,
+        "seconds": 0.333,
+        "sha256": "a3fa001e4d01b040d6ce31be619905c1211b5145f4d1cfe451b0187558116db4"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/47_10.json",
+        "bytes": 232185,
+        "seconds": 0.294,
+        "sha256": "05ebab362af091e4161fd9914fc40c3228b6a72cf0f3bdcc0c63f2d4eb562baa"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/47_11.json",
+        "bytes": 223878,
+        "seconds": 0.319,
+        "sha256": "a714b2680fd3d9715576c8cac832570d31c1f876d93ceef5e94510d0aaa4b413"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/47_12.json",
+        "bytes": 195556,
+        "seconds": 0.269,
+        "sha256": "5fa088f4ccf5f5dc98327a0a09aaa19547a8bfec4b8c4c46a05b19c5896af902"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/47_13.json",
+        "bytes": 200352,
+        "seconds": 0.345,
+        "sha256": "1e254de6cd326e79d424c94e797fd1cf443179681424d3ff15520d1c372449be"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/47_14.json",
+        "bytes": 142245,
+        "seconds": 0.337,
+        "sha256": "83290b527fe9e7e842a3b48534aeaee70c687becd29d26b14c2093764b8d5de3"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/47_15.json",
+        "bytes": 175244,
+        "seconds": 0.292,
+        "sha256": "d92025d997f2275689e6f17bd0373a8ac3cfcb8097af269a689b8977c2fce92b"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/47_16.json",
+        "bytes": 124794,
+        "seconds": 0.321,
+        "sha256": "968228742a8eb0034a9fbe1a33a413fcc49664bdc393ab4d44e14581c5dcb1b1"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/47_17.json",
+        "bytes": 60670,
+        "seconds": 0.287,
+        "sha256": "4b00d3776097d3e4d0f05f62c90c56dd368d8f5782d7fccb3e219607490724ae"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/48_7.json",
+        "bytes": 188757,
+        "seconds": 0.348,
+        "sha256": "d7c9b5226bbb00be0f58edb8f731fc84e35017b944c52eb434247647e1f843db"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/48_8.json",
+        "bytes": 172539,
+        "seconds": 0.347,
+        "sha256": "4e430d362e4f0d52e6f1814387e1bfa357544b6c5482958c5831f13334c688d0"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/48_9.json",
+        "bytes": 199411,
+        "seconds": 0.343,
+        "sha256": "158297a80a08a42a4c0544781aaa827171febc4df355d82c34fdcac2f738fb92"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/48_10.json",
+        "bytes": 153885,
+        "seconds": 0.308,
+        "sha256": "90d6b8ebac9ab7308c927c38a6f2c9358e65813fec0aae1763826947ec1ad374"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/48_11.json",
+        "bytes": 174670,
+        "seconds": 0.415,
+        "sha256": "757a89cf6581c0996874f23f4c81e0cf5aac627a1be32a78554dd03499b71367"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/48_12.json",
+        "bytes": 106790,
+        "seconds": 0.26,
+        "sha256": "227a3fa93e9d41076ab1b1ce9fb5143e1a0ab76a0b888b0531b45d11d1c9d762"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/48_13.json",
+        "bytes": 110870,
+        "seconds": 0.271,
+        "sha256": "247ec8cc901e6d9d345e2a07b9889c29521de650948d9e4a36771936b425d6b3"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/48_14.json",
+        "bytes": 128634,
+        "seconds": 0.361,
+        "sha256": "156c07fd0af9c76e2f3ac9b06132b128fdbab1a43f9d31d5819d8e8ced433ece"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/48_15.json",
+        "bytes": 137151,
+        "seconds": 0.375,
+        "sha256": "3307ab5fb5cb912505c75b00ff36eb3acee815d4260fd287fd0673b8ae48d493"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/48_16.json",
+        "bytes": 172004,
+        "seconds": 0.31,
+        "sha256": "50cdbea52dcb604ca8c52ab15e9503600421836b747d16dace1d7df15d4b5fb5"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/48_17.json",
+        "bytes": 111785,
+        "seconds": 0.25,
+        "sha256": "d84ffa973b145fdecc1bb1dc1c5a18dd22c71f1015ab13bed4ed93d80647455d"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/49_6.json",
+        "bytes": 178565,
+        "seconds": 0.324,
+        "sha256": "da4aca171101ba0ccb4aed05de0fbfb800bc915e3b7f8384c352cf9bf1cc3dfe"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/49_7.json",
+        "bytes": 188079,
+        "seconds": 0.331,
+        "sha256": "72dacf287d0ed057d6a312de9422bfe9e2af60dc140b2a09f6a5798f74fa7a65"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/49_8.json",
+        "bytes": 211539,
+        "seconds": 0.356,
+        "sha256": "d81339dbaf508625d3e834c439906874e6e38afb52d0a86056a00ff7e783587f"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/49_9.json",
+        "bytes": 169648,
+        "seconds": 0.309,
+        "sha256": "1ab5260a8612762b290c70614feaf6cadc6d6c29b1dce37daef3ffe69320090f"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/49_10.json",
+        "bytes": 137601,
+        "seconds": 0.248,
+        "sha256": "9dde951fa554120a784ba933d98513fd23bf8ef63fd99d8b92149920aba713e7"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/49_11.json",
+        "bytes": 183346,
+        "seconds": 0.291,
+        "sha256": "4df902c5b063cdfe8536af41dda176223aad35334a2710ffe7e123daba5ccd9a"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/49_12.json",
+        "bytes": 138557,
+        "seconds": 0.268,
+        "sha256": "05e568a87330eae2ee85dff6c5d164e389e02b826f72c961417868f4b56f49d0"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/49_13.json",
+        "bytes": 118873,
+        "seconds": 0.304,
+        "sha256": "b61f4b0742374875abf874b0c8b9a410f4c15163fed32ca46b36e913d09cebcd"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/49_14.json",
+        "bytes": 81946,
+        "seconds": 0.282,
+        "sha256": "5cb4583cdf50aae6b322937f60164176d6fc5f013b49a3e84eed49af7cb0bfb1"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/49_15.json",
+        "bytes": 81966,
+        "seconds": 0.247,
+        "sha256": "46f0a00a4d2b0e6d1f5b4269eb2cb7efda86ccaeb0e2e63177fbce97c72757e9"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/50_5.json",
+        "bytes": 162316,
+        "seconds": 0.227,
+        "sha256": "4d740221366a3a6eb9053bbe0a5643dd348f8ffeb180d5122b8d7847c0308819"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/50_6.json",
+        "bytes": 160271,
+        "seconds": 0.426,
+        "sha256": "c168e0cfc0d2e62ac8783ec6dbe3cfcc377c824332bdca6cb727410c8bbbfa3f"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/50_7.json",
+        "bytes": 217682,
+        "seconds": 0.42,
+        "sha256": "56232cce15ea786c29fc5d709ee7180066aee6841de6286a9eab62ce7e4e7c41"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/50_8.json",
+        "bytes": 239437,
+        "seconds": 0.428,
+        "sha256": "22e29fb98b555522d4761fb2549af49af4eca992b7000e666b5540d3f17e6afe"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/50_9.json",
+        "bytes": 151715,
+        "seconds": 0.305,
+        "sha256": "39946e9ebcb4a2f7ce5aae154a127262186352550718f6e4fb670e588996a4b1"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/50_10.json",
+        "bytes": 181074,
+        "seconds": 0.282,
+        "sha256": "83a8c7a2e38e7daaf49cc55a1a1cd978ce76da209e555e56b1cf4b45c98b2e78"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/50_11.json",
+        "bytes": 165576,
+        "seconds": 0.416,
+        "sha256": "b218b71b2cd93b14f80157550ec8e77b617772b725a6222be4d5d0443cded6a3"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/50_12.json",
+        "bytes": 147995,
+        "seconds": 0.243,
+        "sha256": "bc96f58bf327d88fce5ec9197edb18e11a2e02aca1105fade08be0c4773af59c"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/50_13.json",
+        "bytes": 123222,
+        "seconds": 0.526,
+        "sha256": "ce0e252fb829da1642af40dfa9c0691c372e77f0ff24d3e6cc4587882439eaca"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/50_14.json",
+        "bytes": 316045,
+        "seconds": 0.48,
+        "sha256": "196a5a5a2b10c41b845175a53661de19dd06e490c3dc20b63dcd236b3229a99f"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/51_5.json",
+        "bytes": 116366,
+        "seconds": 0.294,
+        "sha256": "93cc09b3112ef12c3d23c11119686aecec0817b7f2ae35b05e22fc4a7fa8a185"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/51_6.json",
+        "bytes": 174349,
+        "seconds": 0.288,
+        "sha256": "fc4d106366734a70a1392b0fc3a03f8283298eca7f9be1dc52758ba2edfc721e"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/51_7.json",
+        "bytes": 221137,
+        "seconds": 0.304,
+        "sha256": "4db0f5a61b39f3465766b7fb54a606a8e14f4fb6432a007474ea883dde8b58f3"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/51_8.json",
+        "bytes": 173927,
+        "seconds": 0.422,
+        "sha256": "1d7a34ba904ddcc66fe0ac781bab13c67725d58a415f720c657e4dfeb93882c4"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/51_9.json",
+        "bytes": 169623,
+        "seconds": 0.437,
+        "sha256": "a1cf2fd9dbdda89352f87f25d7256f8f9e50424a26f38228cf09747d42a73fef"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/51_10.json",
+        "bytes": 199972,
+        "seconds": 0.308,
+        "sha256": "43af9ffaf8b7d99b11bfb071bb46da2873c663f7a7866e06654acf8471c708c5"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/51_11.json",
+        "bytes": 118344,
+        "seconds": 0.275,
+        "sha256": "521124f315aa22cd95910f574e8f8fa535867ef87643273ccafe889e76685932"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/51_12.json",
+        "bytes": 104345,
+        "seconds": 0.229,
+        "sha256": "b6da495f84d32d7f181b4241754e2658de9f0b99d91440440f8d209a9aa94598"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/51_13.json",
+        "bytes": 106031,
+        "seconds": 0.371,
+        "sha256": "a5dd14ac75d7d2c4b98cf7f584f5c33ad761ae392983f5e472e39cb7caf544ec"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/51_14.json",
+        "bytes": 85794,
+        "seconds": 0.243,
+        "sha256": "f393037eda0a05b55358a9d660d17356ebe0ca163efdc44932549a908d17e82f"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/51_15.json",
+        "bytes": 73928,
+        "seconds": 0.282,
+        "sha256": "4ac0afea6c51da43d40e7161b85008f80efafeeef93d8794e471832f3709e8b2"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/52_6.json",
+        "bytes": 59498,
+        "seconds": 0.253,
+        "sha256": "679fc7e6d32e3332898cd00689ce5792ef76d311e229457d46ab01479d96948b"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/52_7.json",
+        "bytes": 50404,
+        "seconds": 0.267,
+        "sha256": "2c7494127af0e3f6249d6290e61811b9615e510cec3b80f1e4d14d625a3a205a"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/52_8.json",
+        "bytes": 81868,
+        "seconds": 0.314,
+        "sha256": "3599b054129957d238699daa84a3b8275b105880401c6ed9eb6236c9432aa4fc"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/52_9.json",
+        "bytes": 88388,
+        "seconds": 0.265,
+        "sha256": "7de0d30d893921b344426dde994d81f3d20fb5d8ab2db18dd444955f500812ee"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/52_10.json",
+        "bytes": 74312,
+        "seconds": 0.286,
+        "sha256": "224d9102ef0363837bbfb59c793e37532f152ad625574dfc84352d6cf7f359df"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/52_11.json",
+        "bytes": 73727,
+        "seconds": 0.301,
+        "sha256": "a1d7ddbba8bdc5c0cb62327b7a46b07a16e1a2ada4ade9b4ef631ad4b9a1ac6f"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/52_12.json",
+        "bytes": 55648,
+        "seconds": 0.259,
+        "sha256": "f1fc01b4ccf7f1d7b2689dacff1dfcd2f08e670cd80a0ffe450663d1c3314547"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/52_13.json",
+        "bytes": 145034,
+        "seconds": 0.348,
+        "sha256": "d73b33ad664ad0e79d6c17eb7e8b86b16fd75cdc383c320994bf07ff9a6dfa47"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/52_14.json",
+        "bytes": 50932,
+        "seconds": 0.244,
+        "sha256": "7683086f40e4dccf5c560974ffcd09e0fde50d4d4040c4d47b3fe50c2cc1a745"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/53_6.json",
+        "bytes": 35619,
+        "seconds": 0.255,
+        "sha256": "8956f7caa0d78bf78c7152933ced92a037e1a14483b67aae8085745c0ddd4c05"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/53_7.json",
+        "bytes": 38895,
+        "seconds": 0.29,
+        "sha256": "034e999c00ebca813c8952db2028d52d9c3066c9a00bd1002e57c531b05c7d23"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/53_8.json",
+        "bytes": 49640,
+        "seconds": 0.256,
+        "sha256": "332608353af45b903a29dd40d88a2f148d7db967ec26a2ae20ab9717ae4fd655"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/53_9.json",
+        "bytes": 57206,
+        "seconds": 0.225,
+        "sha256": "9e08a14cfc2a72edf0da6ec4701090d2e51dec435375581ee3ceee3ba0918f6d"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/53_10.json",
+        "bytes": 66802,
+        "seconds": 0.285,
+        "sha256": "7e3f128f196bebfa4b583d452126b3c90e87cb28bd12a22434778443637a2915"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/53_11.json",
+        "bytes": 41327,
+        "seconds": 0.239,
+        "sha256": "f98592dc44400d15cb36638f4ff0d87f16337944ec33fc46b3e335d0d0a1fe8a"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/53_12.json",
+        "bytes": 37769,
+        "seconds": 0.243,
+        "sha256": "a621ee10a222782a555250d91402263ee0a7c4336a4af268a0814cd9e78e0ea0"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/53_13.json",
+        "bytes": 41086,
+        "seconds": 0.278,
+        "sha256": "c03b2f10b63519a2a06e8711981ba423773af3169520e73331dcb03088d92965"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/53_14.json",
+        "bytes": 49215,
+        "seconds": 0.273,
+        "sha256": "03df7e06377a91e924b73695bf8adb71799185955a5a7a0f340068c4b6d4df71"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/54_7.json",
+        "bytes": 1019,
+        "seconds": 0.253,
+        "sha256": "87114d921980d23df14841ab831fe2add0989db2c6470207a4c9c865b6ed64a6"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/54_8.json",
+        "bytes": 10082,
+        "seconds": 0.245,
+        "sha256": "1286f2271ae4caa2f415ddff6ae02c7ad5901673cf5e822e1039b1ee0bb416fa"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/54_9.json",
+        "bytes": 28999,
+        "seconds": 0.232,
+        "sha256": "368b62ad1a0346baf8870c22c192f05b698f4da0d41350a09a84507845e9af67"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/54_10.json",
+        "bytes": 35516,
+        "seconds": 0.255,
+        "sha256": "2d584378bc06447a58df38caeb9324d973a167d504a393ea7b92e8e82c7a8a22"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/54_11.json",
+        "bytes": 16364,
+        "seconds": 0.271,
+        "sha256": "5eb1ae132ab77d830d249fba9ea80db637f5fde87c7f15a4ce88a540b898263d"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/54_12.json",
+        "bytes": 18871,
+        "seconds": 0.235,
+        "sha256": "0e39e08bf760b72cd8d85604f661cc6be44e321d3ee2dad0048da242942242b7"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/54_13.json",
+        "bytes": 20059,
+        "seconds": 0.229,
+        "sha256": "011ac2b953cc4aa002d72529bde1363278adca2ffe8230d53d98c1e9c0e27b1d"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/54_14.json",
+        "bytes": 2154,
+        "seconds": 0.254,
+        "sha256": "9cd37b4dd52f5ede32de7980871ef0e669c3c4676725f5e51b1f9f6d5755660a"
+      },
+      {
+        "path": "v1/2026-09-23.1-r1/cells/55_8.json",
+        "bytes": 14692,
+        "seconds": 0.212,
+        "sha256": "0c6db29d115085c2a8eadfbfcf358b230d6ac9f8d5aa4f945c69d18415a017bb"
+      }
+    ]
+  },
+  "hannoverDataCheck": {
+    "dataset": "2026-09-23.1-r1",
+    "radii": {
+      "10": {
+        "cells": [
+          "52_9"
+        ],
+        "features": 348,
+        "known": [
+          {
+            "name": "Telemax",
+            "p": 16,
+            "positionM": 16
+          },
+          {
+            "name": "Marktkirche",
+            "p": 19,
+            "positionM": 19
+          }
+        ]
+      },
+      "30": {
+        "cells": [
+          "52_9",
+          "52_10"
+        ],
+        "features": 807,
+        "known": [
+          {
+            "name": "Telemax",
+            "p": 16,
+            "positionM": 16
+          },
+          {
+            "name": "Marktkirche",
+            "p": 19,
+            "positionM": 19
+          }
+        ]
+      },
+      "60": {
+        "cells": [
+          "51_8",
+          "51_9",
+          "51_10",
+          "52_8",
+          "52_9",
+          "52_10"
+        ],
+        "features": 2650,
+        "known": [
+          {
+            "name": "Telemax",
+            "p": 16,
+            "positionM": 16
+          },
+          {
+            "name": "Marktkirche",
+            "p": 19,
+            "positionM": 19
+          },
+          {
+            "name": "Marktkirche St. Nicolai",
+            "p": 14,
+            "positionM": 14
+          }
+        ]
+      }
+    }
+  },
+  "reviewedScreenshots": [
+    {
+      "path": "images/aime-0.1.6/candidates.png",
+      "sha256": "253c77e5c6e0ca4cdd145865ad7f2bb735ad64e7617d5bd76d0e268aeab723cc",
+      "runId": "20260927T101856Z-aime-41cc71fe",
+      "original": "Screenshot_1790504538.png"
+    },
+    {
+      "path": "images/aime-0.1.6/map.png",
+      "sha256": "5e5d0a0823c44f053c33a82e58a8069689f6c706c48bfbc40d11e818d8f7bdf8",
+      "runId": "20260927T101856Z-aime-41cc71fe",
+      "original": "Screenshot_1790504573.png"
+    },
+    {
+      "path": "images/aime-0.1.6/landscape.png",
+      "sha256": "7a547d9b84cd695332f2a1f09a7671e4bdc6c3d6f8e3753c55127b75bb5a6859",
+      "runId": "20260927T101856Z-aime-41cc71fe",
+      "original": "Screenshot_1790504635.png"
+    },
+    {
+      "path": "images/aime-0.1.6/large-text.png",
+      "sha256": "656ebdb5d0ad052d10f8f5652b6247e28f0a63d65593c5560ef9469ccb7815f8",
+      "runId": "20260927T101856Z-aime-41cc71fe",
+      "original": "Screenshot_1790504684.png"
+    },
+    {
+      "path": "images/aime-0.1.6/outside-coverage.png",
+      "sha256": "3126584ace58456b40f7ed8fc1acb7a3b32d47bd2563276c929a8de295e33b6d",
+      "runId": "20260927T101856Z-aime-41cc71fe",
+      "original": "Screenshot_1790504719.png"
+    },
+    {
+      "path": "images/aime-0.1.6/live-landmarks.png",
+      "sha256": "7057555214a8e883b641d07323c0c7660659959b9a08655dd79320a43a38bfe4",
+      "runId": "20260927T101856Z-aime-41cc71fe",
+      "original": "Screenshot_1790504945.png"
+    }
+  ],
+  "hardwareAccuracyVerified": false,
+  "priorAttempts": [
+    {
+      "runId": "20260927T100627Z-aime-69fe8c6f",
+      "moduleVersion": "0.1.5",
+      "complete": true,
+      "stopped": true,
+      "checksPassed": 14,
+      "reason": "Successful full pass superseded only by final malformed-record validation; retained separately."
+    },
+    {
+      "runId": "20260927T093242Z-aime-98836f5f",
+      "complete": false,
+      "stopped": true,
+      "checksPassed": 3,
+      "moduleVersion": "0.1.3",
+      "reason": "Gboard contacts/accounts permission prompt obscured WebView; driver now declines only that exact unrelated system prompt."
+    },
+    {
+      "runId": "20260927T093705Z-aime-2900e3fe",
+      "moduleVersion": "0.1.3",
+      "complete": true,
+      "stopped": true,
+      "checksPassed": 14,
+      "reason": "Full pass retained; superseded by 0.1.4 review fixes, not counted as final-package evidence."
+    },
+    {
+      "runId": "20260927T095149Z-aime-3e302264",
+      "moduleVersion": "0.1.4",
+      "complete": false,
+      "stopped": true,
+      "checksPassed": 12,
+      "reason": "Local SSH process terminated; remote runner stopped on broken pipe. Next run owns logs on the staging VM and is independent of SSH lifetime."
+    },
+    {
+      "runId": "20260927T100013Z-aime-d843e794",
+      "moduleVersion": "0.1.4",
+      "complete": false,
+      "stopped": false,
+      "operatorStopped": true,
+      "checksPassed": 8,
+      "reason": "Intentionally superseded for 0.1.6; interrupted before final receipt update. Operator stopped owned emulator separately; subsequent clean run preflight verified it was unoccupied."
+    }
+  ],
+  "priorVersionEvidence": [
+    "aime-0.1.5-staging-2026-09-27.json",
+    "aime-0.1.2-staging-2026-09-27.json",
+    "aime-0.1.3-staging-2026-09-27.json"
+  ],
+  "limitations": [
+    "Physical-phone location/calibration accuracy awaits pilot test.",
+    "New cell-based marks cannot be safely saved by rollback versions 0.1.2 or earlier.",
+    "Dataset position uncertainties are source/geometry heuristics, not measured guarantees.",
+    "Full-frame landscape evidence is the settled before-tap capture, not the earlier top-of-page screenshot."
+  ],
+  "superseded": true,
+  "supersededReason": "Restore consistent name sanitization before display and identity matching."
+}
