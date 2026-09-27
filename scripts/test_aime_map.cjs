@@ -1,5 +1,6 @@
 // Aimé map class: projection, viewer drag/placement callbacks, pan vs. drag,
-// wedge geometry and tile failure handling. Pixels/tiles remain Android work.
+// wedge geometry, tile failure handling and the distance ruler. Pixels/tiles
+// remain Android work.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
@@ -10,7 +11,7 @@ const { TestMap, R } = context;
 const tick = () => new Promise((r) => setImmediate(r));
 function rig(getImage = () => new Promise(() => {})) {
   const listeners = {},
-    events = { viewer: [], pans: 0, errors: [] };
+    events = { viewer: [], pans: 0, errors: [], ruler: [] };
   const canvas = {
     width: 0,
     height: 0,
@@ -21,7 +22,7 @@ function rig(getImage = () => new Promise(() => {})) {
     },
     getContext: () => new Proxy({}, { get: (_, k) => (k === "measureText" ? () => ({ width: 40 }) : () => {}), set: () => true }),
   };
-  const map = new TestMap(canvas, { getImage, onViewer: (p) => events.viewer.push(p), onPan: () => events.pans++, onError: (e) => events.errors.push(e) });
+  const map = new TestMap(canvas, { getImage, onViewer: (p) => events.viewer.push(p), onPan: () => events.pans++, onError: (e) => events.errors.push(e), onRuler: (pts) => events.ruler.push(JSON.parse(JSON.stringify(pts))) });
   const fire = (type, x, y, id = 1) => listeners[type]({ type, pointerId: id, clientX: x, clientY: y, preventDefault() {}, deltaY: 0 });
   map.setScene({ viewer: { lat: 46.8, lon: 9.2, accuracyM: 10 } }, false);
   map.center = { lat: 46.8, lon: 9.2 };
@@ -160,6 +161,84 @@ const ok = (name) => {
       assert.ok(q.x > 0 && q.x < 300);
     }
     ok("fit frames nearby viewer/candidate across the dateline");
+  }
+  {
+    // Known pairs: along the equator 1° is 111.195 km due east; Paris → London
+    // is 343.6 km with an initial bearing of 330.0° (and 148.1° back).
+    const east = TestMap.measure({ lat: 0, lon: 0 }, { lat: 0, lon: 1 });
+    assert.ok(Math.abs(east.km - 111.195) < 0.001 && Math.abs(east.bearing - 90) < 1e-9, JSON.stringify(east));
+    const paris = { lat: 48.8566, lon: 2.3522 },
+      london = { lat: 51.5074, lon: -0.1278 },
+      there = TestMap.measure(paris, london),
+      back = TestMap.measure(london, paris);
+    assert.ok(Math.abs(there.km - 343.56) < 0.05 && Math.abs(there.bearing - 330.02) < 0.05, JSON.stringify(there));
+    assert.ok(Math.abs(back.km - there.km) < 1e-9 && Math.abs(back.bearing - 148.12) < 0.05, "initial bearing depends on the direction");
+    const path = TestMap.rulerPath(paris, london);
+    assert.deepEqual({ ...path[0] }, paris);
+    assert.deepEqual({ ...path.at(-1) }, london);
+    assert.ok(Math.abs(R.distance(paris, path[16]) - there.km / 2) < 1e-6 && Math.abs(R.distance(path[16], london) - there.km / 2) < 1e-3, "the line follows the great circle");
+    ok("ruler: great-circle distance and initial bearing for known pairs, drawn along the great circle");
+  }
+  {
+    const { map, fire, events } = rig();
+    map.setScene({ viewer: null }, false);
+    map.placing = true;
+    map.setRuler(true);
+    const zoom = map.zoom;
+    fire("pointerdown", 100, 100);
+    fire("pointerup", 100, 100);
+    fire("pointerdown", 102, 101);
+    fire("pointerup", 102, 101);
+    assert.equal(events.viewer.length, 0, "ruler taps never place the viewpoint");
+    assert.equal(map.zoom, zoom, "two quick ruler taps are not a double-tap zoom");
+    assert.equal(events.ruler.length, 2);
+    fire("pointerdown", 250, 40);
+    fire("pointerup", 250, 40);
+    assert.equal(map.ruler.points.length, 1, "a third tap starts a new measurement");
+    fire("pointerdown", 40, 250);
+    fire("pointerup", 40, 250);
+    const [a, b] = events.ruler.at(-1);
+    for (const [p, x, y] of [[a, 250, 40], [b, 40, 250]]) {
+      const q = map.xy(p);
+      assert.ok(Math.abs(q.x - x) < 1e-6 && Math.abs(q.y - y) < 1e-6);
+    }
+    assert.ok(TestMap.measure(a, b).bearing > 180 && TestMap.measure(a, b).bearing < 270, "north-east to south-west");
+    const panned = { ...map.center };
+    fire("pointerdown", 150, 150);
+    fire("pointermove", 190, 150);
+    fire("pointerup", 190, 150);
+    assert.equal(map.ruler.points.length, 2, "a drag still pans and adds no point");
+    assert.notDeepEqual(map.center, panned);
+    map.clearRuler();
+    assert.equal(map.ruler.points.length, 0);
+    map.setRuler(false);
+    assert.equal(map.ruler, null);
+    fire("pointerdown", 100, 200);
+    fire("pointerup", 100, 200);
+    assert.equal(events.viewer.length, 1, "with the ruler off, placing works again");
+    ok("ruler: taps add two points, a third restarts, drags pan; clearing and turning it off restore placing");
+  }
+  {
+    const { map, fire, events } = rig();
+    map.editable = true;
+    map.setScene({ viewer: { lat: 46.8, lon: 9.2, accuracyM: 10 }, marks: [{ lat: 46.81, lon: 9.21, name: "Tower" }] }, false);
+    map.setRuler(true);
+    const v = map.xy({ lat: 46.8, lon: 9.2 }),
+      m = map.xy({ lat: 46.81, lon: 9.21 });
+    fire("pointerdown", v.x + 10, v.y - 8);
+    fire("pointerup", v.x + 10, v.y - 8);
+    fire("pointerdown", m.x + 5, m.y - 16);
+    fire("pointerup", m.x + 5, m.y - 16);
+    assert.deepEqual(events.ruler.at(-1), [{ lat: 46.8, lon: 9.2 }, { lat: 46.81, lon: 9.21 }], "taps near the viewer and a pin head snap to them");
+    assert.equal(events.viewer.length, 0, "a tap on the ring measures; it does not move the viewpoint");
+    const labels = [];
+    map.cb.rulerLabel = (r) => (labels.push(r), "label");
+    map.draw();
+    assert.equal(labels.length, 1);
+    assert.ok(Math.abs(labels[0].km - R.distance({ lat: 46.8, lon: 9.2 }, { lat: 46.81, lon: 9.21 })) < 1e-9);
+    map.setScene({ viewer: { lat: 46.8, lon: 9.2 } }, false);
+    assert.equal(map.ruler.points.length, 2, "a new scene (after an edit) keeps the ruler");
+    ok("ruler snaps to the viewer and pins, labels the line through the app's formatter and survives scene updates");
   }
   console.log(`${checks} Aimé map checks passed.`);
 })().catch((e) => {

@@ -1,8 +1,8 @@
 "use strict";
 // Aimé module logic without DOM or host calls: per-photo sidecars keyed by the
 // API 0.12 stable photo id, capture association, orphan reconciliation, the
-// landmark cells (aime-data contract, schema 1), local name search and the
-// candidates shortlist.
+// landmark cells (aime-data contract, schema 1), local name search, the
+// candidates shortlist, point editing with one-step undo and the magnifier.
 // Global `AimeCore` in the module, CommonJS under Node for scripts/test_aime.cjs.
 const AimeCore = (() => {
   const RADII = [10, 30, 60],
@@ -31,8 +31,9 @@ const AimeCore = (() => {
     MESSAGE_BUDGET = 7600;
   const num = (x) => typeof x === "number" && Number.isFinite(x);
   // Control/format characters are dropped: they carry no name and would expand
-  // the storage request when escaped.
-  const text = (s, max = NAME_MAX) => (typeof s === "string" ? s.replace(/[\p{Cc}\p{Cf}\p{Cs}]/gu, "").trim().slice(0, max) : "");
+  // the storage request when escaped. `max` counts code points, as the data
+  // contract does, so an astral character at the limit is never split.
+  const text = (s, max = NAME_MAX) => (typeof s === "string" ? [...s.replace(/[\p{Cc}\p{Cf}\p{Cs}]/gu, "").trim()].slice(0, max).join("").trim() : "");
   const inUnit = (v) => num(v) && v >= 0 && v <= 1;
   const latLon = (lat, lon) => num(lat) && num(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
   const OSM_TYPES = ["node", "way", "relation"];
@@ -295,6 +296,10 @@ const AimeCore = (() => {
       for (let o = lon0; o <= lon1; o++) out.add(a + "_" + ((((o + 180) % 360) + 360) % 360 - 180));
     return [...out];
   }
+  // Licence and attribution exactly as published: a plain bounded string with
+  // no control characters or padding, else null. Never a default: the module
+  // shows only what the dataset states.
+  const legal = (v, max) => (typeof v === "string" && v !== "" && text(v, max) === v ? v : null);
   // index.json text → {release, revision, dataset, path, cells (Set), kinds (Set),
   // coverage, license, attribution}. Anything but schema 1 in the expected shape
   // is unavailable. Kinds only validate records; they carry no position values.
@@ -308,6 +313,9 @@ const AimeCore = (() => {
     const dataset = isRelease(x.release) && Number.isInteger(x.revision) && x.revision >= 1 ? `${x.release}-r${x.revision}` : null;
     if (!dataset || x.dataset !== dataset || !isRelease(x.dataset) || x.path !== dataset + "/cells/" || !Array.isArray(x.cells) || !x.cells.every(validCell) || !kinds.size)
       throw unavailable("the landmark index is incomplete.");
+    const license = legal(x.license, 40),
+      attribution = legal(x.attribution, 120);
+    if (!license || !attribution) throw unavailable("the landmark index has no valid licence or attribution.");
     return {
       release: x.release,
       revision: x.revision,
@@ -316,8 +324,8 @@ const AimeCore = (() => {
       cells: new Set(x.cells),
       kinds,
       coverage: Array.isArray(x.coverage) ? x.coverage.filter((c) => typeof c === "string") : [],
-      license: text(x.license, 40) || "ODbL-1.0",
-      attribution: text(x.attribution, 120) || "© OpenStreetMap contributors, Overture Maps Foundation",
+      license,
+      attribution,
     };
   }
   const cellUrl = (index, cell) => DATA_ORIGIN + "/v1/" + index.path + cell + ".json";
@@ -505,11 +513,92 @@ const AimeCore = (() => {
   // wider than the direction σ.
   const positionMatters = (row) => row.sigmaDeg > 2 * row.wedgeSigmaDeg && row.sigmaDeg - row.wedgeSigmaDeg > 2;
 
+  // ---- Point editing: hit test, drag, one-step undo --------------------------
+  // Gesture thresholds in CSS pixels and milliseconds (Pocket Measure's values).
+  const HIT_PX = 26,
+    TAP_SLOP = 8,
+    HOLD_MS = 350,
+    LOUPE_MAGNIFICATION = 2.5;
+  const unit = (v) => Math.max(0, Math.min(1, v));
+  // Nearest mark or horizon point within `maxPx` of (x, y) on a photo shown
+  // `w` × `h` pixels → {list: "marks"|"horizon", index}, or null. Marks win ties.
+  function hitPoint(sidecar, x, y, w, h, maxPx = HIT_PX) {
+    let best = null;
+    for (const list of ["marks", "horizon"])
+      sidecar[list].forEach((p, index) => {
+        const d = Math.hypot((p.x - x) * w, (p.y - y) * h);
+        if (d <= maxPx && (!best || d < best.d)) best = { list, index, d };
+      });
+    return best && { list: best.list, index: best.index };
+  }
+  // The sidecar with one point moved (clamped to the photo); nothing else changes.
+  const movePoint = (sidecar, hit, x, y) => ({ ...sidecar, [hit.list]: sidecar[hit.list].map((p, i) => (i === hit.index ? { ...p, x: unit(x), y: unit(y) } : p)) });
+  const pointName = (sidecar, hit) => (hit.list === "marks" ? sidecar.marks[hit.index].name : "horizon point " + (hit.index + 1));
+  // A drag previews in memory only; `release(commit)` hands the moved sidecar
+  // to `commit` once, and only when the point actually moved.
+  function pointDrag(sidecar, hit) {
+    let preview = sidecar,
+      open = true;
+    return {
+      hit,
+      get preview() {
+        return preview;
+      },
+      get moved() {
+        return preview !== sidecar;
+      },
+      move(x, y) {
+        if (open) preview = movePoint(sidecar, hit, x, y);
+        return preview;
+      },
+      cancel() {
+        open = false;
+        preview = sidecar;
+      },
+      async release(commit) {
+        if (!open) return false;
+        open = false;
+        const p = preview[hit.list][hit.index],
+          q = sidecar[hit.list][hit.index];
+        if (p.x === q.x && p.y === q.y) return false;
+        await commit(preview);
+        return true;
+      },
+    };
+  }
+  // One undo step: the photo's marks and horizon before its last add, move or
+  // delete. Undo restores both lists and leaves viewpoint and radius alone.
+  const undoStep = (id, sidecar, label) => ({ id, label, marks: sidecar.marks.map((m) => ({ ...m })), horizon: sidecar.horizon.map((h) => ({ ...h })) });
+  const undone = (sidecar, step) => cleanSidecar({ ...sidecar, marks: step.marks, horizon: step.horizon });
+
+  // ---- Magnifier geometry (Pocket Measure's loupe) ----------------------------
+  // Crop for a photo point: source rectangle in image pixels plus where it lands
+  // inside the loupe, so edge crops stay centred on the point.
+  function loupe(point, width, height, fitWidth, diameter, magnification = LOUPE_MAGNIFICATION) {
+    if (!inUnit(point.x) || !inUnit(point.y) || !(width > 0 && height > 0 && fitWidth > 0 && diameter > 0 && magnification > 0)) throw new Error("Magnifier needs a photo point.");
+    const half = (diameter / 2 / magnification) * (width / fitWidth),
+      cx = point.x * width,
+      cy = point.y * height,
+      x = Math.max(0, cx - half),
+      y = Math.max(0, cy - half),
+      scale = diameter / (half * 2);
+    return { x, y, w: Math.max(0, Math.min(width, cx + half) - x), h: Math.max(0, Math.min(height, cy + half) - y), scale, dx: (x - (cx - half)) * scale, dy: (y - (cy - half)) * scale };
+  }
+  // Loupe centre: lifted above the finger, flipped below near the top, clamped inside the view.
+  function loupePlacement(finger, width, height, diameter, lift) {
+    const r = diameter / 2,
+      clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    return { x: clamp(finger.x, r, Math.max(r, width - r)), y: clamp(finger.y - lift - r >= 0 ? finger.y - lift : finger.y + lift, r, Math.max(r, height - r)), r };
+  }
+
   // ---- Formatting ---------------------------------------------------------
   const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
   const compass = (deg) => COMPASS[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
   const km = (d) => (d < 1 ? Math.round(d * 1000) + " m" : d < 10 ? d.toFixed(1) + " km" : Math.round(d) + " km");
   const signed = (d) => (d >= 0 ? "+" : "−") + Math.abs(d).toFixed(1) + "°";
+  // Distance and bearing as the photo, the sheets and the map show them: "12 km · 47° NE".
+  const degrees = (b) => ((Math.round(b) % 360) + 360) % 360;
+  const range = (distanceKm, bearingDeg) => km(distanceKm) + " · " + degrees(bearingDeg) + "° " + compass(bearingDeg);
   function age(ms) {
     if (!num(ms) || ms < 0) return "unknown age";
     const s = Math.round(ms / 1000);
@@ -576,9 +665,23 @@ const AimeCore = (() => {
     candidatesOf,
     shortlist,
     positionMatters,
+    HIT_PX,
+    TAP_SLOP,
+    HOLD_MS,
+    LOUPE_MAGNIFICATION,
+    hitPoint,
+    movePoint,
+    pointName,
+    pointDrag,
+    undoStep,
+    undone,
+    loupe,
+    loupePlacement,
     compass,
     km,
     signed,
+    degrees,
+    range,
     age,
     kindLabel,
     sizeLabel,

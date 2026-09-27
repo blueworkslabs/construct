@@ -2,7 +2,8 @@
 // Aimé map: derived from Sky Watch's SkyMap (tiles, pan, pinch, wheel and
 // double-tap zoom, scale bar, tile cooldowns). Adds the viewer dot (reported and
 // fitted), the tap wedge (±1 direction σ, fainter band to ±2σ), mark pins, numbered candidate pins,
-// dragging the viewer dot to correct it and tapping to place an unlocated viewpoint.
+// dragging the viewer dot to correct it, tapping to place an unlocated viewpoint
+// and a two-tap ruler (great-circle distance and initial bearing).
 class AimeMap {
   static projection = {
     x: (lon) => (lon + 180) / 360,
@@ -29,7 +30,19 @@ class AimeMap {
   static clampZoom(z, fallback = 10) {
     return Math.max(2, Math.min(17, Number.isFinite(z) ? z : fallback));
   }
-  // callbacks: {getImage(url) → dataUrl, onViewer(point) when dragged or placed, onPan(), onError(e|null)}
+  // Ruler between two points: great-circle distance (km) and initial bearing from `a`.
+  static measure(a, b) {
+    return { km: Resection.distance(a, b), bearing: Resection.bearing(a, b) };
+  }
+  // Points along the great circle from `a` to `b`, drawn as the ruler line.
+  static rulerPath(a, b, steps = 32) {
+    const m = AimeMap.measure(a, b),
+      pts = [];
+    for (let i = 0; i <= steps; i++) pts.push(i === 0 || i === steps ? { lat: (i ? b : a).lat, lon: (i ? b : a).lon } : Resection.destination(a, m.bearing, (m.km * i) / steps));
+    return pts;
+  }
+  // callbacks: {getImage(url) → dataUrl, onViewer(point) when dragged or placed, onPan(), onError(e|null),
+  //   onRuler(points) after a ruler tap, rulerLabel({km, bearing}) → text on the line}
   constructor(canvas, callbacks) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
@@ -39,6 +52,7 @@ class AimeMap {
     this.scene = { viewer: null, fitted: null, wedge: null, marks: [], candidates: [], focus: null };
     this.placing = false; // tap sets the viewpoint
     this.editable = false; // viewer dot can be dragged
+    this.ruler = null; // {points: [{lat, lon}]} while the ruler is on; taps then measure
     this.cache = new Map();
     this.failures = new Map();
     this.pending = new Set();
@@ -144,6 +158,14 @@ class AimeMap {
       return;
     }
     const at = this.local(e);
+    if (this.ruler) {
+      const p = this.snap(at);
+      this.ruler.points = this.ruler.points.length >= 2 ? [p] : [...this.ruler.points, p];
+      this.lastTap = null;
+      this.draw();
+      this.cb.onRuler?.(this.ruler.points);
+      return;
+    }
     if (this.placing) {
       const point = this.geoAt(at.x, at.y);
       this.scene.viewer = { ...point, accuracyM: null };
@@ -158,6 +180,31 @@ class AimeMap {
       this.zoomTo(Math.round(this.zoom) + 1, at.x, at.y);
       this.cb.onPan?.();
     } else this.lastTap = { ...at, time: now };
+  }
+  // A ruler tap within 24 px of the viewer, fitted dot or a pin measures from
+  // that exact point; elsewhere it is the tapped map point.
+  snap(at) {
+    const s = this.scene,
+      targets = [s.viewer, s.fitted, ...s.marks, ...s.candidates].filter(Boolean);
+    let best = null,
+      bestD = 24;
+    for (const t of targets) {
+      const q = this.xy(t),
+        // Pins point at their base; their head sits 16 px above it.
+        d = Math.min(Math.hypot(q.x - at.x, q.y - at.y), t === s.viewer || t === s.fitted ? Infinity : Math.hypot(q.x - at.x, q.y - 16 - at.y));
+      if (d < bestD) (best = t), (bestD = d);
+    }
+    return best ? { lat: best.lat, lon: best.lon } : this.geoAt(at.x, at.y);
+  }
+  // Ruler on/off; turning it off or on clears its points.
+  setRuler(on) {
+    this.ruler = on ? { points: [] } : null;
+    this.lastTap = null;
+    this.draw();
+  }
+  clearRuler() {
+    if (this.ruler) this.ruler.points = [];
+    this.draw();
   }
   scale() {
     return 256 * 2 ** this.zoom;
@@ -288,6 +335,7 @@ class AimeMap {
       ctx.fillStyle = "#5FD3A0";
       ctx.fill();
     }
+    if (this.ruler) this.drawRuler(this.ruler.points);
     const bar = AimeMap.scaleBar(mpp, Math.min(140, r.width / 3));
     if (bar) {
       const attribution = c.parentElement?.querySelector(".attribution"),
@@ -344,6 +392,45 @@ class AimeMap {
     ctx.setLineDash([6, 5]);
     ctx.stroke();
     ctx.setLineDash([]);
+  }
+  drawRuler(points) {
+    const ctx = this.ctx,
+      pts = points.length === 2 ? AimeMap.rulerPath(points[0], points[1]).map((p) => this.xy(p)) : points.map((p) => this.xy(p));
+    // Unwrap across the dateline so the line never jumps across the world.
+    const world = this.scale();
+    for (let i = 1; i < pts.length; i++) pts[i].x = pts[i - 1].x + ((((pts[i].x - pts[i - 1].x) % world) + world * 1.5) % world) - world / 2;
+    if (pts.length > 1) {
+      ctx.beginPath();
+      pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.strokeStyle = "#06110Bb3";
+      ctx.lineWidth = 6;
+      ctx.stroke();
+      ctx.strokeStyle = "#8CF0C4";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+    for (const p of [pts[0], pts[pts.length - 1]].slice(0, pts.length)) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = "#8CF0C4";
+      ctx.fill();
+      ctx.strokeStyle = "#06110B";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    if (points.length === 2) {
+      const m = AimeMap.measure(points[0], points[1]),
+        text = this.cb.rulerLabel?.(m) || (m.km < 1 ? Math.round(m.km * 1000) + " m" : m.km.toFixed(1) + " km") + " · " + Math.round(m.bearing) + "°",
+        mid = pts[Math.floor(pts.length / 2)];
+      ctx.font = "600 12px system-ui";
+      const w = ctx.measureText(text).width + 12;
+      ctx.fillStyle = "#102a1fe8";
+      ctx.fillRect(mid.x - w / 2, mid.y - 30, w, 20);
+      ctx.fillStyle = "#e6f0ea";
+      ctx.textAlign = "center";
+      ctx.fillText(text, mid.x, mid.y - 16);
+      ctx.textAlign = "start";
+    }
   }
   pin(q, colour, label, name) {
     if (q.x < -30 || q.y < -30 || q.x > this.width + 30 || q.y > this.height + 30) return;

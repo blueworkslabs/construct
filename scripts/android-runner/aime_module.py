@@ -4,8 +4,9 @@
 Synthetic Aimé (dev.construct.aime-fixture) proves the flow and the ranking on a
 known scene: grants denied/granted, capture → viewpoint, injected landmark data
 offline/HTTP 503 with a single retry, mark → calibrated ruler, horizon → level
-line, tap → candidates → map, rotation, 2× text, a viewpoint outside the data
-coverage, delete → stored record reconciled.
+line, dragging a horizon point and undoing it, tap → candidates → map, the map
+ruler, rotation, 2× text, a viewpoint outside the data coverage, delete →
+stored record reconciled.
 The real Aimé package (dev.construct.aime) then proves the real location and
 internet gates: location off → unlocated photo opens on the map; with an injected
 emulator fix, the live aime-data cells return named landmarks.
@@ -18,7 +19,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_aime_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.aime package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.aime-fixture package digest')
-p.add_argument('--version',default='0.1.7')
+p.add_argument('--version',default='0.1.8')
 p.add_argument('--real-fix',default='52.37648,9.73848',help='lat,lon injected for the real-module landmark data check (Hannover, inside the DE/AT coverage)')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
@@ -117,6 +118,11 @@ def tap_photo(point,checkpoint=None):
   capture('before-tap-'+checkpoint)
   (run/('before-tap-'+checkpoint+'-bounds.json')).write_text(json.dumps({'stage':[x1,y1,x2,y2],'tap':[x,y],'nodes':[dict(n.attrib) for n in nodes()]},indent=2))
  adb('shell','input','tap',str(x),str(y));time.sleep(.6)
+def drag_photo(a,b,ms=700):
+ """Press on photo point a and drag to b; the stage moves a mark or horizon point it starts on."""
+ x1,y1,x2,y2=stage();px=lambda p:(round(x1+1+p['x']*(x2-x1-2)),round(y1+1+p['y']*(y2-y1-2)))
+ (ax,ay),(bx,by)=px(a),px(b)
+ adb('shell','input','swipe',str(ax),str(ay),str(bx),str(by),str(ms));time.sleep(.8)
 def reach_native(label,checkable=False):
  for attempt in range(24):
   tree=nodes()
@@ -248,12 +254,24 @@ try:
  tap_photo(F['horizon'][0]);reach_text('Horizon point saved');tap_photo(F['horizon'][1]);reach_text('Level estimated')
  capture('aime-levelled');done('Two true-level horizon taps level the picture (Level estimated)')
 
+ # 5b. Drag a horizon point (stored once on release), then undo it.
+ moved=dict(F['horizon'][0]);moved['y']=min(.95,moved['y']+.08)
+ drag_photo(F['horizon'][0],moved);reach_text('Horizon point 1 moved');capture('aime-dragged')
+ click(lambda t:t=='Undo moving horizon point 1');reach_text('Undone: moving horizon point 1');reach_text('Level estimated')
+ done('Dragging a horizon point moves it; Undo restores it and the level fit')
+
  # 6. What's that? → candidates with own ±σ → map.
  reveal('What’s that?');rows=what(F['whatB'],'Synthetic Peak B','B')
  assert any('±' in r and 'from your tap' in r for r in labels() if r),'Candidates need offset and ±σ'
  capture('aime-candidates');click(lambda t:t.startswith('Could be Synthetic Peak B'))
  reach_text('Pin 1: Synthetic Peak B (selected)');reach_text('Wedge: your tap points');reach_text('Green pin: Synthetic Tower A')
  reveal('Map of your viewpoint');time.sleep(3);capture('aime-map');done('Tap ranks the known landmark first; a candidate opens the map with wedge, pins and viewer')
+ click(lambda t:t=='Ruler');reach_text('Ruler: tap two points on the map')
+ m=bounds(reveal('Map of your viewpoint'))
+ for fx,fy in ((.3,.3),(.7,.7)):adb('shell','input','tap',str(round(m[0]+(m[2]-m[0])*fx)),str(round(m[1]+(m[3]-m[1])*fy)));time.sleep(.6)
+ reach_text(', initial bearing ');capture('aime-ruler')
+ click(lambda t:t=='Clear ruler');click(lambda t:t=='Ruler');absent(', initial bearing ')
+ done('Map ruler: two taps show the great-circle distance and initial bearing; it clears')
  click(lambda t:t=='Photo')
 
  # Persisted calibration must survive a real process restart on this exact host.

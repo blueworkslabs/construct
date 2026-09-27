@@ -1,6 +1,8 @@
 // Aimé module logic: sidecars, capture association, reconciliation, viewpoint
 // choice, landmark cells (cell math, index/cell validation, fetch and cache),
-// radius changes, search, shortlist, and the Synthetic Aimé scene. The solver itself is covered by test_aime_resection.cjs.
+// radius changes, search, shortlist, point editing (hit test, drag, undo,
+// writes on release), the magnifier geometry, distance/bearing labels and the
+// Synthetic Aimé scene. The solver itself is covered by test_aime_resection.cjs.
 const fs = require("node:fs");
 const assert = require("node:assert/strict");
 const C = require("../examples/aime-module/ui/aime-core.js");
@@ -166,6 +168,16 @@ check("index validation: schema 1 only, dataset = release-rN with its path, list
   bad({ kinds: ["peak", "Tower"] });
   bad({ kinds: ["peak", null] });
   assert.throws(() => C.parseIndex("<html>404</html>"), { code: "DATA_INVALID" });
+  // #40: licence and attribution are required as published, never defaulted.
+  const noLegal = (patch) => assert.throws(() => C.parseIndex(JSON.stringify({ ...INDEX, ...patch })), (e) => e.code === "DATA_INVALID" && e.retry === true && /^Landmark data unavailable: the landmark index has no valid licence or attribution/.test(e.message));
+  for (const field of ["license", "attribution"])
+    for (const value of [undefined, null, "", " ", 7, ["ODbL-1.0"], { name: "ODbL-1.0" }, " padded", "padded ", "Line\nbreak", "Hidden\u202emark", "Lone\ud800surrogate"])
+      noLegal({ [field]: value });
+  noLegal({ license: "x".repeat(41) });
+  noLegal({ attribution: "x".repeat(121) });
+  const longest = C.parseIndex(JSON.stringify({ ...INDEX, license: "L".repeat(39) + "🄯", attribution: "© " + "a".repeat(117) + "🗺" }));
+  assert.equal([...longest.license].length, 40, "limits count code points");
+  assert.ok(longest.attribution.endsWith("🗺"), "an astral character at the limit is kept whole");
   for (const invalid of ["x", 7, "1000_1", "90_1", "46_180", "046_9", "-0_9"]) bad({ cells: ["46_9", invalid] });
   assert.deepEqual(C.cellPlan(ix, { lat: 46.8, lon: 9.2 }, 30).sort(), ["46_9", "47_9"], "only listed cells");
   assert.deepEqual(C.cellPlan(ix, { lat: 40.4, lon: -3.7 }, 60), [], "outside coverage");
@@ -249,6 +261,23 @@ check("feature labels are sanitized before search, identity and saved marks, inc
     assert.equal(C.markFrom(f, 0.4, 0.5).name, f.name);
     assert.equal(C.featureKey(f), "TowerOther|tower|46.90000|9.30000");
   }
+});
+
+check("#40: names are bounded in code points, so an astral character at the limit is never split", () => {
+  const wellFormed = (s) => (encodeURIComponent(s), true);
+  const ix = C.parseIndex(JSON.stringify(INDEX)),
+    edge = "a".repeat(79) + "𝔸"; // 80 code points, 81 UTF-16 units
+  const f = C.parseCell(ix, "46_9", cellText("46_9", [[edge, "tower", 46.9, 9.3, 80, 1.3, 8]]))[0];
+  assert.equal(f.name, edge, "a valid 80-code-point feature label is kept whole");
+  assert.equal(C.markFrom(f, 0.4, 0.5).name, edge, "and stored whole in its mark");
+  assert.equal(C.featureKey(f), edge + "|tower|46.90000|9.30000");
+  assert.throws(() => C.parseCell(ix, "46_9", cellText("46_9", [[edge + "b", "tower", 46.9, 9.3, 80, 1.3, 8]])), { code: "DATA_INVALID" }, "81 code points reject the cell");
+  const stored = (name) => C.cleanSidecar({ marks: [mark(1, { name })] }).marks[0].name;
+  assert.equal(stored(edge), edge);
+  assert.equal(stored("a".repeat(80) + "𝔸"), "a".repeat(80), "the 81st code point goes as a whole");
+  const astral = stored("𝔸".repeat(100));
+  assert.ok(wellFormed(astral) && [...astral].length === C.NAME_MAX && astral.length === 2 * C.NAME_MAX);
+  assert.equal(stored("x".repeat(79) + " 𝔸"), "x".repeat(79), "no trailing space left by the cut");
 });
 
 check("kind labels cover every contract kind with a fallback", () => {
@@ -352,6 +381,108 @@ check("shortlist: top five when something is close, else 'no close match' with t
   assert.equal(C.positionMatters({ sigmaDeg: 4, wedgeSigmaDeg: 3.8 }), false);
 });
 
+// ---- Point editing, undo, magnifier and distance labels ---------------------
+const edited = () => C.cleanSidecar({ viewer: { lat: 46.8, lon: 9.2, accuracyM: 10 }, radiusKm: 30, marks: [mark(1, { x: 0.2, y: 0.5 }), mark(2, { x: 0.6, y: 0.5, name: "Other" })], horizon: [{ x: 0.21, y: 0.52 }, { x: 0.9, y: 0.4 }] });
+check("hit test finds the nearest mark or horizon point within 26 screen pixels, at the current zoom", () => {
+  const s = edited();
+  // A 1000 × 750 px photo: 0.01 across is 10 px.
+  assert.deepEqual(C.hitPoint(s, 0.6, 0.5, 1000, 750), { list: "marks", index: 1 });
+  assert.deepEqual(C.hitPoint(s, 0.9 + 0.02, 0.4 + 0.02, 1000, 750), { list: "horizon", index: 1 }, "≈ 25 px away");
+  assert.equal(C.hitPoint(s, 0.9 + 0.03, 0.4, 1000, 750), null, "30 px away");
+  assert.deepEqual(C.hitPoint(s, 0.212, 0.518, 1000, 750), { list: "horizon", index: 0 }, "nearest wins across lists");
+  assert.deepEqual(C.hitPoint(s, 0.205, 0.51, 1000, 750), { list: "marks", index: 0 });
+  assert.deepEqual(C.hitPoint({ ...s, horizon: [{ x: 0.2, y: 0.5 }] }, 0.2, 0.5, 1000, 750), { list: "marks", index: 0 }, "marks win ties");
+  assert.equal(C.hitPoint(s, 0.9 + 0.02, 0.4 + 0.02, 4000, 3000), null, "zoomed in 4×, the same photo offset is 100 px");
+  assert.equal(C.hitPoint(C.newSidecar(null), 0.5, 0.5, 1000, 750), null);
+});
+
+check("a drag previews in memory, clamps to the photo and leaves the stored sidecar untouched", () => {
+  const s = edited(),
+    frozen = JSON.stringify(s);
+  const drag = C.pointDrag(s, { list: "marks", index: 0 });
+  assert.equal(drag.moved, false);
+  const p = drag.move(0.25, 0.45);
+  assert.deepEqual([p.marks[0].x, p.marks[0].y], [0.25, 0.45]);
+  assert.deepEqual(p.marks[1], s.marks[1], "other points unchanged");
+  assert.deepEqual(p.horizon, s.horizon);
+  assert.equal(JSON.stringify(s), frozen, "the stored sidecar is never mutated");
+  const q = drag.move(-0.2, 1.3);
+  assert.deepEqual([q.marks[0].x, q.marks[0].y], [0, 1], "clamped to the photo");
+  assert.equal(C.cleanSidecar(q).marks.length, 2, "a clamped mark stays valid");
+  const h = C.movePoint(s, { list: "horizon", index: 1 }, 0.8, 0.41);
+  assert.deepEqual(h.horizon, [{ x: 0.21, y: 0.52 }, { x: 0.8, y: 0.41 }]);
+  assert.deepEqual(h.marks, s.marks);
+  assert.equal(C.pointName(s, { list: "marks", index: 1 }), "Other");
+  assert.equal(C.pointName(s, { list: "horizon", index: 0 }), "horizon point 1");
+});
+
+check("undo restores the marks and horizon of the last add, move or removal, leaving viewpoint and radius", () => {
+  const before = edited();
+  // Add
+  const add = C.undoStep("pA", before, "adding Third");
+  const added = C.cleanSidecar({ ...before, marks: [...before.marks, mark(3, { name: "Third" })] });
+  assert.deepEqual(C.undone(added, add), before);
+  // Move, then the viewpoint and radius change: undo keeps those.
+  const move = C.undoStep("pA", before, "moving Other");
+  const moved = C.cleanSidecar(C.movePoint(before, { list: "marks", index: 1 }, 0.7, 0.4));
+  const later = C.cleanSidecar({ ...moved, radiusKm: 60, viewer: { ...moved.viewer, lat: 46.81, corrected: true } });
+  const back = C.undone(later, move);
+  assert.deepEqual(back.marks, before.marks);
+  assert.equal(back.radiusKm, 60);
+  assert.equal(back.viewer.lat, 46.81);
+  // Removal
+  const remove = C.undoStep("pA", before, "removing horizon point 1");
+  assert.deepEqual(C.undone({ ...before, horizon: before.horizon.slice(1) }, remove).horizon, before.horizon);
+  // A step is a copy: later edits of the sidecar it came from do not change it.
+  before.marks[0].x = 0.99;
+  assert.equal(move.marks[0].x, 0.2);
+  assert.equal(add.label, "adding Third");
+  assert.equal(add.id, "pA");
+});
+
+check("moving a mark changes the fit: the fit follows the point", () => {
+  const ix = C.parseIndex(F.index());
+  const features = F.cells.flatMap((c) => C.parseCell(ix, c, F.cell(c)));
+  const tower = features.find((f) => f.name === "Synthetic Tower A");
+  const s = C.cleanSidecar({ viewer: { lat: F.viewer.lat, lon: F.viewer.lon, accuracyM: 10 }, marks: [C.markFrom(tower, F.taps.markA.x, F.taps.markA.y)], horizon: F.taps.horizon });
+  const fit = (x) => R.calibrate(C.calibrationInput(x, F.width, F.height));
+  const drag = C.pointDrag(s, C.hitPoint(s, F.taps.markA.x, F.taps.markA.y, 1000, 750));
+  const moved = fit(drag.move(F.taps.markA.x + 0.05, F.taps.markA.y));
+  // The tower's bearing is fixed, so moving its mark right turns the photo's centre left.
+  assert.ok(R.diff(R.bearingAt(fit(s), 0.5, 0.5), R.bearingAt(moved, 0.5, 0.5)) > 2);
+  assert.ok(Math.abs(R.diff(R.bearingAt(moved, F.taps.markA.x + 0.05, F.taps.markA.y), R.bearing(moved.viewer, tower))) < 0.5);
+});
+
+check("magnifier crop (Pocket Measure's loupe) centres on the point at the current zoom and shifts at photo edges", () => {
+  const centre = C.loupe({ x: 0.5, y: 0.5 }, 1200, 900, 600, 120, 2.5);
+  assert.deepEqual([centre.x, centre.y, centre.w, centre.h, centre.scale], [552, 402, 96, 96, 1.25]);
+  const zoomed = C.loupe({ x: 0.5, y: 0.5 }, 1200, 900, 2400, 120);
+  assert.ok(zoomed.w < centre.w, "zoomed in, fewer photo pixels are magnified");
+  const corner = C.loupe({ x: 0, y: 0 }, 1200, 900, 600, 120);
+  assert.deepEqual([corner.x, corner.y, corner.w], [0, 0, centre.w / 2]);
+  assert.ok(Math.abs(corner.dx - 60) < 1e-9, "crop starts at the loupe centre so the crosshair still marks the point");
+  const far = C.loupe({ x: 1, y: 1 }, 1200, 900, 600, 120);
+  assert.deepEqual([far.x + far.w, far.y + far.h, far.dx], [1200, 900, 0]);
+  assert.throws(() => C.loupe({ x: 1.2, y: 0.5 }, 1200, 900, 600, 120));
+  assert.deepEqual(C.loupePlacement({ x: 300, y: 300 }, 600, 450, 120, 80), { x: 300, y: 220, r: 60 });
+  assert.deepEqual(C.loupePlacement({ x: 300, y: 100 }, 600, 450, 120, 80), { x: 300, y: 180, r: 60 }, "flips below near the top");
+  assert.deepEqual(C.loupePlacement({ x: 10, y: 440 }, 600, 450, 120, 80), { x: 60, y: 360, r: 60 });
+  const tiny = C.loupePlacement({ x: 5, y: 5 }, 40, 40, 120, 80);
+  assert.ok(tiny.x >= 0 && tiny.y >= 0);
+});
+
+check("distance and bearing labels: one format for marks, candidates, search and the map ruler", () => {
+  assert.equal(C.range(12.34, 47.4), "12 km · 47° NE");
+  assert.equal(C.range(3.21, 181), "3.2 km · 181° S");
+  assert.equal(C.range(0.4, 359.6), "400 m · 0° N", "never 360°");
+  assert.equal(C.degrees(-0.2), 0);
+  assert.equal(C.degrees(-10), 350);
+  // The candidate list and the map legend use the solver's bearing and distance from the fitted viewpoint.
+  const v = { lat: 46.8, lon: 9.2 },
+    p = R.destination(v, 42, 18);
+  assert.equal(C.range(R.distance(v, p), R.bearing(v, p)), "18 km · 42° NE");
+});
+
 check("Synthetic Aimé: one mark plus horizon ranks the tapped landmarks first", () => {
   const ix = C.parseIndex(F.index());
   const features = C.within(F.cells.flatMap((c) => C.parseCell(ix, c, F.cell(c))), F.viewer, 30);
@@ -431,6 +562,13 @@ check("control characters are dropped from names; worst-case record and index fi
   assert.ok(index <= C.MESSAGE_BUDGET, "index " + index);
   assert.ok(C.MESSAGE_BUDGET < C.MESSAGE_LIMIT);
   assert.throws(() => C.checkEnvelope("photo.0", { blob: "x".repeat(C.MESSAGE_BUDGET) }), { code: "STORAGE_SIZE" });
+});
+
+check("#40: bridge and storage checks still bound six marks of 80 astral characters", () => {
+  const sidecar = C.cleanSidecar({ ...fullSidecar(), marks: Array.from({ length: 6 }, (_, i) => mark(i, { name: "🗻".repeat(90), kind: "communication_tower", dataset: "9".repeat(40), lat: -89.12345678901234, lon: -179.12345678901234, positionM: 30.123456789012345 })) });
+  assert.ok(sidecar.marks.every((m) => [...m.name].length === C.NAME_MAX && encodeURIComponent(m.name)));
+  assert.ok(C.envelopeLength(C.recordKey(15), C.recordValue(longId(1), sidecar)) <= C.MESSAGE_BUDGET);
+  assert.throws(() => C.checkEnvelope("photo.0", { blob: "🗻".repeat(C.MESSAGE_BUDGET / 2) }), { code: "STORAGE_SIZE" });
 });
 
 check("slot index parsing, record ownership and put/release planning", () => {
@@ -527,6 +665,46 @@ checkAsync("denied or failed reads leave storage unavailable and nothing is writ
     assert.deepEqual(await db.release([]), [], "no reconciliation without readable storage");
     assert.equal(denied.log.length, 0, "no write was attempted");
   }
+});
+
+checkAsync("a dragged point is written once on release, never per move; unmoved or cancelled drags write nothing", async () => {
+  const kv = host(),
+    db = C.persistence(kv);
+  await db.load();
+  await db.put("pA", edited());
+  const writes = kv.log.length;
+  const drag = C.pointDrag(db.store.pA, { list: "horizon", index: 0 });
+  for (let i = 1; i <= 60; i++) drag.move(0.21 + i / 1000, 0.52 - i / 2000);
+  assert.equal(kv.log.length, writes, "no storage request while the finger moves");
+  const commit = (next) => db.put("pA", next);
+  assert.equal(await drag.release(commit), true);
+  assert.deepEqual(kv.log.slice(writes).map((w) => w.key), [C.recordKey(0)], "one record write, no index write");
+  assert.equal(await drag.release(commit), false, "a second release writes nothing");
+  const reopened = C.persistence(kv);
+  await reopened.load();
+  assert.deepEqual(reopened.store.pA.horizon[0], { x: 0.27, y: 0.49 });
+  // Unmoved (back where it started) and cancelled drags.
+  const still = C.pointDrag(db.store.pA, { list: "marks", index: 0 });
+  still.move(0.3, 0.3);
+  still.move(0.2, 0.5);
+  assert.equal(await still.release(commit), false);
+  const cancelled = C.pointDrag(db.store.pA, { list: "marks", index: 0 });
+  cancelled.move(0.3, 0.3);
+  cancelled.cancel();
+  assert.equal(cancelled.preview, db.store.pA);
+  assert.equal(await cancelled.release(commit), false);
+  assert.equal(kv.log.length, writes + 1);
+  // A failed write rejects the release and leaves the stored point.
+  const failing = host({ failSet: (key) => key !== C.INDEX_KEY }),
+    fdb = C.persistence(failing);
+  await fdb.load();
+  failing.data[C.INDEX_KEY] = C.indexValue(["pA", ...Array(C.MAX_SLOTS - 1).fill(null)]);
+  failing.data[C.recordKey(0)] = C.recordValue("pA", edited());
+  await fdb.load();
+  const lost = C.pointDrag(fdb.store.pA, { list: "marks", index: 1 });
+  lost.move(0.1, 0.1);
+  await assert.rejects(lost.release((next) => fdb.put("pA", next)), { code: "STORAGE_QUOTA" });
+  assert.equal(fdb.store.pA.marks[1].x, 0.6);
 });
 
 checkAsync("a failed release keeps the records and memory for the next successful list", async () => {

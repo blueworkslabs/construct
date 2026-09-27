@@ -1,7 +1,8 @@
 "use strict";
 // Aimé controller: library, capture with viewpoint fixes, photo view with taps,
-// marks, horizon, bearing ruler and candidates. Maths lives in resection.js
-// (unchanged reference solver), bookkeeping in aime-core.js.
+// a magnifier on hold, movable marks and horizon points with one-step undo,
+// bearing ruler, candidates and the map with its distance ruler. Maths lives in
+// resection.js (unchanged reference solver), bookkeeping in aime-core.js.
 const $ = (id) => document.getElementById(id);
 const C = AimeCore,
   S = Resection;
@@ -19,6 +20,8 @@ const state = {
   horizonExplained: false,
   pendingTap: null,
   lastTap: null,
+  preview: null, // sidecar with a point being dragged; stored only on release
+  undo: null, // {id, label, marks, horizon} before the last point edit
   lastList: null, // {rows, wedge, bearing} from the last What's that?
   pane: "photo",
   features: new Map(), // cacheKey → {features, dataset, cells}
@@ -195,6 +198,7 @@ async function task(fn) {
   } finally {
     state.busy = false;
     renderGrid();
+    renderUndo();
     if (state.refreshPending) {
       state.refreshPending = false;
       task(refresh);
@@ -262,7 +266,8 @@ async function takePhoto() {
 }
 
 // ---- Photo view ---------------------------------------------------------------
-const current = () => (state.store && state.store[state.selectedId]) || C.newSidecar(null);
+const saved = () => (state.store && state.store[state.selectedId]) || C.newSidecar(null),
+  current = () => state.preview || saved();
 async function openPhoto(id) {
   const generation = ++state.photoGeneration;
   state.thumbGeneration++;
@@ -290,6 +295,10 @@ async function openPhoto(id) {
   state.lastTap = null;
   state.lastList = null;
   state.pendingTap = null;
+  state.undo = null;
+  gestures.cancel();
+  map.setRuler(false);
+  renderRuler();
   state.view = { scale: 1, x: 0, y: 0 };
   $("library").hidden = true;
   $("photo").hidden = false;
@@ -302,6 +311,7 @@ async function openPhoto(id) {
   showPane(s.viewer ? "photo" : "map", true);
 }
 function showLibrary() {
+  gestures.cancel();
   map.pause(true);
   state.photoGeneration++;
   $("photo").hidden = true;
@@ -332,6 +342,26 @@ async function update(change) {
   render();
   if (state.pane === "map") renderMap(false);
 }
+// Point edits (add, move, remove) keep one undo step, recorded once the write succeeded.
+async function edit(label, change) {
+  const step = C.undoStep(state.selectedId, saved(), label);
+  await update(change);
+  state.undo = step;
+  renderUndo();
+}
+function renderUndo() {
+  const step = state.undo && state.undo.id === state.selectedId ? state.undo : null;
+  $("undo").disabled = !step || state.busy;
+  $("undo").textContent = step ? "Undo " + step.label : "Undo";
+}
+// Where distances and bearings are measured from: the viewpoint fitted from the
+// marks, else the saved one.
+function origin() {
+  const v = current().viewer;
+  if (!v) return null;
+  const fitted = state.cal && S.distance(v, state.cal.viewer) * 1000 > 1;
+  return { point: fitted ? state.cal.viewer : v, fitted };
+}
 function setMode(mode) {
   state.mode = mode;
   for (const m of ["mark", "horizon", "what"]) $("mode-" + m).setAttribute("aria-pressed", String(m === mode));
@@ -341,9 +371,10 @@ function hint() {
   const s = current();
   if (!s.viewer) return "This photo has no usable viewpoint. Set where you stood on the map before marking landmarks.";
   if (s.viewer.review) return "Check the estimated viewpoint: confirm it, or drag it on the map to where you stood.";
-  if (state.mode === "mark") return s.marks.length ? `Tap another landmark you know to fit the lens (optional). ${s.marks.length}/${C.MAX_MARKS} marked.` : "Tap a landmark you know, like a church tower or summit, then pick it from the list.";
-  if (state.mode === "horizon") return `Tap a true level horizon: ${s.horizon.length}/${C.MAX_HORIZON} points.`;
-  return state.cal ? "Tap anything to see what it could be." : "Mark a landmark you know first.";
+  const precise = s.marks.length || s.horizon.length ? " Press and hold to magnify; drag a point to move it." : " Press and hold to magnify.";
+  if (state.mode === "mark") return (s.marks.length ? `Tap another landmark you know to fit the lens (optional). ${s.marks.length}/${C.MAX_MARKS} marked.` : "Tap a landmark you know, like a church tower or summit, then pick it from the list.") + precise;
+  if (state.mode === "horizon") return `Tap a true level horizon: ${s.horizon.length}/${C.MAX_HORIZON} points.` + precise;
+  return state.cal ? "Tap anything to see what it could be." + precise : "Mark a landmark you know first.";
 }
 function render() {
   if ($("photo").hidden) return;
@@ -393,7 +424,7 @@ function render() {
       li.append(span);
       ul.append(li);
     }
-    for (const [label, detail, remove] of rows) {
+    for (const [label, detail, remove, name] of rows) {
       const li = document.createElement("li"),
         span = document.createElement("span"),
         small = document.createElement("small"),
@@ -404,25 +435,29 @@ function render() {
       b.textContent = "Remove";
       b.className = "quiet";
       b.setAttribute("aria-label", "Remove " + label);
-      b.onclick = () => task(() => update(remove));
+      b.onclick = () => task(() => edit("removing " + name, remove));
       li.append(span, b);
       ul.append(li);
     }
   };
+  const o = origin();
+  $("range-note").textContent = o && s.marks.length ? `Distance and bearing from ${o.fitted ? "the viewpoint fitted from your marks" : "your viewpoint"}.` : "";
   list(
     "marks",
     s.marks.map((m, i) => [
       m.name,
-      `${C.kindLabel(m)}${v ? " · " + C.km(S.distance(v, m)) + " · " + Math.round(S.bearing(v, m)) + "°" : ""}${state.cal ? " · residual " + C.signed(S.diff(S.bearingAt(state.cal, m.x, m.y), S.bearing(state.cal.viewer, m))) : ""}`,
+      `${C.kindLabel(m)}${o ? " · " + C.range(S.distance(o.point, m), S.bearing(o.point, m)) : ""}${state.cal ? " · residual " + C.signed(S.diff(S.bearingAt(state.cal, m.x, m.y), S.bearing(state.cal.viewer, m))) : ""}`,
       (x) => ({ ...x, marks: x.marks.filter((_, j) => j !== i) }),
+      m.name,
     ]),
     "None yet.",
   );
   list(
     "horizon-points",
-    s.horizon.map((h, i) => [`Point ${i + 1}`, `at ${Math.round(h.x * 100)} % across, ${Math.round(h.y * 100)} % down`, (x) => ({ ...x, horizon: x.horizon.filter((_, j) => j !== i) })]),
+    s.horizon.map((h, i) => [`Point ${i + 1}`, `at ${Math.round(h.x * 100)} % across, ${Math.round(h.y * 100)} % down`, (x) => ({ ...x, horizon: x.horizon.filter((_, j) => j !== i) }), `horizon point ${i + 1}`]),
     "None. Optional: levels tilted photos.",
   );
+  renderUndo();
   drawOverlay();
   drawRuler();
   $("mode-mark").title = $("mode-horizon").title = v ? "" : "Set the viewpoint on the map first";
@@ -473,25 +508,77 @@ function normalised(clientX, clientY) {
   const r = $("frame").getBoundingClientRect();
   return { x: (clientX - r.left) / r.width, y: (clientY - r.top) / r.height };
 }
-(() => {
+// One finger: a short tap acts at once, as before. Press and hold (or slide at
+// fit, as in Pocket Measure) shows the magnifier and release places the point
+// under the finger. Pressing on a mark or horizon point and dragging moves it:
+// the fit updates live, one frame at a time, and storage is written on release.
+// Zoomed in, a drag from empty photo pans; two fingers pinch.
+const gestures = (() => {
   const stage = $("stage"),
     pointers = new Map();
-  let drag = null,
+  let g = null, // {id, x, y, vx, vy, finger, moved, hold, pan, hit, drag}
     pinch = null,
+    completedTap = null,
+    holdTimer = 0,
+    tapTimer = 0,
+    frame = 0;
+  const local = (e) => {
+    const r = stage.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+  // Pointer-driven redraws coalesce to one per frame: live fit, then the loupe.
+  const paint = () => {
+    if (frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      if (!g || !(g.drag || g.hold)) return;
+      if (g.drag) {
+        recalibrate();
+        render();
+      }
+      drawLoupe(g.finger, g.drag ? g.drag.preview[g.hit.list][g.hit.index] : normalisedLocal(g.finger), g.drag ? g.hit : null);
+    });
+  };
+  function cancel() {
+    clearTimeout(holdTimer);
+    if (g && g.drag) {
+      g.drag.cancel();
+      endPreview();
+    }
+    g = null;
+    hideLoupe();
+  }
+  const fireTap = () => {
+    clearTimeout(tapTimer);
+    const p = completedTap;
     completedTap = null;
+    if (p) onTap(p.x, p.y);
+  };
   stage.addEventListener("pointerdown", (e) => {
     completedTap = null;
+    clearTimeout(tapTimer);
     if (e.target.closest(".zoom")) return;
     stage.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 2) {
+      cancel();
       const [a, b] = [...pointers.values()],
         r = stage.getBoundingClientRect();
       const cx = (a.x + b.x) / 2 - r.left, cy = (a.y + b.y) / 2 - r.top;
       pinch = { distance: Math.hypot(a.x - b.x, a.y - b.y) || 1, scale: state.view.scale,
         anchorX: (cx - state.view.x) / state.view.scale, anchorY: (cy - state.view.y) / state.view.scale };
-      drag = null;
-    } else if (pointers.size === 1) drag = { id: e.pointerId, x: e.clientX, y: e.clientY, vx: state.view.x, vy: state.view.y, moved: false };
+    } else if (pointers.size === 1) {
+      const p = normalised(e.clientX, e.clientY),
+        { w, h } = stageSize(),
+        hit = !state.busy && state.image ? C.hitPoint(saved(), p.x, p.y, w * state.view.scale, h * state.view.scale) : null;
+      g = { id: e.pointerId, x: e.clientX, y: e.clientY, vx: state.view.x, vy: state.view.y, finger: local(e), moved: false, hold: false, pan: false, hit, drag: null };
+      holdTimer = setTimeout(() => {
+        if (g && !g.moved) {
+          g.hold = true;
+          paint();
+        }
+      }, C.HOLD_MS);
+    }
   });
   stage.addEventListener("pointermove", (e) => {
     if (!pointers.has(e.pointerId)) return;
@@ -505,43 +592,72 @@ function normalised(clientX, clientY) {
       state.view.y = (a.y + b.y) / 2 - r.top - pinch.anchorY * state.view.scale;
       clampView();
       applyView();
-    } else if (drag && drag.id === e.pointerId) {
-      const dx = e.clientX - drag.x,
-        dy = e.clientY - drag.y;
-      if (Math.hypot(dx, dy) > 8) drag.moved = true;
-      if (drag.moved && state.view.scale > 1) {
-        state.view.x = drag.vx + dx;
-        state.view.y = drag.vy + dy;
+    } else if (g && g.id === e.pointerId) {
+      const dx = e.clientX - g.x,
+        dy = e.clientY - g.y;
+      g.finger = local(e);
+      if (!g.moved && Math.hypot(dx, dy) > C.TAP_SLOP) {
+        g.moved = true;
+        clearTimeout(holdTimer);
+        if (g.hit && !state.busy) g.drag = C.pointDrag(saved(), g.hit);
+        else if (!g.hold && state.view.scale > 1) g.pan = true;
+        else g.hold = true;
+      }
+      if (g.drag) {
+        const p = normalised(e.clientX, e.clientY);
+        state.preview = g.drag.move(p.x, p.y);
+        paint();
+      } else if (g.pan) {
+        state.view.x = g.vx + dx;
+        state.view.y = g.vy + dy;
         clampView();
         applyView();
-      }
+      } else if (g.hold) paint();
     }
   });
   const release = (e) => {
     const wasPinch = !!pinch;
     pointers.delete(e.pointerId);
     if (pinch && pointers.size < 2) pinch = null;
-    if (wasPinch) {
-      drag = null;
+    if (wasPinch || !g || g.id !== e.pointerId) return;
+    if (e.type !== "pointerup") return cancel();
+    clearTimeout(holdTimer);
+    const done = g;
+    g = null;
+    hideLoupe();
+    if (done.drag) {
+      // The moved point stays on screen until its single write settles.
+      if (done.drag.moved && !state.busy) task(() => commitMove(done.drag));
+      else endPreview();
       return;
     }
-    if (!drag || drag.id !== e.pointerId) return;
-    const tap = !drag.moved && e.type === "pointerup";
-    drag = null;
-    if (tap) {
-      const p = normalised(e.clientX, e.clientY);
-      if (p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1) completedTap = p;
-    }
+    if (done.pan || (done.moved && !done.hold)) return;
+    const p = normalised(e.clientX, e.clientY),
+      f = local(e),
+      { w, h } = stageSize();
+    if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1 || f.x < 0 || f.y < 0 || f.x > w || f.y > h) return;
+    completedTap = p;
+    // A long press may end without a compatibility click; place the point anyway.
+    if (done.hold) tapTimer = setTimeout(fireTap, 250);
   };
   stage.addEventListener("pointerup", release);
   stage.addEventListener("pointercancel", release);
-  stage.addEventListener("click", () => {
-    // A modal opened on pointerup can receive the compatibility click from
-    // that same touch. Activate only during click, whose target is now fixed.
-    const p = completedTap;
-    completedTap = null;
-    if (p) onTap(p.x, p.y);
+  // Some Android WebViews end a touch without pointercancel or drop capture.
+  stage.addEventListener("touchcancel", () => {
+    pointers.clear();
+    pinch = null;
+    cancel();
   });
+  stage.addEventListener("lostpointercapture", (e) => {
+    if (g && g.id === e.pointerId && pointers.has(e.pointerId)) {
+      pointers.delete(e.pointerId);
+      cancel();
+    }
+  });
+  stage.addEventListener("contextmenu", (e) => e.preventDefault());
+  // A modal opened on pointerup can receive the compatibility click from that
+  // same touch. Activate only during click, whose target is now fixed.
+  stage.addEventListener("click", fireTap);
   stage.addEventListener(
     "wheel",
     (e) => {
@@ -558,7 +674,27 @@ function normalised(clientX, clientY) {
     state.view = { scale: 1, x: 0, y: 0 };
     applyView();
   };
+  return { cancel };
 })();
+// Stage pixel → photo point.
+function normalisedLocal(f) {
+  const r = $("stage").getBoundingClientRect();
+  return normalised(r.left + f.x, r.top + f.y);
+}
+async function commitMove(drag) {
+  const name = C.pointName(saved(), drag.hit);
+  try {
+    if (await drag.release((next) => edit("moving " + name, () => next))) say("photo-status", `${drag.hit.list === "horizon" ? "H" + name.slice(1) : name} moved.${state.calError ? " Calibration failed: " + state.calError : ""}`);
+  } finally {
+    endPreview();
+  }
+}
+// Back to the stored sidecar: after a move is written, failed or cancelled.
+function endPreview() {
+  state.preview = null;
+  recalibrate();
+  render();
+}
 function onTap(x, y) {
   if (state.busy) return;
   const s = current();
@@ -572,7 +708,7 @@ function onTap(x, y) {
   } else if (state.mode === "horizon") {
     if (s.horizon.length >= C.MAX_HORIZON) return say("photo-status", "Two horizon points are set. Remove one to change it.", "attention");
     task(async () => {
-      await update((x0) => ({ ...x0, horizon: [...x0.horizon, { x, y }] }));
+      await edit(`adding horizon point ${s.horizon.length + 1}`, (x0) => ({ ...x0, horizon: [...x0.horizon, { x, y }] }));
       const n = current().horizon.length;
       say("photo-status", n < C.MAX_HORIZON ? "Horizon point saved. Tap a second point well apart from the first." : state.cal && state.cal.level === "fitted" ? "Horizon levelled. Level estimated." : "Horizon points saved.");
       if (n >= C.MAX_HORIZON) setMode(state.cal ? "what" : "mark");
@@ -671,6 +807,87 @@ function drawRuler() {
   }
 }
 
+// ---- Magnifier ------------------------------------------------------------------
+// Drawing only (Pocket Measure's loupe): a magnified circle lifted off the
+// finger with a crosshair on the photo point under it, red off the photo.
+// `skip` is the point being dragged: the crosshair stands for it.
+function drawLoupe(finger, point, skip) {
+  const canvas = $("loupe"),
+    img = $("picture"),
+    { w, h } = stageSize(),
+    v = state.view,
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+  if (!img.naturalWidth || !img.naturalHeight) return;
+  canvas.hidden = false;
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+  const g = canvas.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const diameter = Math.max(72, Math.min(128, Math.floor(Math.min(w, h) * 0.42))),
+    place = C.loupePlacement(finger, w, h, diameter, Math.round(diameter * 0.72)),
+    valid = point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1 && finger.x >= 0 && finger.y >= 0 && finger.x <= w && finger.y <= h,
+    at = { x: Math.max(0, Math.min(1, point.x)), y: Math.max(0, Math.min(1, point.y)) },
+    crop = C.loupe(at, img.naturalWidth, img.naturalHeight, w * v.scale, diameter),
+    k = w * v.scale * C.LOUPE_MAGNIFICATION,
+    kh = h * v.scale * C.LOUPE_MAGNIFICATION,
+    s = current();
+  g.save();
+  g.beginPath();
+  g.arc(place.x, place.y, place.r, 0, Math.PI * 2);
+  g.lineWidth = 6;
+  g.strokeStyle = "rgba(6,17,11,.55)";
+  g.stroke();
+  g.clip();
+  g.fillStyle = "#122019";
+  g.fillRect(place.x - place.r, place.y - place.r, diameter, diameter);
+  if (crop.w > 0 && crop.h > 0) g.drawImage(img, crop.x, crop.y, crop.w, crop.h, place.x - place.r + crop.dx, place.y - place.r + crop.dy, crop.w * crop.scale, crop.h * crop.scale);
+  // Other points, magnified around the crosshair.
+  const others = (list, colour, ring) =>
+    s[list].forEach((p, i) => {
+      if (skip && skip.list === list && skip.index === i) return;
+      g.beginPath();
+      g.arc(place.x + (p.x - at.x) * k, place.y + (p.y - at.y) * kh, ring ? 8 : 5, 0, Math.PI * 2);
+      g.lineWidth = 2;
+      if (ring) g.strokeStyle = colour;
+      else (g.fillStyle = colour), g.fill(), (g.strokeStyle = "#06110B");
+      g.stroke();
+    });
+  others("marks", "#5FD3A0", false);
+  others("horizon", "#E9C46A", true);
+  const arm = place.r * 0.7,
+    tone = valid ? "#5FD3A0" : "#F08A7E";
+  for (const [colour, width] of [["rgba(6,17,11,.65)", 3], [tone, 1]]) {
+    g.strokeStyle = colour;
+    g.lineWidth = width;
+    g.beginPath();
+    g.moveTo(place.x - arm, place.y);
+    g.lineTo(place.x + arm, place.y);
+    g.moveTo(place.x, place.y - arm);
+    g.lineTo(place.x, place.y + arm);
+    g.stroke();
+  }
+  g.beginPath();
+  g.arc(place.x, place.y, 5, 0, Math.PI * 2);
+  g.strokeStyle = tone;
+  g.lineWidth = 1.5;
+  g.stroke();
+  g.restore();
+  g.beginPath();
+  g.arc(place.x, place.y, place.r, 0, Math.PI * 2);
+  g.strokeStyle = "#E6F0EA";
+  g.lineWidth = 2;
+  g.stroke();
+}
+function hideLoupe() {
+  const canvas = $("loupe");
+  if (canvas.hidden) return;
+  canvas.hidden = true;
+  canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+}
+
 // ---- Features and marks -----------------------------------------------------------
 function currentKey() {
   const s = current();
@@ -728,12 +945,13 @@ function renderResults() {
     ul = $("results");
   ul.replaceChildren();
   if (!data) return;
-  for (const { feature: f, distanceM } of C.search(data.features, $("search").value, current().viewer)) {
+  const from = origin().point;
+  for (const { feature: f, distanceM } of C.search(data.features, $("search").value, from)) {
     const li = document.createElement("li"),
       b = document.createElement("button"),
       small = document.createElement("small");
     b.textContent = f.name;
-    small.textContent = [C.kindLabel(f), C.km(distanceM / 1000), C.sizeLabel(f)].filter(Boolean).join(" · ");
+    small.textContent = [C.kindLabel(f), C.range(distanceM / 1000, S.bearing(from, f)), C.sizeLabel(f)].filter(Boolean).join(" · ");
     b.append(small);
     b.onclick = () => pick(f);
     li.append(b);
@@ -754,7 +972,7 @@ function pick(feature) {
   state.pendingTap = null;
   task(async () => {
     const mark = C.markFrom(feature, tap.x, tap.y);
-    await update((s) => ({ ...s, marks: [...s.marks.filter((m) => !C.sameFeature(m, mark)), mark] }));
+    await edit("adding " + mark.name, (s) => ({ ...s, marks: [...s.marks.filter((m) => !C.sameFeature(m, mark)), mark] }));
     if (state.calError) say("photo-status", "Mark saved, but calibration failed: " + state.calError, "attention");
     else if (current().marks.length === 1) {
       say("photo-status", `Calibrated on ${mark.name}. Mark another to fit the lens, or tap What’s that?`);
@@ -782,7 +1000,8 @@ async function whatsThat(x, y) {
   const wedge = ranked.length ? ranked[0].wedgeSigmaDeg : S.uncertainty(state.cal, x, y);
   state.lastList = { rows: list.rows, wedge, bearing: S.bearingAt(state.cal, x, y), partialCoverage: data.partialCoverage };
   $("candidates-title").textContent = list.anyClose ? "Could be" : "No close match";
-  $("candidates-note").textContent = `Your tap points ${Math.round(S.bearingAt(state.cal, x, y))}° (${C.compass(S.bearingAt(state.cal, x, y))}), direction ±${wedge.toFixed(1)}°.` + (list.anyClose ? "" : " Nearest two shown greyed.") + (data.partialCoverage ? " " + C.coverageNote(data) : "");
+  const o = origin();
+  $("candidates-note").textContent = `Your tap points ${C.degrees(S.bearingAt(state.cal, x, y))}° (${C.compass(S.bearingAt(state.cal, x, y))}), direction ±${wedge.toFixed(1)}°. Distances and bearings from ${o.fitted ? "the fitted viewpoint" : "your viewpoint"}.` + (list.anyClose ? "" : " Nearest two shown greyed.") + (data.partialCoverage ? " " + C.coverageNote(data) : "");
   let positionNote = false;
   list.rows.forEach((r, i) => {
     const li = document.createElement("li"),
@@ -791,7 +1010,7 @@ async function whatsThat(x, y) {
       f = r.candidate.feature;
     li.className = r.greyed ? "greyed" : "";
     b.textContent = `${r.greyed ? "" : "Could be "}${f.name}`;
-    small.textContent = `${C.kindLabel(f)} · ${C.km(r.distanceKm)} · ${C.signed(r.deltaDeg)} from your tap · ±${r.sigmaDeg.toFixed(1)}°${r.close ? "" : " · not close"}`;
+    small.textContent = `${C.kindLabel(f)} · ${C.range(r.distanceKm, r.bearing)} · ${C.signed(r.deltaDeg)} from your tap · ±${r.sigmaDeg.toFixed(1)}°${r.close ? "" : " · not close"}`;
     if (C.positionMatters(r)) positionNote = true;
     b.append(small);
     b.onclick = () => {
@@ -830,10 +1049,28 @@ const map = new AimeMap($("map"), {
   },
   onError: (error) =>
     say("map-status", !error ? "" : error.code === "CAPABILITY_DENIED" ? "Map tiles need internet access for Aimé (Construct menu → Module access)." : "Map tiles unavailable. The list below still describes the map.", error ? "attention" : ""),
+  onRuler: () => renderRuler(),
+  rulerLabel: (m) => C.range(m.km, m.bearing),
 });
+// Map ruler: two taps → great-circle distance and initial bearing from the first.
+function renderRuler() {
+  const r = map.ruler,
+    n = r ? r.points.length : 0,
+    m = n === 2 ? AimeMap.measure(r.points[0], r.points[1]) : null;
+  $("map-ruler").setAttribute("aria-pressed", String(!!r));
+  $("map-ruler-clear").disabled = !n;
+  $("map-ruler-status").textContent = !r
+    ? ""
+    : m
+      ? `Ruler: ${C.km(m.km)}, initial bearing ${C.degrees(m.bearing)}° (${C.compass(m.bearing)}) from the first point, along the great circle. Tap again to start a new measurement.`
+      : n
+        ? "Ruler: tap the second point."
+        : "Ruler: tap two points on the map. A tap near your viewpoint or a pin measures from it exactly.";
+}
 map.pause(true);
 window.addEventListener("constructvisibilitychange", (event) => {
   state.visible = event.detail?.visible !== false;
+  if (!state.visible) gestures.cancel();
   map.pause(!state.visible || $("photo").hidden || state.pane !== "map");
 });
 // A dragged or placed viewpoint is the user's input: corrected, confirmed, with
@@ -886,7 +1123,7 @@ function renderMap(fit, focus = null) {
     fitted = cal && v && S.distance(v, cal.viewer) * 1000 > 1 ? { lat: cal.viewer.lat, lon: cal.viewer.lon } : null;
   const candidates = list ? list.rows.map((r, i) => ({ lat: r.candidate.point.lat, lon: r.candidate.point.lon, n: i + 1, greyed: r.greyed, name: r.candidate.feature.name })) : [];
   const lengthKm = Math.max(s.radiusKm, ...candidates.map((c) => S.distance(fitted || v || c, c) * 1.1));
-  map.placing = !v;
+  map.placing = !v; // While the ruler is on, taps measure instead.
   map.editable = !!v;
   map.setScene(
     {
@@ -909,7 +1146,9 @@ function renderMap(fit, focus = null) {
     map.draw();
   }
   $("map-hint").textContent = !v
-    ? "Set your viewpoint: tap the map where you stood when taking this photo. Pan and zoom first to place it precisely."
+    ? map.ruler
+      ? "Ruler on: taps measure. Turn the ruler off to set your viewpoint."
+      : "Set your viewpoint: tap the map where you stood when taking this photo. Pan and zoom first to place it precisely."
     : v.review
       ? "Drag the ring to where you stood, or confirm the estimated viewpoint above."
       : "Drag the ring to correct where you stood. The wedge shows your last tap’s direction: ±1σ, fainter out to ±2σ.";
@@ -932,12 +1171,14 @@ function renderMap(fit, focus = null) {
     if (fitted) item("Dot: viewpoint fitted from your marks", `${Math.round(S.distance(v, fitted) * 1000)} m from the ring; your saved viewpoint is unchanged`);
   }
   if (list && list.partialCoverage) item("Partial landmark coverage", C.coverageNote(list));
-  if (v && list) item(`Wedge: your tap points ${Math.round(list.bearing)}° (${C.compass(list.bearing)})`, `±${list.wedge.toFixed(1)}° (1σ), fainter band to ±${(2 * list.wedge).toFixed(1)}° (2σ); nearby candidates can have a wider ±σ of their own`);
-  s.marks.forEach((m) => item(`Green pin: ${m.name}`, v ? `landmark you marked · ${C.km(S.distance(v, m))} · ${Math.round(S.bearing(v, m))}°` : "landmark you marked"));
+  if (v && list) item(`Wedge: your tap points ${C.degrees(list.bearing)}° (${C.compass(list.bearing)})`, `±${list.wedge.toFixed(1)}° (1σ), fainter band to ±${(2 * list.wedge).toFixed(1)}° (2σ); nearby candidates can have a wider ±σ of their own`);
+  const from = origin();
+  s.marks.forEach((m) => item(`Green pin: ${m.name}`, from ? `landmark you marked · ${C.range(S.distance(from.point, m), S.bearing(from.point, m))}` : "landmark you marked"));
   candidates.forEach((c, i) => {
     const r = list.rows[i];
-    item(`Pin ${c.n}: ${c.name}${i === focus ? " (selected)" : ""}`, `${r.greyed ? "not close · " : "could be · "}${C.km(r.distanceKm)} · ${C.signed(r.deltaDeg)} ±${r.sigmaDeg.toFixed(1)}°`);
+    item(`Pin ${c.n}: ${c.name}${i === focus ? " (selected)" : ""}`, `${r.greyed ? "not close · " : "could be · "}${C.range(r.distanceKm, r.bearing)} · ${C.signed(r.deltaDeg)} ±${r.sigmaDeg.toFixed(1)}°`);
   });
+  if (v && (s.marks.length || candidates.length)) item("Distances and bearings", `from ${from.fitted ? "the fitted viewpoint (dot)" : "your viewpoint (ring)"}`);
 }
 
 // ---- Wiring ---------------------------------------------------------------------
@@ -947,6 +1188,24 @@ $("show-map").onclick = () => showPane("map", true);
 $("map-zoom-in").onclick = () => map.zoomBy(1);
 $("map-zoom-out").onclick = () => map.zoomBy(-1);
 $("map-fit").onclick = () => renderMap(true);
+$("map-ruler").onclick = () => {
+  map.setRuler(!map.ruler);
+  renderRuler();
+  renderMap(false);
+};
+$("map-ruler-clear").onclick = () => {
+  map.clearRuler();
+  renderRuler();
+};
+$("undo").onclick = () =>
+  task(async () => {
+    const step = state.undo;
+    if (!step || step.id !== state.selectedId) return;
+    await update((s) => C.undone(s, step));
+    state.undo = null;
+    renderUndo();
+    say("photo-status", `Undone: ${step.label}.${state.calError ? " Calibration failed: " + state.calError : ""}`);
+  });
 $("locate-start").onclick = () =>
   task(async () => {
     say("map-status", "Reading your current location to centre the map…");
