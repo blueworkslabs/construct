@@ -7,7 +7,7 @@ offline/429 with a single retry, mark → calibrated ruler, horizon → level li
 tap → candidates → map, rotation, 2× text, delete → stored record reconciled.
 The real Aimé package (dev.construct.aime) then proves the real location and
 internet gates: location off → unlocated photo opens on the map; with an injected
-emulator fix, one real Overpass request returns named landmarks.
+emulator fix, live Overpass returns named landmarks.
 Physical-phone accuracy is the pilot tester's viewpoint test, not claimed here.
 """
 import argparse,datetime,fcntl,hashlib,json,os,re,subprocess,time,uuid
@@ -277,10 +277,28 @@ try:
  for _ in range(3):adb('emu','geo','fix',lon,lat);time.sleep(1)
  to_library();shoot();contains('Estimated viewpoint',60)
  click('Mark landmark');tap_photo({'x':.5,'y':.5})
- found=contains('landmarks within 30 km',40);receipt['realOverpass']=found;save()
- assert re.match(r'^[1-9]\d* landmarks within 30 km',found),found
+ # The loading sentence also contains "landmarks within 30 km". Only a
+ # completed count is success; wait for it rather than matching that fragment.
+ found=None
+ for request in range(2):
+  error=None
+  until=time.monotonic()+45
+  while time.monotonic()<until:
+   text=labels()
+   found=next((t for t in text if t and re.match(r'^[1-9]\d* landmarks within 30 km',t)),None)
+   if found:break
+   error=next((t for t in text if t and re.search(r'\[(?:OVERPASS_|HTTP_|CAPABILITY_|LOCATION_)[A-Z_]*\]',t)),None)
+   if error:break
+   time.sleep(.5)
+  if found:break
+  if request==0 and error and any(t=='Retry' for t in labels()) and ('[OVERPASS_BUSY]' in error or '[HTTP_' in error):
+   receipt['realOverpassRetryReason']=error;save();capture('aime-real-overpass-retry')
+   time.sleep(30);click(lambda t:t=='Retry')
+  else:raise RuntimeError('Real Overpass lookup did not complete: '+str(error))
+ assert found,'No named landmarks after bounded retry'
+ receipt['realOverpass']=found;receipt['realOverpassAttempts']=request+1;save()
  capture('aime-real-overpass');click(lambda t:t=='Cancel')
- done('Real module: injected fix → estimated viewpoint → one real Overpass request returns named landmarks')
+ done('Real module: injected fix → estimated viewpoint → live Overpass returns named landmarks')
  receipt['complete']=True
 except Exception as e:
  receipt['error']=str(e)
