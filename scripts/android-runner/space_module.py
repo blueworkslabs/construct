@@ -233,11 +233,11 @@ try:
  # Grant-denied attempts never reached the provider: reopening must fetch
  # automatically, with no compensating manual refresh.
  contains('Your location',45)
- reach_text('CelesTrak');end=time.monotonic()+45
- while time.monotonic()<end:
-  if any(re.match(r'^Orbit data .+ old · CelesTrak',t or '') for t in labels()):break
-  time.sleep(.5)
- else:raise RuntimeError('Real CelesTrak download did not complete')
+ # Loading the object list moves the status below the viewport. Read the
+ # settled result via actual scrolling, not only currently exposed XML text.
+ status=reach_text('Orbit data ')
+ assert re.match(r'^Orbit data .+ old · CelesTrak',status), ('Live orbit data not ready',status)
+ receipt['realDataStatus']=status;save()
  reveal('Sky dome:');capture('space-real-network');receipt['realCounts']=contains('above you')
  done('Real module: native granted fix and live CelesTrak orbits populate the sky')
  # Cached sky with actual connectivity disabled, no hidden replacement data.
