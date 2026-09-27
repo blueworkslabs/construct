@@ -218,7 +218,7 @@ try:
  second=measured(-10,0,'2×');done('Pitch -10° (looking up) reports pitchDeg < 0 at 2×')
  pair=check_zoom_pair(first,second)
  receipt['zoomPair']=pair or 'fov follows 2·atan(tan(fov1/2)/2)';save()
- require(not pair or pair==['fovDeg omitted; zoom pair not comparable'],'2× FOV is not the digital crop of 1×: %r'%pair)
+ require(not pair,'Expected measurable centred emulator FOV and matching 1×/2× digital crop: %r'%pair)
  measured(0,10,'1×');done('Roll +10° (right side down) reports rollDeg > 0')
  measured(0,-10,'2×');done('Roll -10° (right side up) reports rollDeg < 0')
  level=measured(0,0,'1×')
@@ -229,6 +229,9 @@ try:
  require(screenshot_black('module-switch-off-again'),'Turning the switch off did not restore FLAG_SECURE')
  done('Turning Allow screenshots off restores FLAG_SECURE')
  installed_apk()
+ tap('Construct menu')
+ receipt['fovDiagnostics']=[e for e in diagnostics() if e.get('code')=='CAPTURE_FOV']
+ require(bool(receipt['fovDiagnostics']),'Missing native FOV source/omission diagnostics')
  receipt['complete']=True
 except Exception as e:
  receipt['error']=str(e)
