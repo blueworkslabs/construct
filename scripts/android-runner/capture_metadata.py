@@ -37,6 +37,20 @@ def capture(name):
  adb_capture(name);target=run/(name+'-display');target.mkdir()
  adb('emu','screenrecord','screenshot',str(target))
  require(len(list(target.glob('*.png')))==1,'Missing synthetic console capture')
+def recents_capture(name):
+ capture(name)
+ # Preserve lifecycle/window state next to the actual console image. FLAG_SECURE
+ # screenshots alone cannot prove that Launcher is hiding a live task surface.
+ for section in ('activities','top'):
+  (run/(name+'-activity-'+section+'.txt')).write_text(adb('shell','dumpsys','activity',section))
+ (run/(name+'-windows.txt')).write_text(adb('shell','dumpsys','window','windows'))
+ from PIL import Image
+ path=next((run/(name+'-display')).glob('*.png'))
+ image=Image.open(path).convert('RGB');w,h=image.size
+ # Centre of the settled task tile, away from Launcher icon/label/rounded edges.
+ # Exact-profile check only; preserve the full raw image for mandatory visual review.
+ sample=image.crop((w//4,h//3,3*w//4,2*h//3))
+ require(secure_blackout(list(sample.getdata())),'Recents live task contents are visible: '+name)
 def screenshot_black(name):
  from PIL import Image
  raw=adb('exec-out','screencap','-p',binary=True);(run/(name+'-adb.png')).write_bytes(raw)
@@ -197,7 +211,7 @@ try:
  require(switch('Allow screenshots',True)=='false','Allow screenshots must default to off')
  require(any(t and 'Off by default.' in t for t in labels()),'Missing Allow screenshots copy')
  reopen();require(not screenshot_black('module-switch-on'),'Module screen still black with Allow screenshots on')
- adb('shell','input','keyevent','KEYCODE_APP_SWITCH');time.sleep(1.5);capture('recents-switch-on')
+ adb('shell','input','keyevent','KEYCODE_APP_SWITCH');time.sleep(1.5);recents_capture('recents-switch-on')
  receipt['recents']='Captured with screenshot opt-in enabled; visual review required';save()
  # Backgrounding ends ModuleActivity's session; return to the host, then
  # reopen explicitly after the process restart instead of expecting old controls.
@@ -207,7 +221,7 @@ try:
  act('Open photo confirmation',wait=False);find('Delete this private photo?')
  require(screenshot_black('photo-confirmation-switch-on'),'Native photo confirmation exposed private pixels')
  capture('photo-confirmation-secure')
- adb('shell','input','keyevent','KEYCODE_APP_SWITCH');time.sleep(1.5);capture('recents-photo-confirmation')
+ adb('shell','input','keyevent','KEYCODE_APP_SWITCH');time.sleep(1.5);recents_capture('recents-photo-confirmation')
  adb('shell','input','keyevent','KEYCODE_BACK');adb('shell','am','force-stop','dev.construct.runtime');opened()
 
  before=viewfinder('Capture plain');require(screenshot_black('viewfinder-switch-on'),'Native viewfinder dropped FLAG_SECURE')
