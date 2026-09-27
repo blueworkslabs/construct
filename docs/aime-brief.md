@@ -241,25 +241,32 @@ pre-built static files, built monthly from Overture Maps in the separate
 **data contract (schema 1) lives in that repository's README**; the module
 depends on it, not on Overture directly. Summary:
 
-- `v1/index.json`: release, coverage (`DE`, `AT` for the pilot), the list of
-  non-empty 1° cells, the `kinds` table with `placementM` per kind, licence
-  and attribution. Fetched once per session.
-- `v1/<release>/cells/<lat>_<lon>.json`: features `[name, kind, lat, lon, e,
-  w]` with `e` = elevation (terrain) or height (structures), `w` = visibility
-  weight 0.5–2.0. Each cell under 1 MiB (host cap 2 MiB); the spike's largest
-  was 113 KiB.
+- `v1/index.json`: Overture `release`, data `revision` and `dataset`
+  (`<release>-r<N>`), coverage (`DE`, `AT` for the pilot), the list of
+  non-empty 1° cells, the allowed kinds, licence and attribution. Fetched once
+  per session.
+- `v1/<dataset>/cells/<lat>_<lon>.json`: features `[name, kind, lat, lon, e,
+  w, p]` with `e` = elevation (terrain) or height (structures), `w` =
+  visibility weight 0.5–2.0, `p` = per-feature position uncertainty in metres.
+  Each cell under 1 MiB (host cap 2 MiB); the spike's largest was 113 KiB.
+  A published dataset path is never rewritten; corrections within one
+  Overture release get a new revision.
 - For a confirmed viewpoint and radius (10/30/60 km picker, default 30 km)
   the module fetches only the cells listed in the index that intersect the
   radius's bounding box: at most 9 at 60 km, within the host's four concurrent
   requests. Cells are cached in memory for the session and reused for marks
   and candidates; name search is a local filter.
-- Each landmark's position uncertainty in the solver is its kind's
-  `placementM` (8 m points, 25 m building centroids, 30 m places-derived,
-  50 m bridges and dams).
+- Each landmark's position uncertainty in the solver is its own `p`, used
+  directly as `positionM` for marks and candidates. The pipeline derives it
+  from provenance and footprint: `max(source floor, 0.5 × bbox
+  half-diagonal)`, floors 8 m for OSM-derived base features, 10 m for
+  building footprints, 60 m for places-derived POIs, 250 m for places-only
+  mountains; merges never lower it. There is no kind-level default.
 - Outside coverage (viewpoint radius touching no listed cell) the module says
   "No landmark data here yet. Germany and Austria for now." A failed download
   is shown as a failure with retry, never as an empty result. A cell whose
-  `schema` or `release` does not match the index is rejected as unavailable.
+  `schema`, `release` or `revision` does not match the index, or any feature
+  without a valid `p`, is rejected as unavailable.
 - What leaves the phone: **the ids of the 1° cells** the radius touches (about
   110 × 70 km each) to the data host, and tile coordinates to OpenStreetMap.
   Never the viewpoint, the radius, the photo, the marks or the taps.
@@ -267,7 +274,7 @@ depends on it, not on Overture directly. Summary:
   ODbL licence from `index.json` appear in the module's help and on the map.
 - **Sidecar per photo** (`storage.kv`, key `photos`, a map from stable photo
   id): `{ viewer: {lat, lon, accuracyM, timestamp, approximate, corrected},
-  radiusKm, marks: [{x, y, kind, name, lat, lon, positionM, release}], horizon: [{x, y}],
+  radiusKm, marks: [{x, y, kind, name, lat, lon, positionM, dataset}], horizon: [{x, y}],
   pose?: {heading, fov, pitch, roll, sigma} }`. Position and radius saved
   automatically after capture; marks and horizon as the user adds them; the
   pose is derived and re-fitted on load, stored only as a display cache. Names
