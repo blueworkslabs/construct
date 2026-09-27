@@ -139,6 +139,86 @@ class CaptureMetadataTest {
         assertTrue("Unknown physical lenses count as possible switches", CaptureGeometry.lensSwitchPossible(true, lens, listOf(lens, null), 2.0))
     }
 
+    // ---- FOV from the still frame's own capture result ----
+
+    private val mainGeometry = lens.geometry
+    /** Ultrawide on a different sensor; 2 mm lens. */
+    private val wideGeometry = SensorGeometry(4.0, 3.0, 4000, 3000, 4000, 3000)
+    /** Pixel-8a-like logical camera "0": the main sensor's geometry, two focal lengths, physical "2" (main) and "3" (ultrawide). */
+    private fun logicalCamera(physical: Map<String, CameraLens> = mapOf("2" to CameraLens(mainGeometry, listOf(4.38)), "3" to CameraLens(wideGeometry, listOf(2.0))),
+        focalLengths: List<Double> = listOf(2.0, 4.38)) =
+        LensState(null, true, physical.values.map { v -> v.geometry?.let { g -> v.focalLengths.singleOrNull()?.let { g.lens(it) } } }, true,
+            geometry = mainGeometry, focalLengths = focalLengths, physicalById = physical)
+    private val full = listOf(0, 0, 4000, 3000)
+
+    @Test fun resultFovMatchesZoomMathForCentredCropsAndIsExactForOffCentreOnes() {
+        val zoomed = CaptureGeometry.fieldOfView(lens, 960, 1280, 2.0)!!
+        val viaRatio = CaptureGeometry.fromResult(mainGeometry, 4.38, full, 2.0, 1.0, 960, 1280)!!
+        assertEquals(zoomed.h, viaRatio.h, 1e-9); assertEquals(zoomed.v, viaRatio.v, 1e-9)
+        // Pre-API-30 zoom: CameraX narrows SCALER_CROP_REGION instead of reporting a ratio.
+        val viaCrop = CaptureGeometry.fromResult(mainGeometry, 4.38, listOf(1000, 750, 3000, 2250), null, 7.0, 960, 1280)!!
+        assertEquals(zoomed.h, viaCrop.h, 1e-9); assertEquals(zoomed.v, viaCrop.v, 1e-9)
+        // No crop and no ratio in the result: the applied CameraX zoom is the only crop information.
+        assertEquals(zoomed, CaptureGeometry.fromResult(mainGeometry, 4.38, null, null, 2.0, 960, 1280))
+        // Off-centre crop: angles are measured from the active-array centre, not halved.
+        val side = CaptureGeometry.fromResult(mainGeometry, 4.38, listOf(2000, 0, 4000, 3000), 1.0, 1.0, 2000, 3000)!!
+        assertEquals(deg(atan(2.8 / 4.38)), side.v, 1e-9) // sensor x becomes the portrait image's vertical
+        // A crop outside the active array, or zoom below 1 on it, is not a real frame.
+        assertNull(CaptureGeometry.fromResult(mainGeometry, 4.38, listOf(0, 0, 4100, 3000), 1.0, 1.0, 960, 1280))
+        assertNull(CaptureGeometry.fromResult(mainGeometry, 4.38, full, 0.5, 1.0, 960, 1280))
+        assertNull(CaptureGeometry.fromResult(mainGeometry, 4.38, listOf(10, 10, 10, 20), 1.0, 1.0, 960, 1280))
+    }
+
+    @Test fun logicalCameraWithSeveralFocalLengthsUsesTheResultsFocalLengthAndActivePhysicalCamera() {
+        val camera = logicalCamera()
+        // The Pixel 8a finding: characteristics alone cannot say which lens took the photo.
+        assertEquals(FovDecision.MULTIPLE_FOCAL_LENGTHS, CaptureGeometry.decide(camera, null, 960, 1280, 2.0).omitted)
+        val decision = CaptureGeometry.decide(camera, StillResult(4.38, "2", full, 2.0), 960, 1280, 2.0)
+        assertEquals(FovDecision.FROM_RESULT, decision.source); assertNull(decision.omitted)
+        assertEquals(CaptureGeometry.fieldOfView(lens, 960, 1280, 2.0), decision.fov)
+        // Same frame, crop-region zoom instead of a ratio.
+        assertEquals(CaptureGeometry.fieldOfView(lens, 960, 1280, 2.0),
+            CaptureGeometry.decide(camera, StillResult(4.38, "2", listOf(1000, 750, 3000, 2250), null), 960, 1280, 2.0).fov)
+        val capture = CaptureResult.describe(state(lensState = camera, still = StillResult(4.38, "2", full, 2.0)))
+        assertEquals(zoomedPortrait(2.0).h, capture.getJSONObject("fovDeg").getDouble("h"), 0.01)
+        assertEquals(1.0, capture.getDouble("fovSigmaDeg"), 0.0)
+    }
+    private fun zoomedPortrait(z: Double) = CaptureGeometry.fieldOfView(lens, 960, 1280, z)!!
+
+    @Test fun resultsThatCannotBeTiedToOneLensStillOmitFov() {
+        val camera = logicalCamera()
+        assertEquals(FovDecision.LENS_SWITCH_POSSIBLE, CaptureGeometry.decide(camera, StillResult(2.0, "3", full, 0.7), 960, 1280, 0.7).omitted)
+        assertEquals(FovDecision.PHYSICAL_UNKNOWN, CaptureGeometry.decide(camera, StillResult(4.38, "9", full, 2.0), 960, 1280, 2.0).omitted)
+        assertEquals(FovDecision.FOCAL_MISMATCH, CaptureGeometry.decide(camera, StillResult(6.0, "2", full, 2.0), 960, 1280, 2.0).omitted)
+        assertEquals(FovDecision.BAD_CROP, CaptureGeometry.decide(camera, StillResult(4.38, "2", listOf(0, 0, 5000, 3000), 2.0), 960, 1280, 2.0).omitted)
+        // Two physical cameras on the logical sensor geometry: the crop's coordinate system is ambiguous.
+        val twins = logicalCamera(mapOf("2" to CameraLens(mainGeometry, listOf(4.38)), "4" to CameraLens(mainGeometry, listOf(8.76))), listOf(4.38, 8.76))
+        assertEquals(FovDecision.LENS_SWITCH_POSSIBLE, CaptureGeometry.decide(twins, StillResult(4.38, "2", full, 2.0), 960, 1280, 2.0).omitted)
+        assertEquals(FovDecision.NO_GEOMETRY, CaptureGeometry.decide(null, StillResult(4.38, "2", full, 2.0), 960, 1280, 2.0).omitted)
+    }
+
+    @Test fun missingActivePhysicalIdFallsBackToTheCharacteristicsRule() {
+        // API 28 (or a HAL without the key): the result cannot name the lens.
+        assertEquals(FovDecision.MULTIPLE_FOCAL_LENGTHS, CaptureGeometry.decide(logicalCamera(), StillResult(4.38, null, full, null), 960, 1280, 2.0).omitted)
+        val single = LensState(lens, true, listOf(lens, wideGeometry.lens(2.0)), true)
+        val fallback = CaptureGeometry.decide(single, StillResult(4.38, null, full, null), 960, 1280, 2.0)
+        assertEquals(FovDecision.FROM_CHARACTERISTICS, fallback.source); assertEquals(zoomedPortrait(2.0), fallback.fov)
+        assertEquals(FovDecision.LENS_SWITCH_POSSIBLE, CaptureGeometry.decide(single, StillResult(2.0, null, full, null), 960, 1280, 0.7).omitted)
+        assertEquals(FovDecision.PHYSICAL_UNKNOWN, CaptureGeometry.decide(LensState(lens, true, listOf(lens, null), true), null, 960, 1280, 2.0).omitted)
+        assertEquals(FovDecision.FROM_CHARACTERISTICS, CaptureGeometry.decide(LensState(lens, true, listOf(lens, null), true), null, 960, 1280, 1.0).source)
+    }
+
+    @Test fun nonLogicalOpticalZoomUsesTheResultsFocalLength() {
+        val zoomLens = LensState(null, false, emptyList(), true, geometry = mainGeometry, focalLengths = listOf(4.38, 8.76))
+        assertEquals(FovDecision.MULTIPLE_FOCAL_LENGTHS, CaptureGeometry.decide(zoomLens, null, 960, 1280, 1.0).omitted)
+        val tele = CaptureGeometry.decide(zoomLens, StillResult(8.76, null, full, 1.0), 960, 1280, 1.0)
+        assertEquals(CaptureGeometry.fieldOfView(mainGeometry.lens(8.76), 960, 1280, 1.0), tele.fov)
+        assertEquals(FovDecision.FOCAL_MISMATCH, CaptureGeometry.decide(zoomLens, StillResult(6.0, null, full, 1.0), 960, 1280, 1.0).omitted)
+        // A single-focal camera with a result: the result's crop and ratio replace the CameraX zoom state.
+        val plain = CaptureGeometry.decide(LensState(lens, false, emptyList(), true), StillResult(4.38, null, full, 2.0), 960, 1280, 1.5)
+        assertEquals(zoomedPortrait(2.0), plain.fov)
+    }
+
     @Test fun orientationConsistencyUsesCameraXRotation() {
         assertTrue(CaptureGeometry.orientationConsistent(90, true, 960, 1280))
         assertTrue(CaptureGeometry.orientationConsistent(270, true, 960, 1280))
@@ -356,9 +436,10 @@ class CaptureMetadataTest {
     private fun state(back: Boolean = true, logical: Boolean = false, physical: List<LensSpec?> = emptyList(), zoom: Double = 2.0,
         mirrored: Boolean = false, sensorRotation: Int? = 90, width: Int = 960, height: Int = 1280,
         gravity: List<SensorSample> = listOf(sample(15)), rotation: List<SensorSample> = listOf(SensorSample(t0 + 10 * ms, t0 + 12 * ms, upright(120.0, 0.1f), 3)),
-        lensSpec: LensSpec? = lens, cropMayChange: Boolean = false, window: ExposureWindow? = this.window) =
-        ShutterState(zoom, LensState(lensSpec, logical, physical, back, cropMayChange), 0, sensorRotation, width, height, mirrored,
-            window, gravity, false, rotation)
+        lensSpec: LensSpec? = lens, cropMayChange: Boolean = false, window: ExposureWindow? = this.window,
+        lensState: LensState = LensState(lensSpec, logical, physical, back, cropMayChange), still: StillResult? = null) =
+        ShutterState(zoom, lensState, 0, sensorRotation, width, height, mirrored,
+            window, gravity, false, rotation, still)
 
     private val all = setOf("zoomRatio", "fovDeg", "fovSigmaDeg", "tilt", "headingDeg", "headingRef", "headingAccuracyDeg", "headingAgeMs")
     private val headingKeys = setOf("headingDeg", "headingRef", "headingAccuracyDeg", "headingAgeMs")

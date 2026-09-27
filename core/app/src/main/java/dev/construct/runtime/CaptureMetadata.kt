@@ -74,7 +74,49 @@ internal data class LensSpec(val focalMm: Double, val physicalWidthMm: Double, v
     val tanHalfLong: Double get() = max(activeWidthMm, activeHeightMm) / (2 * focalMm)
 }
 
+internal val LensSpec.geometry: SensorGeometry
+    get() = SensorGeometry(physicalWidthMm, physicalHeightMm, pixelArrayWidth, pixelArrayHeight, activeWidth, activeHeight)
+
+/** Sensor geometry from camera characteristics, independent of the lens: millimetres and pixels. */
+internal data class SensorGeometry(val physicalWidthMm: Double, val physicalHeightMm: Double,
+    val pixelArrayWidth: Int, val pixelArrayHeight: Int, val activeWidth: Int, val activeHeight: Int) {
+    val valid: Boolean get() = physicalWidthMm.isFinite() && physicalWidthMm > 0 && physicalHeightMm.isFinite() && physicalHeightMm > 0 &&
+        pixelArrayWidth > 0 && pixelArrayHeight > 0 && activeWidth in 1..pixelArrayWidth && activeHeight in 1..pixelArrayHeight
+    fun lens(focalMm: Double) = LensSpec(focalMm, physicalWidthMm, physicalHeightMm, pixelArrayWidth, pixelArrayHeight, activeWidth, activeHeight)
+    /** Same sensor and active array, within 1 % on the physical size. */
+    fun sameAs(other: SensorGeometry?): Boolean = other != null && activeWidth == other.activeWidth && activeHeight == other.activeHeight &&
+        pixelArrayWidth == other.pixelArrayWidth && pixelArrayHeight == other.pixelArrayHeight &&
+        abs(physicalWidthMm - other.physicalWidthMm) <= 0.01 * physicalWidthMm && abs(physicalHeightMm - other.physicalHeightMm) <= 0.01 * physicalHeightMm
+}
+
+/** One camera's published lens: geometry (null if incomplete) and every listed focal length. */
+internal data class CameraLens(val geometry: SensorGeometry?, val focalLengths: List<Double>) {
+    fun lists(focalMm: Double) = focalLengths.any { abs(it - focalMm) <= 0.02 * it }
+}
+
+/**
+ * Lens facts from the still frame's own `TotalCaptureResult`: focal length, active physical
+ * camera (API 29+), crop region `[left, top, right, bottom]` in active-array pixels and the
+ * applied zoom ratio (API 30+). Absent keys are null.
+ */
+internal data class StillResult(val focalMm: Double?, val activePhysicalId: String?, val cropRegion: List<Int>?, val zoomRatio: Double?)
+
 internal data class FieldOfView(val h: Double, val v: Double)
+
+/** FOV with where it came from, or the reason it was omitted (for host diagnostics). */
+internal data class FovDecision(val fov: FieldOfView?, val source: String?, val omitted: String?) {
+    companion object {
+        const val MULTIPLE_FOCAL_LENGTHS = "multiple-focal-lengths"
+        const val PHYSICAL_UNKNOWN = "physical-unknown"
+        const val LENS_SWITCH_POSSIBLE = "lens-switch-possible"
+        const val NO_GEOMETRY = "no-geometry"
+        const val FOCAL_MISMATCH = "focal-mismatch"
+        const val BAD_CROP = "crop-region-invalid"
+        const val FROM_RESULT = "capture-result"
+        const val FROM_CHARACTERISTICS = "characteristics"
+        fun omit(reason: String) = FovDecision(null, null, reason)
+    }
+}
 
 internal object CaptureGeometry {
     /** Pure digital crop: the tangent shrinks by the zoom ratio, never the angle. */
@@ -111,6 +153,76 @@ internal object CaptureGeometry {
         if (!main.valid || physical.any { it == null || !it.valid }) return true
         val requested = main.tanHalfLong / zoom
         return physical.any { lens -> lens!!.tanHalfLong < main.tanHalfLong * 0.98 && lens.tanHalfLong >= requested * 0.98 }
+    }
+
+    /**
+     * FOV of the saved image from the still frame's own lens facts: [focalMm], the crop region
+     * (active-array pixels; full array when absent) and the zoom ratio applied on top of it
+     * ([zoomRatio]; when the result reports neither, [fallbackZoom]). The saved image is the
+     * largest centred crop of that region with the output aspect. Angles are measured from the
+     * active-array centre, so off-centre crops are exact under the pinhole model.
+     */
+    fun fromResult(geometry: SensorGeometry, focalMm: Double, crop: List<Int>?, zoomRatio: Double?, fallbackZoom: Double,
+        imageWidth: Int, imageHeight: Int): FieldOfView? {
+        if (!geometry.valid || !focalMm.isFinite() || focalMm <= 0 || imageWidth <= 0 || imageHeight <= 0) return null
+        val w = geometry.activeWidth.toDouble(); val h = geometry.activeHeight.toDouble()
+        val (left, top, right, bottom) = (crop ?: listOf(0, 0, geometry.activeWidth, geometry.activeHeight)).map { it.toDouble() }
+            .takeIf { it.size == 4 } ?: return null
+        if (left < 0 || top < 0 || right > w || bottom > h || right <= left || bottom <= top) return null
+        val factor = zoomRatio ?: if (crop != null) 1.0 else fallbackZoom
+        if (!factor.isFinite() || factor <= 0) return null
+        val cx = (left + right) / 2; val cy = (top + bottom) / 2
+        val regionW = (right - left) / factor; val regionH = (bottom - top) / factor
+        // Zoom below 1 on a crop region would need pixels outside the active array.
+        if (cx - regionW / 2 < -0.5 || cx + regionW / 2 > w + 0.5 || cy - regionH / 2 < -0.5 || cy + regionH / 2 > h + 0.5) return null
+        // Output streams are sensor-aligned: the image's long side runs along the sensor's long side.
+        val pitchX = geometry.physicalWidthMm / geometry.pixelArrayWidth
+        val pitchY = geometry.physicalHeightMm / geometry.pixelArrayHeight
+        val sensorLandscape = w * pitchX >= h * pitchY
+        val longOverShort = max(imageWidth, imageHeight).toDouble() / min(imageWidth, imageHeight)
+        val target = if (sensorLandscape) longOverShort else 1 / longOverShort // output width / height in sensor axes
+        val (outW, outH) = if (regionW / regionH >= target) regionH * target to regionH else regionW to regionW / target
+        fun angle(center: Double, half: Double, origin: Double, pitch: Double) =
+            deg(atan((center + half - origin) * pitch / focalMm) - atan((center - half - origin) * pitch / focalMm))
+        val alongX = angle(cx, outW / 2, w / 2, pitchX)
+        val alongY = angle(cy, outH / 2, h / 2, pitchY)
+        val imageLandscape = imageWidth >= imageHeight
+        return if (imageLandscape == sensorLandscape) FieldOfView(alongX, alongY) else FieldOfView(alongY, alongX)
+    }
+
+    /**
+     * FOV for the saved frame, never guessed. With a tied still result, the result's focal length
+     * and (on logical cameras) its active physical camera give the lens; the crop region is only
+     * applied to a physical camera that is the logical camera's own coordinate system (the unique
+     * physical camera with the logical geometry). Without a usable result (API 28 logical cameras,
+     * untied or missing results) the published-characteristics rule applies.
+     */
+    fun decide(lens: LensState?, still: StillResult?, imageWidth: Int, imageHeight: Int, appliedZoom: Double): FovDecision {
+        if (lens == null) return FovDecision.omit(FovDecision.NO_GEOMETRY)
+        val focal = still?.focalMm?.takeIf { it.isFinite() && it > 0 }
+        if (still != null && focal != null) {
+            fun measured(geometry: SensorGeometry?, listed: CameraLens?): FovDecision {
+                if (geometry == null || !geometry.valid) return FovDecision.omit(FovDecision.NO_GEOMETRY)
+                if (listed != null && listed.focalLengths.isNotEmpty() && !listed.lists(focal)) return FovDecision.omit(FovDecision.FOCAL_MISMATCH)
+                val fov = fromResult(geometry, focal, still.cropRegion, still.zoomRatio, appliedZoom, imageWidth, imageHeight)
+                    ?: return FovDecision.omit(FovDecision.BAD_CROP)
+                return FovDecision(fov, FovDecision.FROM_RESULT, null)
+            }
+            if (!lens.logical) return measured(lens.geometry, CameraLens(lens.geometry, lens.focalLengths))
+            val id = still.activePhysicalId
+            if (id != null) {
+                val active = lens.physicalById[id] ?: return FovDecision.omit(FovDecision.PHYSICAL_UNKNOWN)
+                val base = lens.physicalById.filterValues { it.geometry?.sameAs(lens.geometry) == true }.keys
+                if (base != setOf(id)) return FovDecision.omit(FovDecision.LENS_SWITCH_POSSIBLE)
+                return measured(active.geometry, active)
+            }
+        }
+        if (lens.focalLengths.size > 1) return FovDecision.omit(FovDecision.MULTIPLE_FOCAL_LENGTHS)
+        val spec = lens.lens ?: return FovDecision.omit(FovDecision.NO_GEOMETRY)
+        if (lensSwitchPossible(lens.logical, spec, lens.physical, appliedZoom)) return FovDecision.omit(
+            if (lens.physical.any { it == null || !it.valid }) FovDecision.PHYSICAL_UNKNOWN else FovDecision.LENS_SWITCH_POSSIBLE)
+        val fov = fieldOfView(spec, imageWidth, imageHeight, appliedZoom) ?: return FovDecision.omit(FovDecision.NO_GEOMETRY)
+        return FovDecision(fov, FovDecision.FROM_CHARACTERISTICS, null)
     }
 
     /**
@@ -323,12 +435,19 @@ internal object CaptureHeading {
  * stabilization mode is in use), which can change the saved crop slightly.
  */
 internal data class LensState(val lens: LensSpec?, val logical: Boolean, val physical: List<LensSpec?>, val back: Boolean,
-    val cropMayChange: Boolean = false)
+    val cropMayChange: Boolean = false,
+    /** Logical (bound) camera geometry and focal lengths, available even when [lens] is ambiguous. */
+    val geometry: SensorGeometry? = lens?.geometry,
+    val focalLengths: List<Double> = listOfNotNull(lens?.focalMm),
+    /** Physical cameras of a logical multi-camera by ID. */
+    val physicalById: Map<String, CameraLens> = emptyMap())
 
 /** Everything known at the shutter, plus the saved image's oriented size. */
 internal class ShutterState(val zoomRatio: Double, val lens: LensState?, val displayRotation: Int, val sensorRotationDegrees: Int?,
     val imageWidth: Int, val imageHeight: Int, val mirrored: Boolean, val window: ExposureWindow?,
-    val gravity: List<SensorSample>, val accelerometer: Boolean, val rotation: List<SensorSample>)
+    val gravity: List<SensorSample>, val accelerometer: Boolean, val rotation: List<SensorSample>,
+    /** The still frame's own capture result, when it could be tied to the saved image. */
+    val still: StillResult? = null)
 
 internal object CaptureResult {
     const val FOV_SIGMA_DEG = 1.0
@@ -340,21 +459,25 @@ internal object CaptureResult {
      * and heading for the front camera, mirrored or inconsistently oriented output, and stale,
      * unreliable or clock-inconsistent samples.
      */
-    fun describe(state: ShutterState): JSONObject {
+    fun describe(state: ShutterState): JSONObject = explain(state).first
+
+    /** Metadata plus the FOV decision, whose source or omission reason goes to host diagnostics. */
+    fun explain(state: ShutterState): Pair<JSONObject, FovDecision> {
         val lens = state.lens
         val zoom = state.zoomRatio
-        val fov = lens?.lens?.takeIf { !CaptureGeometry.lensSwitchPossible(lens.logical, it, lens.physical, zoom) }
-            ?.let { CaptureGeometry.fieldOfView(it, state.imageWidth, state.imageHeight, zoom) }
+        val decision = CaptureGeometry.decide(lens, state.still, state.imageWidth, state.imageHeight, zoom)
+        val fov = decision.fov
         val fovSigma = if (lens?.cropMayChange == true) FOV_SIGMA_CROP_DEG else FOV_SIGMA_DEG
         // The optical-axis heading needs only the rear camera; tilt also needs the image's own axes.
         val rear = lens?.back == true
-        val sensorLandscape = lens?.lens?.let { it.activeWidthMm >= it.activeHeightMm } ?: true
+        val sensorLandscape = lens?.geometry?.takeIf { it.valid }?.let {
+            it.physicalWidthMm * it.activeWidth / it.pixelArrayWidth >= it.physicalHeightMm * it.activeHeight / it.pixelArrayHeight } ?: true
         val oriented = state.sensorRotationDegrees != null &&
             CaptureGeometry.orientationConsistent(state.sensorRotationDegrees, sensorLandscape, state.imageWidth, state.imageHeight)
         val tilt = if (rear && !state.mirrored && oriented)
             CaptureTilt.atShutter(state.gravity, state.window, state.displayRotation, state.accelerometer) else null
         val heading = if (rear) CaptureHeading.atShutter(state.rotation, state.window) else null
-        return capture(zoom, fov, fovSigma, tilt, heading)
+        return capture(zoom, fov, fovSigma, tilt, heading) to decision
     }
 
     fun capture(zoomRatio: Double, fov: FieldOfView?, fovSigmaDeg: Double, tilt: Tilt?, heading: Heading?): JSONObject {
