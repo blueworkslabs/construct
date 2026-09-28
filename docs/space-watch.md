@@ -25,8 +25,9 @@ view, not a map.
 - **Future follow mode:** turning the dome with the phone needs a live,
   foreground-only orientation stream. The Aimé brief already plans a one-shot
   `orientation.read` with a "later live mode". That would be a separate, shared
-  host contract. The dome renderer has a `rotation` input reserved for it; the
-  module does not claim or emulate it.
+  host contract, proposed in the [orientation brief](orientation-brief.md). The
+  dome renderer has a `rotation` input reserved for it; the module does not claim
+  or emulate it.
 
 ## Interaction
 
