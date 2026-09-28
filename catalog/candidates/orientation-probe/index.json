@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.orientation-probe",
+      "name": "Orientation probe",
+      "versions": [
+        {
+          "id": "dev.construct.orientation-probe",
+          "name": "Orientation probe",
+          "version": "0.1.0",
+          "artifact": "dev.construct.orientation-probe-0.1.0.zip",
+          "sha256": "53adfc5401d49d3273a387e2156d2840d64efff411aec383b3dae0162381a8b4",
+          "signature": "BOTJBItckcwd1TV69nyNxenT9Lqvv0EYYPZDrp2tF7WcsAuzLdUoEEPJ2f1LDRXJ8UPBSiHHRfNwepHye4IxND0aki96FyXITGlHp0iklWtXjR88Tw1rJ0JESkQw0R187xewLSbr2Nnp+NxRAJc08mU6klIx7Vr4T3RUdtKHRL7y2ZoXPF50dCcyFwHVUsptKRtHzxOBleE4wAL8QJV547NCNGqYAnl6838SJdNCOT8D567Q/8c+HLlU4Utql4wo9sIiW3p7a81fpKj0du5m98gRjB5C9PuhZXLl/InSRKL9jrZIRmW37yPebPfWVlsKO7dIvUczWluKeChZWDrWoA==",
+          "testFixture": true
+        }
+      ]
+    }
+  ]
+}
