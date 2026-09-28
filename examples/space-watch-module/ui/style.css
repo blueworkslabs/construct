@@ -62,6 +62,14 @@ input[type="text"] {
   border-color: #2f6b52;
   color: var(--jade);
 }
+#follow[aria-pressed="true"] {
+  border-color: var(--jade);
+  color: var(--jade);
+}
+.spot-card .turn {
+  color: var(--text);
+  font-weight: 600;
+}
 #red[aria-pressed="true"] {
   border-color: var(--error);
   color: var(--error);

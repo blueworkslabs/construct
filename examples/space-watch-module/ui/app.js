@@ -53,6 +53,9 @@
     passes = new Map(),
     ends = new Map(),
     launches = new Map();
+  // Follow mode state (see "follow mode" below); declared early for frame().
+  const follow = { on: false, want: false, heading: null, accuracy: null, calibrate: false, pose: null, trueNorth: false, request: 0 };
+  let spotAz = null;
   const message = (el, text, tone = "") => {
     el.textContent = text;
     el.className = tone;
@@ -483,6 +486,7 @@
       bodies: sky.bodies,
       dark: s.sunAlt < O.DARK_SUN,
       red: prefs.red,
+      follow: follow.on && follow.heading !== null,
       selected,
       objects: s.items.map((x) => ({
         id: x.id,
@@ -669,6 +673,7 @@
     const found = find(selected, s.t);
     if (!found) {
       selected = null;
+      spotAz = null;
       $("spot").hidden = true;
       return;
     }
@@ -681,6 +686,8 @@
     $("spot-when").hidden = offset === 0;
     $("spot-when").textContent = offset > 0 ? `At ${time(s.t)}:` : offset ? `${K.ago(offset)}:` : "";
     if (!l || st === "below") {
+      spotAz = null;
+      renderTurn();
       $("spot-head").textContent = "Below your horizon";
       if (train) {
         $("spot-anchor").textContent = "Working out the next member above you…";
@@ -704,6 +711,8 @@
     }
     const an = K.anchor(l, K.anchors(sky.bodies, sky.stars, s.sunAlt));
     $("spot-head").textContent = K.headline(l);
+    spotAz = offset === 0 ? l.az : null;
+    renderTurn();
     $("spot-anchor").textContent = an ? an.text : "";
     $("spot-motion").textContent = K.motion(
       l,
@@ -1082,6 +1091,99 @@
   };
 
   // ---- controls ----
+  // ---- follow mode: the dome turns with the phone (orientation.read, API 0.14) ----
+  // Headings arrive as magnetic; WMM2025 declination for the chosen place makes
+  // them true. Readings are smoothed along the circle. Nothing is stored.
+  const wrap360 = (x) => ((x % 360) + 360) % 360,
+    wrap180 = (x) => ((((x + 180) % 360) + 360) % 360) - 180;
+  async function startFollow() {
+    const request = ++follow.request;
+    follow.want = true;
+    try {
+      await call("orientation.read", { op: "watch", rateHz: 10 });
+      if (request !== follow.request) return;
+      follow.on = true;
+      message($("follow-status"), "Hold the phone flat, top pointing where you face.");
+    } catch (e) {
+      if (request !== follow.request) return;
+      follow.on = follow.want = false;
+      message(
+        $("follow-status"),
+        e.code === "CAPABILITY_DENIED"
+          ? "Allow reading compass and tilt for Space Watch in Construct’s Module access, then tap Follow again."
+          : e.code === "ORIENTATION_UNAVAILABLE"
+            ? "This phone has no compass Space Watch can use."
+            : describeError(e),
+        "attention",
+      );
+    }
+    applyFollow(true);
+  }
+  function stopFollow() {
+    follow.request++;
+    follow.on = follow.want = false;
+    follow.heading = null;
+    call("orientation.read", { op: "stop" }).catch(() => {});
+    applyFollow();
+  }
+  function applyFollow(keepStatus = false) {
+    $("follow").setAttribute("aria-pressed", String(follow.on));
+    $("follow-status").hidden = !follow.on && !keepStatus;
+    if (!follow.on) dome.turn(0);
+    frame();
+  }
+  function renderFollow() {
+    if (!follow.on) return;
+    let text, tone = "";
+    if (follow.heading === null)
+      text = follow.pose === "upright" ? "Hold the phone flat, top pointing where you face." : "Waiting for the compass…";
+    else {
+      text = `Facing ${K.dir8(follow.heading)}${follow.accuracy !== null ? ` · compass ±${Math.round(follow.accuracy)}°` : ""}${follow.trueNorth ? "" : " · magnetic north"}`;
+      if (follow.pose === "upright") text += " · hold the phone flat to keep following";
+    }
+    if (follow.calibrate) {
+      text += ". Wave the phone in a figure 8 to calibrate the compass.";
+      tone = "attention";
+    }
+    message($("follow-status"), text, tone);
+  }
+  // "Ahead of you", or which way to turn, for the selected object.
+  function renderTurn() {
+    const el = $("spot-turn");
+    if (!follow.on || follow.heading === null || spotAz === null) {
+      el.hidden = true;
+      return;
+    }
+    const d = wrap180(spotAz - follow.heading),
+      a = Math.abs(d);
+    el.hidden = false;
+    el.textContent =
+      a <= 28
+        ? `Ahead of you${a > 8 ? `, slightly ${d > 0 ? "right" : "left"}` : ""}.`
+        : a >= 150
+          ? "Behind you: turn around."
+          : `Turn ${d > 0 ? "right" : "left"} about ${Math.round(a / 10) * 10}°.`;
+  }
+  window.addEventListener("constructorientation", (event) => {
+    if (!follow.on || !active || !place) return;
+    const s = event.detail || {};
+    follow.pose = s.pose === "flat" ? "flat" : "upright";
+    follow.calibrate = s.calibrate === true;
+    follow.accuracy = Number.isFinite(s.accuracyDeg) ? s.accuracyDeg : null;
+    if (follow.pose === "flat" && Number.isFinite(s.azimuthDeg)) {
+      const dec = SpaceMagnetic.declination(place.lat, place.lon, now());
+      follow.trueNorth = dec !== null;
+      const heading = wrap360(s.azimuthDeg + (dec ?? 0));
+      const first = follow.heading === null;
+      // A quarter of the way toward each reading, along the shorter way round.
+      follow.heading = first ? heading : wrap360(follow.heading + 0.25 * wrap180(heading - follow.heading));
+      dome.turn(follow.heading);
+      if (first) frame();
+    }
+    renderFollow();
+    renderTurn();
+  });
+  $("follow").onclick = () => (follow.want ? stopFollow() : startFollow());
   function applyRed() {
     document.body.classList.toggle("red", prefs.red);
     $("red").setAttribute("aria-pressed", String(prefs.red));
@@ -1125,6 +1227,12 @@
       return;
     }
     message($("status"), "");
+    // The host ends the compass stream on pause; ask again on return.
+    if (follow.want) {
+      follow.on = false;
+      follow.heading = null;
+      startFollow();
+    }
     frame();
     refreshData();
   });

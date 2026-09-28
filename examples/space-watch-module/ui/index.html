@@ -33,8 +33,10 @@
         <div class="toolbar">
           <p id="counts" class="chip">Loading…</p>
           <button id="red" aria-pressed="false">Red mode</button
+          ><button id="follow" aria-pressed="false">Follow</button
           ><button id="area">Place</button>
         </div>
+        <p id="follow-status" role="status" hidden></p>
         <p id="sky-note" role="status"></p>
         <div class="work-grid">
           <div id="dome-wrap">
@@ -58,6 +60,7 @@
               <div class="spot-card" aria-live="polite">
                 <p id="spot-when" class="when" hidden></p>
                 <p id="spot-head" class="head"></p>
+                <p id="spot-turn" class="turn" hidden></p>
                 <p id="spot-anchor"></p>
                 <p id="spot-motion"></p>
                 <p id="spot-state" class="state"></p>
@@ -104,6 +107,15 @@
           behind the drawing and stretch over several fists.
         </p>
         <p>
+          Follow turns the dome with your phone: hold it flat, top pointing
+          where you face, and the green wedge shows your view. It needs
+          “Allow reading compass and tilt” in Construct’s Module access.
+          Headings are corrected to true north with the World Magnetic Model.
+          Phone compasses are rough (often ±10–20°) and metal nearby confuses
+          them; wave the phone in a figure 8 when asked. Compass readings are
+          used only while Follow is on and are never stored or sent.
+        </p>
+        <p>
           The list covers CelesTrak’s ~150 brightest objects, not every
           satellite. Brightness varies and tumbling rocket stages flicker.
           Positions come from published orbits and can be off by seconds, more
@@ -119,6 +131,7 @@
         <p>
           Orbits and catalog: CelesTrak (celestrak.org). Stars: Yale Bright
           Star Catalog. Positions: satellite.js and Astronomy Engine (MIT).
+          Magnetic declination: World Magnetic Model WMM2025 (NOAA/BGS).
           Descriptions: Wikipedia, CC BY-SA 4.0.
         </p>
       </details>
@@ -180,6 +193,7 @@
     <script src="space-sky.js"></script>
     <script src="space-catalog.js"></script>
     <script src="space-plan.js"></script>
+    <script src="space-magnetic.js"></script>
     <script src="space-dome.js"></script>
     <script src="app.js"></script>
   </body>
