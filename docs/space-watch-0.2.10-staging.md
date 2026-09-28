@@ -1,6 +1,6 @@
 # Space Watch 0.2.10 staging
 
-Status: **exact-package Android acceptance in progress.** No hardware clearance,
+Status: **incomplete: 12/16 checks passed; stopped cleanly.** No hardware clearance,
 merge or production promotion yet. Production remains 0.1.6.
 
 ## Artifacts
@@ -49,7 +49,7 @@ The 72-hour train freshness filter is unchanged.
 
 ## Android scope and limitations
 
-The fresh signed candidate runs all 16 existing scenarios: dome and pass list,
+The runner was intended to cover 16 scenarios: dome and pass list,
 future train preview/details/Wikipedia, preview/native-menu resume, Back to now,
 pointing, real same-launch lookup, red/rewind, process restart, canvas selection,
 landscape, 200% text, native menu resume, real native denial/grant gates,
@@ -63,3 +63,20 @@ Follow/orientation is not included; no new APK is required.
 
 [0.2.8 evidence](space-watch-0.2.8-staging.md) remains a separate 16/16 run on
 older bytes, with its now-fixed train-planner blocker recorded honestly.
+
+## Result
+
+Run `20260928T121132Z-space-1c27eaf4` stopped after the 12 synthetic checks.
+The native transition to Mark working failed with `UI label not found: Construct menu`;
+the failure capture shows the native menu and Mark working present. The runner
+was corrected to wait explicitly for Mark working before tapping, avoiding a
+second menu navigation during its enter transition. Real-module denial, live
+and offline checks were **not reached**. Emulator is inactive.
+
+[Partial receipt](evidence/space-watch-0.2.10-staging-2026-09-28.json),
+[18:24 train preview](images/space-watch-0.2.10/space-train-preview.png),
+[landscape](images/space-watch-0.2.10/space-landscape.png),
+[200% text](images/space-watch-0.2.10/space-large-text.png),
+[failure screen](images/space-watch-0.2.10/failure.png).
+A late review also found the Details next-pass lookup still used one train
+representative. Both follow-ups are covered in the separate 0.2.11 candidate.

@@ -45,7 +45,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
   const Clock = class extends Date { constructor(...a) { super(...(a.length ? a : [now])); } static now() { return now; } };
   const sandbox = {
     document: {getElementById: el, createElement: tag => new Element(tag), body: {classList: {toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)), contains: c => classes.has(c)}}},
-    Date: Clock, setInterval: fn => timers.push(fn), setTimeout: () => 0, Math, JSON, Promise, Map, Set, URLSearchParams,
+    Date: Clock, setInterval: fn => timers.push(fn), setTimeout: (fn, delay) => delay === 0 ? setImmediate(fn) : 0, Math, JSON, Promise, Map, Set, URLSearchParams,
     addEventListener(type, handler) { events[type] = handler; },
     call: async (method, params) => {
       calls.push({method, params: JSON.parse(JSON.stringify(params))});
@@ -406,6 +406,12 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   const trainPass = r.el('plan-list').children.find(b => b.dataset.id === 'train:2026-221');
   assert.match(trainPass.text, /^ Now · Guowang train /, 'member-visible train must have a current pass');
   assert.equal(r.el('plan-list').children.filter(b => b.dataset.id === 'train:2026-221').length, 1, 'members merge into one train pass');
+  // Train details search all members, not the currently highest representative.
+  r=rig({clock:Date.parse('2026-09-28T16:50:00Z')});await flush(8);r.tick(1,0);
+  r.select('train:2026-221');r.el('details').click();await flush(15);
+  assert.match(r.el('info-body').text,/06:20 PM/, 'details must use the earliest member rise, not the 18:28 representative');
+  r.el('details').click();const closedBody=r.el('info-body').text;r.el('close-info').click();await flush(15);
+  assert.equal(r.el('info-body').text,closedBody,'closed details discard pending member scan');
   // A genuinely empty recent list is valid and remains fresh across reopen.
   r = rig({recentBody: '[]'}); await flush(8);
   r = rig({saved: r.storage, clock: START + HOUR}); await flush(8);

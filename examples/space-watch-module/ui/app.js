@@ -762,7 +762,7 @@
       c = train ? null : satcat.get(o.id),
       t = now(),
       l = O.look(o, place.ob, t),
-      p = nextPass(o, t);
+      p = train ? null : nextPass(o, t);
     $("info-title").textContent = d.title;
     $("info-kind").textContent = d.kind;
     const body = $("info-body");
@@ -786,7 +786,6 @@
           ["Launched", train.launch ? `${train.launch} · ${d.since < 1 ? "today" : d.since + " days ago"}` : null],
           ["Launch", train.intdes],
           ["Height", alts.length ? `${Math.round(Math.min(...alts)).toLocaleString("en-US")}–${km(Math.max(...alts))}` : null],
-          ["Next time above you", p ? `${day(p.riseMs)} · up to ${K.height(p.maxEl)} · ${p.visible ? "visible" : "not visible"}` : "Not in the next 36 hours"],
         ]),
       );
       body.append(
@@ -796,6 +795,21 @@
           "note",
         ),
       );
+      const next = element("p", "Working out the next member above you…", "note");
+      body.append(next);
+      // Yield between member scans; closing/pausing/replacing the dialog cancels.
+      const members = P.planMembers(train);
+      let best = null, memberIndex = 0;
+      function scanMember() {
+        if (!active || infoTarget !== o || generation !== infoGeneration) return;
+        const p = nextPass(members[memberIndex++], t);
+        if (p && (!best || p.riseMs < best.riseMs)) best = p;
+        if (memberIndex < members.length) setTimeout(scanMember, 0);
+        else next.textContent = best
+          ? `Next member above you: ${day(best.riseMs)} · ${best.visible ? "visible" : "not visible"}`
+          : "No member rises above 10° in the next 36 hours.";
+      }
+      setTimeout(scanMember, 0);
       wikiSection = element("section");
       body.append(wikiSection);
       $("wiki").hidden = false;

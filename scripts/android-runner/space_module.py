@@ -11,7 +11,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_space_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.space-watch package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.space-watch-fixture package digest')
-p.add_argument('--version',default='0.2.10')
+p.add_argument('--version',default='0.2.11')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -261,7 +261,7 @@ try:
  # Native menu pause/resume on retained data, then real module gates.
  tap('Construct menu');tap('Return to module');contains('visible ·')
  done('Native menu pause/resume restores the sky')
- tap('Construct menu');tap('Mark working');install(REAL,a.module_sha);open_module(REAL)
+ tap('Construct menu');find('Mark working');tap('Mark working');install(REAL,a.module_sha);open_module(REAL)
  contains('Phone location isn’t enabled');capture('space-real-location-denied')
  done('Real module refuses ungranted phone location and offers manual place')
  click('Choose place')
