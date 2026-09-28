@@ -140,7 +140,8 @@ class OrientationTest {
         val manager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         val shadow: ShadowSensorManager = shadowOf(manager)
         val sensor: Sensor = ShadowSensor.newInstance(Sensor.TYPE_ROTATION_VECTOR).also { shadow.addSensor(it) }
-        val clockOrigin = android.os.SystemClock.elapsedRealtimeNanos() + 1
+        // Robolectric advances its clock at millisecond resolution.
+        val clockOrigin = android.os.SystemClock.elapsedRealtimeNanos() + 1_000_000L
         var granted = true
         var activityPaused = false
         val emitted = mutableListOf<JSONObject>()
