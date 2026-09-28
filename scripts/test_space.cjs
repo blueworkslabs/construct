@@ -256,28 +256,75 @@ test("grazing passes between coarse samples are refined, at almost no extra cost
 
   // Same passes as a 5 s reference scan for every fixture object at three places,
   // for a small fraction of its propagations.
-  const look = O.look;
-  let calls = 0;
-  O.look = (...a) => (calls++, look(...a));
+  // Every propagation counts, including those inside SpaceOrbit (peak search).
+  let mark = O.stats.looks;
+  const take = () => { const n = O.stats.looks - mark; mark = O.stats.looks; return n; };
   try {
     let adaptive = 0, reference = 0;
     for (const [lat, lon] of [[49.5, 13.4], [52.52, 13.405], [-33.9, 151.2]]) {
       const o3 = O.observer(lat, lon, 0), a3 = K.observer(lat, lon, 0), s3 = (ms) => K.sun(ms, a3).el,
         r3 = P.darkRanges(from, from + 12 * 3600000, s3);
       for (const o of objects) {
-        calls = 0;
+        take();
         const fast = P.passes(o, o3, r3, s3);
-        adaptive += calls;
-        calls = 0;
+        adaptive += take();
         const slow = P.passes(o, o3, r3, s3, 5000);
-        reference += calls;
+        reference += take();
         assert.deepEqual(fast.map((p) => Math.round(p.maxMs / 120000)), slow.map((p) => Math.round(p.maxMs / 120000)), o.name);
       }
     }
-    assert.ok(adaptive < 0.2 * reference, `${adaptive} vs ${reference}`);
+    assert.ok(adaptive > 0 && adaptive < 0.2 * reference, `${adaptive} vs ${reference}`);
   } finally {
-    O.look = look;
+    mark = O.stats.looks;
   }
+});
+test("next-rise lookup finds the same grazing pass as the planner, cheaply", () => {
+  // #49 review: from 49.5 N 13.4 E (40 m) at 00:39:10 UTC the old 30 s lookup
+  // jumped to 02:16:35, skipping SL-14 R/B 16792's 10.01° pass at 00:42:19.
+  const ob2 = O.observer(49.5, 13.4, 0.04),
+    ab2 = K.observer(49.5, 13.4, 40),
+    sun2 = (ms) => K.sun(ms, ab2).el,
+    from = at("2026-09-29T00:39:10Z"),
+    rise = O.nextPass(byId(16792), ob2, from, sun2),
+    [planned] = P.passes(byId(16792), ob2, [[from, from + 3600000]], sun2);
+  near(rise.riseMs, "2026-09-29T00:42:19Z", 2);
+  assert.ok(Math.abs(rise.riseMs - planned.startMs) <= 2000, "lookup and planner agree");
+  assert.ok(rise.maxEl >= 10 && rise.maxEl < 10.1 && rise.visible === true);
+  // Against a plain 5 s scan (first sample at or above 10° after the current
+  // pass) for every fixture object, and at a fraction of its propagations.
+  const brute = (o, ob, ms, hours) => {
+    let t = ms, l = O.look(o, ob, t);
+    while (l && l.el >= 10) l = O.look(o, ob, (t += 5000));
+    for (; t < ms + hours * 3600000; t += 5000) {
+      l = O.look(o, ob, t);
+      if (!l) return null;
+      if (l.el >= 10) return t;
+    }
+    return null;
+  };
+  // Every propagation counts, including those inside SpaceOrbit (peak search).
+  let mark = O.stats.looks;
+  const take = () => { const n = O.stats.looks - mark; mark = O.stats.looks; return n; };
+  try {
+    let fast = 0, slow = 0;
+    const start = at("2026-09-28T17:50:40Z");
+    for (const o of objects) {
+      take();
+      const got = O.nextPass(o, ob, start, sunAt, 12);
+      fast += take();
+      const want = brute(o, ob, start, 12);
+      slow += take();
+      if (want === null) assert.equal(got, null, o.name);
+      else assert.ok(got && Math.abs(got.riseMs - want) <= 5000, `${o.name}: ${got && new Date(got.riseMs).toISOString()} vs ${new Date(want).toISOString()}`);
+    }
+    assert.ok(fast > 0 && fast < 0.35 * slow, `${fast} vs ${slow}`);
+    console.log(`  next-rise propagations: ${fast} adaptive vs ${slow} for a 5 s scan`);
+  } finally {
+    mark = O.stats.looks;
+  }
+  // A lookup that starts inside a pass still skips to the next one.
+  const inside = O.nextPass(byId(25544), ob, at("2026-09-28T17:51:00Z"), sunAt);
+  assert.ok(inside.riseMs > at("2026-09-28T17:53:10Z"));
 });
 test("train passes merge member intervals, one bounded scan per member", () => {
   const rows = O.parseElements(fs.readFileSync("scripts/space-fixture/recent.json", "utf8")),
@@ -293,20 +340,21 @@ test("train passes merge member intervals, one bounded scan per member", () => {
   assert.equal(P.planMembers({ ...shared, centre: train.centre }).length, 9, "same elements under other ids plan once");
   // Each member is one queue entry of roughly one object's cost, so the ~15 ms
   // slices stay as fine-grained as before.
-  const look = O.look;
-  let calls = 0;
-  O.look = (...a) => (calls++, look(...a));
+  // Every propagation counts, including those inside SpaceOrbit (peak search).
+  let mark = O.stats.looks;
+  const take = () => { const n = O.stats.looks - mark; mark = O.stats.looks; return n; };
   const parts = [];
   let centreCost = 0;
   try {
     for (const m of members) {
-      calls = 0;
+      take();
       parts.push(...P.passes(m, ob, ranges, sunAt));
+      const calls = take();
       if (m === train.centre) centreCost = calls;
       assert.ok(calls < 1.2 * centreCost, `${m.id}: ${calls} vs ${centreCost}`);
     }
   } finally {
-    O.look = look;
+    mark = O.stats.looks;
   }
   const [centrePass] = P.passes(train.centre, ob, ranges, sunAt),
     [merged] = P.mergePasses(parts);
@@ -350,7 +398,7 @@ test("planner distinguishes clipped windows and keeps short previews inside visi
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
   assert.equal(m.id, "dev.construct.space-watch");
-  assert.equal(m.version, "0.2.12");
+  assert.equal(m.version, "0.2.13");
   assert.deepEqual(m.constructApi, { min: "0.9.0", target: "0.9.0" });
   const caps = Object.fromEntries(m.capabilities.map((c) => [c.id, c]));
   assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "storage.kv"]);
@@ -375,7 +423,7 @@ test("package: manifest, capabilities, scripts and no location in any URL", () =
   for (const shared of ["construct-ui.css", "bridge.js"])
     assert.equal(fs.readFileSync(root + "ui/" + shared, "utf8"), fs.readFileSync("examples/sky-watch-module/ui/" + shared, "utf8"), shared);
   const docs = fs.readFileSync("docs/space-watch.md", "utf8");
-  assert.match(docs, /Space Watch \*\*0\.2\.12\*\*/);
+  assert.match(docs, /Space Watch \*\*0\.2\.13\*\*/);
   // Vendored libraries are pinned by hash in the doc.
   for (const f of ["satellite.min.js", "astronomy.min.js"]) {
     const sha = crypto.createHash("sha256").update(fs.readFileSync(root + "ui/vendor/" + f)).digest("hex");

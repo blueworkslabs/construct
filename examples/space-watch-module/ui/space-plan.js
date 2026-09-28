@@ -95,38 +95,9 @@ const SpacePlan = (() => {
       endReason: after ? why(after, "sets") : "window",
     };
   }
-  // Peak elevation between a and b (one hump), by golden-section search to ~1 s.
-  function peak(o, ob, a, b) {
-    const g = (Math.sqrt(5) - 1) / 2,
-      el = (t) => {
-        const l = O.look(o, ob, t);
-        return l ? l.el : -90;
-      };
-    let c = b - g * (b - a),
-      d = a + g * (b - a),
-      fc = el(c),
-      fd = el(d);
-    while (b - a > 1000) {
-      if (fc > fd) {
-        b = d;
-        d = c;
-        fd = fc;
-        c = b - g * (b - a);
-        fc = el(c);
-      } else {
-        a = c;
-        c = d;
-        fc = fd;
-        d = a + g * (b - a);
-        fd = el(d);
-      }
-    }
-    const t = Math.round((a + b) / 2);
-    return { t, el: el(t) };
-  }
-  // A coarse sample this far below 10° at a local maximum may hide a grazing
-  // pass between samples. Within 60 s of its peak a low pass drops about 1°.
-  const GRAZE_MARGIN = 4;
+  // Shared with SpaceOrbit.nextPass so both paths find the same grazing passes.
+  const peak = O.peak,
+    GRAZE_MARGIN = O.GRAZE_MARGIN;
   // Visible passes of one object within the given dark ranges: a coarse scan
   // (60 s) for rises above 10°, refined to 5 s, then the visible stretch of each
   // pass. Short passes that peak between two coarse samples are caught by

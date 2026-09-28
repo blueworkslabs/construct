@@ -160,7 +160,10 @@ const SpaceOrbit = (() => {
       Math.hypot(p.x - d * s[0], p.y - d * s[1], p.z - d * s[2]) > RE
     );
   }
+  // Propagation count, for the planner's cost and responsiveness tests.
+  const stats = { looks: 0 };
   function look(o, ob, ms) {
+    stats.looks++;
     let pv;
     try {
       pv = S.propagate(o.rec, new Date(ms));
@@ -242,40 +245,99 @@ const SpaceOrbit = (() => {
     }
     return { atMs: ms + lastT * 1000, inS: lastT, reason: "long", az: last.az, el: last.el };
   }
+  // Peak elevation between a and b (one hump), by golden-section search to ~1 s.
+  function peak(o, ob, a, b) {
+    const g = (Math.sqrt(5) - 1) / 2,
+      el = (t) => {
+        const l = look(o, ob, t);
+        return l ? l.el : -90;
+      };
+    let c = b - g * (b - a),
+      d = a + g * (b - a),
+      fc = el(c),
+      fd = el(d);
+    while (b - a > 1000) {
+      if (fc > fd) {
+        b = d;
+        d = c;
+        fd = fc;
+        c = b - g * (b - a);
+        fc = el(c);
+      } else {
+        a = c;
+        c = d;
+        fc = fd;
+        d = a + g * (b - a);
+        fd = el(d);
+      }
+    }
+    const t = Math.round((a + b) / 2);
+    return { t, el: el(t) };
+  }
+  // A coarse sample this far below 10° at a local maximum may hide a grazing
+  // pass between samples: within a minute of its peak a low pass drops ~1°.
+  const GRAZE_MARGIN = 4;
   // Next rise above 10° after the current pass, with its highest point and
-  // whether any part is visible. Coarse 30 s scan, refined to 5 s.
-  function nextPass(o, ob, ms, sunAltAt, hours = 36) {
+  // whether any part is visible. Coarse 30 s scan, rises refined to 5 s; a coarse
+  // local maximum within GRAZE_MARGIN of 10° (or a near-10° first interval) gets
+  // a peak search, so passes that clear 10° only between samples are found.
+  function nextPass(o, ob, ms, sunAltAt, hours = 36, step = 30000) {
     const end = ms + hours * 3600000;
     let t = ms,
       l = look(o, ob, t);
     while (l && l.el >= VISIBLE_EL && t < end) {
-      t += 30000;
+      t += step;
       l = look(o, ob, t);
     }
+    if (!l) return null;
+    let back = null,
+      prev = { t, el: l.el };
     while (t < end) {
-      t += 30000;
-      l = look(o, ob, t);
-      if (!l) return null;
-      if (l.el < VISIBLE_EL) continue;
-      let rise = t;
-      for (let b = t - 5000; b > t - 30000; b -= 5000) {
-        const q = look(o, ob, b);
-        if (!q || q.el < VISIBLE_EL) break;
-        rise = b;
-      }
-      let max = l,
-        maxAt = t,
-        visible = false;
-      for (let u = rise; u < rise + 1800000; u += 10000) {
-        const q = look(o, ob, u);
-        if (!q || q.el < VISIBLE_EL) break;
-        if (q.el > max.el) {
-          max = q;
-          maxAt = u;
+      const n = t + step,
+        q = look(o, ob, n);
+      if (!q) return null;
+      let rise = null;
+      if (q.el >= VISIBLE_EL) {
+        rise = n;
+        for (let b = n - 5000; b > t; b -= 5000) {
+          const r = look(o, ob, b);
+          if (!r || r.el < VISIBLE_EL) break;
+          rise = b;
         }
-        if (!visible && q.sunlit && sunAltAt(u) < DARK_SUN) visible = true;
+      } else {
+        const hump = back && prev.el >= back.el && prev.el >= q.el;
+        if (
+          (hump && prev.el >= VISIBLE_EL - GRAZE_MARGIN) ||
+          (!back && Math.max(prev.el, q.el) >= VISIBLE_EL - GRAZE_MARGIN)
+        ) {
+          const left = hump ? back.t : t,
+            top = peak(o, ob, left, n);
+          if (top.el >= VISIBLE_EL) {
+            rise = top.t;
+            while (rise - 1000 > left) {
+              const r = look(o, ob, rise - 1000);
+              if (!r || r.el < VISIBLE_EL) break;
+              rise -= 1000;
+            }
+          }
+        }
       }
-      return { riseMs: rise, maxEl: max.el, maxAz: max.az, maxMs: maxAt, visible };
+      if (rise !== null) {
+        // The pass itself: 1 s steps for its first minute (grazing passes are
+        // seconds long), then 10 s.
+        let max = null,
+          visible = false;
+        for (let u = rise; u < rise + 1800000; u += u - rise < 60000 ? 1000 : 10000) {
+          const r = look(o, ob, u);
+          if (!r || r.el < VISIBLE_EL) break;
+          if (!max || r.el > max.l.el) max = { l: r, t: u };
+          if (!visible && r.sunlit && sunAltAt(u) < DARK_SUN) visible = true;
+        }
+        if (max) return { riseMs: rise, maxEl: max.l.el, maxAz: max.l.az, maxMs: max.t, visible };
+      }
+      back = prev;
+      prev = { t: n, el: q.el };
+      t = n;
     }
     return null;
   }
@@ -317,7 +379,10 @@ const SpaceOrbit = (() => {
     state,
     trail,
     passEnd,
+    peak,
+    GRAZE_MARGIN,
     nextPass,
+    stats,
     chunks,
     ageHours,
   };
