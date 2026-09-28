@@ -303,6 +303,21 @@
         }
       ],
       "latest": "0.3.4"
+    },
+    {
+      "id": "dev.construct.space-watch",
+      "name": "Space Watch",
+      "versions": [
+        {
+          "id": "dev.construct.space-watch",
+          "name": "Space Watch",
+          "version": "0.1.6",
+          "artifact": "dev.construct.space-watch-0.1.6.zip",
+          "sha256": "159262e0b2008b56130f92171eac929048236f0fd565444e639f8e5e42fd299c",
+          "signature": "l5OrpEwiTgORf8SG5NAsKnn61oBltapfvnB76OG9NOEAK5fBCOj62iP9Sq2+5DigYnYtB38IvuSyLm7oUASf4bMPW6j/R8uAj8T7wba58M9i+PCMe+VPH69QyETx0paaxko5IaYBez9FTr25AAHyiTx6LGhGC3vxD5Rlr6RfMIhORPKIw5zOwCG01Uc+AzlSQQkSKbRHkX4IrcKc9shY25AvmLDZdmqKoamnEjchab5GfzAQvxgOEGXyjtoSz8Ow14A0GGD5mGhxEfI32uVB6nlc7/Aajhcu2/LiPVJMY2O82s5YmurHjkZPmFMyuesqpFloO+iOBbxBToRg3x7LMg=="
+        }
+      ],
+      "latest": "0.1.6"
     }
   ]
 }

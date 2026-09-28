@@ -213,8 +213,9 @@ view, not a map.
   location/internet gates and live CelesTrak. Menu pause/resume is exercised on
   cached data; in-flight cancellation is covered by controller regressions.
 
-  [Real-device checks](space-watch-0.1.6-hardware-check.md), including spotting
-  at dusk, remain the next step; emulator acceptance is not physical sky validation.
+  [Real-device checks](space-watch-0.1.6-hardware-check.md) passed on
+  2026-09-28, and the same signed 0.1.6 bytes are published in the production
+  catalog.
 
 ## Screenshots (browser preview of Synthetic Space Watch, not Android)
 

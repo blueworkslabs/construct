@@ -1,7 +1,9 @@
 # Space Watch 0.1.6 phone check
 
-Status: **ready for phone testing** after [13/13 Android staging checks](space-watch-0.1.6-staging.md).
-Real-sky accuracy remains to be checked on hardware; the PR is unmerged.
+Status: **passed on hardware** (2026-09-28, pilot tester: "works as expected"),
+after [13/13 Android staging checks](space-watch-0.1.6-staging.md). The exact
+signed 0.1.6 package (SHA-256 `159262e0b2008b56130f92171eac929048236f0fd565444e639f8e5e42fd299c`)
+is promoted unchanged to the production catalog.
 
 No new APK is needed. The staging target is the existing alpha34 candidate.
 Use only **Space Watch**, not Synthetic Space Watch, from this isolated catalog:
