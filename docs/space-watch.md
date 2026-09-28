@@ -300,8 +300,8 @@ not Android; pre-review wording and stale-train policy):
 - **Android acceptance:** the standalone runner is
   `scripts/android-runner/space_module.py`. The exact signed candidate, native
   grant checks, live/offline results and original Android screenshots are tracked
-  in the [0.2.4 staging report](space-watch-0.2.4-staging.md).
-  The [0.2.4 phone checklist](space-watch-0.2.4-hardware-check.md) tracks the
+  in the [0.2.5 staging report](space-watch-0.2.5-staging.md).
+  The [0.2.5 phone checklist](space-watch-0.2.5-hardware-check.md) tracks the
   next hardware handoff. The earlier [0.1.6 acceptance](space-watch-0.1.6-staging.md)
   remains separate.
   The synthetic fixture exercises UI; the real package separately verifies native

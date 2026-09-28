@@ -1,0 +1,23 @@
+{
+  "source": "1d5e5bb",
+  "objects": 24,
+  "places": 3,
+  "hours": 12,
+  "totals": {
+    "old": {
+      "calls": 38719,
+      "passes": 75
+    },
+    "adaptive": {
+      "calls": 39105,
+      "passes": 77
+    },
+    "reference5s": {
+      "calls": 397229,
+      "passes": 77
+    }
+  },
+  "adaptiveVsOld": 1.0099692657351689,
+  "referenceVsAdaptive": 10.158010484592763,
+  "note": "Counts of orbit look calls; not a wall-clock or Android responsiveness benchmark. Five-second sampling is a reference, not proof of every possible pass."
+}
