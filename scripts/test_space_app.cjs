@@ -336,6 +336,22 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
       assert.match(r.el('data-status').textContent, /^Orbit data .+ old · CelesTrak$/);
     }
   }
+  // A pass must become Now at its actual start, not the next minute tick.
+  {
+    const O = require('../' + root + 'space-orbit.js'), K = require('../' + root + 'space-sky.js'), P = require('../' + root + 'space-plan.js');
+    const ob = O.observer(52.517834, 13.388761, 0), aob = K.observer(52.517834, 13.388761, 0);
+    const sun = t => K.sun(t, aob).el, ranges = P.darkRanges(START, START + 12 * HOUR, sun);
+    r = rig(); await flush(8); r.tick(1, 0);
+    const listed = new Set(r.el('plan-list').children.map(b => b.dataset.id));
+    const pass = O.build(O.parseElements(ELEMENTS)).flatMap(o => P.passes(o, ob, ranges, sun).map(p => ({...p, id: String(o.id)})))
+      .find(p => listed.has(p.id) && p.startMs > START + 60000 && p.startMs < START + 20 * 60000 && p.startMs % 60000 > 1000 && p.startMs % 60000 < 59000);
+    assert(pass, 'fixture has a scheduled pass beginning inside a minute');
+    r.advance(pass.startMs - START - 1000); r.tick(1, 0);
+    const button = () => r.el('plan-list').children.find(b => b.dataset.id === pass.id);
+    assert(!button().text.includes('Now ·'));
+    r.tick(1, 2000);
+    assert(button().text.includes('Now ·'), 'pass switches to Now immediately at start');
+  }
   // A genuinely empty recent list is valid and remains fresh across reopen.
   r = rig({recentBody: '[]'}); await flush(8);
   r = rig({saved: r.storage, clock: START + HOUR}); await flush(8);
