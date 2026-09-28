@@ -11,7 +11,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_space_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.space-watch package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.space-watch-fixture package digest')
-p.add_argument('--version',default='0.2.2')
+p.add_argument('--version',default='0.2.3')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -91,6 +91,15 @@ def reveal(match):
  raise RuntimeError('Module control not reachable: '+str(match))
 def click(match):tap_node(reveal(match))
 def reach_text(fragment):return text_of(reveal(lambda t:fragment in t))
+def wiki_credit():
+ contains('Wikipedia loaded',45)
+ # WebView exposes long dialog text beyond the clipped scroller. Move the
+ # dialog body itself to the attribution before taking visual evidence.
+ for _ in range(3):
+  x1,y1,x2,y2=web();x=(x1+x2)//2
+  adb('shell','input','swipe',str(x),str(y1+(y2-y1)*3//4),str(x),str(y1+(y2-y1)//3),'350')
+  time.sleep(.3)
+ reach_text('CC BY-SA 4.0')
 def full_dome():
  # Start above the canvas: clipped accessibility bounds do not reveal which
  # edge is missing, so blindly scrolling down can move a top-clipped dome out.
@@ -182,7 +191,7 @@ try:
  click(lambda t:'Guowang train' in t and ' · ' in t)
  reach_text('Preview ');reach_text('At ');reach_text('9 satellites in a line');capture('space-train-preview')
  click(lambda t:t=='Details');reach_text('9 of 11 from this launch');reach_text('2026-221');capture('space-train-details')
- click('Read on Wikipedia');contains('Wikipedia loaded',45);reach_text('CC BY-SA 4.0');capture('space-train-wikipedia')
+ click('Read on Wikipedia');wiki_credit();capture('space-train-wikipedia')
  done('Future Guowang pass previews on the dome with train details and live Wikipedia attribution')
  click(lambda t:t=='Close');tap('Construct menu');tap('Return to module');reach_text('Preview ')
  click('Back to now');reach_text('Overhead now');capture('space-train-back-now')
@@ -195,7 +204,7 @@ try:
  done('Fixture stage list selection gives EAST, 1½ fists up and Saturn anchor')
  click(lambda t:t=='Details');contains('NORAD 29507 · 2006-046C')
  contains('Carried:',45);capture('space-details')
- click('Read on Wikipedia');contains('Wikipedia loaded',45);reach_text('CC BY-SA 4.0');capture('space-wikipedia')
+ click('Read on Wikipedia');wiki_credit();capture('space-wikipedia')
  done('Real same-launch lookup and explicit Wikipedia request render attributed results')
  click(lambda t:t=='Close');click(lambda t:t=='Red mode')
  # Rewind via the actual accessible range control.

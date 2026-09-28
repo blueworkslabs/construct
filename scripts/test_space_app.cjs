@@ -326,9 +326,10 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   r.el('details').click(); await flush(4);
   assert.match(r.el('info-body').text, /9 of 11 from this launch/, 'cache preserves original batch size');
   // Bad optional responses must preserve the prior cache and observe backoff.
-  for (const bad of ['{"error":"notice"}', '[{"broken":true}]', 'not json', 'partial']) {
+  for (const bad of ['{"error":"notice"}', '[{"broken":true}]', 'not json', 'partial', 'missing-designator', 'bad-designator']) {
     for (const field of ['recentBody', 'recentSatcatBody']) {
-      const body = bad === 'partial' ? JSON.stringify([JSON.parse(field === 'recentBody' ? RECENT : RECENT_SATCAT)[0], {broken:true}]) : bad;
+      let body = bad === 'partial' ? JSON.stringify([JSON.parse(field === 'recentBody' ? RECENT : RECENT_SATCAT)[0], {broken:true}]) : bad;
+      if (bad.endsWith('-designator')) body = JSON.stringify(JSON.parse(field === 'recentBody' ? RECENT : RECENT_SATCAT).map(o => ({...o, OBJECT_ID: bad === 'missing-designator' ? undefined : 'invalid'})));
       r = rig({saved: withTrains, clock: START + 9 * HOUR, [field]: body}); await flush(10);
       assert.equal(r.storage['recent.meta'].at, withTrains['recent.meta'].at);
       assert.equal(r.storage['fetch-state'].recentUntil, START + 11 * HOUR);

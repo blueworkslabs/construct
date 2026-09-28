@@ -301,7 +301,9 @@
       let raw = null;
       try { raw = JSON.parse(r.text); } catch (_) { /* Checked below. */ }
       const parsed = O.parseElements(r.text);
-      if (!Array.isArray(raw) || raw.some(o => !O.compact(o)))
+      // The generic orbit parser permits unknown launch IDs. Grouping cannot:
+      // incomplete provider records must not become a successful empty snapshot.
+      if (!Array.isArray(raw) || raw.some(o => !O.compact(o)?.[2]))
         throw Object.assign(new Error("Invalid recent orbit data"), { code: "HTTP_DATA" });
       const rows = P.trainRows(parsed);
       let dates = new Map();
@@ -312,7 +314,7 @@
         let rawCatalog = null;
         try { rawCatalog = JSON.parse(q.text); } catch (_) { /* Checked below. */ }
         const catalog = C.parseSatcat(q.text);
-        if (!Array.isArray(rawCatalog) || !catalog.length || rawCatalog.some(o => !C.compact(o)))
+        if (!Array.isArray(rawCatalog) || !catalog.length || rawCatalog.some(o => !C.compact(o)?.[9]))
           throw Object.assign(new Error("Invalid recent catalog"), { code: "HTTP_DATA" });
         dates = P.launchDates(catalog);
       }
