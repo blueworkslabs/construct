@@ -255,6 +255,36 @@ const SpacePlan = (() => {
       return f && r[2] && count.get(r[2].slice(0, 8) + f.key) >= TRAIN_MIN;
     });
   }
+  // Members worth planning separately: one per distinct element set (fresh
+  // batches often share one), the representative first.
+  function planMembers(train) {
+    const seen = new Set(),
+      out = [];
+    for (const o of [train.centre, ...train.members]) {
+      const key = o.row ? o.row.slice(3).join() : String(o.id);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(o);
+    }
+    return out;
+  }
+  // A train is visible while any member is: merge member intervals that overlap
+  // or touch (within gapMs). Start fields come from the earliest member, end
+  // fields from the latest, and the highest point from the highest member.
+  function mergePasses(list, gapMs = 60000) {
+    const out = [];
+    for (const p of [...list].sort((a, b) => a.startMs - b.startMs)) {
+      const cur = out[out.length - 1];
+      if (!cur || p.startMs > cur.endMs + gapMs) {
+        out.push({ ...p });
+        continue;
+      }
+      if (p.endMs > cur.endMs)
+        Object.assign(cur, { endMs: p.endMs, endAz: p.endAz, endEl: p.endEl, endReason: p.endReason });
+      if (p.maxEl > cur.maxEl) Object.assign(cur, { maxMs: p.maxMs, maxAz: p.maxAz, maxEl: p.maxEl });
+    }
+    return out;
+  }
   // Launch dates by designator from SATCAT rows (compact form).
   function launchDates(rows) {
     const out = new Map();
@@ -262,6 +292,6 @@ const SpacePlan = (() => {
     return out;
   }
   const previewTime = (p, now) => Math.max(now, Math.min(p.startMs + 20000, (p.startMs + p.endMs) / 2));
-  return { darkRanges, passes, examine, peak, GRAZE_MARGIN, family, trains, trainRows, launchDates, previewTime, TRAIN_MIN, TRAIN_CLUSTER };
+  return { darkRanges, passes, examine, peak, GRAZE_MARGIN, planMembers, mergePasses, family, trains, trainRows, launchDates, previewTime, TRAIN_MIN, TRAIN_CLUSTER };
 })();
 if (typeof module !== "undefined") module.exports = SpacePlan;

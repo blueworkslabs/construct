@@ -299,6 +299,9 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   guowang.click();
   assert.match(r.el('rewind-label').textContent, /^Preview /); assert(!r.el('now').hidden);
   assert.equal(r.el('spot-title').textContent, 'Guowang train');
+  // The merged pass opens with its first visible member; a little later the
+  // rest of the line is up too, and every drawn bead meets the conditions.
+  r.tick(150);
   const beads = r.dome().objects.find(o=>o.id==='train:2026-221').members;
   assert(beads.length > 0);
   assert(beads.every(m=>m.el>=10 && m.sunlit), 'train beads must each meet visibility conditions');
@@ -388,6 +391,11 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   assert.equal(r.dome().objects.find(o=>o.id==='train:2026-221')?.state,'visible','visible member makes the grouped train visible');
   const earlyTrain=r.el('list').children.find(b=>b.dataset.id==='train:2026-221');
   assert.match(earlyTrain.text,/visible/);earlyTrain.click();assert.match(r.el('spot-state').textContent,/Sunlit · should be visible/);
+  // The planner must agree: the train's pass is current, starting from the member
+  // that is already visible, not from the centre's later rise (#49 review).
+  const trainPass = r.el('plan-list').children.find(b => b.dataset.id === 'train:2026-221');
+  assert.match(trainPass.text, /^ Now · Guowang train /, 'member-visible train must have a current pass');
+  assert.equal(r.el('plan-list').children.filter(b => b.dataset.id === 'train:2026-221').length, 1, 'members merge into one train pass');
   // A genuinely empty recent list is valid and remains fresh across reopen.
   r = rig({recentBody: '[]'}); await flush(8);
   r = rig({saved: r.storage, clock: START + HOUR}); await flush(8);

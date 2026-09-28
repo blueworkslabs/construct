@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.2.8** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
+Space Watch **0.2.9** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
 alpha26** and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -15,8 +15,9 @@ view, not a map.
 
 Both features are module-only, with no host change, no new origin and no new
 consent. 0.1.6 stays published unchanged. 0.2.4 was the reviewed candidate after
-the initial 0.2.0 package; 0.2.8 adds the grazing-pass refinement below and
-needs its own acceptance.
+the initial 0.2.0 package; 0.2.8 added the grazing-pass refinement below and
+passed 16/16 Android checks. 0.2.9 plans trains from all their members (below)
+and needs its own acceptance.
 
 - **Visible passes · next 12 h.** This lists passes of the bright objects (and
   trains) that should be visible from your place, soonest first, at most 10.
@@ -70,6 +71,19 @@ needs its own acceptance.
   - **How it is shown:** a train is one entry, e.g. "Guowang train · 9 satellites
     in a line · launched 5 days ago". Its cluster representative gives the pointing
     words, and the other members are small beads on the dome.
+  - **Planning a train (0.2.9).** A train is visible while *any* member is. So
+    each member with a distinct element set is planned as its own queue entry,
+    and the member intervals are merged. Overlaps, or gaps under a minute, join
+    into one pass. The merged pass takes its start from the earliest member, its
+    end from the latest, and its highest point from the highest member.
+    - This keeps the pass list in step with the live state, which already points
+      at a visible member.
+    - Example from the Berlin fixture: the Guowang train is visible from
+      18:23:55, when member 100799 is up, not from the centre's own rise at
+      18:26:50. At 18:24 the list reads "Now · Guowang train".
+    - Each member costs about one object's scan (~700 propagations for a 12.5 h
+      window), so the ~15 ms slices stay as fine-grained as before. A batch with
+      shared elements is planned once.
   - **Honest note:** early orbit data for a batch is rough, and CelesTrak often
     gives a whole batch one shared set of elements. The card therefore says to
     look along the track ahead and behind.

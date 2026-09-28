@@ -541,8 +541,10 @@
     // Buffer the refresh interval; renderPlan still exposes only the rolling
     // next 12 hours, including passes that enter that window before refresh.
     const ranges = P.darkRanges(t, t + PLAN_HOURS * HOUR + 30 * MINUTE, sunAt),
+      // One queue entry per object keeps each slice to a single scan; a train
+      // contributes one entry per distinct member, merged when rendering.
       queue = [
-        ...trainList.map((tr) => ({ id: tr.id, o: tr.centre })),
+        ...trainList.flatMap((tr) => P.planMembers(tr).map((o) => ({ id: tr.id, o }))),
         ...objects.map((o) => ({ id: o.id, o })),
       ];
     plan = { from: t, ranges, queue, i: 0, results: [], done: !ranges.length, shown: "" };
@@ -575,10 +577,24 @@
     const top = p.maxEl >= 75 ? (p.maxEl >= 84 ? "passes straight overhead" : "passes almost overhead") : `highest ${K.height(p.maxEl)} in the ${K.dir16(p.maxAz)}`;
     return `${K.dir16(p.startAz)} → ${K.dir16(p.endAz)} · ${top} · ${mins} min${p.endReason === "shadow" ? " · fades into shadow" : ""}`;
   }
+  // Train members are planned separately; merge them into one pass per train.
+  function planned() {
+    if (plan.merged && plan.merged.n === plan.results.length) return plan.merged.list;
+    const trains = new Map(),
+      list = [];
+    for (const p of plan.results) {
+      if (typeof p.id !== "string") list.push(p);
+      else if (trains.has(p.id)) trains.get(p.id).push(p);
+      else trains.set(p.id, [p]);
+    }
+    for (const [id, parts] of trains) for (const m of P.mergePasses(parts)) list.push({ ...m, id });
+    plan.merged = { n: plan.results.length, list };
+    return list;
+  }
   function renderPlan() {
     if (!plan) return;
     const t = now(),
-      list = plan.results
+      list = planned()
         .filter((p) => p.endMs >= t && p.startMs <= t + PLAN_HOURS * HOUR && find(p.id))
         .sort((a, b) => a.startMs - b.startMs)
         .slice(0, 10),
