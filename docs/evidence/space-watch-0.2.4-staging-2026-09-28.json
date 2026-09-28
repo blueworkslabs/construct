@@ -1,0 +1,44 @@
+{
+  "complete": false,
+  "stopped": true,
+  "apkSha256": "990f178d0516f4d0797b98d12c62da3813d665087e725a464ec7300851b65dbc",
+  "moduleSha256": "abc81b10103b749eb77c7398d1c139b9d428eb09272ebe941f4c2560760615ce",
+  "fixtureSha256": "50d9458172c1c62d3d639878bd340d026721d44ff8d9660b41ec4adf235b1231",
+  "version": "0.2.4",
+  "scope": "Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy",
+  "checks": [
+    "Signed fixture opens its computed dome and equivalent overhead list",
+    "Visible-pass list includes the current ISS pass and pointing/max-height words",
+    "Future Guowang pass previews on the dome with train details and live Wikipedia attribution",
+    "Future preview survives native menu pause and Back to now restores the live sky",
+    "Fixture stage list selection gives EAST, 1½ fists up and Saturn anchor",
+    "Real same-launch lookup and explicit Wikipedia request render attributed results",
+    "Red mode and native touch rewind update the selected-object view",
+    "Red preference survives a genuine process restart",
+    "Canvas touch selects the ISS, independently of the list",
+    "Landscape train preview/details remain operable and cached batch identity survives restart",
+    "200% Android text: train preview, scrolling details and close controls remain operable",
+    "Native menu pause/resume restores the sky",
+    "Real module refuses ungranted phone location and offers manual place",
+    "Real manual-place flow works without location, but ungranted HTTP stays denied"
+  ],
+  "apiLevel": "37",
+  "reopenedPalettePixels": {
+    "red": 19556,
+    "green": 1372
+  },
+  "runId": "20260928T100229Z-space-f1f5ce4d",
+  "moduleSource": "e9dbb9a",
+  "runnerCommit": "f9f6753992b90383ff8bf8cf76d44b7d45dbb744",
+  "packageCommit": "f9f6753992b90383ff8bf8cf76d44b7d45dbb744",
+  "catalog": "https://raw.githubusercontent.com/blueworkslabs/construct/f9f6753992b90383ff8bf8cf76d44b7d45dbb744/catalog/candidates/space-watch-024/index.json",
+  "apkSource": "e1318303cbb64e43360a2807b81c3beebb5806c6",
+  "error": "Live orbit-data status was not reachable before the driver bound; last UI showed Downloading orbit data. Offline reopen was not run.",
+  "hardwareClearance": false,
+  "limitations": [
+    "14 of 16 checks only; no complete 0.2.4 Android acceptance",
+    "Confirmed grazing-pass prediction gap remains open",
+    "No physical-device spotting accuracy tested",
+    "Synthetic fixture bypasses location/orbit authority; separate real-module denial checks passed"
+  ]
+}

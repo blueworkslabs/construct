@@ -1,0 +1,47 @@
+{
+  "complete": true,
+  "stopped": true,
+  "apkSha256": "990f178d0516f4d0797b98d12c62da3813d665087e725a464ec7300851b65dbc",
+  "moduleSha256": "4ff57d4bcaa38e6b26c5fad5c29321adfcd96a719aaf863475e0c262288b82d0",
+  "fixtureSha256": "18b3392d92ae4db975d5efa0689161c636247c2fa11ee02e73e86c0b9c5c72cf",
+  "version": "0.2.7",
+  "scope": "Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy",
+  "checks": [
+    "Signed fixture opens its computed dome and equivalent overhead list",
+    "Visible-pass list includes the current ISS pass and pointing/max-height words",
+    "Future Guowang pass previews on the dome with train details and live Wikipedia attribution",
+    "Future preview survives native menu pause and Back to now restores the live sky",
+    "Fixture stage list selection gives EAST, 1½ fists up and Saturn anchor",
+    "Real same-launch lookup and explicit Wikipedia request render attributed results",
+    "Red mode and native touch rewind update the selected-object view",
+    "Red preference survives a genuine process restart",
+    "Canvas touch selects the ISS, independently of the list",
+    "Landscape train preview/details remain operable and cached batch identity survives restart",
+    "200% Android text: train preview, scrolling details and close controls remain operable",
+    "Native menu pause/resume restores the sky",
+    "Real module refuses ungranted phone location and offers manual place",
+    "Real manual-place flow works without location, but ungranted HTTP stays denied",
+    "Real module: native granted fix and live CelesTrak orbits populate the sky",
+    "Real cached sky reopens with Wi-Fi and mobile data disabled"
+  ],
+  "apiLevel": "37",
+  "reopenedPalettePixels": {
+    "red": 19554,
+    "green": 1372
+  },
+  "realCounts": "0 visible · 10 above you",
+  "realDataStatus": "Orbit data 32 h old · CelesTrak",
+  "offlineCounts": "0 visible · 10 above you",
+  "runId": "20260928T104939Z-space-24b232e6",
+  "moduleSource": "b336835",
+  "runnerCommit": "c7cf8f3e8979eb12375c108a5351fbb1d57f98fa",
+  "packageCommit": "c7cf8f3e8979eb12375c108a5351fbb1d57f98fa",
+  "catalog": "https://raw.githubusercontent.com/blueworkslabs/construct/c7cf8f3e8979eb12375c108a5351fbb1d57f98fa/catalog/candidates/space-watch-027/index.json",
+  "apkSource": "e1318303cbb64e43360a2807b81c3beebb5806c6",
+  "limitations": [
+    "No physical-device spotting or compass alignment tested",
+    "Synthetic position/orbit answers bypass authority; native gates exercised separately with real module",
+    "Menu-during-download cancellation checked in controller regressions; Android run checks native menu pause/resume with cached sky",
+    "Desktop browser layout checks are additional and do not substitute for Android captures"
+  ]
+}

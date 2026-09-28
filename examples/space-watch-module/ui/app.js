@@ -3,7 +3,8 @@
   const $ = (id) => document.getElementById(id),
     O = SpaceOrbit,
     K = SpaceSky,
-    C = SpaceCatalog;
+    C = SpaceCatalog,
+    P = SpacePlan;
   // The acceptance fixture pins the clock; the product uses the phone's.
   const fixture = typeof SpaceFixture !== "undefined" ? SpaceFixture : null,
     now = () => (fixture ? fixture.now() : Date.now());
@@ -16,14 +17,22 @@
     RETRY = 15 * MINUTE,
     ELEMENT_CHUNKS = 8,
     SATCAT_CHUNKS = 4,
+    RECENT_CHUNKS = 4,
+    PLAN_HOURS = 12,
     OLD_DATA = 72 * HOUR;
   let place = null,
     objects = [],
     satcat = new Map(),
-    meta = { elements: 0, satcat: 0 },
-    fetchState = { last: 0, until: 0, satcatLast: 0, satcatUntil: 0 },
+    recent = [],
+    launchDates = new Map(),
+    trainList = [],
+    plan = null,
+    planKey = "",
+    meta = { elements: 0, satcat: 0, recent: 0 },
+    fetchState = { last: 0, until: 0, satcatLast: 0, satcatUntil: 0, recentLast: 0, recentUntil: 0 },
     prefs = { startWithLocation: true, red: false },
     selected = null,
+    selectedPass = null,
     offset = 0,
     active = true,
     epoch = 0,
@@ -118,7 +127,8 @@
   // Chunks first, index last: a torn write leaves a generation mismatch, not bad data.
   async function saveRows(name, rowList, at, max) {
     const parts = O.chunks(rowList);
-    if (!parts.length || parts.length > max) return false;
+    if (!parts.length) parts.push([]);
+    if (parts.length > max) return false;
     for (let i = 0; i < max; i++)
       if (!(await kvSet(`${name}.${i}`, i < parts.length ? { g: at, r: parts[i] } : null)))
         return false;
@@ -152,7 +162,7 @@
     }
     const f = await kvGet("fetch-state");
     if (f && typeof f === "object")
-      for (const k of ["last", "until", "satcatLast", "satcatUntil"])
+      for (const k of ["last", "until", "satcatLast", "satcatUntil", "recentLast", "recentUntil"])
         if (Number.isFinite(f[k])) fetchState[k] = Math.max(0, Math.min(now() + 86400000, f[k]));
     applyRed();
     $("start-with-location").checked = prefs.startWithLocation;
@@ -168,6 +178,24 @@
       satcat = C.index(s.rows);
       meta.satcat = s.at;
     }
+    const r = await loadRows("recent", O.validRow, RECENT_CHUNKS),
+      dates = await kvGet("recent-launches");
+    if (r.at && dates && dates.at === r.at && Array.isArray(dates.d)) {
+      recent = O.build(P.trainRows(r.rows));
+      launchDates = new Map(dates.d.filter(validLaunch));
+      meta.recent = r.at;
+      rebuildTrains();
+    }
+  }
+  const validLaunch = (x) =>
+    Array.isArray(x) && x.length === 2 && /^\d{4}-\d{3}$/.test(x[0]) && /^\d{4}-\d\d-\d\d$/.test(x[1]);
+  function rebuildTrains() {
+    const key = (trains) => trains.map(t => `${t.id}:${t.centre.id}:${t.members.map(m => m.id).join()}`).join("|");
+    const next = P.trains(recent, launchDates, now()), changed = key(next) !== key(trainList);
+    trainList = next;
+    described.clear();
+    listKey = "";
+    if (changed) planKey = "";
   }
   const ready = Promise.all([initPrefs(), initCache()]);
 
@@ -263,6 +291,60 @@
       await saveFetchState();
     }
   }
+  // Trains: recent launches, only the batches that can still fly as a line.
+  async function fetchRecent(t) {
+    const previous = fetchState.recentLast;
+    fetchState.recentLast = t;
+    try {
+      const r = await getJson(C.RECENT_URL);
+      if (r.status === 403 || r.status === 429) fetchState.recentUntil = t + BACKOFF;
+      if (r.status !== 200) return;
+      let raw = null;
+      try { raw = JSON.parse(r.text); } catch (_) { /* Checked below. */ }
+      // The generic orbit parser permits unknown launch IDs. Grouping cannot:
+      // incomplete provider records must not become a successful empty snapshot.
+      if (!Array.isArray(raw) || raw.some(o => !O.compact(o)?.[2]))
+        throw Object.assign(new Error("Invalid recent orbit data"), { code: "HTTP_DATA" });
+      // The ordinary visual parser caps at 400. Recent feeds must be grouped
+      // in full (the host bounds response bytes), not truncated mid-batch.
+      const parsed = [...new Map(raw.map(o => { const r = O.compact(o); return [r[0], r]; })).values()];
+      const rows = P.trainRows(parsed);
+      let dates = new Map();
+      if (rows.length) {
+        const q = await getJson(C.RECENT_SATCAT_URL);
+        if (q.status === 403 || q.status === 429) fetchState.recentUntil = t + BACKOFF;
+        if (q.status !== 200) return;
+        let rawCatalog = null;
+        try { rawCatalog = JSON.parse(q.text); } catch (_) { /* Checked below. */ }
+        if (!Array.isArray(rawCatalog) || !rawCatalog.length || rawCatalog.some(o => !C.compact(o)?.[9]))
+          throw Object.assign(new Error("Invalid recent catalog"), { code: "HTTP_DATA" });
+        dates = P.launchDates(rawCatalog.map(o => C.compact(o)));
+      }
+      const keep = new Set(rows.map((x) => x[2].slice(0, 8)));
+      // Orbit and catalog feeds can lag one another. A launch date cannot
+      // change, so preserve known metadata when the fresh catalog omits it.
+      for (const key of keep) if (!dates.has(key) && launchDates.has(key)) dates.set(key, launchDates.get(key));
+      recent = O.build(rows);
+      launchDates = new Map([...dates].filter(([k]) => keep.has(k)));
+      meta.recent = t;
+      fetchState.recentUntil = 0;
+      rebuildTrains();
+      frame();
+      // Retain the entire source batch for each detected train, including
+      // stragglers: otherwise reopening changes “9 of 11” into “9 of 9”.
+      const batches = new Set(trainList.map((x) => x.intdes)),
+        kept = rows.filter((x) => batches.has(x[2].slice(0, 8)));
+      if (await saveRows("recent", kept, t, RECENT_CHUNKS))
+        await kvSet("recent-launches", { at: t, d: [...launchDates] });
+    } catch (e) {
+      if (e.code === "HTTP_DATA" || e.code === "HTTP_SIZE") fetchState.recentUntil = t + BACKOFF;
+      if (e.code === "RUN_PAUSED" || e.code === "CAPABILITY_DENIED") fetchState.recentLast = previous;
+      if (e.code === "RUN_PAUSED") throw e;
+      /* Trains are optional; the bright-object sky works without them. */
+    } finally {
+      await saveFetchState();
+    }
+  }
   async function refreshData(manual = false) {
     if (fetching || !active) return;
     const t = now(),
@@ -293,6 +375,13 @@
         t - fetchState.satcatLast > RETRY
       )
         await fetchSatcat(t);
+      if (
+        objects.length &&
+        t - meta.recent > ELEMENTS_TTL &&
+        t >= fetchState.recentUntil &&
+        t - fetchState.recentLast > RETRY
+      )
+        await fetchRecent(t);
     } catch (_) {
       /* Paused: the next visible tick retries. */
     } finally {
@@ -312,8 +401,46 @@
     }
     return d;
   }
+  function trainInfo(train) {
+    let d = described.get(train.id);
+    if (!d) {
+      const since = train.launch ? Math.floor((now() - Date.parse(train.launch + "T00:00:00Z")) / 86400000) : null;
+      d = {
+        title: `${train.family} train`,
+        kind: `${train.members.length} satellites in a line${train.launch ? ` · launched ${since < 1 ? "today" : since === 1 ? "yesterday" : since + " days ago"}` : ""}`,
+        wiki: train.wiki,
+        major: true,
+        since,
+      };
+      described.set(train.id, d);
+    }
+    return d;
+  }
+  // Prefer a member that can actually be spotted now, rather than letting a
+  // low/shadowed cluster centre hide the already-visible end of the train.
+  function trainRepresentative(train, t) {
+    if (!place) return train.centre;
+    const sunAlt = sunAt(t);
+    let highest = null;
+    for (const o of train.members) {
+      const l = O.look(o, place.ob, t);
+      if (!l) continue;
+      if (O.state(l, sunAlt) === "visible") return o;
+      if (!highest || l.el > highest.l.el) highest = { o, l };
+    }
+    return highest ? highest.o : train.centre;
+  }
+  // An id is a NORAD number, or "train:YYYY-NNN" for a train.
+  function find(id, t = now()) {
+    if (typeof id === "string") {
+      const train = trainList.find((x) => x.id === id);
+      return train ? { id, o: trainRepresentative(train, t), train, d: trainInfo(train) } : null;
+    }
+    const o = objects.find((x) => x.id === id);
+    return o ? { id, o, train: null, d: info(o) } : null;
+  }
   const shortLabel = (o, d) =>
-    o.id === 25544 ? "ISS" : o.id === 48274 ? "Tiangong" : o.id === 20580 ? "Hubble" : d.major ? d.title : o.name;
+    d.title.endsWith(" train") ? d.title : o.id === 25544 ? "ISS" : o.id === 48274 ? "Tiangong" : o.id === 20580 ? "Hubble" : d.major ? d.title : o.name;
   const sunAt = (ms) => K.sun(ms, place.aob).el;
   function context(t) {
     if (!sky.stars || Math.abs(t - sky.starsAt) > 20000) {
@@ -331,7 +458,13 @@
     for (const o of objects) {
       const l = O.look(o, place.ob, t);
       if (!l || l.el < 0) continue;
-      items.push({ o, l, state: O.state(l, sunAlt), d: info(o) });
+      items.push({ id: o.id, o, l, state: O.state(l, sunAlt), d: info(o) });
+    }
+    for (const train of trainList) {
+      const o = trainRepresentative(train, t),
+        l = O.look(o, place.ob, t);
+      if (!l || l.el < 0) continue;
+      items.push({ id: train.id, o, train, l, state: O.state(l, sunAlt), d: trainInfo(train) });
     }
     const rank = { visible: 0, low: 1, shadow: 2, daylight: 2 };
     items.sort((a, b) => rank[a.state] - rank[b.state] || b.l.el - a.l.el);
@@ -352,16 +485,22 @@
       red: prefs.red,
       selected,
       objects: s.items.map((x) => ({
-        id: x.o.id,
+        id: x.id,
         az: x.l.az,
         el: x.l.el,
         state: x.state,
         major: x.d.major,
-        label: x.d.major || x.o.id === selected ? shortLabel(x.o, x.d) : null,
+        label: x.d.major || x.id === selected ? shortLabel(x.o, x.d) : null,
         trail:
-          x.state === "visible" || x.state === "low" || x.o.id === selected
+          x.state === "visible" || x.state === "low" || x.id === selected
             ? O.trail(x.o, place.ob, t)
             : null,
+        members: x.train
+          ? x.train.members
+              .filter((m) => m !== x.o)
+              .map((m) => O.look(m, place.ob, t))
+              .filter((m) => m && O.state(m, s.sunAlt) === "visible")
+          : null,
       })),
     });
     const counts = `${visible} visible · ${s.items.length} above you`;
@@ -386,8 +525,112 @@
     $("sky-note").textContent = note;
     renderList(s);
     renderSpot(s);
-    $("rewind-label").textContent = K.ago(offset);
+    $("rewind-label").textContent = offset > 0 ? `Preview ${time(t)}` : K.ago(offset);
     $("now").hidden = offset === 0;
+    planStart();
+    renderPlan();
+  }
+
+  // ---- visible passes over the next hours, worked out in small slices ----
+  let planTimer = 0;
+  function planStart() {
+    if (!place || !objects.length) return;
+    const t = now(),
+      key = `${place.lat},${place.lon}|${meta.elements}|${meta.recent}|${trainList.length}`;
+    if (plan && planKey === key && t - plan.from < 30 * MINUTE) return;
+    planKey = key;
+    // Buffer the refresh interval; renderPlan still exposes only the rolling
+    // next 12 hours, including passes that enter that window before refresh.
+    const ranges = P.darkRanges(t, t + PLAN_HOURS * HOUR + 30 * MINUTE, sunAt),
+      // One queue entry per object keeps each slice to a single scan; a train
+      // contributes one entry per distinct member, merged when rendering.
+      queue = [
+        ...trainList.flatMap((tr) => P.planMembers(tr).map((o) => ({ id: tr.id, o }))),
+        ...objects.map((o) => ({ id: o.id, o })),
+      ];
+    plan = { from: t, ranges, queue, i: 0, results: [], done: !ranges.length, shown: "" };
+    schedulePlan();
+  }
+  function planStep(budgetMs = 15) {
+    if (!plan || plan.done || !active || !place) return;
+    const started = Date.now();
+    while (plan.i < plan.queue.length) {
+      const q = plan.queue[plan.i++];
+      for (const p of P.passes(q.o, place.ob, plan.ranges, sunAt)) plan.results.push({ ...p, id: q.id });
+      if (Date.now() - started > budgetMs) break;
+    }
+    if (plan.i >= plan.queue.length) plan.done = true;
+    renderPlan();
+    schedulePlan();
+  }
+  function schedulePlan() {
+    if (plan && !plan.done && !planTimer)
+      planTimer = setTimeout(() => {
+        planTimer = 0;
+        planStep();
+      }, 30);
+  }
+  const START = { rises: "rises", shadow: "comes out of Earth’s shadow", daylight: "appears as the sky darkens", ongoing: "already visible" },
+    END = { sets: "sets", shadow: "fades into Earth’s shadow", daylight: "fades in the brightening sky", window: "still visible at window end" };
+  function passLine(p) {
+    const secs = (p.endMs - p.startMs) / 1000,
+      mins = secs < 45 ? "under 1" : String(Math.max(1, Math.round(secs / 60)));
+    const top = p.maxEl >= 75 ? (p.maxEl >= 84 ? "passes straight overhead" : "passes almost overhead") : `highest ${K.height(p.maxEl)} in the ${K.dir16(p.maxAz)}`;
+    return `${K.dir16(p.startAz)} → ${K.dir16(p.endAz)} · ${top} · ${mins} min${p.endReason === "shadow" ? " · fades into shadow" : ""}`;
+  }
+  // Train members are planned separately; merge them into one pass per train.
+  function planned() {
+    if (plan.merged && plan.merged.n === plan.results.length) return plan.merged.list;
+    const trains = new Map(),
+      list = [];
+    for (const p of plan.results) {
+      if (typeof p.id !== "string") list.push(p);
+      else if (trains.has(p.id)) trains.get(p.id).push(p);
+      else trains.set(p.id, [p]);
+    }
+    for (const [id, parts] of trains) for (const m of P.mergePasses(parts)) list.push({ ...m, id });
+    plan.merged = { n: plan.results.length, list };
+    return list;
+  }
+  function renderPlan() {
+    if (!plan) return;
+    const t = now(),
+      list = planned()
+        .filter((p) => p.endMs >= t && p.startMs <= t + PLAN_HOURS * HOUR && find(p.id))
+        .sort((a, b) => a.startMs - b.startMs)
+        .slice(0, 10),
+      key = list.map((p) => p.id + ":" + p.startMs + ":" + (p.startMs <= t)).join() + "|" + plan.i + "|" + plan.done + "|" + Math.floor(t / MINUTE) + "|" + selected + "|" + selectedPass + "|" + (offset > 0);
+    if (key === plan.shown) return;
+    plan.shown = key;
+    $("plan-status").textContent = !plan.ranges.length
+      ? "The sky here stays too bright for satellites in the next 12 hours."
+      : !plan.done
+        ? `Working out passes… ${Math.round((100 * plan.i) / plan.queue.length)}%`
+        : list.length
+          ? "Tap one to preview it on the dome."
+          : "No visible passes of the bright objects in the next 12 hours.";
+    $("plan-list").replaceChildren(
+      ...list.map((p) => {
+        const f = find(p.id),
+          b = element("button", null, "object pass");
+        b.dataset.id = String(p.id);
+        b.setAttribute("aria-pressed", String(p.id === selected && p.startMs === selectedPass && offset > 0));
+        b.append(
+          element("strong", `${p.startMs <= t ? "Now" : time(p.startMs)} · ${f.d.title}`),
+          element("span", passLine(p)),
+          element("span", `${START[p.startReason]} ${K.dir16(p.startAz)}, ${END[p.endReason]} ${K.height(p.endEl)} in the ${K.dir16(p.endAz)}`),
+        );
+        b.onclick = () => previewPass(p);
+        return b;
+      }),
+    );
+  }
+  // Show the dome shortly after the pass becomes visible; it then runs in real time.
+  function previewPass(p) {
+    offset = Math.max(0, Math.round((P.previewTime(p, now()) - now()) / 1000));
+    $("rewind").value = "0";
+    plan.shown = "";
+    select(p.id, true, p.startMs);
   }
   function listLine(x) {
     const where = `${K.dir16(x.l.az)} · ${K.height(x.l.el)}`,
@@ -395,52 +638,60 @@
     return `${where} · ${state}`;
   }
   function renderList(s) {
-    const key = s.items.map((x) => x.o.id + x.state).join() + "|" + selected;
+    const key = s.items.map((x) => x.id + x.state).join() + "|" + selected + "|" + selectedPass + "|" + (offset > 0);
     if (key !== listKey) {
       listKey = key;
       const rows = s.items.map((x) => {
         const b = element("button", null, `object${x.state === "visible" ? " visible" : ""}`);
-        b.dataset.id = String(x.o.id);
-        b.setAttribute("aria-pressed", String(x.o.id === selected));
+        b.dataset.id = String(x.id);
+        b.setAttribute("aria-pressed", String(x.id === selected));
         b.append(element("strong", x.d.title), element("span", listLine(x)));
-        b.onclick = () => select(x.o.id, true);
+        b.onclick = () => select(x.id, true);
         return b;
       });
       $("list").replaceChildren(...rows);
-      $("list-title").textContent = offset ? `Overhead ${K.ago(offset)}` : "Overhead now";
+      $("list-title").textContent = offset > 0 ? `Overhead at ${time(now() + offset * 1000)}` : offset ? `Overhead ${K.ago(offset)}` : "Overhead now";
     } else {
-      const byId = new Map(s.items.map((x) => [String(x.o.id), x]));
+      const byId = new Map(s.items.map((x) => [String(x.id), x]));
       for (const b of $("list").children) {
         const x = byId.get(b.dataset.id);
         if (x && b.children[1]) b.children[1].textContent = listLine(x);
       }
     }
   }
+  let spotPassRequest = 0;
   function renderSpot(s) {
+    const request = ++spotPassRequest;
     if (selected === null) {
       $("spot").hidden = true;
       return;
     }
-    const o = objects.find((x) => x.id === selected);
-    if (!o) {
+    const found = find(selected, s.t);
+    if (!found) {
       selected = null;
       $("spot").hidden = true;
       return;
     }
-    const d = info(o),
+    const { o, d, train } = found,
       l = O.look(o, place.ob, s.t),
       st = O.state(l, s.sunAlt);
     $("spot").hidden = false;
     $("spot-title").textContent = d.title;
     $("spot-kind").textContent = d.kind;
     $("spot-when").hidden = offset === 0;
-    $("spot-when").textContent = offset ? `${K.ago(offset)}:` : "";
+    $("spot-when").textContent = offset > 0 ? `At ${time(s.t)}:` : offset ? `${K.ago(offset)}:` : "";
     if (!l || st === "below") {
       $("spot-head").textContent = "Below your horizon";
-      const p = nextPass(o, s.t);
-      $("spot-anchor").textContent = p
-        ? `Next time above you: ${day(p.riseMs)}, up to ${K.height(p.maxEl)}${p.visible ? ", visible" : ", not visible (shadow or daylight)"}.`
-        : "Not above you in the next 36 hours.";
+      if (train) {
+        $("spot-anchor").textContent = "Working out the next member above you…";
+        nextTrainPass(train, s.t, () => selected === train.id && request === spotPassRequest,
+          p => { $("spot-anchor").textContent = trainRiseText(p); });
+      } else {
+        const p = nextPass(o, s.t);
+        $("spot-anchor").textContent = p
+          ? `Next time above you: ${day(p.riseMs)}, up to ${K.height(p.maxEl)}${p.visible ? ", visible" : ", not visible (shadow or daylight)"}.`
+          : "Not above you in the next 36 hours.";
+      }
       $("spot-motion").textContent = "";
       $("spot-state").textContent = "";
       for (const id of ["stat-alt", "stat-speed", "stat-range"]) $(id).textContent = "–";
@@ -459,8 +710,11 @@
       O.look(o, place.ob, s.t + MINUTE),
       O.look(o, place.ob, s.t + 4 * MINUTE),
     );
-    const end = st === "visible" && offset === 0 ? passEnd(o, s.t) : null;
-    $("spot-state").textContent = [K.STATE[st], K.ending(end)].filter(Boolean).join(". ");
+    const end = !train && st === "visible" && offset === 0 ? passEnd(o, s.t) : null;
+    const line = train
+      ? `A line of ${train.members.length} satellites; early orbits are rough, so look along the track ahead and behind`
+      : "";
+    $("spot-state").textContent = [K.STATE[st], K.ending(end), line].filter(Boolean).join(". ");
     $("stat-alt").textContent = km(l.altKm);
     $("stat-speed").textContent = `${l.speedKms.toFixed(1)} km/s`;
     $("stat-range").textContent = km(l.rangeKm);
@@ -481,8 +735,37 @@
     passes.set(o.id, { t, p });
     return p;
   }
-  function select(id, fromList = false) {
+  const trainRiseCache = new Map();
+  const trainRiseText = p => p
+    ? `Next member above you: ${day(p.riseMs)} · ${p.visible ? "visible" : "not visible"}`
+    : "No member rises above 10° in the next 36 hours.";
+  // Both grouped views use the same bounded, cancellable member search.
+  function nextTrainPass(train, t, current, done) {
+    const origin = place, startedEpoch = epoch;
+    const valid = () => active && place === origin && epoch === startedEpoch && current();
+    const cached = trainRiseCache.get(train.id);
+    if (cached && cached.train === train && cached.place === origin && t >= cached.t &&
+        t - cached.t < 5 * MINUTE && (!cached.p || cached.p.riseMs > t)) {
+      if (valid()) done(cached.p);
+      return;
+    }
+    const members = P.planMembers(train);
+    let best = null, i = 0;
+    function step() {
+      if (!valid()) return;
+      const p = nextPass(members[i++], t);
+      if (p && (!best || p.riseMs < best.riseMs)) best = p;
+      if (i < members.length) setTimeout(step, 0);
+      else {
+        trainRiseCache.set(train.id, { train, place: origin, t, p: best });
+        done(best);
+      }
+    }
+    setTimeout(step, 0);
+  }
+  function select(id, fromList = false, passStart = null) {
     selected = id;
+    selectedPass = passStart;
     listKey = "";
     frame();
     if (fromList && id !== null) $("spot").scrollIntoView({ block: "nearest" });
@@ -503,17 +786,19 @@
     return section;
   }
   function openInfo() {
-    const o = objects.find((x) => x.id === selected);
-    if (!o || !place) return;
+    const found = find(selected);
+    if (!found || !place) return;
+    const o = found.o;
     infoTarget = o;
     const generation = ++infoGeneration;
     infoBusy = false;
     wikiDone = false;
-    const d = info(o),
-      c = satcat.get(o.id),
+    const d = found.d,
+      train = found.train,
+      c = train ? null : satcat.get(o.id),
       t = now(),
       l = O.look(o, place.ob, t),
-      p = nextPass(o, t);
+      p = train ? null : nextPass(o, t);
     $("info-title").textContent = d.title;
     $("info-kind").textContent = d.kind;
     const body = $("info-body");
@@ -529,6 +814,35 @@
         ]),
       );
     else body.append(facts("Right now", [["Where", "Below your horizon"]]));
+    if (train) {
+      const alts = train.members.map((m) => O.look(m, place.ob, t)).filter(Boolean).map((m) => m.altKm);
+      body.append(
+        facts("Train", [
+          ["Satellites in the line", `${train.members.length} of ${train.batch} from this launch`],
+          ["Launched", train.launch ? `${train.launch} · ${d.since < 1 ? "today" : d.since + " days ago"}` : null],
+          ["Launch", train.intdes],
+          ["Height", alts.length ? `${Math.round(Math.min(...alts)).toLocaleString("en-US")}–${km(Math.max(...alts))}` : null],
+        ]),
+      );
+      body.append(
+        element(
+          "p",
+          `Freshly launched ${train.family} satellites fly close together, like a string of lights, until they raise their orbits and spread out over days to weeks. Early orbit data for a batch is rough, so the real line can run ahead of or behind the drawing.`,
+          "note",
+        ),
+      );
+      const next = element("p", "Working out the next member above you…", "note");
+      body.append(next);
+      nextTrainPass(train, t, () => infoTarget === o && generation === infoGeneration,
+        p => { next.textContent = trainRiseText(p); });
+      wikiSection = element("section");
+      body.append(wikiSection);
+      $("wiki").hidden = false;
+      $("wiki").disabled = false;
+      $("wiki").textContent = "Read on Wikipedia";
+      $("info-dialog").showModal();
+      return;
+    }
     body.append(
       facts("Orbit", [
         ["Circles Earth every", c && c.period ? C.period(c.period) : null],
@@ -597,7 +911,8 @@
   $("wiki").onclick = async () => {
     const o = infoTarget, generation = infoGeneration;
     if (!o || infoBusy || wikiDone) return;
-    const d = info(o),
+    const selectedObject = find(selected);
+    const d = selectedObject && (selectedObject.o === o || selectedObject.train?.members.includes(o)) ? selectedObject.d : info(o),
       section = wikiSection;
     infoBusy = true;
     $("wiki").disabled = true;
@@ -778,12 +1093,14 @@
     frame();
   };
   $("rewind").oninput = () => {
+    selectedPass = null;
     const v = Number($("rewind").value);
     offset = Number.isFinite(v) ? Math.max(-300, Math.min(0, Math.round(v))) : 0;
     listKey = "";
     frame();
   };
   $("now").onclick = () => {
+    selectedPass = null;
     offset = 0;
     $("rewind").value = "0";
     listKey = "";
@@ -815,7 +1132,11 @@
   setInterval(() => {
     if (!active || !place) return;
     frame();
-    if (++ticks % 60 === 0) refreshData();
+    planStep();
+    if (++ticks % 60 === 0) {
+      rebuildTrains();
+      refreshData();
+    }
   }, 1000);
   (async () => {
     await ready;

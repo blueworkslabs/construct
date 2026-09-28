@@ -24,7 +24,8 @@ FIXTURE = ROOT / 'scripts/space-fixture'
 def stub():
     """The fixture script with the captured CelesTrak subset inlined."""
     text = (FIXTURE / 'synthetic-space.js').read_text()
-    for marker, name in (('/*ELEMENTS*/ null', 'elements.json'), ('/*SATCAT*/ null', 'satcat.json')):
+    for marker, name in (('/*ELEMENTS*/ null', 'elements.json'), ('/*SATCAT*/ null', 'satcat.json'),
+                         ('/*RECENT*/ null', 'recent.json'), ('/*RECENT_SATCAT*/ null', 'recent-satcat.json')):
         data = json.loads((FIXTURE / name).read_text())
         assert isinstance(data, list) and data and text.count(marker) == 1
         text = text.replace(marker, json.dumps(data, separators=(',', ':')))

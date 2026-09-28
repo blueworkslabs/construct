@@ -74,6 +74,11 @@
             </section>
             <h2 id="list-title">Overhead now</h2>
             <div id="list"></div>
+            <section id="plan">
+              <h2>Visible passes · next 12 h</h2>
+              <p id="plan-status" role="status"></p>
+              <div id="plan-list"></div>
+            </section>
             <p id="data-status" role="status"></p>
             <p id="status" role="status"></p>
             <button id="refresh">Refresh orbit data</button>
@@ -89,6 +94,14 @@
           with a track are sunlit against a dark sky and should be visible;
           faint rings are in Earth’s shadow or in daylight. Rewind shows the
           last five minutes for something you just saw.
+        </p>
+        <p>
+          Visible passes lists what should be visible over the next 12 hours;
+          tap one to preview it on the dome. Trains are fresh batches of
+          Starlink, Qianfan or Guowang satellites that still fly close
+          together, like a line of lights, for days to weeks after launch.
+          Their early orbits are approximate, so the line can be ahead of or
+          behind the drawing and stretch over several fists.
         </p>
         <p>
           The list covers CelesTrak’s ~150 brightest objects, not every
@@ -166,6 +179,7 @@
     <script src="space-orbit.js"></script>
     <script src="space-sky.js"></script>
     <script src="space-catalog.js"></script>
+    <script src="space-plan.js"></script>
     <script src="space-dome.js"></script>
     <script src="app.js"></script>
   </body>

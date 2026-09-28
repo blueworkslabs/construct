@@ -8,12 +8,18 @@ const flush = async (n = 3) => { for (let i = 0; i < n; i++) await new Promise(r
 const HOUR = 3600000, START = Date.parse('2026-09-28T17:50:40Z');
 const ELEMENTS = fs.readFileSync('scripts/space-fixture/elements.json', 'utf8');
 const SATCAT = fs.readFileSync('scripts/space-fixture/satcat.json', 'utf8');
+const RECENT = fs.readFileSync('scripts/space-fixture/recent.json', 'utf8');
+const RECENT_SATCAT = fs.readFileSync('scripts/space-fixture/recent-satcat.json', 'utf8');
+const GP = 'https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=json',
+  SC = 'https://celestrak.org/satcat/records.php?GROUP=visual&FORMAT=json',
+  RGP = 'https://celestrak.org/NORAD/elements/gp.php?GROUP=last-30-days&FORMAT=json',
+  RSC = 'https://celestrak.org/satcat/records.php?GROUP=last-30-days&FORMAT=json';
 const LAUNCH = JSON.stringify([
   {NORAD_CAT_ID: 29505, OBJECT_TYPE: 'PAY', OBJECT_NAME: 'SHIJIAN-6 02A (SJ-6 02A)', OBJECT_ID: '2006-046A'},
   {NORAD_CAT_ID: 29507, OBJECT_TYPE: 'R/B', OBJECT_NAME: 'CZ-4B R/B', OBJECT_ID: '2006-046C'},
 ]);
 const WIKI = JSON.stringify({query: {pages: [{title: 'Long March 4B', extract: 'The Long March 4B is a Chinese launch vehicle.', fullurl: 'https://en.wikipedia.org/wiki/Long_March_4B'}]}});
-function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false} = {}) {
+function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, recentBody = RECENT, recentSatcatBody = RECENT_SATCAT, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false, planScenario = false} = {}) {
   const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [];
   const storage = structuredClone(saved);
   let now = clock;
@@ -39,7 +45,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, netE
   const Clock = class extends Date { constructor(...a) { super(...(a.length ? a : [now])); } static now() { return now; } };
   const sandbox = {
     document: {getElementById: el, createElement: tag => new Element(tag), body: {classList: {toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)), contains: c => classes.has(c)}}},
-    Date: Clock, setInterval: fn => timers.push(fn), setTimeout: () => 0, Math, JSON, Promise, Map, Set, URLSearchParams,
+    Date: Clock, setInterval: fn => timers.push(fn), setTimeout: (fn, delay) => delay === 0 ? setImmediate(fn) : 0, Math, JSON, Promise, Map, Set, URLSearchParams,
     addEventListener(type, handler) { events[type] = handler; },
     call: async (method, params) => {
       calls.push({method, params: JSON.parse(JSON.stringify(params))});
@@ -49,15 +55,17 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, netE
       }
       if (method === 'location.read') {
         if (error) throw Object.assign(new Error(error), {code: error});
-        const result = {latitude: 52.52, longitude: 13.405, accuracyM: 12};
+        const result = {latitude: 52.517834, longitude: 13.388761, accuracyM: 12};
         if (pendingLocation) return new Promise(resolve => heldLocation.push(() => resolve(result)));
         return result;
       }
       if (method === 'net.http') {
         const u = params.url;
         if (netError) throw Object.assign(new Error(netError), {code: netError});
-        const result = u.includes('gp.php') ? (gpStatus === 200 ? {status: 200, text: elementsBody} : {status: gpStatus})
-          : u.includes('GROUP=visual') ? (satcatStatus === 200 ? {status: 200, text: SATCAT} : {status: satcatStatus})
+        const result = u === GP ? (gpStatus === 200 ? {status: 200, text: elementsBody} : {status: gpStatus})
+          : u === SC ? (satcatStatus === 200 ? {status: 200, text: SATCAT} : {status: satcatStatus})
+          : u === RGP ? (recentStatus === 200 ? {status: 200, text: recentBody} : {status: recentStatus})
+          : u === RSC ? {status: 200, text: recentSatcatBody}
           : u.includes('INTDES=') ? {status: 200, text: launchBody}
           : u.startsWith('https://en.wikipedia.org/') ? {status: 200, text: WIKI} : {status: 404};
         if (typeof pendingHttp === "function" ? pendingHttp(u) : pendingHttp) return new Promise(resolve => held.push(() => resolve(result)));
@@ -67,13 +75,15 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, netE
     }};
   sandbox.window = sandbox;
   const context = vm.createContext(sandbox);
-  const scripts = ['vendor/satellite.min.js', 'vendor/astronomy.min.js', 'space-stars.js', 'space-orbit.js', 'space-sky.js', 'space-catalog.js', 'space-dome.js', 'app.js'];
+  const scripts = ['vendor/satellite.min.js', 'vendor/astronomy.min.js', 'space-stars.js', 'space-orbit.js', 'space-sky.js', 'space-catalog.js', 'space-plan.js', 'space-dome.js', 'app.js'];
   for (const f of scripts) {
-    if (f === 'app.js') vm.runInContext('SpaceDome = class extends SpaceDome { constructor(c, cb) { super(c, cb); window.selectObject = cb; } }', context);
+    if (f === 'app.js') vm.runInContext('SpaceDome = class extends SpaceDome { constructor(c, cb) { super(c, cb); window.selectObject = cb; } set(s) { window.domeSnapshot = s; } }', context);
     vm.runInContext(fs.readFileSync(root + f, 'utf8'), context, {filename: f});
+    if (f === 'space-plan.js' && planScenario) vm.runInContext(`SpacePlan.darkRanges = (from,to)=>[[from,to]]; SpacePlan.passes = (o,ob,ranges)=> { const t=${clock} + 12.25*3600000; return o.id===25544 && ranges.some(([a,b])=>a<=t&&t<=b) ? [{startMs:t,endMs:t+120000,maxMs:t+60000,startAz:90,endAz:180,maxAz:135,startEl:10,endEl:10,maxEl:20,startReason:'rises',endReason:'sets'}] : []; };`,context);
+    if (f === 'space-plan.js' && planScenario === 'repeated') vm.runInContext(`SpacePlan.passes = (o)=>o.id===25544 ? [60000,600000].map(dt=>({startMs:${clock}+dt,endMs:${clock}+dt+120000,maxMs:${clock}+dt+60000,startAz:90,endAz:180,maxAz:135,startEl:10,endEl:10,maxEl:20,startReason:'rises',endReason:'sets'})) : [];`,context);
   }
   const http = () => calls.filter(c => c.method === 'net.http').map(c => c.params.url);
-  return {el, calls, storage, classes, http, select: id => sandbox.selectObject(id),
+  return {el, calls, storage, classes, http, dome: () => sandbox.domeSnapshot, select: id => sandbox.selectObject(id),
     finishLocation: () => heldLocation.splice(0).forEach(f => f()),
     finishHttp: () => held.splice(0).forEach(f => f()),
     tick: (n = 1, ms = 1000) => { for (let i = 0; i < n; i++) { now += ms; timers.forEach(f => f()); } },
@@ -81,21 +91,19 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, netE
     visibility: visible => events.constructvisibilitychange({detail: {visible}}),
     submit: (lat, lon) => { el('latitude').value = lat; el('longitude').value = lon; el('area-form').onsubmit({preventDefault() {}}); }};
 }
-const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|satcat\.(meta|[0-3]))$/.test(key);
+const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.(meta|[0-7])|(satcat|recent)\.(meta|[0-3]))$/.test(key);
 (async () => {
   // First open: one fix, one download of each CelesTrak list, nothing else.
   let r = rig(); await flush(8);
   assert.equal(r.calls.filter(c => c.method === 'location.read').length, 1);
   assert(r.el('welcome').hidden); assert(!r.el('workspace').hidden);
   assert.match(r.el('place-label').textContent, /^Your location · ±12 m · stays on this phone$/);
-  assert.deepEqual(r.http(), [
-    'https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=json',
-    'https://celestrak.org/satcat/records.php?GROUP=visual&FORMAT=json']);
+  assert.deepEqual(r.http(), [GP, SC, RGP, RSC]);
   assert.match(r.el('counts').textContent, /^[1-9]\d* visible · \d+ above you$/);
   assert.match(r.el('data-status').textContent, /^Orbit data \d+ h old · CelesTrak$/);
   for (const key of Object.keys(r.storage)) assert(allowedKeys(key), key);
   const stored = JSON.stringify(r.storage);
-  assert(!/52\.5|13\.40/.test(stored), 'coordinates never reach storage');
+  assert(!/52\.517|13\.388/.test(stored), 'coordinates never reach storage');
   // Select from the accessible list; the spot card speaks in plain words.
   const stage = r.el('list').children.find(b => b.dataset.id === '29507');
   assert(stage, 'Long March 4B stage listed'); assert.match(stage.text, /Long March 4B rocket stage.*E · 1½ fists up · visible/);
@@ -115,7 +123,7 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   await r.el('wiki').onclick(); await flush();
   assert.match(r.http().at(-1), /^https:\/\/en\.wikipedia\.org\/w\/api\.php\?.*&titles=Long%20March%204B$/);
   assert.match(r.el('info-body').text, /Chinese launch vehicle.*CC BY-SA 4\.0/);
-  for (const u of r.http()) assert(!/52\.5|13\.40/.test(u), 'coordinates never leave the phone: ' + u);
+  for (const u of r.http()) assert(!/52\.5|13\.3/.test(u), 'coordinates never leave the phone: ' + u);
   r.el('close-info').click(); assert(!r.el('info-dialog').open);
   // Rewind and back.
   r.el('rewind').value = '-120'; r.el('rewind').oninput();
@@ -134,10 +142,10 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   assert.match(r.el('counts').textContent, /visible · \d+ above you$/);
   // After the 8-hour freshness window the next minute tick downloads again.
   r.advance(8 * HOUR); r.tick(60); await flush(8);
-  assert.deepEqual(r.http(), ['https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=json']);
+  assert.deepEqual(r.http(), [GP, RGP, RSC]);
   // A manual refresh inside two hours explains instead of re-downloading.
   r.el('refresh').click(); await flush();
-  assert.equal(r.http().length, 1); assert.match(r.el('data-status').textContent, /nothing newer yet/);
+  assert.equal(r.http().length, 3); assert.match(r.el('data-status').textContent, /nothing newer yet/);
 
   // Refresh must invalidate name-derived descriptions even with a fresh SATCAT.
   const renamed = JSON.parse(ELEMENTS);
@@ -160,13 +168,13 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   // A torn cache (chunk from another generation) is ignored, not half-used.
   const torn = structuredClone(saved); torn['elements.0'].g = 1;
   r = rig({saved: torn, clock: START + HOUR}); await flush(8);
-  assert.equal(r.http().filter(u => u.includes('gp.php')).length, 1);
+  assert.equal(r.http().filter(u => u === GP).length, 1);
 
   // Corrupt numeric epochs must invalidate the cache, not abort startup.
   const corrupt = structuredClone(saved); corrupt['elements.0'].r[0][3] = 1e100;
   r = rig({saved: corrupt, clock: START + HOUR}); await flush(8);
   assert(!r.el('workspace').hidden, 'bad cached epoch must not strand startup');
-  assert.equal(r.http().filter(u => u.includes('gp.php')).length, 1);
+  assert.equal(r.http().filter(u => u === GP).length, 1);
 
   // The same launch can contain several selectable payloads. Each excludes itself.
   const launchPair = JSON.stringify([
@@ -215,16 +223,16 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   assert.match(r.el('data-status').textContent, /Enable the requested capability/);
   const deniedState = r.storage;
   r = rig({saved: deniedState, clock: START + 1000}); await flush(8);
-  assert.equal(r.http().filter(u => u.includes('gp.php')).length, 1, 'grant change must not wait 15 minutes');
+  assert.equal(r.http().filter(u => u === GP).length, 1, 'grant change must not wait 15 minutes');
   assert.match(r.el('counts').textContent, /visible/);
 
   // Catalog throttling uses the two-hour provider backoff too.
   for (const status of [403, 429]) {
     r = rig({satcatStatus: status}); await flush(8);
     r.advance(16 * 60000); r.tick(60); await flush(8);
-    assert.equal(r.http().filter(u => u.includes('/satcat/')).length, 1, 'catalog provider backoff');
+    assert.equal(r.http().filter(u => u === SC).length, 1, 'catalog provider backoff');
     r.advance(2 * HOUR); r.tick(60); await flush(8);
-    assert.equal(r.http().filter(u => u.includes('/satcat/')).length, 2);
+    assert.equal(r.http().filter(u => u === SC).length, 2);
   }
 
   // CelesTrak failure: a clear message, a remembered back-off, no hammering.
@@ -233,9 +241,9 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   assert.equal(r.el('data-status').className, 'attention');
   assert.equal(r.storage['fetch-state'].until, START + 15 * 60000);
   r.tick(60); await flush();
-  assert.equal(r.http().filter(u => u.includes('gp.php')).length, 1, 'no retry inside 15 minutes');
+  assert.equal(r.http().filter(u => u === GP).length, 1, 'no retry inside 15 minutes');
   r.tick(15 * 60); await flush(8);
-  assert.equal(r.http().filter(u => u.includes('gp.php')).length, 2);
+  assert.equal(r.http().filter(u => u === GP).length, 2);
 
   // No location grant: a quiet fallback to typed coordinates, never stored.
   for (const code of ['CAPABILITY_DENIED', 'LOCATION_PERMISSION', 'LOCATION_TIMEOUT']) {
@@ -245,10 +253,10 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   }
   r.el('start').click(); assert(r.el('area-dialog').open);
   r.submit('95', '13'); assert(r.el('area-dialog').open); assert.match(r.el('area-status').textContent, /latitude from −90 to 90/);
-  r.submit('52,52', '−13.405'); await flush(8);
+  r.submit('52,5178', '−13,3887'); await flush(8);
   assert(!r.el('area-dialog').open); assert(!r.el('workspace').hidden);
-  assert.equal(r.el('place-label').textContent, '52.52° N, 13.40° W');
-  assert(!/52\.5|13\.40/.test(JSON.stringify(r.storage)));
+  assert.equal(r.el('place-label').textContent, '52.52° N, 13.39° W');
+  assert(!/52\.517|13\.388/.test(JSON.stringify(r.storage)));
   r = rig({saved: {preferences: {startWithLocation: false, red: false}}}); await flush(4);
   assert.equal(r.calls.filter(c => c.method === 'location.read').length, 0);
   assert.equal(r.el('welcome-title').textContent, 'Where are you watching from?');
@@ -276,8 +284,148 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   r.finishHttp(); await flush(4);
   assert.equal(r.storage['elements.meta'], undefined, 'no data applied from a paused request');
   r.visibility(true); await flush(2); r.finishHttp(); await flush(8);
-  assert.equal(r.http().filter(u => u.includes('gp.php')).length, 2);
+  assert.equal(r.http().filter(u => u === GP).length, 2);
   assert.equal(r.el('status').textContent, '');
   assert.match(r.el('counts').textContent, /visible/);
-  console.log('Space Watch app checks passed: start, privacy (no coordinates in URLs or storage), list selection, spot words, details, Wikipedia on request, rewind, red mode, cache reuse/expiry/torn cache, CelesTrak back-off, location fallbacks and paused downloads.');
+
+  // Visible passes: worked out in slices, soonest first; the ISS pass is on now.
+  r = rig(); await flush(8); r.tick(1); await flush();
+  assert.equal(r.el('plan-status').textContent, 'Tap one to preview it on the dome.');
+  const planned = r.el('plan-list').children;
+  assert(planned.length >= 5 && planned.length <= 10);
+  assert.match(planned.find(b => b.dataset.id === '25544').text, /^ Now · ISS \(Zarya\) WSW → SSW · highest 1½ fists up in the SW · [34] min already visible WSW, sets 1 fist up in the SSW$/);
+  // Trains come from the last-30-days list and can be planned like anything else.
+  const guowang = planned.find(b => b.dataset.id === 'train:2026-221');
+  assert(guowang, 'Guowang train pass planned'); assert.match(guowang.text, /^ [\d:]+( [AP]M)? · Guowang train /);
+  guowang.click();
+  assert.match(r.el('rewind-label').textContent, /^Preview /); assert(!r.el('now').hidden);
+  assert.equal(r.el('spot-title').textContent, 'Guowang train');
+  // The merged pass opens with its first visible member; a little later the
+  // rest of the line is up too, and every drawn bead meets the conditions.
+  r.tick(150);
+  const beads = r.dome().objects.find(o=>o.id==='train:2026-221').members;
+  assert(beads.length > 0);
+  assert(beads.every(m=>m.el>=10 && m.sunlit), 'train beads must each meet visibility conditions');
+  assert.equal(r.el('spot-kind').textContent, '9 satellites in a line · launched 5 days ago');
+  assert.match(r.el('spot-when').textContent, /^At /);
+  assert.match(r.el('spot-state').textContent, /A line of 9 satellites; early orbits are rough/);
+  assert.match(r.el('list-title').textContent, /^Overhead at /);
+  r.el('details').click(); await flush(4);
+  assert.match(r.el('info-body').text, /9 of 11 from this launch/); assert.match(r.el('info-body').text, /2026-09-23 · 5 days ago/);
+  const before = r.http().length;
+  await r.el('wiki').onclick(); await flush(4);
+  assert.equal(r.http().length, before + 1); assert.match(r.http().at(-1), /&titles=Guowang$/);
+  r.el('close-info').click();
+  r.el('now').click(); assert.equal(r.el('rewind-label').textContent, 'Now'); assert.equal(r.el('list-title').textContent, 'Overhead now');
+  const trainButton = () => r.el('plan-list').children.find(b => b.dataset.id === 'train:2026-221');
+  assert.equal(trainButton().attributes['aria-pressed'], 'false', 'Back to now clears preview selection immediately');
+  trainButton().click(); assert.equal(trainButton().attributes['aria-pressed'], 'true');
+  r.el('rewind').value = '-120'; r.el('rewind').oninput();
+  assert.equal(trainButton().attributes['aria-pressed'], 'false', 'rewind clears preview selection immediately');
+  r.el('now').click();
+  for (const key of Object.keys(r.storage)) assert(allowedKeys(key), key);
+  assert(r.storage['recent.meta'] && r.storage['recent-launches'].d.length === 2);
+  // Reopen: trains come from the cache, no download.
+  const withTrains = r.storage;
+  r = rig({saved: withTrains, clock: START + 10 * 60000}); await flush(8); r.tick(1); await flush();
+  assert.deepEqual(r.http(), []);
+  assert(r.el('plan-list').children.some(b => b.dataset.id === 'train:2026-221'));
+  r.el('plan-list').children.find(b => b.dataset.id === 'train:2026-221').click();
+  r.el('details').click(); await flush(4);
+  assert.match(r.el('info-body').text, /9 of 11 from this launch/, 'cache preserves original batch size');
+  // Bad optional responses must preserve the prior cache and observe backoff.
+  for (const bad of ['{"error":"notice"}', '[{"broken":true}]', 'not json', 'partial', 'missing-designator', 'bad-designator']) {
+    for (const field of ['recentBody', 'recentSatcatBody']) {
+      let body = bad === 'partial' ? JSON.stringify([JSON.parse(field === 'recentBody' ? RECENT : RECENT_SATCAT)[0], {broken:true}]) : bad;
+      if (bad.endsWith('-designator')) body = JSON.stringify(JSON.parse(field === 'recentBody' ? RECENT : RECENT_SATCAT).map(o => ({...o, OBJECT_ID: bad === 'missing-designator' ? undefined : 'invalid'})));
+      r = rig({saved: withTrains, clock: START + 9 * HOUR, [field]: body}); await flush(10);
+      assert.equal(r.storage['recent.meta'].at, withTrains['recent.meta'].at);
+      assert.equal(r.storage['fetch-state'].recentUntil, START + 11 * HOUR);
+      assert.match(r.el('data-status').textContent, /^Orbit data .+ old · CelesTrak$/);
+    }
+  }
+  // A pass must become Now at its actual start, not the next minute tick.
+  {
+    const O = require('../' + root + 'space-orbit.js'), K = require('../' + root + 'space-sky.js'), P = require('../' + root + 'space-plan.js');
+    const ob = O.observer(52.517834, 13.388761, 0), aob = K.observer(52.517834, 13.388761, 0);
+    const sun = t => K.sun(t, aob).el, ranges = P.darkRanges(START, START + 12 * HOUR, sun);
+    r = rig(); await flush(8); r.tick(1, 0);
+    const listed = new Set(r.el('plan-list').children.map(b => b.dataset.id));
+    const pass = O.build(O.parseElements(ELEMENTS)).flatMap(o => P.passes(o, ob, ranges, sun).map(p => ({...p, id: String(o.id)})))
+      .find(p => listed.has(p.id) && p.startMs > START + 60000 && p.startMs < START + 20 * 60000 && p.startMs % 60000 > 1000 && p.startMs % 60000 < 59000);
+    assert(pass, 'fixture has a scheduled pass beginning inside a minute');
+    r.advance(pass.startMs - START - 1000); r.tick(1, 0);
+    const button = () => r.el('plan-list').children.find(b => b.dataset.id === pass.id);
+    assert(!button().text.includes('Now ·'));
+    r.tick(1, 2000);
+    assert(button().text.includes('Now ·'), 'pass switches to Now immediately at start');
+  }
+  // Two passes of one object must not both announce themselves as selected.
+  r=rig({planScenario:'repeated',recentBody:'[]'});await flush(8);r.tick(1,0);
+  const repeated=()=>r.el('plan-list').children;
+  assert.equal(repeated().length,2);
+  repeated()[1].click();
+  assert.deepEqual(repeated().map(b=>b.attributes['aria-pressed']),['false','true']);
+  repeated()[0].click();
+  assert.deepEqual(repeated().map(b=>b.attributes['aria-pressed']),['true','false']);
+  r.el('now').click();assert(repeated().every(b=>b.attributes['aria-pressed']==='false'));
+  // A cached plan must include passes entering the rolling 12-hour window.
+  r = rig({planScenario: true, recentBody: '[]'}); await flush(8); r.tick(1,0);
+  assert.equal(r.el('plan-list').children.length,0, '12h15m pass is initially outside displayed horizon');
+  r.advance(29*60000); r.tick(1,0);
+  assert(r.el('plan-list').children.some(b=>b.dataset.id==='25544'), 'buffered pass enters horizon before 30-minute refresh');
+  // Recent orbit/SATCAT feeds can be temporarily out of sync. Launch dates
+  // are immutable metadata: incomplete coverage must not erase a known date.
+  for(const omitBatch of [false,true]) {
+    let rows=JSON.parse(RECENT_SATCAT);
+    rows=omitBatch?rows.filter(o=>!o.OBJECT_ID.startsWith('2026-221')):rows.map(o=>({...o,LAUNCH_DATE:undefined}));
+    r=rig({saved:withTrains,clock:START+9*HOUR,recentSatcatBody:JSON.stringify(rows)});await flush(10);
+    assert.equal(r.storage['recent-launches'].d.find(([id])=>id==='2026-221')?.[1],'2026-09-23','prior launch date survives missing provider coverage');
+  }
+  // Recent provider feeds may exceed the ordinary 400-object visual catalog.
+  // Qualifying batches and launch dates after an unrelated prefix still count.
+  {
+    const prefix = Array.from({length:401},(_,i)=>({...JSON.parse(RECENT)[0],NORAD_CAT_ID:800000+i,OBJECT_NAME:'WEATHER-'+i,OBJECT_ID:'2025-001A'}));
+    const catPrefix = prefix.map(o=>({NORAD_CAT_ID:o.NORAD_CAT_ID,OBJECT_ID:o.OBJECT_ID,OBJECT_NAME:o.OBJECT_NAME,LAUNCH_DATE:'2025-01-01'}));
+    r = rig({recentBody:JSON.stringify([...prefix,...JSON.parse(RECENT)]),recentSatcatBody:JSON.stringify([...catPrefix,...JSON.parse(RECENT_SATCAT)])});
+    await flush(8);r.tick(1,0);
+    const train=r.el('plan-list').children.find(b=>b.dataset.id==='train:2026-221');
+    assert(train,'recent train beyond first 400 provider rows must remain discoverable');
+    train.click();r.el('details').click();await flush(4);
+    assert.match(r.el('info-body').text,/9 of 11 from this launch/);
+    assert.match(r.el('info-body').text,/2026-09-23 · 5 days ago/,'launch date beyond first 400 SATCAT rows retained');
+  }
+  // The Guowang centre is still low at 18:24, but another member is visible.
+  // Group count/list/dome and selected pointing must agree with that member.
+  r=rig({clock:Date.parse('2026-09-28T18:24:00Z')});await flush(8);r.tick(1,0);
+  assert.equal(r.dome().objects.find(o=>o.id==='train:2026-221')?.state,'visible','visible member makes the grouped train visible');
+  const earlyTrain=r.el('list').children.find(b=>b.dataset.id==='train:2026-221');
+  assert.match(earlyTrain.text,/visible/);earlyTrain.click();assert.match(r.el('spot-state').textContent,/Sunlit · should be visible/);
+  // The planner must agree: the train's pass is current, starting from the member
+  // that is already visible, not from the centre's later rise (#49 review).
+  const trainPass = r.el('plan-list').children.find(b => b.dataset.id === 'train:2026-221');
+  assert.match(trainPass.text, /^ Now · Guowang train /, 'member-visible train must have a current pass');
+  assert.equal(r.el('plan-list').children.filter(b => b.dataset.id === 'train:2026-221').length, 1, 'members merge into one train pass');
+  // Train details search all members, not the currently highest representative.
+  r=rig({clock:Date.parse('2026-09-28T16:50:00Z')});await flush(8);r.tick(1,0);
+  r.select('train:2026-221');await flush(15);
+  assert.match(r.el('spot-anchor').textContent,/06:20 PM/, 'grouped spot card uses the earliest member rise');
+  r.el('details').click();await flush(15);
+  assert.match(r.el('info-body').text,/06:20 PM/, 'details must use the earliest member rise, not the 18:28 representative');
+  r=rig({clock:Date.parse('2026-09-28T16:50:00Z')});await flush(8);r.tick(1,0);
+  r.select('train:2026-221');r.el('details').click();const closedBody=r.el('info-body').text;r.el('close-info').click();await flush(15);
+  assert.equal(r.el('info-body').text,closedBody,'closed details discard pending member scan');
+  r=rig({clock:Date.parse('2026-09-28T16:50:00Z')});await flush(8);r.tick(1,0);
+  r.select('train:2026-221');r.select(29507);const otherAnchor=r.el('spot-anchor').textContent;await flush(15);
+  assert.equal(r.el('spot-anchor').textContent,otherAnchor,'old train lookup cannot overwrite a new selection');
+  // A genuinely empty recent list is valid and remains fresh across reopen.
+  r = rig({recentBody: '[]'}); await flush(8);
+  r = rig({saved: r.storage, clock: START + HOUR}); await flush(8);
+  assert.deepEqual(r.http(), [], 'valid empty recent data should not refetch on every reopen');
+  // Trains are optional: a failing recent list leaves the sky and its message alone.
+  r = rig({recentStatus: 503}); await flush(8);
+  assert.deepEqual(r.http(), [GP, SC, RGP]);
+  assert.match(r.el('data-status').textContent, /^Orbit data \d+ h old · CelesTrak$/);
+  assert.equal(r.storage['fetch-state'].recentLast, START);
+  console.log('Space Watch app checks passed: start, privacy (no coordinates in URLs or storage), list selection, spot words, details, Wikipedia on request, rewind, red mode, visible passes and preview, trains (plan, details, cache, optional failure), cache reuse/expiry/torn cache, CelesTrak back-off, location fallbacks and paused downloads.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

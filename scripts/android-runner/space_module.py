@@ -11,7 +11,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_space_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.space-watch package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.space-watch-fixture package digest')
-p.add_argument('--version',default='0.1.6')
+p.add_argument('--version',default='0.2.14')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -34,6 +34,18 @@ def nodes():
   tap_node(deny);receipt.setdefault('systemInterruptions',[]).append('Gboard contacts/accounts permission declined');save()
   time.sleep(.5);current=ui.nodes()
  return current
+def tap(text):
+ try:
+  return ui.tap(text)
+ except RuntimeError as e:
+  if text != 'Construct menu' or str(e) != 'Unstable UI target: Construct menu':raise
+  # No click was issued by ui.tap in this failure case. Freshly locate only
+  # the trusted native menu button; subsequent native-menu assertions verify it.
+  n=next((n for n in nodes() if n.get('content-desc')=='Construct menu' and
+          n.get('class')=='android.widget.Button' and n.get('package')=='dev.construct.runtime' and
+          n.get('enabled')=='true' and visible(n)),None)
+  if n is None:raise
+  tap_node(n);receipt.setdefault('driverNotes',[]).append('Native menu tapped at freshly resolved bounds after stability wait');save()
 def labels():
  return [n.get('text') or n.get('content-desc') for n in nodes() if n.get('text') or n.get('content-desc')]
 FIXTURE='Synthetic Space Watch';REAL='Space Watch';heading=FIXTURE+' · '+a.version
@@ -58,19 +70,23 @@ def contains(fragment,timeout=35):
 def absent(fragment):
  assert not any(fragment in (x or '') for x in labels()),'Unexpected text: '+fragment
 def web():
- w=next((n for n in nodes() if n.get('class')=='android.webkit.WebView' and visible(n)),None)
- if w is None:raise RuntimeError('No module WebView')
- return bounds(w)
+ end=time.monotonic()+10
+ while time.monotonic()<end:
+  w=next((n for n in nodes() if n.get('class')=='android.webkit.WebView' and visible(n)),None)
+  if w is not None:return bounds(w)
+  time.sleep(.2)
+ raise RuntimeError('No module WebView after native transition settled')
 def scroll(direction,distance=None):
  dialogs=[n for n in nodes() if n.get('class')=='android.app.AlertDialog' and visible(n)]
- x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=x1+max(12,(x2-x1)//5);lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
+ # Scroll in the padding, not across the rewind range or a canvas hit target.
+ x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=x1+12;lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
  if distance is not None:lo=hi-max(24,min(hi-lo,round(distance)))
  adb('shell','input','swipe',str(x),str(hi if direction=='down' else lo),str(x),str(lo if direction=='down' else hi),'300');time.sleep(.35)
 def reveal(match):
  """First visible node whose text satisfies match (a string prefix or predicate), scrolling the module page."""
  test=match if callable(match) else (lambda t:t.startswith(match))
  for direction in ('up','down'):
-  for _ in range(10):
+  for _ in range(24):
    viewport=web()
    hits=[n for n in nodes() if test(text_of(n)) and visible(n) and n.get('package')=='dev.construct.runtime' and bounds(n)[1]>=viewport[1] and bounds(n)[3]<=viewport[3]]
    if hits:
@@ -78,18 +94,35 @@ def reveal(match):
     before=bounds(hits[0]);time.sleep(.5)
     settled=[n for n in nodes() if test(text_of(n)) and visible(n) and bounds(n)==before]
     if settled:return settled[0]
+   # Detect an actual scroll boundary instead of swiping upward 24 times at
+   # the top of the page. Text+geometry avoids confusing equal-height rows.
+   before=tuple((text_of(n),n.get('bounds')) for n in nodes() if visible(n) and text_of(n))
    scroll(direction)
+   after=tuple((text_of(n),n.get('bounds')) for n in nodes() if visible(n) and text_of(n))
+   if before==after:break
  raise RuntimeError('Module control not reachable: '+str(match))
 def click(match):tap_node(reveal(match))
 def reach_text(fragment):return text_of(reveal(lambda t:fragment in t))
+def wiki_credit():
+ contains('Wikipedia loaded',45)
+ # WebView exposes long dialog text beyond the clipped scroller. Move the
+ # dialog body itself to the attribution before taking visual evidence.
+ for _ in range(3):
+  x1,y1,x2,y2=web();x=(x1+x2)//2
+  adb('shell','input','swipe',str(x),str(y1+(y2-y1)*3//4),str(x),str(y1+(y2-y1)//3),'350')
+  time.sleep(.3)
+ reach_text('CC BY-SA 4.0')
 def full_dome():
- reveal('Sky dome:')
- for _ in range(12):
-  c=next(n for n in nodes() if text_of(n).startswith('Sky dome:') and visible(n))
-  b=bounds(c);w=web();size=b[2]-b[0]
-  if abs(size-(b[3]-b[1]))<=6 and b[1]>=w[1] and b[3]<=w[3]:return c
-  scroll('down',min(300,max(30,size-(b[3]-b[1])+16)))
- raise RuntimeError('Whole square dome not visible after scrolling')
+ # Start above the canvas: clipped accessibility bounds do not reveal which
+ # edge is missing, so blindly scrolling down can move a top-clipped dome out.
+ reveal(lambda t:t in (FIXTURE,REAL))
+ for _ in range(18):
+  c=next((n for n in nodes() if text_of(n).startswith('Sky dome:') and visible(n)),None)
+  if c is not None:
+   b=bounds(c);w=web();size=b[2]-b[0]
+   if abs(size-(b[3]-b[1]))<=6 and b[1]>=w[1] and b[3]<=w[3]:return c
+  scroll('down',180)
+ raise RuntimeError('Whole square dome not visible after scrolling from page top')
 def reach_native(label,checkable=False):
  for attempt in range(24):
   tree=nodes()
@@ -163,12 +196,27 @@ try:
  open_module(FIXTURE);module_access();switch('Allow approved internet sources',True);reopen()
  contains('visible ·');capture('space-dome')
  done('Signed fixture opens its computed dome and equivalent overhead list')
+ reach_text('Visible passes · next 12 h')
+ reach_text('Now · ISS (Zarya)');scroll('down',500);capture('space-plan')
+ reach_text('highest 1½ fists up in the SW')
+ done('Visible-pass list includes the current ISS pass and pointing/max-height words')
+ click(lambda t:'Guowang train' in t and ' · ' in t)
+ reach_text('Preview ');reach_text('At ');reach_text('9 satellites in a line');capture('space-train-preview')
+ click(lambda t:t=='Details');reach_text('9 of 11 from this launch');reach_text('2026-221');capture('space-train-details')
+ click('Read on Wikipedia');wiki_credit();capture('space-train-wikipedia')
+ done('Future Guowang pass previews on the dome with train details and live Wikipedia attribution')
+ click(lambda t:t=='Close');tap('Construct menu');tap('Return to module');reach_text('Preview ')
+ click('Back to now');reach_text('Overhead now');capture('space-train-back-now')
+ done('Future preview survives native menu pause and Back to now restores the live sky')
+ # Reset the running fixture clock before the old, time-sensitive EAST card.
+ # Planner navigation and real Wikipedia can outlast that original position.
+ adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·')
  click(lambda t:t.startswith('Long March 4B rocket stage'))
  reach_text('EAST · 1½ fists up');reach_text('above Saturn');capture('space-spot')
  done('Fixture stage list selection gives EAST, 1½ fists up and Saturn anchor')
  click(lambda t:t=='Details');contains('NORAD 29507 · 2006-046C')
  contains('Carried:',45);capture('space-details')
- click('Read on Wikipedia');contains('Wikipedia loaded',45);reach_text('CC BY-SA 4.0');capture('space-wikipedia')
+ click('Read on Wikipedia');wiki_credit();capture('space-wikipedia')
  done('Real same-launch lookup and explicit Wikipedia request render attributed results')
  click(lambda t:t=='Close');click(lambda t:t=='Red mode')
  # Rewind via the actual accessible range control.
@@ -201,17 +249,19 @@ try:
  adb('shell','input','tap',str(round(x)),str(round(y)))
  reach_text('ISS (Zarya)');reach_text('International Space Station · crewed');capture('space-canvas-selected')
  done('Canvas touch selects the ISS, independently of the list')
+ # This preview uses the cached train after the genuine process restart.
+ click(lambda t:'Guowang train' in t and ' · ' in t);reach_text('Preview ')
  adb('shell','settings','put','system','user_rotation','1');time.sleep(3)
- full_dome();capture('space-landscape');click('Details');reach_text('NORAD 25544');capture('space-landscape-details');click(lambda t:t=='Close')
- done('Landscape dome and selected-object details remain operable')
+ full_dome();capture('space-landscape');click('Details');reach_text('9 of 11 from this launch');reach_text('2026-221');capture('space-landscape-details');click(lambda t:t=='Close')
+ done('Landscape train preview/details remain operable and cached batch identity survives restart')
  adb('shell','settings','put','system','user_rotation','0');adb('shell','settings','put','system','font_scale','2.0');time.sleep(3)
- click('Details');reach_text('NORAD 25544');capture('space-large-text-details');click(lambda t:t=='Close');full_dome();capture('space-large-text')
- done('200% Android text: dome, scrolling details and close controls remain operable')
+ click('Details');reach_text('2026-221');capture('space-large-text-details');click(lambda t:t=='Close');full_dome();capture('space-large-text')
+ done('200% Android text: train preview, scrolling details and close controls remain operable')
  adb('shell','settings','put','system','font_scale','1.0');time.sleep(2)
  # Native menu pause/resume on retained data, then real module gates.
  tap('Construct menu');tap('Return to module');contains('visible ·')
  done('Native menu pause/resume restores the sky')
- tap('Construct menu');tap('Mark working');install(REAL,a.module_sha);open_module(REAL)
+ tap('Construct menu');find('Mark working');tap('Mark working');install(REAL,a.module_sha);open_module(REAL)
  contains('Phone location isn’t enabled');capture('space-real-location-denied')
  done('Real module refuses ungranted phone location and offers manual place')
  click('Choose place')
@@ -240,9 +290,20 @@ try:
  contains('Your location',45)
  # Loading the object list moves the status below the viewport. Read the
  # settled result via actual scrolling, not only currently exposed XML text.
- status=text_of(reveal(lambda t:bool(re.match(r'^Orbit data .+ old · CelesTrak',t))))
+ # Permission return can precede the initial provider reply. Wait for the
+ # async result, without tapping Refresh or counting a downloading state as pass.
+ deadline=time.monotonic()+90;status=''
+ while time.monotonic()<deadline:
+  try:
+   status=text_of(reveal(lambda t:bool(re.match(r'^Orbit data .+ old · CelesTrak',t))))
+   break
+  except RuntimeError:
+   time.sleep(2)
+ if not status:raise RuntimeError('Live orbit data did not arrive within 90 seconds after grants')
  assert re.match(r'^Orbit data .+ old · CelesTrak',status), ('Live orbit data not ready',status)
  receipt['realDataStatus']=status;save()
+ # The previous runner could scrub while scrolling. Require live-time capture.
+ reach_text('Overhead now')
  receipt['realCounts']=text_of(reveal(lambda t:bool(re.fullmatch(r'\d+ visible · \d+ above you',t))))
  capture('space-real-network')
  done('Real module: native granted fix and live CelesTrak orbits populate the sky')

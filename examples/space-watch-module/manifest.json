@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "dev.construct.space-watch",
   "name": "Space Watch",
-  "version": "0.1.6",
-  "description": "What's passing overhead: a sky dome of the brightest satellites and rocket stages with plain-language pointing, rewind and details. Positions are computed on the phone; your location is never sent. Requires Construct alpha26 or later.",
+  "version": "0.2.14",
+  "description": "What's passing overhead: a sky dome of the brightest satellites, rocket stages and fresh satellite trains, with plain-language pointing, rewind, the next visible passes and details. Positions are computed on the phone; your location is never sent. Requires Construct alpha26 or later.",
   "constructApi": {
     "min": "0.9.0",
     "target": "0.9.0"
@@ -15,7 +15,7 @@
   "capabilities": [
     {
       "id": "net.http",
-      "reason": "Download the public orbit list and catalog of bright objects from CelesTrak, and, only when you ask, a short Wikipedia description of the selected object. No location is sent.",
+      "reason": "Download public orbit lists and catalogs from CelesTrak (bright objects and recent launches), and, only when you ask, a short Wikipedia description of the selected object. No location is sent.",
       "origins": [
         "https://celestrak.org",
         "https://en.wikipedia.org"

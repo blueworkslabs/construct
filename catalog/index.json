@@ -315,9 +315,17 @@
           "artifact": "dev.construct.space-watch-0.1.6.zip",
           "sha256": "159262e0b2008b56130f92171eac929048236f0fd565444e639f8e5e42fd299c",
           "signature": "l5OrpEwiTgORf8SG5NAsKnn61oBltapfvnB76OG9NOEAK5fBCOj62iP9Sq2+5DigYnYtB38IvuSyLm7oUASf4bMPW6j/R8uAj8T7wba58M9i+PCMe+VPH69QyETx0paaxko5IaYBez9FTr25AAHyiTx6LGhGC3vxD5Rlr6RfMIhORPKIw5zOwCG01Uc+AzlSQQkSKbRHkX4IrcKc9shY25AvmLDZdmqKoamnEjchab5GfzAQvxgOEGXyjtoSz8Ow14A0GGD5mGhxEfI32uVB6nlc7/Aajhcu2/LiPVJMY2O82s5YmurHjkZPmFMyuesqpFloO+iOBbxBToRg3x7LMg=="
+        },
+        {
+          "id": "dev.construct.space-watch",
+          "name": "Space Watch",
+          "version": "0.2.14",
+          "artifact": "dev.construct.space-watch-0.2.14.zip",
+          "sha256": "a6654fe67444d1fdcf84fcc0d246c246213295915fa0a653c90198cb4832f425",
+          "signature": "m5c2+wxOgRccnkJkvSbwJ73GDbF18CP6DtzZpEMZgFYusmRu7QD9OT2LFmYBzPs5NkQyOYYZGHia0AOHvtphQ98/7y6NbskPtnDuitz0Nhp8iBgMl62oXot0rmTx4d7sCQgyTbr9K0GJsPFlv0Aye39g7jBWin23yth3WAwx3aabGiow0QzhOKerNqJZGbxWIrqgXcNNHIEkBFSY4Abtq6TA39pGA3wDN4h9nUlNXHBw8QGN46JhQxnGBWWrdAI9U5Dc+301mSusxbWTOujboO+HQYGkbxSpFWL41x7ndKVJpszHET2KSaA3OlMN8WrvavZI3MLsm3/j11Ios/FEZA=="
         }
       ],
-      "latest": "0.1.6"
+      "latest": "0.2.14"
     }
   ]
 }
