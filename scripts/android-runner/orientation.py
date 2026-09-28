@@ -8,8 +8,10 @@ from config import CONFIG,SERIAL,require_runner,catalog
 p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.add_argument('--sha',required=True)
 p.add_argument('--catalog',required=True);p.add_argument('--module-sha',required=True,help='Signed orientation probe digest')
 p.add_argument('--version',default='0.1.3')
+p.add_argument('--pause-apk',type=Path,required=True);p.add_argument('--pause-sha',required=True)
 a=p.parse_args();require_runner();catalog(a.catalog)
 if hashlib.sha256(a.apk.read_bytes()).hexdigest()!=a.sha:raise SystemExit('APK checksum mismatch')
+if hashlib.sha256(a.pause_apk.read_bytes()).hexdigest()!=a.pause_sha:raise SystemExit('Pause fixture checksum mismatch')
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
 if subprocess.run(['systemctl','--user','is-active','--quiet',CONFIG.service]).returncode==0:raise SystemExit('Preserve running emulator')
 if any(x.startswith(SERIAL+'\t') for x in subprocess.check_output([str(CONFIG.sdk/'platform-tools/adb'),'devices'],text=True).splitlines()):raise SystemExit('Preserve occupied port')
@@ -19,7 +21,7 @@ import ui
 from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
-receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'checks':[],'samples':[]}
+receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'pauseFixtureSha256':a.pause_sha,'checks':[],'samples':[]}
 started=False
 name='Orientation probe';heading=name+' · '+a.version
 def save():(run/'result.json').write_text(json.dumps(receipt,indent=2)+'\n')
@@ -154,6 +156,7 @@ try:
  adb('shell','settings','put','system','accelerometer_rotation','0');adb('shell','settings','put','system','user_rotation','0')
  inject('0:0:9.80665','0:50:-20')
  adb('logcat','-c');adb('install',str(a.apk.resolve()),timeout=120)
+ adb('install',str(a.pause_apk.resolve()),timeout=60)
  receipt['hostVersion']=[line.strip() for line in adb('shell','dumpsys','package','dev.construct.runtime').splitlines() if 'versionCode=' in line or 'versionName=' in line]
  launch();catalog_settings()
  replace_text(nodes,lambda v:ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(v),a.catalog)
@@ -199,16 +202,17 @@ try:
  require(act('Read once')=='Read.','Large-text read failed');require(act('Stop').startswith('Stopped:'),'Large-text stop missing')
  done('Landscape and 200% text retain readable controls and working one-shot access')
  adb('shell','settings','put','system','font_scale','1.0');adb('shell','am','force-stop','dev.construct.runtime');opened();watch(10)
- # A system settings panel is translucent: verify pause without onStop and denied new requests.
+ # A permission-free test activity is deliberately translucent; system panels vary by OS.
  before=act('Check paused requests in 3 seconds',wait=False)
- adb('shell','am','start','-W','-a','android.settings.panel.action.INTERNET_CONNECTIVITY')
+ adb('shell','am','start','-W','-n','dev.construct.test.pause/.PauseActivity')
  time.sleep(4)
  activities=adb('shell','dumpsys','activity','activities');(run/'activity-pause.txt').write_text(activities)
+ client=adb('shell','dumpsys','activity','dev.construct.runtime/.ModuleActivity');(run/'activity-pause-client.txt').write_text(client)
  capture('activity-paused')
  block=re.search(r'Hist #[^\n]*dev\.construct\.runtime/\.ModuleActivity[^\n]*\n(.*?)(?=\* Hist #|RootTask|$)',activities,re.S)
- require(block is not None and 'state=PAUSED' in block.group(1) and 'stopped=false' in block.group(1),'No pause-only lifecycle observation; do not count this as covered')
+ require(block is not None and 'state=PAUSED' in block.group(1) and 'mStopped=false' in client,'No pause-only lifecycle observation; do not count this as covered')
  sensor_state('activity-paused')
- adb('shell','input','keyevent','KEYCODE_BACK');find('Read once')
+ tap('Close lifecycle test overlay');find('Read once')
  require(result(before)=='Pause requests: get=RUN_PAUSED; watch=RUN_PAUSED','Paused requests were not denied')
  require('Ended: paused (1)' in labels(),'Missing or repeated terminal pause event')
  no_events();sensor_state('pause-resumed');capture('pause-only-returned')
