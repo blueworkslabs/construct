@@ -361,6 +361,19 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   assert.equal(r.el('plan-list').children.length,0, '12h15m pass is initially outside displayed horizon');
   r.advance(29*60000); r.tick(1,0);
   assert(r.el('plan-list').children.some(b=>b.dataset.id==='25544'), 'buffered pass enters horizon before 30-minute refresh');
+  // Recent provider feeds may exceed the ordinary 400-object visual catalog.
+  // Qualifying batches and launch dates after an unrelated prefix still count.
+  {
+    const prefix = Array.from({length:401},(_,i)=>({...JSON.parse(RECENT)[0],NORAD_CAT_ID:800000+i,OBJECT_NAME:'WEATHER-'+i,OBJECT_ID:'2025-001A'}));
+    const catPrefix = prefix.map(o=>({NORAD_CAT_ID:o.NORAD_CAT_ID,OBJECT_ID:o.OBJECT_ID,OBJECT_NAME:o.OBJECT_NAME,LAUNCH_DATE:'2025-01-01'}));
+    r = rig({recentBody:JSON.stringify([...prefix,...JSON.parse(RECENT)]),recentSatcatBody:JSON.stringify([...catPrefix,...JSON.parse(RECENT_SATCAT)])});
+    await flush(8);r.tick(1,0);
+    const train=r.el('plan-list').children.find(b=>b.dataset.id==='train:2026-221');
+    assert(train,'recent train beyond first 400 provider rows must remain discoverable');
+    train.click();r.el('details').click();await flush(4);
+    assert.match(r.el('info-body').text,/9 of 11 from this launch/);
+    assert.match(r.el('info-body').text,/2026-09-23 · 5 days ago/,'launch date beyond first 400 SATCAT rows retained');
+  }
   // A genuinely empty recent list is valid and remains fresh across reopen.
   r = rig({recentBody: '[]'}); await flush(8);
   r = rig({saved: r.storage, clock: START + HOUR}); await flush(8);

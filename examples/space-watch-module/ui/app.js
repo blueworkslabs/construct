@@ -300,11 +300,13 @@
       if (r.status !== 200) return;
       let raw = null;
       try { raw = JSON.parse(r.text); } catch (_) { /* Checked below. */ }
-      const parsed = O.parseElements(r.text);
       // The generic orbit parser permits unknown launch IDs. Grouping cannot:
       // incomplete provider records must not become a successful empty snapshot.
       if (!Array.isArray(raw) || raw.some(o => !O.compact(o)?.[2]))
         throw Object.assign(new Error("Invalid recent orbit data"), { code: "HTTP_DATA" });
+      // The ordinary visual parser caps at 400. Recent feeds must be grouped
+      // in full (the host bounds response bytes), not truncated mid-batch.
+      const parsed = [...new Map(raw.map(o => { const r = O.compact(o); return [r[0], r]; })).values()];
       const rows = P.trainRows(parsed);
       let dates = new Map();
       if (rows.length) {
@@ -313,10 +315,9 @@
         if (q.status !== 200) return;
         let rawCatalog = null;
         try { rawCatalog = JSON.parse(q.text); } catch (_) { /* Checked below. */ }
-        const catalog = C.parseSatcat(q.text);
-        if (!Array.isArray(rawCatalog) || !catalog.length || rawCatalog.some(o => !C.compact(o)?.[9]))
+        if (!Array.isArray(rawCatalog) || !rawCatalog.length || rawCatalog.some(o => !C.compact(o)?.[9]))
           throw Object.assign(new Error("Invalid recent catalog"), { code: "HTTP_DATA" });
-        dates = P.launchDates(catalog);
+        dates = P.launchDates(rawCatalog.map(o => C.compact(o)));
       }
       const keep = new Set(rows.map((x) => x[2].slice(0, 8)));
       recent = O.build(rows);

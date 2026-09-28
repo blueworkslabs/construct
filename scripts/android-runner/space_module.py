@@ -11,7 +11,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_space_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.space-watch package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.space-watch-fixture package digest')
-p.add_argument('--version',default='0.2.5')
+p.add_argument('--version',default='0.2.6')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -34,6 +34,18 @@ def nodes():
   tap_node(deny);receipt.setdefault('systemInterruptions',[]).append('Gboard contacts/accounts permission declined');save()
   time.sleep(.5);current=ui.nodes()
  return current
+def tap(text):
+ try:
+  return ui.tap(text)
+ except RuntimeError as e:
+  if text != 'Construct menu' or str(e) != 'Unstable UI target: Construct menu':raise
+  # No click was issued by ui.tap in this failure case. Freshly locate only
+  # the trusted native menu button; subsequent native-menu assertions verify it.
+  n=next((n for n in nodes() if n.get('content-desc')=='Construct menu' and
+          n.get('class')=='android.widget.Button' and n.get('package')=='dev.construct.runtime' and
+          n.get('enabled')=='true' and visible(n)),None)
+  if n is None:raise
+  tap_node(n);receipt.setdefault('driverNotes',[]).append('Native menu tapped at freshly resolved bounds after stability wait');save()
 def labels():
  return [n.get('text') or n.get('content-desc') for n in nodes() if n.get('text') or n.get('content-desc')]
 FIXTURE='Synthetic Space Watch';REAL='Space Watch';heading=FIXTURE+' · '+a.version

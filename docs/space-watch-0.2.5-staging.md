@@ -1,6 +1,9 @@
 # Space Watch 0.2.5 staging
 
-Status: **fresh exact-package Android acceptance in progress.** Not yet cleared
+Status: **incomplete: runner stopped before the first check.** The native menu
+button remained present but its accessibility bounds did not settle. No tap was
+issued by that failed stability wait. The emulator stopped cleanly; a narrowly
+scoped fresh-target driver fallback is included with the 0.2.6 rerun. Not cleared
 for the phone handoff. The 0.2.4 grazing-pass blocker is corrected; its earlier
 incomplete acceptance remains separately recorded. No merge or production change.
 
