@@ -550,7 +550,8 @@
   const START = { rises: "rises", shadow: "comes out of Earth’s shadow", daylight: "appears as the sky darkens", ongoing: "already visible" },
     END = { sets: "sets", shadow: "fades into Earth’s shadow", daylight: "fades in the brightening sky", window: "still visible at window end" };
   function passLine(p) {
-    const mins = Math.max(1, Math.round((p.endMs - p.startMs) / MINUTE));
+    const secs = (p.endMs - p.startMs) / 1000,
+      mins = secs < 45 ? "under 1" : String(Math.max(1, Math.round(secs / 60)));
     const top = p.maxEl >= 75 ? (p.maxEl >= 84 ? "passes straight overhead" : "passes almost overhead") : `highest ${K.height(p.maxEl)} in the ${K.dir16(p.maxAz)}`;
     return `${K.dir16(p.startAz)} → ${K.dir16(p.endAz)} · ${top} · ${mins} min${p.endReason === "shadow" ? " · fades into shadow" : ""}`;
   }

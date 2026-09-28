@@ -33,14 +33,15 @@ const SpacePlan = (() => {
     const l = O.look(o, ob, t);
     return { l, v: O.state(l, sunAltAt(t)) === "visible" };
   };
-  // The visible stretch of one pass that is above 10° from a to b, sampled every 5 s.
-  function examine(o, ob, a, b, sunAltAt) {
+  // The visible stretch of one pass that is above 10° from a to b, sampled every
+  // 5 s (1 s for grazing passes that are only seconds long).
+  function examine(o, ob, a, b, sunAltAt, dt = 5000) {
     let first = null,
       last = null,
       max = null,
-      before = { ...visibleAt(o, ob, a - 5000, sunAltAt), t: a - 5000 },
+      before = { ...visibleAt(o, ob, a - dt, sunAltAt), t: a - dt },
       after = null;
-    for (let t = a; t <= b; t += 5000) {
+    for (let t = a; t <= b; t += dt) {
       const { l, v } = visibleAt(o, ob, t, sunAltAt);
       if (!l) break;
       if (v) {
@@ -70,15 +71,51 @@ const SpacePlan = (() => {
       endReason: after ? why(after, "sets") : "window",
     };
   }
-  // Visible passes of one object within the given dark ranges: coarse 60 s scan
-  // for rises above 10°, refined to 5 s, then the visible stretch of each pass.
+  // Peak elevation between a and b (one hump), by golden-section search to ~1 s.
+  function peak(o, ob, a, b) {
+    const g = (Math.sqrt(5) - 1) / 2,
+      el = (t) => {
+        const l = O.look(o, ob, t);
+        return l ? l.el : -90;
+      };
+    let c = b - g * (b - a),
+      d = a + g * (b - a),
+      fc = el(c),
+      fd = el(d);
+    while (b - a > 1000) {
+      if (fc > fd) {
+        b = d;
+        d = c;
+        fd = fc;
+        c = b - g * (b - a);
+        fc = el(c);
+      } else {
+        a = c;
+        c = d;
+        fc = fd;
+        d = a + g * (b - a);
+        fd = el(d);
+      }
+    }
+    const t = Math.round((a + b) / 2);
+    return { t, el: el(t) };
+  }
+  // A coarse sample this far below 10° at a local maximum may hide a grazing
+  // pass between samples. Within 60 s of its peak a low pass drops about 1°.
+  const GRAZE_MARGIN = 4;
+  // Visible passes of one object within the given dark ranges: a coarse scan
+  // (60 s) for rises above 10°, refined to 5 s, then the visible stretch of each
+  // pass. Short passes that peak between two coarse samples are caught by
+  // refining every coarse local maximum within GRAZE_MARGIN of 10°.
   function passes(o, ob, ranges, sunAltAt, step = 60000) {
     const out = [];
     for (const [from, to] of ranges) {
       let t = from,
         l = O.look(o, ob, t);
       if (!l) return out;
-      let start = l.el >= O.VISIBLE_EL ? from : null;
+      let start = l.el >= O.VISIBLE_EL ? from : null,
+        back = null,
+        prev = { t, el: l.el };
       while (t < to) {
         const n = Math.min(to, t + step),
           q = O.look(o, ob, n);
@@ -95,7 +132,27 @@ const SpacePlan = (() => {
           const p = examine(o, ob, start, n, sunAltAt);
           if (p) out.push(p);
           start = null;
+        } else if (
+          start === null &&
+          back &&
+          prev.el >= O.VISIBLE_EL - GRAZE_MARGIN &&
+          prev.el >= back.el &&
+          prev.el >= q.el
+        ) {
+          const top = peak(o, ob, back.t, n);
+          if (top.el >= O.VISIBLE_EL) {
+            let a = top.t;
+            while (a - 1000 > back.t) {
+              const r = O.look(o, ob, a - 1000);
+              if (!r || r.el < O.VISIBLE_EL) break;
+              a -= 1000;
+            }
+            const p = examine(o, ob, a, n, sunAltAt, 1000);
+            if (p) out.push(p);
+          }
         }
+        back = prev;
+        prev = { t: n, el: q.el };
         t = n;
       }
       if (start !== null) {
@@ -176,6 +233,6 @@ const SpacePlan = (() => {
     return out;
   }
   const previewTime = (p, now) => Math.max(now, Math.min(p.startMs + 20000, (p.startMs + p.endMs) / 2));
-  return { darkRanges, passes, examine, family, trains, trainRows, launchDates, previewTime, TRAIN_MIN, TRAIN_CLUSTER };
+  return { darkRanges, passes, examine, peak, GRAZE_MARGIN, family, trains, trainRows, launchDates, previewTime, TRAIN_MIN, TRAIN_CLUSTER };
 })();
 if (typeof module !== "undefined") module.exports = SpacePlan;

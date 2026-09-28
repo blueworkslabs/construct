@@ -221,6 +221,44 @@ test("visible passes over the next hours reproduce the Heavens-Above ISS pass", 
   assert.ok(all.some((p) => p.endReason === "shadow"));
   for (const p of all) assert.ok(p.startMs <= p.maxMs && p.maxMs <= p.endMs && p.maxEl >= 10);
 });
+test("grazing passes between coarse samples are refined, at almost no extra cost", () => {
+  // Codex/Astra reproduction on #49: SL-14 R/B (16792) from 49.5 N 13.4 E peaks at
+  // 10.01° for about 15 s at 00:42:2x UTC; a plain 60 s scan skipped it.
+  const ob2 = O.observer(49.5, 13.4, 0),
+    ab2 = K.observer(49.5, 13.4, 0),
+    sun2 = (ms) => K.sun(ms, ab2).el,
+    from = at("2026-09-28T17:50:40Z"),
+    ranges = P.darkRanges(from, from + 12 * 3600000, sun2);
+  const graze = P.passes(byId(16792), ob2, ranges, sun2).find((p) => p.maxEl < 10.1);
+  assert.ok(graze, "grazing pass found");
+  near(graze.startMs, "2026-09-29T00:42:20Z", 3);
+  near(graze.endMs, "2026-09-29T00:42:35Z", 3);
+  assert.ok(graze.maxEl >= 10);
+  // Same passes as a 5 s reference scan for every fixture object at three places,
+  // for a small fraction of its propagations.
+  const look = O.look;
+  let calls = 0;
+  O.look = (...a) => (calls++, look(...a));
+  try {
+    let adaptive = 0, reference = 0;
+    for (const [lat, lon] of [[49.5, 13.4], [52.52, 13.405], [-33.9, 151.2]]) {
+      const o3 = O.observer(lat, lon, 0), a3 = K.observer(lat, lon, 0), s3 = (ms) => K.sun(ms, a3).el,
+        r3 = P.darkRanges(from, from + 12 * 3600000, s3);
+      for (const o of objects) {
+        calls = 0;
+        const fast = P.passes(o, o3, r3, s3);
+        adaptive += calls;
+        calls = 0;
+        const slow = P.passes(o, o3, r3, s3, 5000);
+        reference += calls;
+        assert.deepEqual(fast.map((p) => Math.round(p.maxMs / 120000)), slow.map((p) => Math.round(p.maxMs / 120000)), o.name);
+      }
+    }
+    assert.ok(adaptive < 0.2 * reference, `${adaptive} vs ${reference}`);
+  } finally {
+    O.look = look;
+  }
+});
 test("trains: fresh batches that still fly bunched, with launch dates", () => {
   const recent = JSON.parse(fs.readFileSync("scripts/space-fixture/recent.json", "utf8")),
     dates = P.launchDates(C.parseSatcat(fs.readFileSync("scripts/space-fixture/recent-satcat.json", "utf8"))),
@@ -249,7 +287,7 @@ test("planner distinguishes clipped windows and keeps short previews inside visi
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
   assert.equal(m.id, "dev.construct.space-watch");
-  assert.equal(m.version, "0.2.4");
+  assert.equal(m.version, "0.2.5");
   assert.deepEqual(m.constructApi, { min: "0.9.0", target: "0.9.0" });
   const caps = Object.fromEntries(m.capabilities.map((c) => [c.id, c]));
   assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "storage.kv"]);
@@ -274,7 +312,7 @@ test("package: manifest, capabilities, scripts and no location in any URL", () =
   for (const shared of ["construct-ui.css", "bridge.js"])
     assert.equal(fs.readFileSync(root + "ui/" + shared, "utf8"), fs.readFileSync("examples/sky-watch-module/ui/" + shared, "utf8"), shared);
   const docs = fs.readFileSync("docs/space-watch.md", "utf8");
-  assert.match(docs, /Space Watch \*\*0\.2\.4\*\*/);
+  assert.match(docs, /Space Watch \*\*0\.2\.5\*\*/);
   // Vendored libraries are pinned by hash in the doc.
   for (const f of ["satellite.min.js", "astronomy.min.js"]) {
     const sha = crypto.createHash("sha256").update(fs.readFileSync(root + "ui/vendor/" + f)).digest("hex");

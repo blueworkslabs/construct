@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.2.4** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
+Space Watch **0.2.5** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
 alpha26** and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -14,8 +14,9 @@ view, not a map.
 ## Module 0.2.0: visible passes and trains
 
 Both features are module-only, with no host change, no new origin and no new
-consent. 0.1.6 stays published unchanged; 0.2.4 is the reviewed candidate following the
-initial 0.2.0 package.
+consent. 0.1.6 stays published unchanged. 0.2.4 was the reviewed candidate after
+the initial 0.2.0 package; 0.2.5 adds the grazing-pass refinement below and
+needs its own acceptance.
 
 - **Visible passes · next 12 h.** This lists passes of the bright objects (and
   trains) that should be visible from your place, soonest first, at most 10.
@@ -34,6 +35,17 @@ initial 0.2.0 package.
       daylight hours cost nothing.
     - Each object is then scanned every 60 s for rises above 10°, refined to
       5 s, and the visible stretch is sampled every 5 s.
+    - **Grazing passes (0.2.5).** A pass that peaks just above 10° can fit
+      between two 60 s samples. The 0.2.4 review found one: SL-14 R/B 16792
+      from 49.5° N at 00:42:20–00:42:35 UTC, peak 10.01°. So every coarse local
+      maximum within 4° of the 10° line is refined:
+      - the peak is found by golden-section search to about 1 s;
+      - if it reaches 10°, the stretch is sampled every second.
+      - Why 4°: within 60 s of its peak, a low pass drops only about 1°.
+      - Checked against a 5 s reference scan: 156 objects × 8 places over a
+        12 h night gave the same 1,466 passes. Plain 60 s scanning missed 7 of
+        them. The refinement costs about 0.6% more propagations; the 5 s scan
+        would cost about 10×.
     - The work runs in slices of about 15 ms between frames, with a progress
       line. It is redone after 30 minutes, a new place, new data or changed train membership.
     - The ISS pass of 28 Sep over Berlin again matches Heavens-Above to within
