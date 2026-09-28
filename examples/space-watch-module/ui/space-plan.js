@@ -109,6 +109,10 @@ const SpacePlan = (() => {
   // refining every coarse local maximum within GRAZE_MARGIN of 10°.
   function passes(o, ob, ranges, sunAltAt, step = 60000) {
     const out = [];
+    const add = (p) => {
+      // An edge bracket and the next local-maximum bracket can cover one peak.
+      if (p && !out.some((q) => p.startMs <= q.endMs + 5000 && p.endMs >= q.startMs - 5000)) out.push(p);
+    };
     for (const [from, to] of ranges) {
       let t = from,
         l = O.look(o, ob, t);
@@ -130,25 +134,26 @@ const SpacePlan = (() => {
           }
         } else if (start !== null && !up) {
           const p = examine(o, ob, start, n, sunAltAt);
-          if (p) out.push(p);
+          add(p);
           start = null;
         } else if (
           start === null &&
-          back &&
-          prev.el >= O.VISIBLE_EL - GRAZE_MARGIN &&
-          prev.el >= back.el &&
-          prev.el >= q.el
+          ((back && prev.el >= O.VISIBLE_EL - GRAZE_MARGIN && prev.el >= back.el && prev.el >= q.el) ||
+            ((t === from || n === to) && Math.max(prev.el, q.el) >= O.VISIBLE_EL - GRAZE_MARGIN))
         ) {
-          const top = peak(o, ob, back.t, n);
+          // At a range boundary there may be no sample on the other side of
+          // the peak. Refine that bounded interval too, never outside the range.
+          const left = back && prev.el >= back.el && prev.el >= q.el ? back.t : t;
+          const top = peak(o, ob, left, n);
           if (top.el >= O.VISIBLE_EL) {
             let a = top.t;
-            while (a - 1000 > back.t) {
+            while (a - 1000 > left) {
               const r = O.look(o, ob, a - 1000);
               if (!r || r.el < O.VISIBLE_EL) break;
               a -= 1000;
             }
             const p = examine(o, ob, a, n, sunAltAt, 1000);
-            if (p) out.push(p);
+            add(p);
           }
         }
         back = prev;
@@ -157,7 +162,7 @@ const SpacePlan = (() => {
       }
       if (start !== null) {
         const p = examine(o, ob, start, to, sunAltAt);
-        if (p) out.push(p);
+        add(p);
       }
     }
     return out;

@@ -278,7 +278,16 @@ try:
  contains('Your location',45)
  # Loading the object list moves the status below the viewport. Read the
  # settled result via actual scrolling, not only currently exposed XML text.
- status=text_of(reveal(lambda t:bool(re.match(r'^Orbit data .+ old · CelesTrak',t))))
+ # Permission return can precede the initial provider reply. Wait for the
+ # async result, without tapping Refresh or counting a downloading state as pass.
+ deadline=time.monotonic()+90;status=''
+ while time.monotonic()<deadline:
+  try:
+   status=text_of(reveal(lambda t:bool(re.match(r'^Orbit data .+ old · CelesTrak',t))))
+   break
+  except RuntimeError:
+   time.sleep(2)
+ if not status:raise RuntimeError('Live orbit data did not arrive within 90 seconds after grants')
  assert re.match(r'^Orbit data .+ old · CelesTrak',status), ('Live orbit data not ready',status)
  receipt['realDataStatus']=status;save()
  # The previous runner could scrub while scrolling. Require live-time capture.

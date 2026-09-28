@@ -33,16 +33,20 @@ needs its own acceptance.
   - **How it is worked out:**
     - Dark stretches (Sun below −6°) are found first on a 10-minute grid, so
       daylight hours cost nothing.
+    - A 30-minute look-ahead buffer preserves the full rolling 12-hour
+      displayed horizon between recalculations.
     - Each object is then scanned every 60 s for rises above 10°, refined to
       5 s, and the visible stretch is sampled every 5 s.
     - **Grazing passes (0.2.5).** A pass that peaks just above 10° can fit
       between two 60 s samples. The 0.2.4 review found one: SL-14 R/B 16792
       from 49.5° N at 00:42:20–00:42:35 UTC, peak 10.01°. So every coarse local
-      maximum within 4° of the 10° line is refined:
+      maximum within 4° of the 10° line is refined; the first and last
+      scan intervals are also checked when close to that line:
       - the peak is found by golden-section search to about 1 s;
       - if it reaches 10°, the stretch is sampled every second.
       - Why 4°: within 60 s of its peak, a low pass drops only about 1°.
-      - Checked against a 5 s reference scan: 156 objects × 8 places over a
+      - The author’s initial adaptive-refinement benchmark checked a 5 s
+        reference scan: 156 objects × 8 places over a
         12 h night gave the same 1,466 passes. Plain 60 s scanning missed 7 of
         them. The refinement costs about 0.6% more propagations; the 5 s scan
         would cost about 10×.

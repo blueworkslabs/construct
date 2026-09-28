@@ -480,7 +480,7 @@
           ? x.train.members
               .filter((m) => m !== x.o)
               .map((m) => O.look(m, place.ob, t))
-              .filter((m) => m && m.el > 0)
+              .filter((m) => m && O.state(m, s.sunAlt) === "visible")
           : null,
       })),
     });
@@ -520,7 +520,9 @@
       key = `${place.lat},${place.lon}|${meta.elements}|${meta.recent}|${trainList.length}`;
     if (plan && planKey === key && t - plan.from < 30 * MINUTE) return;
     planKey = key;
-    const ranges = P.darkRanges(t, t + PLAN_HOURS * HOUR, sunAt),
+    // Buffer the refresh interval; renderPlan still exposes only the rolling
+    // next 12 hours, including passes that enter that window before refresh.
+    const ranges = P.darkRanges(t, t + PLAN_HOURS * HOUR + 30 * MINUTE, sunAt),
       queue = [
         ...trainList.map((tr) => ({ id: tr.id, o: tr.centre })),
         ...objects.map((o) => ({ id: o.id, o })),
@@ -559,7 +561,7 @@
     if (!plan) return;
     const t = now(),
       list = plan.results
-        .filter((p) => p.endMs >= t && find(p.id))
+        .filter((p) => p.endMs >= t && p.startMs <= t + PLAN_HOURS * HOUR && find(p.id))
         .sort((a, b) => a.startMs - b.startMs)
         .slice(0, 10),
       key = list.map((p) => p.id + ":" + p.startMs + ":" + (p.startMs <= t)).join() + "|" + plan.i + "|" + plan.done + "|" + Math.floor(t / MINUTE) + "|" + selected + "|" + (offset > 0);

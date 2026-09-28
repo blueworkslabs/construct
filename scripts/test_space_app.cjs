@@ -19,7 +19,7 @@ const LAUNCH = JSON.stringify([
   {NORAD_CAT_ID: 29507, OBJECT_TYPE: 'R/B', OBJECT_NAME: 'CZ-4B R/B', OBJECT_ID: '2006-046C'},
 ]);
 const WIKI = JSON.stringify({query: {pages: [{title: 'Long March 4B', extract: 'The Long March 4B is a Chinese launch vehicle.', fullurl: 'https://en.wikipedia.org/wiki/Long_March_4B'}]}});
-function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, recentBody = RECENT, recentSatcatBody = RECENT_SATCAT, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false} = {}) {
+function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, recentBody = RECENT, recentSatcatBody = RECENT_SATCAT, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false, planScenario = false} = {}) {
   const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [];
   const storage = structuredClone(saved);
   let now = clock;
@@ -77,11 +77,12 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
   const context = vm.createContext(sandbox);
   const scripts = ['vendor/satellite.min.js', 'vendor/astronomy.min.js', 'space-stars.js', 'space-orbit.js', 'space-sky.js', 'space-catalog.js', 'space-plan.js', 'space-dome.js', 'app.js'];
   for (const f of scripts) {
-    if (f === 'app.js') vm.runInContext('SpaceDome = class extends SpaceDome { constructor(c, cb) { super(c, cb); window.selectObject = cb; } }', context);
+    if (f === 'app.js') vm.runInContext('SpaceDome = class extends SpaceDome { constructor(c, cb) { super(c, cb); window.selectObject = cb; } set(s) { window.domeSnapshot = s; } }', context);
     vm.runInContext(fs.readFileSync(root + f, 'utf8'), context, {filename: f});
+    if (f === 'space-plan.js' && planScenario) vm.runInContext(`SpacePlan.darkRanges = (from,to)=>[[from,to]]; SpacePlan.passes = (o,ob,ranges)=> { const t=${clock} + 12.25*3600000; return o.id===25544 && ranges.some(([a,b])=>a<=t&&t<=b) ? [{startMs:t,endMs:t+120000,maxMs:t+60000,startAz:90,endAz:180,maxAz:135,startEl:10,endEl:10,maxEl:20,startReason:'rises',endReason:'sets'}] : []; };`,context);
   }
   const http = () => calls.filter(c => c.method === 'net.http').map(c => c.params.url);
-  return {el, calls, storage, classes, http, select: id => sandbox.selectObject(id),
+  return {el, calls, storage, classes, http, dome: () => sandbox.domeSnapshot, select: id => sandbox.selectObject(id),
     finishLocation: () => heldLocation.splice(0).forEach(f => f()),
     finishHttp: () => held.splice(0).forEach(f => f()),
     tick: (n = 1, ms = 1000) => { for (let i = 0; i < n; i++) { now += ms; timers.forEach(f => f()); } },
@@ -298,6 +299,9 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   guowang.click();
   assert.match(r.el('rewind-label').textContent, /^Preview /); assert(!r.el('now').hidden);
   assert.equal(r.el('spot-title').textContent, 'Guowang train');
+  const beads = r.dome().objects.find(o=>o.id==='train:2026-221').members;
+  assert(beads.length > 0);
+  assert(beads.every(m=>m.el>=10 && m.sunlit), 'train beads must each meet visibility conditions');
   assert.equal(r.el('spot-kind').textContent, '9 satellites in a line · launched 5 days ago');
   assert.match(r.el('spot-when').textContent, /^At /);
   assert.match(r.el('spot-state').textContent, /A line of 9 satellites; early orbits are rough/);
@@ -352,6 +356,11 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
     r.tick(1, 2000);
     assert(button().text.includes('Now ·'), 'pass switches to Now immediately at start');
   }
+  // A cached plan must include passes entering the rolling 12-hour window.
+  r = rig({planScenario: true, recentBody: '[]'}); await flush(8); r.tick(1,0);
+  assert.equal(r.el('plan-list').children.length,0, '12h15m pass is initially outside displayed horizon');
+  r.advance(29*60000); r.tick(1,0);
+  assert(r.el('plan-list').children.some(b=>b.dataset.id==='25544'), 'buffered pass enters horizon before 30-minute refresh');
   // A genuinely empty recent list is valid and remains fresh across reopen.
   r = rig({recentBody: '[]'}); await flush(8);
   r = rig({saved: r.storage, clock: START + HOUR}); await flush(8);

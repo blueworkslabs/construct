@@ -234,6 +234,15 @@ test("grazing passes between coarse samples are refined, at almost no extra cost
   near(graze.startMs, "2026-09-29T00:42:20Z", 3);
   near(graze.endMs, "2026-09-29T00:42:35Z", 3);
   assert.ok(graze.maxEl >= 10);
+  // A local maximum can sit inside the first/last coarse interval, with no
+  // neighbouring sample available to establish a three-point maximum.
+  for (const [a,b] of [["2026-09-29T00:42:00Z", "2026-09-29T00:45:00Z"],
+    ["2026-09-29T00:39:00Z", "2026-09-29T00:42:50Z"]]) {
+    const edge = P.passes(byId(16792), ob2, [[at(a),at(b)]], sun2);
+    assert.equal(edge.length, 1, "one grazing pass at range edge, without duplicates");
+    near(edge[0].startMs, "2026-09-29T00:42:20Z", 3);
+  }
+
   // Same passes as a 5 s reference scan for every fixture object at three places,
   // for a small fraction of its propagations.
   const look = O.look;
