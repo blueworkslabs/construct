@@ -185,6 +185,17 @@ const SpaceOrbit = (() => {
       sunlit: sunlit(p, ms),
     };
   }
+  // Inertial position in km, for comparing objects with each other (trains).
+  function position(o, ms) {
+    let pv;
+    try {
+      pv = S.propagate(o.rec, new Date(ms));
+    } catch (_) {
+      return null;
+    }
+    const p = pv && pv.position;
+    return p && typeof p === "object" && Number.isFinite(p.x) ? p : null;
+  }
   // visible: sunlit against a dark sky and high enough to clear most horizons.
   function state(l, sunAlt) {
     if (!l || l.el < 0) return "below";
@@ -302,6 +313,7 @@ const SpaceOrbit = (() => {
     build,
     observer,
     look,
+    position,
     state,
     trail,
     passEnd,

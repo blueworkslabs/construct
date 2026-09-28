@@ -6,6 +6,10 @@ const SpaceCatalog = (() => {
       "https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=json",
     SATCAT_URL =
       "https://celestrak.org/satcat/records.php?GROUP=visual&FORMAT=json",
+    RECENT_URL =
+      "https://celestrak.org/NORAD/elements/gp.php?GROUP=last-30-days&FORMAT=json",
+    RECENT_SATCAT_URL =
+      "https://celestrak.org/satcat/records.php?GROUP=last-30-days&FORMAT=json",
     WIKI = "https://en.wikipedia.org/w/api.php";
   const TYPES = new Set(["PAY", "R/B", "DEB", "UNK"]),
     DATE = /^\d{4}-\d\d-\d\d$/,
@@ -268,6 +272,8 @@ const SpaceCatalog = (() => {
   return {
     ELEMENTS_URL,
     SATCAT_URL,
+    RECENT_URL,
+    RECENT_SATCAT_URL,
     compact,
     validRow,
     rows,

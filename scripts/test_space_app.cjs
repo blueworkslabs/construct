@@ -8,12 +8,18 @@ const flush = async (n = 3) => { for (let i = 0; i < n; i++) await new Promise(r
 const HOUR = 3600000, START = Date.parse('2026-09-28T17:50:40Z');
 const ELEMENTS = fs.readFileSync('scripts/space-fixture/elements.json', 'utf8');
 const SATCAT = fs.readFileSync('scripts/space-fixture/satcat.json', 'utf8');
+const RECENT = fs.readFileSync('scripts/space-fixture/recent.json', 'utf8');
+const RECENT_SATCAT = fs.readFileSync('scripts/space-fixture/recent-satcat.json', 'utf8');
+const GP = 'https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=json',
+  SC = 'https://celestrak.org/satcat/records.php?GROUP=visual&FORMAT=json',
+  RGP = 'https://celestrak.org/NORAD/elements/gp.php?GROUP=last-30-days&FORMAT=json',
+  RSC = 'https://celestrak.org/satcat/records.php?GROUP=last-30-days&FORMAT=json';
 const LAUNCH = JSON.stringify([
   {NORAD_CAT_ID: 29505, OBJECT_TYPE: 'PAY', OBJECT_NAME: 'SHIJIAN-6 02A (SJ-6 02A)', OBJECT_ID: '2006-046A'},
   {NORAD_CAT_ID: 29507, OBJECT_TYPE: 'R/B', OBJECT_NAME: 'CZ-4B R/B', OBJECT_ID: '2006-046C'},
 ]);
 const WIKI = JSON.stringify({query: {pages: [{title: 'Long March 4B', extract: 'The Long March 4B is a Chinese launch vehicle.', fullurl: 'https://en.wikipedia.org/wiki/Long_March_4B'}]}});
-function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false} = {}) {
+function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false} = {}) {
   const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [];
   const storage = structuredClone(saved);
   let now = clock;
@@ -49,15 +55,17 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, netE
       }
       if (method === 'location.read') {
         if (error) throw Object.assign(new Error(error), {code: error});
-        const result = {latitude: 52.52, longitude: 13.405, accuracyM: 12};
+        const result = {latitude: 52.517834, longitude: 13.388761, accuracyM: 12};
         if (pendingLocation) return new Promise(resolve => heldLocation.push(() => resolve(result)));
         return result;
       }
       if (method === 'net.http') {
         const u = params.url;
         if (netError) throw Object.assign(new Error(netError), {code: netError});
-        const result = u.includes('gp.php') ? (gpStatus === 200 ? {status: 200, text: elementsBody} : {status: gpStatus})
-          : u.includes('GROUP=visual') ? (satcatStatus === 200 ? {status: 200, text: SATCAT} : {status: satcatStatus})
+        const result = u === GP ? (gpStatus === 200 ? {status: 200, text: elementsBody} : {status: gpStatus})
+          : u === SC ? (satcatStatus === 200 ? {status: 200, text: SATCAT} : {status: satcatStatus})
+          : u === RGP ? (recentStatus === 200 ? {status: 200, text: RECENT} : {status: recentStatus})
+          : u === RSC ? {status: 200, text: RECENT_SATCAT}
           : u.includes('INTDES=') ? {status: 200, text: launchBody}
           : u.startsWith('https://en.wikipedia.org/') ? {status: 200, text: WIKI} : {status: 404};
         if (typeof pendingHttp === "function" ? pendingHttp(u) : pendingHttp) return new Promise(resolve => held.push(() => resolve(result)));
@@ -67,7 +75,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, netE
     }};
   sandbox.window = sandbox;
   const context = vm.createContext(sandbox);
-  const scripts = ['vendor/satellite.min.js', 'vendor/astronomy.min.js', 'space-stars.js', 'space-orbit.js', 'space-sky.js', 'space-catalog.js', 'space-dome.js', 'app.js'];
+  const scripts = ['vendor/satellite.min.js', 'vendor/astronomy.min.js', 'space-stars.js', 'space-orbit.js', 'space-sky.js', 'space-catalog.js', 'space-plan.js', 'space-dome.js', 'app.js'];
   for (const f of scripts) {
     if (f === 'app.js') vm.runInContext('SpaceDome = class extends SpaceDome { constructor(c, cb) { super(c, cb); window.selectObject = cb; } }', context);
     vm.runInContext(fs.readFileSync(root + f, 'utf8'), context, {filename: f});
@@ -81,21 +89,19 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, netE
     visibility: visible => events.constructvisibilitychange({detail: {visible}}),
     submit: (lat, lon) => { el('latitude').value = lat; el('longitude').value = lon; el('area-form').onsubmit({preventDefault() {}}); }};
 }
-const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|satcat\.(meta|[0-3]))$/.test(key);
+const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.(meta|[0-7])|(satcat|recent)\.(meta|[0-3]))$/.test(key);
 (async () => {
   // First open: one fix, one download of each CelesTrak list, nothing else.
   let r = rig(); await flush(8);
   assert.equal(r.calls.filter(c => c.method === 'location.read').length, 1);
   assert(r.el('welcome').hidden); assert(!r.el('workspace').hidden);
   assert.match(r.el('place-label').textContent, /^Your location · ±12 m · stays on this phone$/);
-  assert.deepEqual(r.http(), [
-    'https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=json',
-    'https://celestrak.org/satcat/records.php?GROUP=visual&FORMAT=json']);
+  assert.deepEqual(r.http(), [GP, SC, RGP, RSC]);
   assert.match(r.el('counts').textContent, /^[1-9]\d* visible · \d+ above you$/);
   assert.match(r.el('data-status').textContent, /^Orbit data \d+ h old · CelesTrak$/);
   for (const key of Object.keys(r.storage)) assert(allowedKeys(key), key);
   const stored = JSON.stringify(r.storage);
-  assert(!/52\.5|13\.40/.test(stored), 'coordinates never reach storage');
+  assert(!/52\.517|13\.388/.test(stored), 'coordinates never reach storage');
   // Select from the accessible list; the spot card speaks in plain words.
   const stage = r.el('list').children.find(b => b.dataset.id === '29507');
   assert(stage, 'Long March 4B stage listed'); assert.match(stage.text, /Long March 4B rocket stage.*E · 1½ fists up · visible/);
@@ -115,7 +121,7 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   await r.el('wiki').onclick(); await flush();
   assert.match(r.http().at(-1), /^https:\/\/en\.wikipedia\.org\/w\/api\.php\?.*&titles=Long%20March%204B$/);
   assert.match(r.el('info-body').text, /Chinese launch vehicle.*CC BY-SA 4\.0/);
-  for (const u of r.http()) assert(!/52\.5|13\.40/.test(u), 'coordinates never leave the phone: ' + u);
+  for (const u of r.http()) assert(!/52\.5|13\.3/.test(u), 'coordinates never leave the phone: ' + u);
   r.el('close-info').click(); assert(!r.el('info-dialog').open);
   // Rewind and back.
   r.el('rewind').value = '-120'; r.el('rewind').oninput();
@@ -134,10 +140,10 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   assert.match(r.el('counts').textContent, /visible · \d+ above you$/);
   // After the 8-hour freshness window the next minute tick downloads again.
   r.advance(8 * HOUR); r.tick(60); await flush(8);
-  assert.deepEqual(r.http(), ['https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=json']);
+  assert.deepEqual(r.http(), [GP, RGP, RSC]);
   // A manual refresh inside two hours explains instead of re-downloading.
   r.el('refresh').click(); await flush();
-  assert.equal(r.http().length, 1); assert.match(r.el('data-status').textContent, /nothing newer yet/);
+  assert.equal(r.http().length, 3); assert.match(r.el('data-status').textContent, /nothing newer yet/);
 
   // Refresh must invalidate name-derived descriptions even with a fresh SATCAT.
   const renamed = JSON.parse(ELEMENTS);
@@ -160,13 +166,13 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   // A torn cache (chunk from another generation) is ignored, not half-used.
   const torn = structuredClone(saved); torn['elements.0'].g = 1;
   r = rig({saved: torn, clock: START + HOUR}); await flush(8);
-  assert.equal(r.http().filter(u => u.includes('gp.php')).length, 1);
+  assert.equal(r.http().filter(u => u === GP).length, 1);
 
   // Corrupt numeric epochs must invalidate the cache, not abort startup.
   const corrupt = structuredClone(saved); corrupt['elements.0'].r[0][3] = 1e100;
   r = rig({saved: corrupt, clock: START + HOUR}); await flush(8);
   assert(!r.el('workspace').hidden, 'bad cached epoch must not strand startup');
-  assert.equal(r.http().filter(u => u.includes('gp.php')).length, 1);
+  assert.equal(r.http().filter(u => u === GP).length, 1);
 
   // The same launch can contain several selectable payloads. Each excludes itself.
   const launchPair = JSON.stringify([
@@ -215,16 +221,16 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   assert.match(r.el('data-status').textContent, /Enable the requested capability/);
   const deniedState = r.storage;
   r = rig({saved: deniedState, clock: START + 1000}); await flush(8);
-  assert.equal(r.http().filter(u => u.includes('gp.php')).length, 1, 'grant change must not wait 15 minutes');
+  assert.equal(r.http().filter(u => u === GP).length, 1, 'grant change must not wait 15 minutes');
   assert.match(r.el('counts').textContent, /visible/);
 
   // Catalog throttling uses the two-hour provider backoff too.
   for (const status of [403, 429]) {
     r = rig({satcatStatus: status}); await flush(8);
     r.advance(16 * 60000); r.tick(60); await flush(8);
-    assert.equal(r.http().filter(u => u.includes('/satcat/')).length, 1, 'catalog provider backoff');
+    assert.equal(r.http().filter(u => u === SC).length, 1, 'catalog provider backoff');
     r.advance(2 * HOUR); r.tick(60); await flush(8);
-    assert.equal(r.http().filter(u => u.includes('/satcat/')).length, 2);
+    assert.equal(r.http().filter(u => u === SC).length, 2);
   }
 
   // CelesTrak failure: a clear message, a remembered back-off, no hammering.
@@ -233,9 +239,9 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   assert.equal(r.el('data-status').className, 'attention');
   assert.equal(r.storage['fetch-state'].until, START + 15 * 60000);
   r.tick(60); await flush();
-  assert.equal(r.http().filter(u => u.includes('gp.php')).length, 1, 'no retry inside 15 minutes');
+  assert.equal(r.http().filter(u => u === GP).length, 1, 'no retry inside 15 minutes');
   r.tick(15 * 60); await flush(8);
-  assert.equal(r.http().filter(u => u.includes('gp.php')).length, 2);
+  assert.equal(r.http().filter(u => u === GP).length, 2);
 
   // No location grant: a quiet fallback to typed coordinates, never stored.
   for (const code of ['CAPABILITY_DENIED', 'LOCATION_PERMISSION', 'LOCATION_TIMEOUT']) {
@@ -245,10 +251,10 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   }
   r.el('start').click(); assert(r.el('area-dialog').open);
   r.submit('95', '13'); assert(r.el('area-dialog').open); assert.match(r.el('area-status').textContent, /latitude from −90 to 90/);
-  r.submit('52,52', '−13.405'); await flush(8);
+  r.submit('52,5178', '−13,3887'); await flush(8);
   assert(!r.el('area-dialog').open); assert(!r.el('workspace').hidden);
-  assert.equal(r.el('place-label').textContent, '52.52° N, 13.40° W');
-  assert(!/52\.5|13\.40/.test(JSON.stringify(r.storage)));
+  assert.equal(r.el('place-label').textContent, '52.52° N, 13.39° W');
+  assert(!/52\.517|13\.388/.test(JSON.stringify(r.storage)));
   r = rig({saved: {preferences: {startWithLocation: false, red: false}}}); await flush(4);
   assert.equal(r.calls.filter(c => c.method === 'location.read').length, 0);
   assert.equal(r.el('welcome-title').textContent, 'Where are you watching from?');
@@ -276,8 +282,44 @@ const allowedKeys = key => /^(preferences|fetch-state|elements\.(meta|[0-7])|sat
   r.finishHttp(); await flush(4);
   assert.equal(r.storage['elements.meta'], undefined, 'no data applied from a paused request');
   r.visibility(true); await flush(2); r.finishHttp(); await flush(8);
-  assert.equal(r.http().filter(u => u.includes('gp.php')).length, 2);
+  assert.equal(r.http().filter(u => u === GP).length, 2);
   assert.equal(r.el('status').textContent, '');
   assert.match(r.el('counts').textContent, /visible/);
-  console.log('Space Watch app checks passed: start, privacy (no coordinates in URLs or storage), list selection, spot words, details, Wikipedia on request, rewind, red mode, cache reuse/expiry/torn cache, CelesTrak back-off, location fallbacks and paused downloads.');
+
+  // Visible passes: worked out in slices, soonest first; the ISS pass is on now.
+  r = rig(); await flush(8); r.tick(1); await flush();
+  assert.equal(r.el('plan-status').textContent, 'Tap one to preview it on the dome.');
+  const planned = r.el('plan-list').children;
+  assert(planned.length >= 5 && planned.length <= 10);
+  assert.match(planned.find(b => b.dataset.id === '25544').text, /^ Now · ISS \(Zarya\) WSW → SSW · highest 1½ fists up in the SW · [34] min rises WSW, sets 1 fist up in the SSW$/);
+  // Trains come from the last-30-days list and can be planned like anything else.
+  const guowang = planned.find(b => b.dataset.id === 'train:2026-221');
+  assert(guowang, 'Guowang train pass planned'); assert.match(guowang.text, /^ [\d:]+( [AP]M)? · Guowang train /);
+  guowang.click();
+  assert.match(r.el('rewind-label').textContent, /^Preview /); assert(!r.el('now').hidden);
+  assert.equal(r.el('spot-title').textContent, 'Guowang train');
+  assert.equal(r.el('spot-kind').textContent, '9 satellites in a line · launched 5 days ago');
+  assert.match(r.el('spot-when').textContent, /^At /);
+  assert.match(r.el('spot-state').textContent, /A line of 9 satellites; early orbits are rough/);
+  assert.match(r.el('list-title').textContent, /^Overhead at /);
+  r.el('details').click(); await flush(4);
+  assert.match(r.el('info-body').text, /9 of 11 from this launch/); assert.match(r.el('info-body').text, /2026-09-23 · 5 days ago/);
+  const before = r.http().length;
+  await r.el('wiki').onclick(); await flush(4);
+  assert.equal(r.http().length, before + 1); assert.match(r.http().at(-1), /&titles=Guowang$/);
+  r.el('close-info').click();
+  r.el('now').click(); assert.equal(r.el('rewind-label').textContent, 'Now'); assert.equal(r.el('list-title').textContent, 'Overhead now');
+  for (const key of Object.keys(r.storage)) assert(allowedKeys(key), key);
+  assert(r.storage['recent.meta'] && r.storage['recent-launches'].d.length === 2);
+  // Reopen: trains come from the cache, no download.
+  const withTrains = r.storage;
+  r = rig({saved: withTrains, clock: START + 10 * 60000}); await flush(8); r.tick(1); await flush();
+  assert.deepEqual(r.http(), []);
+  assert(r.el('plan-list').children.some(b => b.dataset.id === 'train:2026-221'));
+  // Trains are optional: a failing recent list leaves the sky and its message alone.
+  r = rig({recentStatus: 503}); await flush(8);
+  assert.deepEqual(r.http(), [GP, SC, RGP]);
+  assert.match(r.el('data-status').textContent, /^Orbit data \d+ h old · CelesTrak$/);
+  assert.equal(r.storage['fetch-state'].recentLast, START);
+  console.log('Space Watch app checks passed: start, privacy (no coordinates in URLs or storage), list selection, spot words, details, Wikipedia on request, rewind, red mode, visible passes and preview, trains (plan, details, cache, optional failure), cache reuse/expiry/torn cache, CelesTrak back-off, location fallbacks and paused downloads.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

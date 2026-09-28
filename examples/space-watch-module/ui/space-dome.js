@@ -188,6 +188,13 @@ class SpaceDome {
         }
         g.fillStyle = o.major ? c.satMajor : c.sat;
         g.globalAlpha = o.state === "low" ? 0.6 : 1;
+        // A train: its other members as small beads, then the stand-in.
+        for (const m of o.members || []) {
+          const [mx, my] = P(m.az, m.el);
+          g.beginPath();
+          g.arc(mx, my, 1.8, 0, 2 * Math.PI);
+          g.fill();
+        }
         g.beginPath();
         g.arc(x, y, o.major ? 5 : 3.6, 0, 2 * Math.PI);
         g.fill();

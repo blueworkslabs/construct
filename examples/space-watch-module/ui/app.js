@@ -3,7 +3,8 @@
   const $ = (id) => document.getElementById(id),
     O = SpaceOrbit,
     K = SpaceSky,
-    C = SpaceCatalog;
+    C = SpaceCatalog,
+    P = SpacePlan;
   // The acceptance fixture pins the clock; the product uses the phone's.
   const fixture = typeof SpaceFixture !== "undefined" ? SpaceFixture : null,
     now = () => (fixture ? fixture.now() : Date.now());
@@ -16,12 +17,19 @@
     RETRY = 15 * MINUTE,
     ELEMENT_CHUNKS = 8,
     SATCAT_CHUNKS = 4,
+    RECENT_CHUNKS = 4,
+    PLAN_HOURS = 12,
     OLD_DATA = 72 * HOUR;
   let place = null,
     objects = [],
     satcat = new Map(),
-    meta = { elements: 0, satcat: 0 },
-    fetchState = { last: 0, until: 0, satcatLast: 0, satcatUntil: 0 },
+    recent = [],
+    launchDates = new Map(),
+    trainList = [],
+    plan = null,
+    planKey = "",
+    meta = { elements: 0, satcat: 0, recent: 0 },
+    fetchState = { last: 0, until: 0, satcatLast: 0, satcatUntil: 0, recentLast: 0, recentUntil: 0 },
     prefs = { startWithLocation: true, red: false },
     selected = null,
     offset = 0,
@@ -152,7 +160,7 @@
     }
     const f = await kvGet("fetch-state");
     if (f && typeof f === "object")
-      for (const k of ["last", "until", "satcatLast", "satcatUntil"])
+      for (const k of ["last", "until", "satcatLast", "satcatUntil", "recentLast", "recentUntil"])
         if (Number.isFinite(f[k])) fetchState[k] = Math.max(0, Math.min(now() + 86400000, f[k]));
     applyRed();
     $("start-with-location").checked = prefs.startWithLocation;
@@ -168,6 +176,22 @@
       satcat = C.index(s.rows);
       meta.satcat = s.at;
     }
+    const r = await loadRows("recent", O.validRow, RECENT_CHUNKS),
+      dates = await kvGet("recent-launches");
+    if (r.rows.length && dates && dates.at === r.at && Array.isArray(dates.d)) {
+      recent = O.build(P.trainRows(r.rows));
+      launchDates = new Map(dates.d.filter(validLaunch));
+      meta.recent = r.at;
+      rebuildTrains();
+    }
+  }
+  const validLaunch = (x) =>
+    Array.isArray(x) && x.length === 2 && /^\d{4}-\d{3}$/.test(x[0]) && /^\d{4}-\d\d-\d\d$/.test(x[1]);
+  function rebuildTrains() {
+    trainList = P.trains(recent, launchDates, now());
+    described.clear();
+    listKey = "";
+    planKey = "";
   }
   const ready = Promise.all([initPrefs(), initCache()]);
 
@@ -263,6 +287,45 @@
       await saveFetchState();
     }
   }
+  // Trains: recent launches, only the batches that can still fly as a line.
+  async function fetchRecent(t) {
+    const previous = fetchState.recentLast;
+    fetchState.recentLast = t;
+    try {
+      const r = await getJson(C.RECENT_URL);
+      if (r.status === 403 || r.status === 429) fetchState.recentUntil = t + BACKOFF;
+      if (r.status !== 200) return;
+      const rows = P.trainRows(O.parseElements(r.text));
+      let dates = new Map();
+      if (rows.length) {
+        const q = await getJson(C.RECENT_SATCAT_URL);
+        if (q.status === 403 || q.status === 429) fetchState.recentUntil = t + BACKOFF;
+        if (q.status !== 200) return;
+        dates = P.launchDates(C.parseSatcat(q.text));
+      }
+      const keep = new Set(rows.map((x) => x[2].slice(0, 8)));
+      recent = O.build(rows);
+      launchDates = new Map([...dates].filter(([k]) => keep.has(k)));
+      meta.recent = t;
+      fetchState.recentUntil = 0;
+      rebuildTrains();
+      frame();
+      // Cache only the satellites that currently form a train.
+      const members = new Set(trainList.flatMap((x) => x.members.map((m) => m.id))),
+        kept = rows.filter((x) => members.has(x[0]));
+      if (kept.length) {
+        if (await saveRows("recent", kept, t, RECENT_CHUNKS))
+          await kvSet("recent-launches", { at: t, d: [...launchDates] });
+      } else await kvSet("recent.meta", null);
+    } catch (e) {
+      if (e.code === "HTTP_DATA" || e.code === "HTTP_SIZE") fetchState.recentUntil = t + BACKOFF;
+      if (e.code === "RUN_PAUSED" || e.code === "CAPABILITY_DENIED") fetchState.recentLast = previous;
+      if (e.code === "RUN_PAUSED") throw e;
+      /* Trains are optional; the bright-object sky works without them. */
+    } finally {
+      await saveFetchState();
+    }
+  }
   async function refreshData(manual = false) {
     if (fetching || !active) return;
     const t = now(),
@@ -293,6 +356,13 @@
         t - fetchState.satcatLast > RETRY
       )
         await fetchSatcat(t);
+      if (
+        objects.length &&
+        t - meta.recent > ELEMENTS_TTL &&
+        t >= fetchState.recentUntil &&
+        t - fetchState.recentLast > RETRY
+      )
+        await fetchRecent(t);
     } catch (_) {
       /* Paused: the next visible tick retries. */
     } finally {
@@ -312,8 +382,32 @@
     }
     return d;
   }
+  function trainInfo(train) {
+    let d = described.get(train.id);
+    if (!d) {
+      const since = train.launch ? Math.floor((now() - Date.parse(train.launch + "T00:00:00Z")) / 86400000) : null;
+      d = {
+        title: `${train.family} train`,
+        kind: `${train.members.length} satellites in a line${train.launch ? ` · launched ${since < 1 ? "today" : since === 1 ? "yesterday" : since + " days ago"}` : ""}`,
+        wiki: train.wiki,
+        major: true,
+        since,
+      };
+      described.set(train.id, d);
+    }
+    return d;
+  }
+  // An id is a NORAD number, or "train:YYYY-NNN" for a train.
+  function find(id) {
+    if (typeof id === "string") {
+      const train = trainList.find((x) => x.id === id);
+      return train ? { id, o: train.centre, train, d: trainInfo(train) } : null;
+    }
+    const o = objects.find((x) => x.id === id);
+    return o ? { id, o, train: null, d: info(o) } : null;
+  }
   const shortLabel = (o, d) =>
-    o.id === 25544 ? "ISS" : o.id === 48274 ? "Tiangong" : o.id === 20580 ? "Hubble" : d.major ? d.title : o.name;
+    d.title.endsWith(" train") ? d.title : o.id === 25544 ? "ISS" : o.id === 48274 ? "Tiangong" : o.id === 20580 ? "Hubble" : d.major ? d.title : o.name;
   const sunAt = (ms) => K.sun(ms, place.aob).el;
   function context(t) {
     if (!sky.stars || Math.abs(t - sky.starsAt) > 20000) {
@@ -331,7 +425,13 @@
     for (const o of objects) {
       const l = O.look(o, place.ob, t);
       if (!l || l.el < 0) continue;
-      items.push({ o, l, state: O.state(l, sunAlt), d: info(o) });
+      items.push({ id: o.id, o, l, state: O.state(l, sunAlt), d: info(o) });
+    }
+    for (const train of trainList) {
+      const o = train.centre,
+        l = O.look(o, place.ob, t);
+      if (!l || l.el < 0) continue;
+      items.push({ id: train.id, o, train, l, state: O.state(l, sunAlt), d: trainInfo(train) });
     }
     const rank = { visible: 0, low: 1, shadow: 2, daylight: 2 };
     items.sort((a, b) => rank[a.state] - rank[b.state] || b.l.el - a.l.el);
@@ -352,16 +452,22 @@
       red: prefs.red,
       selected,
       objects: s.items.map((x) => ({
-        id: x.o.id,
+        id: x.id,
         az: x.l.az,
         el: x.l.el,
         state: x.state,
         major: x.d.major,
-        label: x.d.major || x.o.id === selected ? shortLabel(x.o, x.d) : null,
+        label: x.d.major || x.id === selected ? shortLabel(x.o, x.d) : null,
         trail:
-          x.state === "visible" || x.state === "low" || x.o.id === selected
+          x.state === "visible" || x.state === "low" || x.id === selected
             ? O.trail(x.o, place.ob, t)
             : null,
+        members: x.train
+          ? x.train.members
+              .filter((m) => m !== x.o)
+              .map((m) => O.look(m, place.ob, t))
+              .filter((m) => m && m.el > 0)
+          : null,
       })),
     });
     const counts = `${visible} visible · ${s.items.length} above you`;
@@ -386,8 +492,93 @@
     $("sky-note").textContent = note;
     renderList(s);
     renderSpot(s);
-    $("rewind-label").textContent = K.ago(offset);
+    $("rewind-label").textContent = offset > 0 ? `Preview ${time(t)}` : K.ago(offset);
     $("now").hidden = offset === 0;
+    planStart();
+    renderPlan();
+  }
+
+  // ---- visible passes over the next hours, worked out in small slices ----
+  let planTimer = 0;
+  function planStart() {
+    if (!place || !objects.length) return;
+    const t = now(),
+      key = `${place.lat},${place.lon}|${meta.elements}|${meta.recent}|${trainList.length}`;
+    if (plan && planKey === key && t - plan.from < 30 * MINUTE) return;
+    planKey = key;
+    const ranges = P.darkRanges(t, t + PLAN_HOURS * HOUR, sunAt),
+      queue = [
+        ...trainList.map((tr) => ({ id: tr.id, o: tr.centre })),
+        ...objects.map((o) => ({ id: o.id, o })),
+      ];
+    plan = { from: t, ranges, queue, i: 0, results: [], done: !ranges.length, shown: "" };
+    schedulePlan();
+  }
+  function planStep(budgetMs = 15) {
+    if (!plan || plan.done || !active || !place) return;
+    const started = Date.now();
+    while (plan.i < plan.queue.length) {
+      const q = plan.queue[plan.i++];
+      for (const p of P.passes(q.o, place.ob, plan.ranges, sunAt)) plan.results.push({ ...p, id: q.id });
+      if (Date.now() - started > budgetMs) break;
+    }
+    if (plan.i >= plan.queue.length) plan.done = true;
+    renderPlan();
+    schedulePlan();
+  }
+  function schedulePlan() {
+    if (plan && !plan.done && !planTimer)
+      planTimer = setTimeout(() => {
+        planTimer = 0;
+        planStep();
+      }, 30);
+  }
+  const START = { rises: "rises", shadow: "comes out of Earth’s shadow", daylight: "appears as the sky darkens" },
+    END = { sets: "sets", shadow: "fades into Earth’s shadow", daylight: "fades in the brightening sky" };
+  function passLine(p) {
+    const mins = Math.max(1, Math.round((p.endMs - p.startMs) / MINUTE));
+    const top = p.maxEl >= 75 ? (p.maxEl >= 84 ? "passes straight overhead" : "passes almost overhead") : `highest ${K.height(p.maxEl)} in the ${K.dir16(p.maxAz)}`;
+    return `${K.dir16(p.startAz)} → ${K.dir16(p.endAz)} · ${top} · ${mins} min${p.endReason === "shadow" ? " · fades into shadow" : ""}`;
+  }
+  function renderPlan() {
+    if (!plan) return;
+    const t = now(),
+      list = plan.results
+        .filter((p) => p.endMs >= t && find(p.id))
+        .sort((a, b) => a.startMs - b.startMs)
+        .slice(0, 10),
+      key = list.map((p) => p.id + ":" + p.startMs).join() + "|" + plan.done + "|" + Math.floor(t / MINUTE) + "|" + selected;
+    if (key === plan.shown) return;
+    plan.shown = key;
+    $("plan-status").textContent = !plan.ranges.length
+      ? "The sky here stays too bright for satellites in the next 12 hours."
+      : !plan.done
+        ? `Working out passes… ${Math.round((100 * plan.i) / plan.queue.length)}%`
+        : list.length
+          ? "Tap one to preview it on the dome."
+          : "No visible passes of the bright objects in the next 12 hours.";
+    $("plan-list").replaceChildren(
+      ...list.map((p) => {
+        const f = find(p.id),
+          b = element("button", null, "object pass");
+        b.dataset.id = String(p.id);
+        b.setAttribute("aria-pressed", String(p.id === selected && offset > 0));
+        b.append(
+          element("strong", `${p.startMs <= t ? "Now" : time(p.startMs)} · ${f.d.title}`),
+          element("span", passLine(p)),
+          element("span", `${START[p.startReason]} ${K.dir16(p.startAz)}, ${END[p.endReason]} ${K.height(p.endEl)} in the ${K.dir16(p.endAz)}`),
+        );
+        b.onclick = () => previewPass(p);
+        return b;
+      }),
+    );
+  }
+  // Show the dome shortly after the pass becomes visible; it then runs in real time.
+  function previewPass(p) {
+    offset = Math.max(0, Math.round((p.startMs + 20000 - now()) / 1000));
+    $("rewind").value = "0";
+    plan.shown = "";
+    select(p.id, true);
   }
   function listLine(x) {
     const where = `${K.dir16(x.l.az)} · ${K.height(x.l.el)}`,
@@ -395,21 +586,21 @@
     return `${where} · ${state}`;
   }
   function renderList(s) {
-    const key = s.items.map((x) => x.o.id + x.state).join() + "|" + selected;
+    const key = s.items.map((x) => x.id + x.state).join() + "|" + selected;
     if (key !== listKey) {
       listKey = key;
       const rows = s.items.map((x) => {
         const b = element("button", null, `object${x.state === "visible" ? " visible" : ""}`);
-        b.dataset.id = String(x.o.id);
-        b.setAttribute("aria-pressed", String(x.o.id === selected));
+        b.dataset.id = String(x.id);
+        b.setAttribute("aria-pressed", String(x.id === selected));
         b.append(element("strong", x.d.title), element("span", listLine(x)));
-        b.onclick = () => select(x.o.id, true);
+        b.onclick = () => select(x.id, true);
         return b;
       });
       $("list").replaceChildren(...rows);
-      $("list-title").textContent = offset ? `Overhead ${K.ago(offset)}` : "Overhead now";
+      $("list-title").textContent = offset > 0 ? `Overhead at ${time(now() + offset * 1000)}` : offset ? `Overhead ${K.ago(offset)}` : "Overhead now";
     } else {
-      const byId = new Map(s.items.map((x) => [String(x.o.id), x]));
+      const byId = new Map(s.items.map((x) => [String(x.id), x]));
       for (const b of $("list").children) {
         const x = byId.get(b.dataset.id);
         if (x && b.children[1]) b.children[1].textContent = listLine(x);
@@ -421,20 +612,20 @@
       $("spot").hidden = true;
       return;
     }
-    const o = objects.find((x) => x.id === selected);
-    if (!o) {
+    const found = find(selected);
+    if (!found) {
       selected = null;
       $("spot").hidden = true;
       return;
     }
-    const d = info(o),
+    const { o, d, train } = found,
       l = O.look(o, place.ob, s.t),
       st = O.state(l, s.sunAlt);
     $("spot").hidden = false;
     $("spot-title").textContent = d.title;
     $("spot-kind").textContent = d.kind;
     $("spot-when").hidden = offset === 0;
-    $("spot-when").textContent = offset ? `${K.ago(offset)}:` : "";
+    $("spot-when").textContent = offset > 0 ? `At ${time(s.t)}:` : offset ? `${K.ago(offset)}:` : "";
     if (!l || st === "below") {
       $("spot-head").textContent = "Below your horizon";
       const p = nextPass(o, s.t);
@@ -460,7 +651,10 @@
       O.look(o, place.ob, s.t + 4 * MINUTE),
     );
     const end = st === "visible" && offset === 0 ? passEnd(o, s.t) : null;
-    $("spot-state").textContent = [K.STATE[st], K.ending(end)].filter(Boolean).join(". ");
+    const line = train
+      ? `A line of ${train.members.length} satellites; early orbits are rough, so look along the track ahead and behind`
+      : "";
+    $("spot-state").textContent = [K.STATE[st], K.ending(end), line].filter(Boolean).join(". ");
     $("stat-alt").textContent = km(l.altKm);
     $("stat-speed").textContent = `${l.speedKms.toFixed(1)} km/s`;
     $("stat-range").textContent = km(l.rangeKm);
@@ -503,14 +697,16 @@
     return section;
   }
   function openInfo() {
-    const o = objects.find((x) => x.id === selected);
-    if (!o || !place) return;
+    const found = find(selected);
+    if (!found || !place) return;
+    const o = found.o;
     infoTarget = o;
     const generation = ++infoGeneration;
     infoBusy = false;
     wikiDone = false;
-    const d = info(o),
-      c = satcat.get(o.id),
+    const d = found.d,
+      train = found.train,
+      c = train ? null : satcat.get(o.id),
       t = now(),
       l = O.look(o, place.ob, t),
       p = nextPass(o, t);
@@ -529,6 +725,32 @@
         ]),
       );
     else body.append(facts("Right now", [["Where", "Below your horizon"]]));
+    if (train) {
+      const alts = train.members.map((m) => O.look(m, place.ob, t)).filter(Boolean).map((m) => m.altKm);
+      body.append(
+        facts("Train", [
+          ["Satellites in the line", `${train.members.length} of ${train.batch} from this launch`],
+          ["Launched", train.launch ? `${train.launch} · ${d.since < 1 ? "today" : d.since + " days ago"}` : null],
+          ["Launch", train.intdes],
+          ["Height", alts.length ? `${Math.round(Math.min(...alts)).toLocaleString("en-US")}–${km(Math.max(...alts))}` : null],
+          ["Next time above you", p ? `${day(p.riseMs)} · up to ${K.height(p.maxEl)} · ${p.visible ? "visible" : "not visible"}` : "Not in the next 36 hours"],
+        ]),
+      );
+      body.append(
+        element(
+          "p",
+          `Freshly launched ${train.family} satellites fly close together, like a string of lights, until they raise their orbits and spread out over days to weeks. Early orbit data for a batch is rough, so the real line can run ahead of or behind the drawing.`,
+          "note",
+        ),
+      );
+      wikiSection = element("section");
+      body.append(wikiSection);
+      $("wiki").hidden = false;
+      $("wiki").disabled = false;
+      $("wiki").textContent = "Read on Wikipedia";
+      $("info-dialog").showModal();
+      return;
+    }
     body.append(
       facts("Orbit", [
         ["Circles Earth every", c && c.period ? C.period(c.period) : null],
@@ -597,7 +819,7 @@
   $("wiki").onclick = async () => {
     const o = infoTarget, generation = infoGeneration;
     if (!o || infoBusy || wikiDone) return;
-    const d = info(o),
+    const d = find(selected)?.o === o ? find(selected).d : info(o),
       section = wikiSection;
     infoBusy = true;
     $("wiki").disabled = true;
@@ -815,6 +1037,7 @@
   setInterval(() => {
     if (!active || !place) return;
     frame();
+    planStep();
     if (++ticks % 60 === 0) refreshData();
   }, 1000);
   (async () => {

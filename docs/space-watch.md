@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.1.6** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
+Space Watch **0.2.0** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
 alpha26** and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -10,6 +10,64 @@ It is a sibling of [Sky Watch](sky-watch.md) (aircraft), not a layer in it.
 Aircraft are a 10–100 km map question. Orbiting objects are seen from well over
 1,000 km away and cross a 100 km circle in about 25 seconds, so they need a sky
 view, not a map.
+
+## Module 0.2.0: visible passes and trains
+
+Both features are module-only, with no host change, no new origin and no new
+consent. 0.1.6 stays published unchanged; 0.2.0 is a new immutable version.
+
+- **Visible passes · next 12 h.** This lists passes of the bright objects (and
+  trains) that should be visible from your place, soonest first, at most 10.
+  - Each entry shows the time, or **Now** while one is under way. It gives the
+    direction from and to, the highest point in fists and its direction, and the
+    duration.
+  - It also says how the pass begins and ends: "rises", "comes out of Earth's
+    shadow" or "appears as the sky darkens"; "sets", "fades into Earth's shadow"
+    or "fades in the brightening sky".
+  - **Tap one to preview it:** the dome, the list and the spot card jump to 20 s
+    after it becomes visible and run on in real time. The spot card says
+    "At 18:27:", the label says **Preview 18:27**, and **Back to now** returns.
+  - **How it is worked out:**
+    - Dark stretches (Sun below −6°) are found first on a 10-minute grid, so
+      daylight hours cost nothing.
+    - Each object is then scanned every 60 s for rises above 10°, refined to
+      5 s, and the visible stretch is sampled every 5 s.
+    - The work runs in slices of about 15 ms between frames, with a progress
+      line. It is redone after 30 minutes, a new place or new data.
+    - The ISS pass of 28 Sep over Berlin again matches Heavens-Above to within
+      10 s.
+- **Trains.** Freshly launched Starlink, Qianfan, Guowang, Kuiper and OneWeb
+  batches fly as a line of lights for days to weeks.
+  - **Source:** CelesTrak's `GROUP=last-30-days` orbits and SATCAT, about 77 KB
+    and 69 KB as of 2026-09-28.
+  - **What counts as a train:** at least eight satellites of one family from one
+    launch, still within 10° of one of them as seen from Earth's centre.
+    Batches that have spread around their orbit, and stragglers with stale
+    elements, drop out. On 2026-09-28 this found Starlink 2026-219 (23 of 27,
+    launched 20 Sep) and Guowang 2026-221 (9 of 11, launched 23 Sep).
+  - **How it is shown:** a train is one entry, e.g. "Guowang train · 9 satellites
+    in a line · launched 5 days ago". Its middle satellite gives the pointing
+    words, and the other members are small beads on the dome.
+  - **Honest note:** early orbit data for a batch is rough, and CelesTrak often
+    gives a whole batch one shared set of elements. The card therefore says to
+    look along the track ahead and behind.
+  - **Details:** how many satellites are in the line out of the batch, the
+    launch date and days since, the height range, the next time above you, why
+    trains happen, and Wikipedia for the family article (Starlink, Qianfan,
+    Guowang, Project Kuiper, OneWeb).
+  - **Downloads:** the recent lists are fetched with the orbits (8-hour
+    freshness, 15-minute spacing, 2-hour back-off on 403/429 or bad data). Only
+    the current train members are cached (`recent.*`, about 5 KB) plus their
+    launch dates (`recent-launches`). The whole cache stays near 38 KB of the
+    64 KiB quota.
+  - **Failure:** trains are optional. If the recent lists fail, the rest of the
+    sky and its status line are unaffected.
+
+Browser previews of Synthetic Space Watch 0.2.0 (desktop Chromium, not Android):
+
+![Visible passes](images/space-watch-0.2.0/plan.jpg)
+![Previewing the Guowang train pass](images/space-watch-0.2.0/train.jpg)
+![Train details](images/space-watch-0.2.0/traindetails.jpg)
 
 ## Ownership and delivery
 
@@ -94,6 +152,8 @@ view, not a map.
   (about 52 KB).
 - **Same launch:** `https://celestrak.org/satcat/records.php?INTDES=YYYY-NNN&FORMAT=json`,
   with the launch taken from a validated designator.
+- **Recent launches (0.2.0):** `https://celestrak.org/NORAD/elements/gp.php?GROUP=last-30-days&FORMAT=json`
+  and `https://celestrak.org/satcat/records.php?GROUP=last-30-days&FORMAT=json`.
 - **Wikipedia:** the `https://en.wikipedia.org/w/api.php?action=query&…` Action
   API with `redirects=1`, so the server resolves redirects. Construct never
   follows HTTP redirects.
@@ -180,12 +240,17 @@ view, not a map.
   - record validation, cache chunking, and the Heavens-Above pass regression;
   - visibility states, pointing words, anchors and the star table;
   - catalogue naming, URL building and Wikipedia parsing;
+  - (0.2.0) dark ranges and the planner's ISS pass against Heavens-Above, and
+    train detection on the captured last-30-days subset;
   - the manifest and package shape (CSP, script order, shared files) and the
     vendored hashes.
 - `node scripts/test_space_app.cjs` runs the real controller against a host and
   DOM double. It covers:
   - start and fix;
   - **no coordinates in any request URL or in storage**;
+  - (0.2.0) the pass list with a Now entry, preview of a train pass, train
+    details and Wikipedia, the train cache on reopen, and a failing recent list
+    leaving the sky alone;
   - list selection and spot words, details with the same-launch lookup, and
     Wikipedia only on request;
   - rewind and red mode persistence;
@@ -197,7 +262,9 @@ view, not a map.
   Space Watch is the real UI plus `scripts/space-fixture/synthetic-space.js`:
   - a clock starting at 2026-09-28 17:50:40 UTC and running in real time;
   - a fixed Berlin viewpoint;
-  - a captured 24-object CelesTrak subset.
+  - a captured 24-object CelesTrak subset, plus two trains from the last-30-days
+    lists (Starlink 2026-219 and Guowang 2026-221; the Guowang train has a
+    visible pass at about 18:26 UTC, 1 fist up in the SW).
 
   Storage, same-launch lookups and Wikipedia use the real host. The synthetic
   location and orbit answers bypass those native grants; use the real module to

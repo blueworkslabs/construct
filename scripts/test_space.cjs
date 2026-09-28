@@ -8,6 +8,7 @@ const O = require("../" + root + "ui/space-orbit.js");
 const K = require("../" + root + "ui/space-sky.js");
 const C = require("../" + root + "ui/space-catalog.js");
 const Stars = require("../" + root + "ui/space-stars.js");
+const P = require("../" + root + "ui/space-plan.js");
 let count = 0;
 function test(name, body) {
   body();
@@ -202,10 +203,44 @@ test("same-launch lookups and Wikipedia stay on fixed, encoded URLs", () => {
   assert.equal(C.parseWiki(JSON.stringify({ query: { pages: [{ title: "T", missing: true }] } })), null);
   assert.equal(C.parseWiki("<html>"), null);
 });
+test("visible passes over the next hours reproduce the Heavens-Above ISS pass", () => {
+  const from = at("2026-09-28T15:00:00Z"),
+    ranges = P.darkRanges(from, from + 12 * 3600000, sunAt);
+  assert.equal(ranges.length, 1);
+  near(ranges[0][0], "2026-09-28T17:20:00Z", 600);
+  const [iss] = P.passes(byId(25544), ob, ranges, sunAt);
+  near(iss.startMs, "2026-09-28T17:49:57Z", 10);
+  near(iss.endMs, "2026-09-28T17:53:10Z", 10);
+  assert.ok(Math.abs(iss.maxEl - 13) < 1);
+  assert.deepEqual([K.dir16(iss.startAz), K.dir16(iss.maxAz), K.dir16(iss.endAz)], ["WSW", "SW", "SSW"]);
+  assert.deepEqual([iss.startReason, iss.endReason], ["rises", "sets"]);
+  // Daylight has no dark range, so nothing is scanned.
+  assert.deepEqual(P.darkRanges(at("2026-09-28T09:00:00Z"), at("2026-09-28T13:00:00Z"), sunAt), []);
+  // A pass that ends in Earth's shadow says so.
+  const all = objects.flatMap((o) => P.passes(o, ob, ranges, sunAt));
+  assert.ok(all.some((p) => p.endReason === "shadow"));
+  for (const p of all) assert.ok(p.startMs <= p.maxMs && p.maxMs <= p.endMs && p.maxEl >= 10);
+});
+test("trains: fresh batches that still fly bunched, with launch dates", () => {
+  const recent = JSON.parse(fs.readFileSync("scripts/space-fixture/recent.json", "utf8")),
+    dates = P.launchDates(C.parseSatcat(fs.readFileSync("scripts/space-fixture/recent-satcat.json", "utf8"))),
+    rows = O.parseElements(JSON.stringify(recent));
+  assert.equal(P.trainRows(rows).length, rows.length);
+  assert.deepEqual(P.trainRows(rows.slice(0, 5).concat(rows.filter((r) => r[1].startsWith("GUOWANG")))).length, 11, "a family needs eight from one launch");
+  const trains = P.trains(O.build(rows), dates, at("2026-09-28T18:00:00Z"));
+  assert.deepEqual(trains.map((t) => [t.id, t.family, t.launch, t.members.length, t.batch]), [
+    ["train:2026-221", "Guowang", "2026-09-23", 9, 11],
+    ["train:2026-219", "Starlink", "2026-09-20", 23, 27],
+  ]);
+  for (const t of trains) assert.ok(t.spread <= 2 * P.TRAIN_CLUSTER && t.members.includes(t.centre));
+  assert.equal(P.family("STARLINK-38381").wiki, "Starlink");
+  assert.equal(P.family("KUIPER-P1").wiki, "Project Kuiper");
+  assert.equal(P.family("COSMOS 2428"), null);
+});
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
   assert.equal(m.id, "dev.construct.space-watch");
-  assert.equal(m.version, "0.1.6");
+  assert.equal(m.version, "0.2.0");
   assert.deepEqual(m.constructApi, { min: "0.9.0", target: "0.9.0" });
   const caps = Object.fromEntries(m.capabilities.map((c) => [c.id, c]));
   assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "storage.kv"]);
@@ -217,20 +252,20 @@ test("package: manifest, capabilities, scripts and no location in any URL", () =
   // Module CSP: no inline script or style.
   assert.doesNotMatch(html, /\sstyle=|<style|<script(?![^>]*\ssrc=)/);
   const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map((x) => x[1]);
-  assert.deepEqual(scripts, ["bridge.js", "vendor/satellite.min.js", "vendor/astronomy.min.js", "space-stars.js", "space-orbit.js", "space-sky.js", "space-catalog.js", "space-dome.js", "app.js"]);
+  assert.deepEqual(scripts, ["bridge.js", "vendor/satellite.min.js", "vendor/astronomy.min.js", "space-stars.js", "space-orbit.js", "space-sky.js", "space-catalog.js", "space-plan.js", "space-dome.js", "app.js"]);
   for (const s of scripts) assert.ok(fs.existsSync(root + "ui/" + s), s);
   assert.doesNotMatch(app, /\bfetch\s*\(|XMLHttpRequest|navigator\.geolocation|console\./);
   // Every URL the module can request is built from fixed strings plus a
   // catalogue designator or an object name; coordinates never enter one.
-  const urls = [C.ELEMENTS_URL, C.SATCAT_URL, C.launchUrl("1998-067A"), C.wikiUrl({ wiki: "International Space Station" }), C.wikiUrl({ search: "COSMOS 2428" }, true)];
+  const urls = [C.ELEMENTS_URL, C.SATCAT_URL, C.RECENT_URL, C.RECENT_SATCAT_URL, C.launchUrl("1998-067A"), C.wikiUrl({ wiki: "International Space Station" }), C.wikiUrl({ search: "COSMOS 2428" }, true)];
   for (const u of urls) assert.match(u, /^https:\/\/(celestrak\.org|en\.wikipedia\.org)\//);
   const keys = [...app.matchAll(/kvSet\("([^"]+)"/g)].map((x) => x[1]);
-  assert.deepEqual([...new Set(keys)].sort(), ["fetch-state", "preferences"]);
+  assert.deepEqual([...new Set(keys)].sort(), ["fetch-state", "preferences", "recent-launches", "recent.meta"]);
   assert.doesNotMatch(app, /kvSet\(`?(place|location|coordinates|lat)/);
   for (const shared of ["construct-ui.css", "bridge.js"])
     assert.equal(fs.readFileSync(root + "ui/" + shared, "utf8"), fs.readFileSync("examples/sky-watch-module/ui/" + shared, "utf8"), shared);
   const docs = fs.readFileSync("docs/space-watch.md", "utf8");
-  assert.match(docs, /Space Watch \*\*0\.1\.6\*\*/);
+  assert.match(docs, /Space Watch \*\*0\.2\.0\*\*/);
   // Vendored libraries are pinned by hash in the doc.
   for (const f of ["satellite.min.js", "astronomy.min.js"]) {
     const sha = crypto.createHash("sha256").update(fs.readFileSync(root + "ui/vendor/" + f)).digest("hex");
