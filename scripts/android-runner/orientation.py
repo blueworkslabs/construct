@@ -211,10 +211,10 @@ try:
  activities=adb('shell','dumpsys','activity','activities');(run/'activity-pause.txt').write_text(activities)
  client=adb('shell','dumpsys','activity','dev.construct.runtime/.ModuleActivity');(run/'activity-pause-client.txt').write_text(client)
  capture('activity-paused')
- block=re.search(r'Hist #[^\n]*dev\.construct\.runtime/\.ModuleActivity[^\n]*\n(.*?)(?=\* Hist #|RootTask|$)',activities,re.S)
- require(block is not None and 'state=PAUSED' in block.group(1) and 'mStopped=false' in client,'No pause-only lifecycle observation; do not count this as covered')
+ from orientation_checks import paused_without_stop
+ require(paused_without_stop(activities,client),'No pause-only lifecycle observation; do not count this as covered')
  sensor_state('activity-paused')
- tap('Close lifecycle test overlay');find('Read once')
+ tap('CLOSE LIFECYCLE TEST OVERLAY');find('Read once')
  require(result(before)=='Pause requests: get=RUN_PAUSED; watch=RUN_PAUSED','Paused requests were not denied')
  require('Ended: paused (1)' in labels(),'Missing or repeated terminal pause event')
  no_events();sensor_state('pause-resumed');capture('pause-only-returned')
