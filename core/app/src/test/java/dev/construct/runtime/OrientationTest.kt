@@ -193,4 +193,25 @@ class OrientationTest {
         val session = ModuleOrientation(context, { }, { 0 }) { }
         denied("ORIENTATION_UNAVAILABLE") { session.request(JSONObject("{op:'watch'}")) { _, _ -> } }
     }
+
+    @Test fun repeatedWatchAndStopCannotResetDeliveryBudget() {
+        val r = Rig()
+        for (i in 1..20) {
+            r.request("{op:'watch',rateHz:10}")
+            r.send(i * 25_000_000L)
+            r.request("{op:'stop'}")
+        }
+        assertEquals(5, r.emitted.size)
+    }
+
+    @Test fun failedRegistrationDoesNotLeaveGetBusy() {
+        val r = Rig()
+        r.shadow.setForceListenersToFail(true)
+        denied("ORIENTATION_UNAVAILABLE") { r.request("{op:'get'}") }
+        r.shadow.setForceListenersToFail(false)
+        r.request("{op:'get'}")
+        r.send(1_000_000L)
+        assertNotNull(r.result)
+        assertFalse(r.listening)
+    }
 }
