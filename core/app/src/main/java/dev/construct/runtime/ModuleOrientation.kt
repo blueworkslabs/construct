@@ -36,6 +36,15 @@ internal object OrientationMath {
     const val MIN_HORIZONTAL = 0.25
     const val CALIBRATE_ABOVE_DEG = 30.0
 
+    const val MAX_AGE_NS = 250_000_000L
+    /** Sensor timestamps and elapsedRealtimeNanos share Android's boot-time clock. */
+    fun measurementTime(sensorNs: Long, elapsedNs: Long, wallMs: Long): Long? {
+        if (sensorNs <= 0 || sensorNs > elapsedNs) return null
+        val age = elapsedNs - sensorNs
+        if (age > MAX_AGE_NS) return null
+        return wallMs - age / 1_000_000L
+    }
+
     private fun round1(value: Double) = (value * 10).roundToLong() / 10.0
     private fun bearing(east: Double, north: Double): Double? {
         val horizontal = hypot(east, north)
@@ -158,12 +167,13 @@ internal class ModuleOrientation(context: Context, private val authorize: () -> 
     }
     override fun onSensorChanged(event: SensorEvent) {
         if (closed || event.sensor.type != Sensor.TYPE_ROTATION_VECTOR) return
-        val sample = OrientationMath.sample(event.values, event.accuracy, displayRotation(), System.currentTimeMillis()) ?: return
+        val timestamp = OrientationMath.measurementTime(event.timestamp, SystemClock.elapsedRealtimeNanos(), System.currentTimeMillis()) ?: return
+        val sample = OrientationMath.sample(event.values, event.accuracy, displayRotation(), timestamp) ?: return
         pending?.let { done ->
             pending = null; timeout?.let { handler.removeCallbacks(it) }; timeout = null
             try { authorize(); done(sample, null) } catch (e: ConstructError) { done(null, e) }
         }
-        if (watching && throttle.admit(event.timestamp.takeIf { it > 0 } ?: SystemClock.elapsedRealtimeNanos())) {
+        if (watching && throttle.admit(event.timestamp)) {
             try { authorize(); emit(sample) } catch (e: ConstructError) {
                 watching = false
                 ended(if (e.code == "RUN_PAUSED") "paused" else "revoked")

@@ -140,6 +140,7 @@ class OrientationTest {
         val manager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         val shadow: ShadowSensorManager = shadowOf(manager)
         val sensor: Sensor = ShadowSensor.newInstance(Sensor.TYPE_ROTATION_VECTOR).also { shadow.addSensor(it) }
+        val clockOrigin = android.os.SystemClock.elapsedRealtimeNanos() + 1
         var granted = true
         var activityPaused = false
         val emitted = mutableListOf<JSONObject>()
@@ -152,7 +153,10 @@ class OrientationTest {
         fun request(json: String) { result = null; error = null; session.request(JSONObject(json)) { v, e -> result = v; error = e } }
         fun send(ns: Long, values: FloatArray = floatArrayOf(0f, 0f, 0f, 1f, 0.1f)) {
             val event = ShadowSensorManager.createSensorEvent(5, Sensor.TYPE_ROTATION_VECTOR)
-            values.copyInto(event.values); event.timestamp = ns; event.accuracy = SensorManager.SENSOR_STATUS_ACCURACY_HIGH
+            val timestamp = clockOrigin + ns
+            val advance = timestamp - android.os.SystemClock.elapsedRealtimeNanos()
+            if (advance > 0) org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofNanos(advance))
+            values.copyInto(event.values); event.timestamp = timestamp; event.accuracy = SensorManager.SENSOR_STATUS_ACCURACY_HIGH
             event.sensor = sensor
             shadow.sendSensorEventToListeners(event)
         }
@@ -270,6 +274,14 @@ class OrientationTest {
         // Activity transitions do not change the separate picker/menu epoch.
         view.gate.authorizeReply(pickerRequest)
         view.destroy()
+    }
+
+    @Test fun measurementTimestampPreservesAgeAndRejectsStaleOrFutureSamples() {
+        assertEquals(9_850L, OrientationMath.measurementTime(850_000_000L, 1_000_000_000L, 10_000L))
+        assertEquals(9_750L, OrientationMath.measurementTime(750_000_000L, 1_000_000_000L, 10_000L))
+        assertNull(OrientationMath.measurementTime(749_999_999L, 1_000_000_000L, 10_000L))
+        assertNull(OrientationMath.measurementTime(1_000_000_001L, 1_000_000_000L, 10_000L))
+        assertNull(OrientationMath.measurementTime(0L, 1_000_000_000L, 10_000L))
     }
 
 }

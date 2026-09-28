@@ -328,9 +328,11 @@ A sample has the following fields:
 | `accuracyDeg` | The sensor's own heading estimate, or its status: HIGH 8, MEDIUM 15, LOW 30 |
 | `pitchDeg`, `rollDeg` | The Aimé solver's signs (`docs/aime/resection.js`): pitch > 0 when the camera axis points below the horizon, roll > 0 when the screen's right side is down |
 | `calibrate` | `true` when the heading is unreliable or worse than 30° |
-| `timestamp` | Unix milliseconds |
+| `timestamp` | Measurement time in Unix milliseconds, derived from the sensor monotonic timestamp |
 
 Samples come from Android's rotation-vector sensor. Angles are rounded to 0.1°.
+Events older than 250 ms, with a future timestamp or without a valid monotonic
+timestamp are discarded; a pending `get` still has its 2 s timeout.
 The host has no location for this, so it applies no declination; a module that
 knows its place converts to true north itself.
 
@@ -357,7 +359,12 @@ knows its place converts to true north itself.
 - Closing the module stops everything.
 - Every delivery re-checks the grant and both pause states; a revoked grant stops
   the stream at the next sample.
-- There is no background or batched delivery.
+- There is no background sampling or batched delivery. Queued one-shot replies are
+  invalidated by an activity pause, including after resume.
+- Authorization is checked at the native handoff to the WebView. Like other bridge
+  results, data already handed to an authorized module cannot be recalled if its
+  JavaScript renderer processes it later; revocation stops new handoffs, not use of
+  data already received. `timestamp` retains measurement time, not dispatch time.
 
 **Errors:** `ORIENTATION_PARAMS`, `ORIENTATION_BUSY`, `ORIENTATION_UNAVAILABLE`
 (no rotation-vector sensor, registration failure, or no reading within 2 s),
