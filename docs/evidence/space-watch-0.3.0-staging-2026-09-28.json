@@ -1,0 +1,38 @@
+{
+  "complete": false,
+  "stopped": true,
+  "checks": [
+    "Signed fixture opens its computed dome and equivalent overhead list",
+    "Visible-pass list includes the current ISS pass and pointing/max-height words",
+    "Future Guowang pass previews on the dome with train details and live Wikipedia attribution",
+    "Future preview survives native menu pause and Back to now restores the live sky",
+    "Fixture stage list selection gives EAST, 1\u00bd fists up and Saturn anchor",
+    "Real same-launch lookup and explicit Wikipedia request render attributed results",
+    "Red mode and native touch rewind update the selected-object view",
+    "Red preference survives a genuine process restart",
+    "Canvas touch selects the ISS, independently of the list",
+    "Landscape train preview/details remain operable and cached batch identity survives restart",
+    "200% Android text: train preview, scrolling details and close controls remain operable",
+    "Native menu pause/resume restores the sky",
+    "Follow denied without native orientation grant; static sky remains usable",
+    "Granted real rotation-vector readings drive true-north-corrected north/east Follow dome"
+  ],
+  "error": "('Follow listeners', 'off', 1, 0)",
+  "apkSha256": "23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477",
+  "moduleSha256": "72a0baea94c47f6224eac4205b0313ef5a5ad940dbcc05838ed44955e18d32f3",
+  "fixtureSha256": "874cc6c75eafce030d30b86ea56155bbb07e380178aa68ae82bb45bdc8154dd4",
+  "version": "0.3.0",
+  "followNativeConnections": {
+    "denied": 0,
+    "watching": 1,
+    "off": 1
+  },
+  "runId": "20260928T233251Z-space-8f4a921d",
+  "plannedChecks": 23,
+  "packageCommit": "47f038b6d9d0ced166f1b5e03d6a504f9e5fcc6d",
+  "runnerCommit": "47f038b6d9d0ced166f1b5e03d6a504f9e5fcc6d",
+  "limitations": [
+    "Superseded package with visible announcement styling bug; incomplete 14/23; not hardware clearance",
+    "Immediate post-off native connection assertion failed; asynchronous completion was not awaited"
+  ]
+}

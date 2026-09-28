@@ -30,7 +30,9 @@ slightly right.", "Turn left about 40°." or "Behind you: turn around."
 - **Smoothing.** Each reading moves the heading a quarter of the way, along the
   shorter way round.
 - **Poses.** Upright readings do not turn the dome: the status asks you to hold
-  the phone flat. Directional guidance and the view wedge are hidden until a
+  the phone flat. The chart retains its last rotation (including its compass
+  labels); it is not a live facing indicator while upright. Turning Follow off
+  explicitly restores north-up. Directional guidance and the view wedge are hidden until a
   fresh flat reading arrives. Missing headings or a 1.5-second sample gap also
   suspend guidance rather than retaining a stale direction.
 - **Accuracy.** The status line shows the compass accuracy, e.g. "Facing

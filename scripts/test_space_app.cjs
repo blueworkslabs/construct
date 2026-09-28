@@ -517,7 +517,10 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   r.select(25544);
   const sample = {pose:'flat', azimuthDeg:90, accuracyDeg:12, calibrate:false};
   r.orient(sample); assert(!r.el('spot-turn').hidden);
+  const flatRotation = r.rotation();
   r.orient({...sample, pose:'upright'}); assert(r.el('spot-turn').hidden);
+  assert.equal(r.rotation(), flatRotation, 'upright suspends guidance without spinning the chart');
+  assert.equal(r.dome().follow, false);
   r.orient(sample); r.tick(2); assert(r.el('spot-turn').hidden); assert.equal(r.dome().follow, false);
   r.orient(sample); assert(!r.el('spot-turn').hidden);
   // A true-coordinate sky cannot be rotated by uncorrected magnetic headings.
