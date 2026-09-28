@@ -8,10 +8,15 @@ API 0.9 adds bounded transport and one-shot location. API 0.10 adds
 [bounded image selection and marker detection](module-images.md). API 0.11 adds
 [bounded capture, private-photo access and still-image inference](module-photos.md).
 API 0.12 (source candidate, unreleased) adds a [stable private-photo `id`](module-photos.md#stable-photo-identity--api-012-source-candidate) to library listings.
+API 0.13 (source candidate, unreleased) adds [capture options and metadata](module-photos.md#capture-metadata--api-013-source-candidate)
+to `camera.photo`: a level indicator, fixed zoom steps, and the new photo's `id`,
+zoom, field of view, tilt and a weak heading hint.
+API 0.14 (source candidate, unreleased) adds [foreground compass and tilt](#foreground-compass-and-tilt-orientationread-api-014-source-candidate)
+(`orientation.read`): one sample or a rate-capped stream while the module is visible.
 Unrestricted WebView networking/geolocation and general native rendering remain unavailable.
 
 The current host accepts exact `constructApi.min == constructApi.target` versions
-0.1.0 through 0.12.0. Module versions are three numeric components. See the
+0.1.0 through 0.14.0. Module versions are three numeric components. See the
 [manifest schema](../schemas/module-manifest.schema.json) and runnable
 [examples](../examples); the native validator is authoritative.
 
@@ -73,6 +78,8 @@ a granted module can retain data it has read; revocation is not retroactive eras
 - **`contacts.read` (0.3+):** bounded native provider search/details, below.
 - **`camera.photo`, `photos.library`, `image.analyze` (0.11):** bounded acquisition,
   private-photo access and reusable inference; [contracts](module-photos.md).
+  0.12 adds stable library IDs; 0.13 adds `camera.photo` `level`/`zoom` options and
+  capture metadata. Earlier API callers keep their exact request and result shapes.
 - **`camera.capture` (historical 0.4+):** retired in the alpha31 candidate; below.
 
 Denials are structured errors, not permission prompts initiated by JavaScript.
@@ -290,6 +297,91 @@ completion, cancellation or close. Data is re-authorized before delivery.
 Errors include `LOCATION_PERMISSION`, `LOCATION_PARAMS`, `LOCATION_BUSY`,
 `LOCATION_RATE`, `LOCATION_TIMEOUT`, `LOCATION_DATA`, `LOCATION_UNAVAILABLE` and
 `LOCATION_CANCELLED`, plus common grant/session errors.
+
+## Foreground compass and tilt (`orientation.read`, API 0.14, source candidate)
+
+**Alpha37 Android acceptance complete:** 11/11 exact-APK gates pass, including
+pause-only, focus loss and real multi-resume. Physical-phone checks remain pending;
+see the [alpha37 staging report](orientation-alpha37-staging.md). The host PR and
+its API 0.13 base remain unmerged; this is not production availability.
+
+For modules that point at things: Space Watch's follow mode, and Aimé's compass
+hint. Declare `orientation.read` with a reason and `constructApi` 0.14.0. The
+capability can be `optional`, and it is off until granted in **Module access**
+("Allow reading compass and tilt"). No Android runtime permission is involved.
+
+- **`{op:'get'}`** answers one sample within 2 s, or `ORIENTATION_UNAVAILABLE`.
+  One pending `get` is allowed per session. All get/watch deliveries share a
+  persistent 15-readings/second session budget; a read may wait for the next slot.
+- **`{op:'watch', rateHz?}`** returns `{watching:true, rateHz}`.
+  - `rateHz` is 5, 10 or 15; the default is 10.
+  - Samples arrive as `window.dispatchEvent(new CustomEvent('constructorientation',
+    {detail: sample}))`, at most `rateHz` per second by sensor time.
+  - Only one stream runs per session; a new `watch` replaces its rate.
+    Replacing, stopping or restarting a watch does not reset its delivery budget.
+- **`{op:'stop'}`** returns `{watching:false}` and is idempotent.
+
+A sample has the following fields:
+
+| Field | Meaning |
+| --- | --- |
+| `pose` | `flat` when the screen faces up or down within 45° of horizontal, otherwise `upright` |
+| `azimuthDeg` | Degrees clockwise from **magnetic** north. For `flat`, the bearing of the screen's top edge for the current display rotation. For `upright`, the bearing of the rear camera axis. |
+| `headingRef` | Always `magnetic` when `azimuthDeg` is present |
+| `accuracyDeg` | The sensor's own heading estimate, or its status: HIGH 8, MEDIUM 15, LOW 30 |
+| `pitchDeg`, `rollDeg` | The Aimé solver's signs (`docs/aime/resection.js`): pitch > 0 when the camera axis points below the horizon, roll > 0 when the screen's right side is down |
+| `calibrate` | `true` when the heading is unreliable or worse than 30° |
+| `timestamp` | Measurement time in Unix milliseconds, derived from the sensor monotonic timestamp |
+
+Samples come from Android's rotation-vector sensor. Angles are rounded to 0.1°.
+Events older than 250 ms, with a future timestamp or without a valid monotonic
+timestamp are discarded; a pending `get` still has its 2 s timeout.
+The host has no location for this, so it applies no declination; a module that
+knows its place converts to true north itself.
+
+- **Omitted fields:** when the sensor reports UNRELIABLE or NO_CONTACT, or the
+  measured axis is near vertical, `azimuthDeg`, `headingRef` and `accuracyDeg`
+  are omitted and tilt is kept. Fields are omitted rather than guessed.
+- **Raw data:** raw accelerometer, gyroscope and magnetometer vectors are never
+  exposed.
+
+**Foreground only.**
+- A menu pause stops the stream and fails a pending `get` with
+  `RUN_PAUSED` through the bridge, like other asynchronous capabilities (the
+  native sensor session cancels immediately). After resume the module must call `watch` again.
+- **Losing the foreground** also stops it, even when Android does not stop the
+  activity. That covers another window in front, a system dialog, Home or
+  Recents, and, on Android 10+, another app becoming top-resumed in split screen
+  or freeform while this activity stays resumed. Eligibility needs the activity
+  resumed with window focus and, on Android 10+, also top-resumed. It is checked at `onResume`,
+  `onPause` (before `onStop`), window-focus changes and every top-resumed change.
+  Notification shade and Quick Settings focus loss also stop the stream. While the activity is
+  ineligible, new `get` and `watch` requests fail with `RUN_PAUSED`. Regaining the
+  foreground does not restart the stream; the module must call `watch` again. Image and camera pickers keep their existing pause and
+  completion handling.
+- When the host ends an active stream because of foreground eligibility loss or a revoked
+  grant, it sends one final `constructorientation` event with
+  `detail: {watching: false, reason: "paused" | "revoked"}`. A menu pause is
+  signalled by `constructvisibilitychange` instead.
+- Closing the module stops everything.
+- Every delivery re-checks the grant and both pause states; a revoked grant stops
+  the stream at the next sample.
+- There is no background sampling or batched delivery. Queued one-shot replies are
+  invalidated by an activity pause, including after resume.
+- Authorization is checked at the native handoff to the WebView. Like other bridge
+  results, data already handed to an authorized module cannot be recalled if its
+  JavaScript renderer processes it later; revocation stops new handoffs, not use of
+  data already received. `timestamp` retains measurement time, not dispatch time.
+
+**Errors:** `ORIENTATION_PARAMS`, `ORIENTATION_BUSY`, `ORIENTATION_UNAVAILABLE`
+(no rotation-vector sensor, registration failure, or no reading within 2 s),
+plus the common grant and session errors, including `RUN_PAUSED` for a pending
+read interrupted by the menu. Closing the module discards pending bridge replies.
+
+Fine-grained motion data can reveal activity patterns. The foreground-only
+limit, the rate cap, the rounding and the separate consent line are the bounds;
+granted storage or internet access can still retain or send what the module
+receives. The contract was proposed in the [orientation brief](orientation-brief.md).
 
 **Composition matters:** unlike the legacy Sky launcher, these capabilities return
 data to module JavaScript. If internet access is also granted, the module may send

@@ -36,6 +36,8 @@ def prepare(output):
     prepare_transport(output, key)
     prepare_sensitive(output, key)
     prepare_photo_identity(output, key)
+    prepare_capture_metadata(output, key)
+    prepare_orientation(output, key)
     print('Prepared complete JVM fixtures plus home/test catalogs under the selected output.')
 
 def prepare_sensitive(output, key):
@@ -61,6 +63,33 @@ def prepare_photo_identity(output, key):
         for version,api in [('0.1.0','0.11.0'),('0.2.0','0.12.0'),('0.3.0','0.12.0')]:
             (probe/'manifest.json').write_text(json.dumps({**manifest,'version':version,'constructApi':dict(min=api,target=api)}))
             publish(output/'photo-identity-registry',*build(probe,key),fixture=True)
+
+def prepare_capture_metadata(output, key):
+    # 0.1.0 is the same UI on API 0.12 (exact {op} request, {saved} result); 0.2.0 is
+    # API 0.13 so the runner proves both the unchanged legacy shape and the metadata.
+    with tempfile.TemporaryDirectory() as tmp:
+        probe=Path(tmp)/'capture-metadata'; shutil.copytree(ROOT/'examples/fixtures/capture-metadata',probe)
+        manifest=json.loads((probe/'manifest.json').read_text())
+        for version,api in [('0.1.0','0.12.0'),('0.2.0','0.13.0'),('0.2.1','0.13.0'),('0.2.2','0.13.0')]:
+            # Extend only a NEW signed fixture version; published 0.1.0/0.2.0 stay byte-identical.
+            if version == '0.2.1':
+                html=probe/'ui/index.html'
+                html.write_text(html.read_text().replace('<p id="status"', '<button id="confirmation">Open photo confirmation</button><p id="status"'))
+                js=probe/'ui/app.js'
+                js.write_text(js.read_text()+'''\n$('confirmation').onclick=task(async()=>{
+  const photos=(await call('photos.library',{op:'list'})).photos;
+  if(!photos.length)return 'No photos.';
+  const r=await call('photos.library',{op:'delete',ref:photos[0].ref});
+  return r.deleted?'Deleted.':'Delete canceled.';
+});\n''')
+            if version == '0.2.2':
+                js=probe/'ui/app.js';js.write_text(js.read_text().replace('r.deleted?', 'r.completed?'))
+            (probe/'manifest.json').write_text(json.dumps({**manifest,'version':version,'constructApi':dict(min=api,target=api)}))
+            publish(output/'capture-metadata-registry',*build(probe,key),fixture=True)
+
+def prepare_orientation(output, key):
+    # API 0.14 orientation.read probe: one reading, a rate-capped stream and stop.
+    publish(output/'orientation-registry',*build(ROOT/'examples/fixtures/orientation-probe',key),fixture=True)
 
 def prepare_transport(output, key):
     # Signed scopes exercise expansion, removal/reintroduction and rollback.

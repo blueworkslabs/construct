@@ -1,0 +1,334 @@
+{
+  "accepted": false,
+  "source": "05de64b79e2a7fb8a2ba052d33cf39dcd7f9a79a",
+  "hostVersion": "0.1.0-alpha36",
+  "unitTests": 258,
+  "lintPassed": true,
+  "packageTests": 35,
+  "runnerTests": 92,
+  "apks": {
+    "arm64-v8a": {
+      "sha256": "c5cf72d2fe307bf5df68078ef2eb8b11e12d8626a46b4467055b08f6d3773496",
+      "bytes": 23871866
+    },
+    "x86_64": {
+      "sha256": "12d846811e2210b80553d529b307e5b7c08ecd99a398ee7f48e4c435f2718a8b",
+      "bytes": 26755451
+    }
+  },
+  "runs": [
+    {
+      "complete": false,
+      "stopped": true,
+      "apkSha256": "12d846811e2210b80553d529b307e5b7c08ecd99a398ee7f48e4c435f2718a8b",
+      "moduleSha256": "7ddfcef340238db112eae99f255fec5e1beb02061f29308d5a9e7c6ed85b51ea",
+      "checks": [
+        "Signed probe installed; one-shot and watch denied before explicit native grant",
+        "Flat north/east samples follow injected magnetic field with bounded schema and precision",
+        "Upright camera bearing and positive pitch follow synthetic orientation",
+        "10 and 15 Hz streams deliver within their caps; stop leaves event counts stable",
+        "Native menu pause stops watch and resume does not restart it",
+        "Revocation stops stream; both operations denied after reopening",
+        "Background/close and process restart do not resurrect the stream; grant persists",
+        "Landscape and 200% text retain readable controls and working one-shot access"
+      ],
+      "samples": [
+        {
+          "pose": "flat",
+          "pitchDeg": 90,
+          "rollDeg": 0,
+          "calibrate": false,
+          "timestamp": 1790627279123,
+          "azimuthDeg": 0,
+          "headingRef": "magnetic",
+          "accuracyDeg": 0
+        },
+        {
+          "pose": "flat",
+          "pitchDeg": 90,
+          "rollDeg": 0,
+          "calibrate": false,
+          "timestamp": 1790627282016,
+          "azimuthDeg": 90,
+          "headingRef": "magnetic",
+          "accuracyDeg": 0
+        },
+        {
+          "pose": "upright",
+          "pitchDeg": 0,
+          "rollDeg": 0,
+          "calibrate": false,
+          "timestamp": 1790627284789,
+          "azimuthDeg": 90,
+          "headingRef": "magnetic",
+          "accuracyDeg": 0
+        },
+        {
+          "pose": "upright",
+          "pitchDeg": 10,
+          "rollDeg": 0,
+          "calibrate": false,
+          "timestamp": 1790627287370,
+          "azimuthDeg": 90,
+          "headingRef": "magnetic",
+          "accuracyDeg": 0
+        },
+        {
+          "pose": "flat",
+          "pitchDeg": 90,
+          "rollDeg": 0,
+          "calibrate": false,
+          "timestamp": 1790627437616,
+          "azimuthDeg": 90,
+          "headingRef": "magnetic",
+          "accuracyDeg": 0
+        }
+      ],
+      "rates": [
+        {
+          "rate": 10,
+          "events": 36,
+          "elapsedSeconds": 4.845175641938113
+        },
+        {
+          "rate": 15,
+          "events": 53,
+          "elapsedSeconds": 5.9071090270299464
+        },
+        {
+          "rate": 10,
+          "events": 55,
+          "elapsedSeconds": 6.583753003971651
+        },
+        {
+          "rate": 10,
+          "events": 34,
+          "elapsedSeconds": 5.210834413999692
+        },
+        {
+          "rate": 10,
+          "events": 41,
+          "elapsedSeconds": 8.215136782033369
+        },
+        {
+          "rate": 10,
+          "events": 46,
+          "elapsedSeconds": 5.911439310992137
+        }
+      ],
+      "nativeConnections": {
+        "watching": 1,
+        "stopped": 0,
+        "paused": 0,
+        "revoked": 0,
+        "background": 0
+      },
+      "error": "No pause-only lifecycle observation; do not count this as covered",
+      "id": "20260928T202609Z-orientation-0678f6b7",
+      "runnerSource": "05de64b",
+      "scope": "full",
+      "plannedChecks": 9
+    },
+    {
+      "complete": false,
+      "stopped": true,
+      "apkSha256": "12d846811e2210b80553d529b307e5b7c08ecd99a398ee7f48e4c435f2718a8b",
+      "moduleSha256": "7ddfcef340238db112eae99f255fec5e1beb02061f29308d5a9e7c6ed85b51ea",
+      "checks": [
+        "Signed probe installed; one-shot and watch denied before explicit native grant",
+        "Flat north/east samples follow injected magnetic field with bounded schema and precision",
+        "Upright camera bearing and positive pitch follow synthetic orientation",
+        "10 and 15 Hz streams deliver within their caps; stop leaves event counts stable",
+        "Native menu pause stops watch and resume does not restart it",
+        "Revocation stops stream; both operations denied after reopening"
+      ],
+      "samples": [
+        {
+          "pose": "flat",
+          "pitchDeg": 90,
+          "rollDeg": 0,
+          "calibrate": false,
+          "timestamp": 1790627780299,
+          "azimuthDeg": 0,
+          "headingRef": "magnetic",
+          "accuracyDeg": 0
+        },
+        {
+          "pose": "flat",
+          "pitchDeg": 90,
+          "rollDeg": 0,
+          "calibrate": false,
+          "timestamp": 1790627783199,
+          "azimuthDeg": 90,
+          "headingRef": "magnetic",
+          "accuracyDeg": 0
+        },
+        {
+          "pose": "upright",
+          "pitchDeg": 0,
+          "rollDeg": 0,
+          "calibrate": false,
+          "timestamp": 1790627785839,
+          "azimuthDeg": 90,
+          "headingRef": "magnetic",
+          "accuracyDeg": 0
+        },
+        {
+          "pose": "upright",
+          "pitchDeg": 10,
+          "rollDeg": 0,
+          "calibrate": false,
+          "timestamp": 1790627788733,
+          "azimuthDeg": 90,
+          "headingRef": "magnetic",
+          "accuracyDeg": 0
+        }
+      ],
+      "rates": [
+        {
+          "rate": 10,
+          "events": 37,
+          "elapsedSeconds": 4.4852135189576074
+        },
+        {
+          "rate": 15,
+          "events": 49,
+          "elapsedSeconds": 4.913776039029472
+        },
+        {
+          "rate": 10,
+          "events": 43,
+          "elapsedSeconds": 5.328666870016605
+        },
+        {
+          "rate": 10,
+          "events": 33,
+          "elapsedSeconds": 4.14805879292544
+        },
+        {
+          "rate": 10,
+          "events": 35,
+          "elapsedSeconds": 4.537205137079582
+        }
+      ],
+      "nativeConnections": {
+        "watching": 1,
+        "stopped": 0,
+        "paused": 0,
+        "revoked": 0,
+        "background": 1
+      },
+      "error": "Unexpected native listeners after background",
+      "pauseFixtureSha256": "220aa18ec12fbc0164366c468d0aca766880f1166ecc9a7ff5b4b0456be89b2d",
+      "id": "20260928T203427Z-orientation-b8cc6113",
+      "runnerSource": "f427572",
+      "scope": "full",
+      "plannedChecks": 9
+    },
+    {
+      "complete": false,
+      "stopped": true,
+      "apkSha256": "12d846811e2210b80553d529b307e5b7c08ecd99a398ee7f48e4c435f2718a8b",
+      "moduleSha256": "7ddfcef340238db112eae99f255fec5e1beb02061f29308d5a9e7c6ed85b51ea",
+      "checks": [
+        "Signed probe installed; one-shot and watch denied before explicit native grant"
+      ],
+      "samples": [],
+      "rates": [
+        {
+          "rate": 10,
+          "events": 39,
+          "elapsedSeconds": 4.133931610966101
+        }
+      ],
+      "error": "No pause-only lifecycle observation; do not count this as covered",
+      "pauseFixtureSha256": "220aa18ec12fbc0164366c468d0aca766880f1166ecc9a7ff5b4b0456be89b2d",
+      "id": "20260928T203941Z-orientation-ca9083e4",
+      "runnerSource": "0ec2902",
+      "scope": "pause-only",
+      "plannedChecks": 2
+    },
+    {
+      "complete": true,
+      "stopped": true,
+      "apkSha256": "12d846811e2210b80553d529b307e5b7c08ecd99a398ee7f48e4c435f2718a8b",
+      "moduleSha256": "7ddfcef340238db112eae99f255fec5e1beb02061f29308d5a9e7c6ed85b51ea",
+      "checks": [
+        "Signed probe installed; one-shot and watch denied before explicit native grant",
+        "Pause-only panel releases listener, denies get/watch, emits one terminal event and requires explicit restart"
+      ],
+      "samples": [],
+      "rates": [
+        {
+          "rate": 10,
+          "events": 36,
+          "elapsedSeconds": 4.298745253006928
+        },
+        {
+          "rate": 10,
+          "events": 50,
+          "elapsedSeconds": 5.505012041074224
+        }
+      ],
+      "nativeConnections": {
+        "activity-paused": 0,
+        "pause-resumed": 0
+      },
+      "pauseFixtureSha256": "220aa18ec12fbc0164366c468d0aca766880f1166ecc9a7ff5b4b0456be89b2d",
+      "id": "20260928T204330Z-orientation-99315f29",
+      "runnerSource": "dfebdc2",
+      "scope": "pause-only",
+      "plannedChecks": 2
+    }
+  ],
+  "images": [
+    {
+      "run": "20260928T202609Z-orientation-0678f6b7",
+      "label": "native-grant",
+      "path": "../images/orientation-alpha36/4-native-grant.png",
+      "sha256": "c85ac3889a8c226cbf4e8c1ddbfdf3d81aada89d37a6b21379e6c06623500ac9"
+    },
+    {
+      "run": "20260928T202609Z-orientation-0678f6b7",
+      "label": "flat-east",
+      "path": "../images/orientation-alpha36/4-flat-east.png",
+      "sha256": "141e59773d2507bd9d02ca810376b53aeed0c3d463edde83d70176063f298879"
+    },
+    {
+      "run": "20260928T202609Z-orientation-0678f6b7",
+      "label": "upright-pitch",
+      "path": "../images/orientation-alpha36/4-upright-pitch.png",
+      "sha256": "9db8327f726a58b2228a6a3e64bebdfd1922476df1aa9dc10b3ae2c718b43c04"
+    },
+    {
+      "run": "20260928T202609Z-orientation-0678f6b7",
+      "label": "landscape",
+      "path": "../images/orientation-alpha36/4-landscape.png",
+      "sha256": "e9f1fd8cfaed6021288c5788c75dd02a8d7e8250780e8391a159ba964557042f"
+    },
+    {
+      "run": "20260928T202609Z-orientation-0678f6b7",
+      "label": "large-text",
+      "path": "../images/orientation-alpha36/4-large-text.png",
+      "sha256": "9ea64e19e77abcb89caabff4d7a746d0716e29a4652c38eae8123f4e01b78dea"
+    },
+    {
+      "run": "20260928T203427Z-orientation-b8cc6113",
+      "label": "failure",
+      "path": "../images/orientation-alpha36/5-failure.png",
+      "sha256": "5dedd2df7c851e713cd7522e16ea049752ccb4c846032b2e1a33f1c1fc1f964b"
+    },
+    {
+      "run": "20260928T204330Z-orientation-99315f29",
+      "label": "activity-paused",
+      "path": "../images/orientation-alpha36/7-activity-paused.png",
+      "sha256": "4f0cdacde4c0f2667ad68460e62ac400df13534d94f6dcd7b624a924d078cb04"
+    },
+    {
+      "run": "20260928T204330Z-orientation-99315f29",
+      "label": "pause-only-returned",
+      "path": "../images/orientation-alpha36/7-pause-only-returned.png",
+      "sha256": "ffb395ce3daec5f60727b8b5dc61f4605e96310b219c3456d826f75e82d4cd33"
+    }
+  ]
+}

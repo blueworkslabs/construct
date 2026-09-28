@@ -1,0 +1,334 @@
+{
+  "complete": true,
+  "stopped": true,
+  "apkSha256": "7d85825695ae7acc418d30c8ab8e5d376c1cb835196c3cca784f4fc08b46a77e",
+  "moduleSha256": {
+    "0.1.0": "af3fb19913bcc4a440e91bf75630618777f1db3e7ca59198211a02b3412c0583",
+    "0.2.2": "4c4f3268e66b528b316c141ec91de4f08695634ea3f81b43243ea0146773b95e"
+  },
+  "recents": "Captured with screenshot opt-in enabled; visual review required",
+  "checks": [
+    "API 0.12 keeps the exact {op} request and {saved} result; no level or zoom controls",
+    "Allow screenshots is off by default, drops FLAG_SECURE for this module only, and the viewfinder stays secure",
+    "Pitch +10\u00b0 (looking down) reports pitchDeg > 0 at 1\u00d7 with a listed stable id",
+    "Pitch -10\u00b0 (looking up) reports pitchDeg < 0 at 2\u00d7",
+    "Roll +10\u00b0 (right side down) reports rollDeg > 0",
+    "Roll -10\u00b0 (right side up) reports rollDeg < 0",
+    "Level pose reports near-zero tilt with a small sigma",
+    "Turning Allow screenshots off restores FLAG_SECURE"
+  ],
+  "captures": [
+    {
+      "injected": {
+        "pitch": 10,
+        "roll": 0
+      },
+      "zoom": "1\u00d7",
+      "readout": {
+        "Pitch": 10.0,
+        "Roll": -0.0
+      },
+      "result": {
+        "saved": true,
+        "id": "pgecao-UmrguaO6eW2kD-Y7DN",
+        "capture": {
+          "zoomRatio": 1,
+          "fovDeg": {
+            "h": 39.97,
+            "v": 51.73
+          },
+          "fovSigmaDeg": 1,
+          "tilt": {
+            "pitchDeg": 9.97,
+            "rollDeg": -0.02,
+            "sigmaDeg": 1.02,
+            "ageMs": 173
+          },
+          "headingDeg": 0,
+          "headingRef": "magnetic",
+          "headingAccuracyDeg": 0,
+          "headingAgeMs": 173
+        }
+      },
+      "problems": [],
+      "attempt": 1
+    },
+    {
+      "injected": {
+        "pitch": -10,
+        "roll": 0
+      },
+      "zoom": "2\u00d7",
+      "readout": {
+        "Pitch": -10.0,
+        "Roll": -0.0
+      },
+      "result": {
+        "saved": true,
+        "id": "puvu-sP8BwNgopLgYtseMYPDp",
+        "capture": {
+          "zoomRatio": 2,
+          "fovDeg": {
+            "h": 20.61,
+            "v": 27.25
+          },
+          "fovSigmaDeg": 1,
+          "tilt": {
+            "pitchDeg": -10.03,
+            "rollDeg": -0.03,
+            "sigmaDeg": 1.02,
+            "ageMs": 160
+          },
+          "headingDeg": 0,
+          "headingRef": "magnetic",
+          "headingAccuracyDeg": 0,
+          "headingAgeMs": 160
+        }
+      },
+      "problems": [],
+      "attempt": 1
+    },
+    {
+      "injected": {
+        "pitch": 0,
+        "roll": 10
+      },
+      "zoom": "1\u00d7",
+      "readout": {
+        "Pitch": -0.0,
+        "Roll": 10.0
+      },
+      "result": {
+        "saved": true,
+        "id": "ph5NjoA81BUWfMt8wnGoA-uAA",
+        "capture": {
+          "zoomRatio": 1,
+          "fovDeg": {
+            "h": 39.97,
+            "v": 51.73
+          },
+          "fovSigmaDeg": 1,
+          "tilt": {
+            "pitchDeg": -0.03,
+            "rollDeg": 9.98,
+            "sigmaDeg": 1,
+            "ageMs": 165
+          },
+          "headingDeg": 357.9,
+          "headingRef": "magnetic",
+          "headingAccuracyDeg": 0,
+          "headingAgeMs": 165
+        }
+      },
+      "problems": [],
+      "attempt": 1
+    },
+    {
+      "injected": {
+        "pitch": 0,
+        "roll": -10
+      },
+      "zoom": "2\u00d7",
+      "readout": {
+        "Pitch": -0.0,
+        "Roll": -10.0
+      },
+      "result": {
+        "saved": true,
+        "id": "pFhu2V_e7kJiFJb6zIaH7fCMD",
+        "capture": {
+          "zoomRatio": 2,
+          "fovDeg": {
+            "h": 20.61,
+            "v": 27.25
+          },
+          "fovSigmaDeg": 1,
+          "headingDeg": 2,
+          "headingRef": "magnetic",
+          "headingAccuracyDeg": 0,
+          "headingAgeMs": 254
+        }
+      },
+      "problems": [
+        "tilt missing or malformed None"
+      ],
+      "attempt": 1
+    },
+    {
+      "injected": {
+        "pitch": 0,
+        "roll": -10
+      },
+      "zoom": "2\u00d7",
+      "readout": {
+        "Pitch": -0.0,
+        "Roll": -10.0
+      },
+      "result": {
+        "saved": true,
+        "id": "pEC-_8ws3jlkuTSt98-HD_czE",
+        "capture": {
+          "zoomRatio": 2,
+          "fovDeg": {
+            "h": 20.61,
+            "v": 27.25
+          },
+          "fovSigmaDeg": 1,
+          "tilt": {
+            "pitchDeg": -0.02,
+            "rollDeg": -10.02,
+            "sigmaDeg": 1,
+            "ageMs": 188
+          },
+          "headingDeg": 2,
+          "headingRef": "magnetic",
+          "headingAccuracyDeg": 0,
+          "headingAgeMs": 188
+        }
+      },
+      "problems": [],
+      "attempt": 2
+    },
+    {
+      "injected": {
+        "pitch": 0,
+        "roll": 0
+      },
+      "zoom": "1\u00d7",
+      "readout": {
+        "Pitch": -0.0,
+        "Roll": -0.0
+      },
+      "result": {
+        "saved": true,
+        "id": "p6GXUFxZBL93VTbifeM883UvJ",
+        "capture": {
+          "zoomRatio": 1,
+          "fovDeg": {
+            "h": 39.97,
+            "v": 51.73
+          },
+          "fovSigmaDeg": 1,
+          "tilt": {
+            "pitchDeg": -0.03,
+            "rollDeg": -0.02,
+            "sigmaDeg": 1,
+            "ageMs": 197
+          },
+          "headingDeg": 0,
+          "headingRef": "magnetic",
+          "headingAccuracyDeg": 0,
+          "headingAgeMs": 197
+        }
+      },
+      "problems": [],
+      "attempt": 1
+    }
+  ],
+  "snapshot": {
+    "avd": "construct-api37",
+    "name": "clean",
+    "loaded": true
+  },
+  "apiLevel": "37",
+  "hostVersion": [
+    "versionCode=33 minSdk=28 targetSdk=35",
+    "versionName=0.1.0-alpha33"
+  ],
+  "screenshotRegions": {
+    "module-switch-off": [
+      0,
+      36,
+      720,
+      1280
+    ],
+    "module-switch-on": [
+      0,
+      36,
+      720,
+      1280
+    ],
+    "module-switch-on-restart": [
+      0,
+      36,
+      720,
+      1280
+    ],
+    "photo-confirmation-switch-on": [
+      0,
+      36,
+      720,
+      1280
+    ],
+    "viewfinder-switch-on": [
+      0,
+      36,
+      720,
+      1280
+    ],
+    "module-switch-off-again": [
+      0,
+      36,
+      720,
+      1280
+    ]
+  },
+  "zoomPair": "fov follows 2\u00b7atan(tan(fov1/2)/2)",
+  "retakes": [
+    {
+      "pitch": 0,
+      "roll": -10,
+      "attempt": 1,
+      "reason": "Tilt omitted; heading age exceeds the 250 ms tilt bound",
+      "headingAgeMs": 254
+    }
+  ],
+  "runId": "20260927T151743Z-capture-metadata-9506f749",
+  "source": "f172276bfb4b191f08acff7fb148b3d3e057503d",
+  "driver": "2cca77813cbb2ef327da85ed4abbe59aff3a50ae",
+  "fixtureCatalog": "https://raw.githubusercontent.com/blueworkslabs/construct/f8ee568ee0a0cb5d028759c08345de9a9afff495/catalog/candidates/capture-metadata/index.json",
+  "build": {
+    "unitTests": 231,
+    "lint": "pass",
+    "runnerTests": 89,
+    "apks": {
+      "arm64-v8a": {
+        "sha256": "45437aafaf3e09f37a547c37665a675722a6e0429b5f5571dec0cf9748486376",
+        "bytes": 23855482,
+        "signer": "Signer #1 certificate SHA-256 digest: c066034d20f4f9f625b5b2bda525a5b94f32961583f837d0e3437746013443cb"
+      },
+      "x86_64": {
+        "sha256": "7d85825695ae7acc418d30c8ab8e5d376c1cb835196c3cca784f4fc08b46a77e",
+        "bytes": 26739067,
+        "signer": "Signer #1 certificate SHA-256 digest: c066034d20f4f9f625b5b2bda525a5b94f32961583f837d0e3437746013443cb"
+      }
+    }
+  },
+  "visualReview": {
+    "recentsModule": "Private module content hidden",
+    "recentsPhotoDialog": "Private dialog and module content hidden",
+    "viewfinder": "Pitch/roll signs and zoom chips readable; controls scroll",
+    "imageFiles": [
+      "recents-module.png",
+      "recents-photo-dialog.png",
+      "screenshots-enabled.png",
+      "viewfinder-secured.png",
+      "screenshots-disabled.png",
+      "photo-dialog.png",
+      "pitch-down-1x.png",
+      "pitch-up-2x.png",
+      "roll-right.png",
+      "roll-left.png",
+      "level.png"
+    ]
+  },
+  "shutdownIndependent": "Emulator and suite units inactive",
+  "crashReview": "Only known emulator Bluetooth boot abort; no Construct crash found",
+  "limitations": [
+    "One justified negative-roll retake: tilt absent at heading age 254 ms, then valid tilt at 188 ms. All five poses ultimately carry valid measured tilt.",
+    "Synthetic emulated sensors/camera do not establish physical lens or magnetic accuracy.",
+    "ARM64 build is signer/hash verified, not executed on the emulator. Physical upgrade/retention and vendor behavior await phone feedback.",
+    "No claim of large-text/landscape capture acceptance in this 8-check run.",
+    "Earlier incomplete attempts are retained separately and not combined into this pass."
+  ]
+}

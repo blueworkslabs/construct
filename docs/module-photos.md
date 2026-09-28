@@ -44,6 +44,10 @@ Result: `{ "saved": true }` after a successful save, or `{ "saved": false }` on
 ordinary cancellation. No filename, pixels or analysis accompanies this result.
 To display a captured photo, the module separately lists and opens its private
 library. A capture-only grant does not implicitly grant those operations.
+API 0.13 adds optional request fields and capture metadata; see
+[capture metadata](#capture-metadata--api-013-source-candidate). API 0.11/0.12
+callers keep exactly this request and result: the new fields fail with
+`CAMERA_PARAMS`.
 
 The tracked native handoff may pause the WebView. Returning from shutter/Cancel
 resumes that same run. Backgrounding or rotating the acquisition activity closes
@@ -173,3 +177,144 @@ the image. Never turn failed inference into a zero-detection success. Closing or
 backgrounding the module clears its transient image run while retaining originals.
 Review [security boundaries](../SECURITY.md) and the actual acceptance evidence
 before treating a prototype success as a completed migration.
+
+## Capture metadata — API 0.13 source candidate
+
+Implemented in source for slice 2b of [Aimé](aime-brief.md); not in any released
+host APK, and not accepted until the staging check below has run on exact bytes.
+Modules declare API `min` and `target` `0.13.0`.
+
+Request: `{ "op": "capture", "level"?: boolean, "zoom"?: [ratio, …] }`. Exact keys;
+`level` must be a JSON boolean; `zoom` is 1–4 numbers in 0.1–10 that differ by at
+least 0.05 (closer steps would be indistinguishable chips and are rejected, never
+merged or rounded). Anything else fails with `CAMERA_PARAMS`. `level: true` shows a level indicator in the native
+viewfinder (horizon line plus a pitch/roll readout, green within ±1°) for the rear
+camera. `zoom` offers fixed steps as chips, each clamped to the bound camera's range
+(ratios keep their precision; only steps clamped onto the same range limit merge). The initial step is 1× when offered,
+otherwise the first; without `zoom` the capture is at 1×. There is no free zoom.
+
+Result after a save:
+
+```json
+{ "saved": true, "id": "p…", "capture": {
+  "zoomRatio": 2.0,
+  "fovDeg": { "h": 33.6, "v": 43.9 }, "fovSigmaDeg": 1.0,
+  "tilt": { "pitchDeg": 4.2, "rollDeg": -0.8, "sigmaDeg": 1.0, "ageMs": 31 },
+  "headingDeg": 212.5, "headingRef": "magnetic", "headingAccuracyDeg": 11.5, "headingAgeMs": 44 } }
+```
+
+Cancellation still returns `{ "saved": false }`. `id` is the new original's stable
+ID, identical to its `photos.library` list `id` (API 0.12 scheme); it is identity,
+not authority. If the host cannot persist that identity, the original is discarded
+and the capture fails instead of returning a photo the module cannot identify.
+No location is included.
+
+Every value describes the saved image **as the module opens it** (after EXIF
+orientation), sampled at the shutter. These are estimates from published camera
+characteristics and phone sensors, not a lens calibration. Every measured field
+except `zoomRatio` is optional, carries its own uncertainty (`fovSigmaDeg`,
+`tilt.sigmaDeg`, `headingAccuracyDeg`) and, for sensor values, its age (`tilt.ageMs`,
+`headingAgeMs`); it is **omitted** rather than guessed when unavailable or
+unreliable. Modules treat a missing key as unknown, never as zero, and set a
+"measured" flag only for fields that are present.
+
+**Timing.** Sensor ages use each sample's measurement time (`SensorEvent.timestamp`,
+the `elapsedRealtimeNanos` clock), never its delivery time: a sample measured 2 s
+ago and delivered late is 2 s old. The exposure is known to start between the
+moment before `takePicture` and the arrival of CameraX's `onCaptureStarted` (or,
+if that callback never arrives, the moment the image is saved). A sample's age is
+its largest possible distance from any instant in that window, in milliseconds
+rounded up, and the host picks the sample with the smallest such age. Samples
+measured after their own delivery (clock mismatch), with unreliable or no-contact
+status, or with non-finite values are never used.
+
+- `zoomRatio`: the ratio CameraX reports as applied when the shutter is pressed.
+- `fovDeg`: from the still frame's own lens. The host reads the saved frame's
+  Camera2 capture result (a still-capture request completed after the shutter; exactly
+  one, or the result is not used): its focal length, active physical camera (API 29+),
+  crop region and applied zoom ratio (API 30+). With the physical camera's sensor size,
+  pixel and active arrays, the output region is the crop region reduced by the zoom
+  ratio, and the saved image is the largest centred crop of it with the output aspect.
+  Angles are measured from the active-array centre, so for a centred digital crop
+  `fov(z) = 2·atan(tan(fov(1)/2)/z)`; the angle is never divided by the ratio. `h` is
+  across the image as opened, so portrait photos have `h < v`. On a logical
+  multi-camera (for example main + ultrawide) the crop region is in the logical
+  camera's coordinates, so it is applied only when the active physical camera is the
+  unique one with the logical camera's sensor geometry and the result's focal length
+  is one it lists; a different active lens omits the FOV. Without a usable result
+  (none or several still results, API 28, or no active physical ID) the published
+  characteristics apply: one focal length only, and no possible lens switch (below 1×,
+  or a narrower lens that could cover the view). Each capture writes one host
+  diagnostic line, `CAPTURE_FOV`, with the FOV source or `fov-omitted: <reason>`
+  (`multiple-focal-lengths`, `physical-unknown`, `lens-switch-possible`,
+  `no-geometry`, `focal-mismatch`, `crop-region-invalid`, `crop-off-centre`,
+  `crop-unverifiable`), `tilt-heading-omitted: <reason>` when applicable, and camera
+  facts only: no image, location or sensor values.
+
+  **Centred optical axis.** The contract has no principal-point field: `fovDeg`,
+  `tilt` and the heading all assume the optical axis passes through the saved
+  image's centre (taken as the active-array centre). When the still result reports
+  a crop region whose centre is more than **0.05°** off that axis (the larger of the
+  horizontal and vertical angles, using the shortest candidate focal length, so the
+  strictest), `fovDeg`, `fovSigmaDeg`, `tilt` and all heading fields are omitted
+  (`crop-off-centre`); the characteristics fallback is not used for such a frame. The
+  same applies to a crop outside the active array (`crop-region-invalid`) or one that
+  cannot be checked for lack of sensor geometry (`crop-unverifiable`). 0.05° keeps the
+  axis error well below 0.1° and still tolerates integer crop rounding (about 2–3
+  pixels on a 1.4 µm, 4.4 mm phone camera). Supporting off-centre crops would need an
+  explicit principal-point contract and consumer support.
+  Distortion correction and lens tolerances are not modelled; `fovSigmaDeg` (always
+  present with `fovDeg`, at least 0.5°) is 1° by default and 2° when the camera
+  advertises distortion correction, which can change the saved crop. This host never
+  enables video or preview stabilization for the capture.
+- `tilt`: the gravity sample (raw accelerometer where there is no gravity sensor)
+  nearest the exposure, in the solver's signs (`basis()` in [`resection.js`](aime/resection.js)):
+
+  | Field | Positive means | Negative means |
+  | --- | --- | --- |
+  | `pitchDeg` | camera looks below the horizon | camera looks above it |
+  | `rollDeg` | image's right side points down; horizon appears higher on the right | right side up; horizon higher on the left |
+
+  The conversion uses the display rotation the photo was saved for, so a photo
+  taken with rotation locked while the phone is sideways reports roll near ±90°.
+  `sigmaDeg` is one standard deviation, never below 1°: √(1² + s²)/cos(pitch),
+  where s is the angular RMS of the samples measured within 250 ms of the chosen
+  one (hand motion). `ageMs` is that sample's age (above). Omitted for the front
+  camera, mirrored or inconsistently oriented output, no sample within 250 ms, an
+  accelerometer reading more than 1.5 m/s² from 1 g, or `sigmaDeg` above 10°
+  (including poses within about 5° of vertical). The viewfinder's level readout
+  uses a smoothed copy and is never the reported value.
+- `headingDeg`: azimuth of the rear camera's optical axis from the rotation-vector
+  sensor, clockwise from **magnetic** north (`headingRef: "magnetic"`; no
+  declination is applied because the capture carries no location). A weak hint
+  only. `headingAccuracyDeg` is the sensor's own accuracy estimate and is always
+  present with the heading; `headingAgeMs` is the sample's age. All heading fields
+  are omitted for the front camera, when the sensor reports unreliable accuracy or
+  no contact, gives no accuracy estimate (no uncertainty is invented), estimates
+  worse than 45°, has no sample within 1 s, or the optical axis is within about 15°
+  of vertical.
+
+Orientation sensors run only while the API 0.13 viewfinder is in the foreground;
+the host keeps at most the last 5 s of samples and no stream reaches the module.
+
+Source implementation: `CaptureMetadata.kt` (pure derivations), `CaptureSensors.kt`
+and `PhotoCaptureActivity`. JVM coverage is `CaptureMetadataTest` (validation, FOV,
+tilt in all four display rotations and both signs, sample timing including delayed
+delivery, fresh samples and clock mismatch through an injected clock, heading
+omission, result shape, version gating) and `PhotoIdentityTest`; the exact-APK staging check is
+`scripts/android-runner/capture_metadata.py` ([reproduce](reproduce.md)).
+
+## Allow screenshots — API 0.13 source candidate
+
+Module sessions that can show image pixels (`image.read`, which `photos.library`
+requires) run with Android's secure-window flag, so screenshots and screen
+recordings come out black. Module access offers a per-module **Allow screenshots**
+switch for those modules, off by default. When on, that module's session drops
+the flag. On Android 13+ the Recents thumbnail stays hidden
+(`setRecentsScreenshotEnabled(false)`); on older Android the thumbnail follows the
+flag, and the switch's text says so. The native viewfinder always keeps the flag.
+The choice is stored with the module's install record (`allowScreenshots`), survives
+update and rollback, and is forgotten when the module is removed. It is a host
+setting: it applies whatever API version the module declares, and modules cannot
+read or change it. JVM coverage is `ScreenCaptureTest`; the staging check above
+also covers it.

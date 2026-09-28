@@ -51,8 +51,17 @@ internal class CameraPhotos(context: Context, moduleId: String,
         if (all.isEmpty()) return@synchronized emptyList()
         val mac = javax.crypto.Mac.getInstance("HmacSHA256")
         mac.init(javax.crypto.spec.SecretKeySpec(identityKey(), "HmacSHA256"))
-        val encoder = java.util.Base64.getUrlEncoder().withoutPadding()
-        all.map { it to "p" + encoder.encodeToString(mac.doFinal(it.name.toByteArray(Charsets.US_ASCII)).copyOf(18)) }
+        all.map { it to identifier(mac, it) }
+    }
+    private fun identifier(mac: javax.crypto.Mac, photo: File): String =
+        "p" + java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(photo.name.toByteArray(Charsets.US_ASCII)).copyOf(18))
+    /** API 0.13: the stable ID of one existing original, identical to its `listIdentified` entry. */
+    fun identify(photo: File): String = synchronized(lock) {
+        checkRule(photo.parentFile == folder && name.matches(photo.name) && photo.canonicalFile == photo.absoluteFile && photo.isFile,
+            "CAMERA_STORAGE", "Invalid saved photo")
+        val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+        mac.init(javax.crypto.spec.SecretKeySpec(identityKey(), "HmacSHA256"))
+        identifier(mac, photo)
     }
     private fun identityKey(): ByteArray {
         val key = File(folder, IDENTITY_KEY)
@@ -117,7 +126,11 @@ internal class CameraPhotos(context: Context, moduleId: String,
         checkRule(total + extra <= MAX_TOTAL, "CAMERA_QUOTA", "Construct photo space is full. Delete saved photos first.")
     }
     fun reserve() = synchronized(lock) { checkCapacity(MAX_FILE) }
-    fun commit(temp: File, publish: ((() -> File) -> File) = { it() }, authorize: () -> Unit): File = synchronized(lock) {
+    /**
+     * [published] runs after the original is durably in place, still under the final
+     * authority check; if it fails, the original is removed and the capture fails.
+     */
+    fun commit(temp: File, publish: ((() -> File) -> File) = { it() }, published: (File) -> Unit = {}, authorize: () -> Unit): File = synchronized(lock) {
         checkRule(temp.isFile && temp.length() in 1..MAX_FILE, "CAMERA_IMAGE", "Photo is too large or incomplete. Try again.")
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(temp.path, bounds)
@@ -135,6 +148,7 @@ internal class CameraPhotos(context: Context, moduleId: String,
                 authorize()
                 checkRule(stage.renameTo(target), "CAMERA_STORAGE", "Could not finish saving the photo")
                 sync(folder)
+                published(target)
                 target
             }
         } catch (error: Exception) {

@@ -1,0 +1,257 @@
+{
+  "complete": true,
+  "stopped": true,
+  "apkSha256": "23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477",
+  "moduleSha256": "7ddfcef340238db112eae99f255fec5e1beb02061f29308d5a9e7c6ed85b51ea",
+  "pauseFixtureSha256": "e243239074765672f2fabe9c8c5217e294ad6943e0066471a1c36f193f648404",
+  "scope": "full",
+  "plannedChecks": 11,
+  "checks": [
+    "Signed probe installed; one-shot and watch denied before explicit native grant",
+    "Flat north/east samples follow injected magnetic field with bounded schema and precision",
+    "Upright camera bearing and positive pitch follow synthetic orientation",
+    "10 and 15 Hz streams deliver within their caps; stop leaves event counts stable",
+    "Native menu pause stops watch and resume does not restart it",
+    "Revocation stops stream; both operations denied after reopening",
+    "Background/close and process restart do not resurrect the stream; grant persists",
+    "Landscape and 200% text retain readable controls and working one-shot access",
+    "Pause-only panel releases listener, denies get/watch, emits one terminal event and requires explicit restart",
+    "Quick Settings focus loss while resumed denies requests, releases listener and requires explicit restart",
+    "Freeform top-resumed loss without onPause denies requests, releases listener and requires explicit restart"
+  ],
+  "samples": [
+    {
+      "pose": "flat",
+      "pitchDeg": 90,
+      "rollDeg": 0,
+      "calibrate": false,
+      "timestamp": 1790632565140,
+      "azimuthDeg": 0,
+      "headingRef": "magnetic",
+      "accuracyDeg": 0
+    },
+    {
+      "pose": "flat",
+      "pitchDeg": 90,
+      "rollDeg": 0,
+      "calibrate": false,
+      "timestamp": 1790632567833,
+      "azimuthDeg": 90,
+      "headingRef": "magnetic",
+      "accuracyDeg": 0
+    },
+    {
+      "pose": "upright",
+      "pitchDeg": 0,
+      "rollDeg": 0,
+      "calibrate": false,
+      "timestamp": 1790632570680,
+      "azimuthDeg": 90,
+      "headingRef": "magnetic",
+      "accuracyDeg": 0
+    },
+    {
+      "pose": "upright",
+      "pitchDeg": 10,
+      "rollDeg": 0,
+      "calibrate": false,
+      "timestamp": 1790632573573,
+      "azimuthDeg": 90,
+      "headingRef": "magnetic",
+      "accuracyDeg": 0
+    },
+    {
+      "pose": "flat",
+      "pitchDeg": 90,
+      "rollDeg": 0,
+      "calibrate": false,
+      "timestamp": 1790632703953,
+      "azimuthDeg": 90,
+      "headingRef": "magnetic",
+      "accuracyDeg": 0
+    }
+  ],
+  "apiLevel": "37",
+  "hostVersion": [
+    "versionCode=37 minSdk=28 targetSdk=35",
+    "versionName=0.1.0-alpha37"
+  ],
+  "rates": [
+    {
+      "rate": 10,
+      "events": 23,
+      "elapsedSeconds": 4.41400914802216
+    },
+    {
+      "rate": 15,
+      "events": 19,
+      "elapsedSeconds": 4.658183298888616
+    },
+    {
+      "rate": 10,
+      "events": 20,
+      "elapsedSeconds": 3.882274197996594
+    },
+    {
+      "rate": 10,
+      "events": 18,
+      "elapsedSeconds": 3.986492429045029
+    },
+    {
+      "rate": 10,
+      "events": 19,
+      "elapsedSeconds": 3.9871746980352327
+    },
+    {
+      "rate": 10,
+      "events": 24,
+      "elapsedSeconds": 4.96706759207882
+    },
+    {
+      "rate": 10,
+      "events": 20,
+      "elapsedSeconds": 5.307176408008672
+    },
+    {
+      "rate": 10,
+      "events": 21,
+      "elapsedSeconds": 4.180746640078723
+    },
+    {
+      "rate": 10,
+      "events": 22,
+      "elapsedSeconds": 3.889345806906931
+    },
+    {
+      "rate": 10,
+      "events": 18,
+      "elapsedSeconds": 4.43968815903645
+    },
+    {
+      "rate": 10,
+      "events": 21,
+      "elapsedSeconds": 7.2787242089398205
+    }
+  ],
+  "nativeConnections": {
+    "watching": 1,
+    "stopped": 0,
+    "paused": 0,
+    "revoked": 0,
+    "background": 0,
+    "activity-paused": 0,
+    "pause-resumed": 0,
+    "focus-lost": 0,
+    "focus-returned": 0,
+    "top-resumed-lost": 0,
+    "top-resumed-returned": 0
+  },
+  "homeCallbackObservationSeconds": 1.792021870962344,
+  "source": "4e7f53478fab0f21c75b315691f3ea749cb845e6",
+  "runnerSource": "0798c424e04f5c83cda2dd76210b8d24b39d924d",
+  "run": "20260928T215416Z-orientation-9c0d6cd8",
+  "jvmTests": 262,
+  "lintPassed": true,
+  "packageTests": 35,
+  "runnerHelperTests": 93,
+  "apks": {
+    "arm64-v8a": {
+      "sha256": "9e47fa6467095993372476b30615b95a03f7e20b48b759d531d74dc1f8ff7862",
+      "bytes": 23871866
+    },
+    "x86_64": {
+      "sha256": "23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477",
+      "bytes": 26755451
+    }
+  },
+  "images": [
+    {
+      "path": "../images/orientation-alpha37/activity-paused.png",
+      "sha256": "54695c7bb9bc6d6f8d488d43fc8692292570cebe61c3f45f37fa90dcd11ed097"
+    },
+    {
+      "path": "../images/orientation-alpha37/denied.png",
+      "sha256": "a9b02dd7c2d370d722eb474e79a7f5edfdcf649116aeb9d6df85b73df9ef3bcf"
+    },
+    {
+      "path": "../images/orientation-alpha37/flat-east.png",
+      "sha256": "5d412103768b8c36575136c6a86b3c3b1e46941465496976fd087e0046647840"
+    },
+    {
+      "path": "../images/orientation-alpha37/flat-north.png",
+      "sha256": "ca590b53c1f39ff381ef83dc1327ec103da8cfd6f4bbe13b059fc31e92e6a538"
+    },
+    {
+      "path": "../images/orientation-alpha37/focus-returned.png",
+      "sha256": "d9f134d6cbb3cc2f7dc8d87a7e7e2695c464aa46018d68842f06e883d269da53"
+    },
+    {
+      "path": "../images/orientation-alpha37/install-consent.png",
+      "sha256": "1dcf92e27bcced761854fee6dd1db934d55e2f505f1d7aca1ea78f2337751877"
+    },
+    {
+      "path": "../images/orientation-alpha37/landscape.png",
+      "sha256": "223740f8eda2dc1f87eb8e9b5733be566eb953f70657ed844164a01daba3134f"
+    },
+    {
+      "path": "../images/orientation-alpha37/large-text.png",
+      "sha256": "8e41042a041c08a1ffd1638692f8d39d873995aebe720b95ba3518d58447a201"
+    },
+    {
+      "path": "../images/orientation-alpha37/multi-resume-peer.png",
+      "sha256": "f412b527507a8b26c2556f2f5c9f57de9d52b7f136d9de3cb99114de201e8de9"
+    },
+    {
+      "path": "../images/orientation-alpha37/multi-resume-returned.png",
+      "sha256": "512c7d50e6d5f7a03d60d24b1b01e683b2bc9f41b8fdb6099621c9ed5081053f"
+    },
+    {
+      "path": "../images/orientation-alpha37/native-grant.png",
+      "sha256": "17093fc57f43ac02a0303e76661f67878c710a243e2ed0134d85be34fe6b4a80"
+    },
+    {
+      "path": "../images/orientation-alpha37/pause-only-returned.png",
+      "sha256": "bc93a347ff82e1795679c207a71b99c65da8ef2ed530401af5df8e1156d80297"
+    },
+    {
+      "path": "../images/orientation-alpha37/pause-resume.png",
+      "sha256": "c63149c16ee277654f9309d8fb6032a5d8f205c3d5307b5d59b92e57167fc02a"
+    },
+    {
+      "path": "../images/orientation-alpha37/quick-settings.png",
+      "sha256": "5ca62712cacd25f771655166b66f9e9c985d1e2acddae12eb0ea4dbd43b38974"
+    },
+    {
+      "path": "../images/orientation-alpha37/revoked.png",
+      "sha256": "42b3804228b7d69fb7760eb15c62f04ae65c3aa949d05ea5dc9204b4e4a284f0"
+    },
+    {
+      "path": "../images/orientation-alpha37/upright-east.png",
+      "sha256": "4eb9ab4a22bc607b2c514fda782436924e0653f4d5aa7461e3d26f7407b89a46"
+    },
+    {
+      "path": "../images/orientation-alpha37/upright-pitch.png",
+      "sha256": "413862056cd0c6f9a12feaf92912b19279bd106f914fbe7753d9b1d70a66c61d"
+    },
+    {
+      "path": "../images/orientation-alpha37/watch-10.png",
+      "sha256": "932ffbe7095bce94d5ec8504a1fa9cf15798da6029987c67173b014ebab9e181"
+    }
+  ],
+  "priorAttempt": {
+    "run": "20260928T214921Z-orientation-eec9713c",
+    "runnerSource": "37dda2bdb48ae9b2563d8234e9dad4f0e7f1e0ca",
+    "checksPassed": 0,
+    "plannedChecks": 11,
+    "stopped": true,
+    "error": "Native control not reachable: Allow & install",
+    "cause": "Driver incorrectly required a fixed dialog action inside the disclosure scroll viewport; corrected locator in 0798c42. Same host/probe bytes."
+  },
+  "scopeLimits": [
+    "Synthetic sensor inputs are not physical compass/calibration acceptance.",
+    "Multi-resume used freeform, not the split-screen UI.",
+    "Home teardown checked after bounded client-callback observation, not a fixed keypress latency.",
+    "Combined get/watch burst ceiling is JVM coverage, not an Android bridge flood.",
+    "Picker independence is JVM/source coverage, not a fresh end-to-end camera/gallery run."
+  ]
+}

@@ -1,0 +1,188 @@
+{
+  "status": "blocked",
+  "date": "2026-09-28",
+  "hostVersion": "0.1.0-alpha35",
+  "api": "0.14.0",
+  "apkSource": "1f33a838f8637738c0d28a0cf28b9e5845652296",
+  "runnerSource": "b621e7394487962224f92a853424a424b8a54962",
+  "runId": "20260928T191114Z-orientation-f846a001",
+  "apks": {
+    "arm64-v8a": {
+      "sha256": "d11f3262620ac608b9ad15b050697cb84861ef0fa9eb0bb289365065fd3ca42e",
+      "bytes": 23871862
+    },
+    "x86_64": {
+      "sha256": "7b0be4a729c743a699c8dff749ac7f5f72cc515901d0a6c373e29661421bc5ba",
+      "bytes": 26755447
+    }
+  },
+  "module": {
+    "version": "0.1.2",
+    "sha256": "cc1633a35c8ec6ac1f6f2372d060325b060d7e1d4dc4e512ad1ae6f8f8b3df23",
+    "catalog": "https://raw.githubusercontent.com/blueworkslabs/construct/b621e7394487962224f92a853424a424b8a54962/catalog/candidates/orientation-probe/index.json",
+    "moduleSha256": "cc1633a35c8ec6ac1f6f2372d060325b060d7e1d4dc4e512ad1ae6f8f8b3df23"
+  },
+  "checks": [
+    "Signed probe installed; one-shot and watch denied before explicit native grant",
+    "Flat north/east samples follow injected magnetic field with bounded schema and precision",
+    "Upright camera bearing and positive pitch follow synthetic orientation",
+    "10 and 15 Hz streams deliver within their caps; stop leaves event counts stable",
+    "Native menu pause stops watch and resume does not restart it",
+    "Revocation stops stream; both operations denied after reopening"
+  ],
+  "plannedCheckCount": 9,
+  "complete": false,
+  "stopped": true,
+  "failure": "Unexpected native listeners after background",
+  "nativeConnectionCounts": {
+    "watching": 1,
+    "stopped": 0,
+    "background": 1,
+    "revoked": 0,
+    "paused": 0
+  },
+  "nativeConnectionCountsSource": "Parsed from the retained native sensor-service dumps using the installed app UID; background count was derived after the failed assertion.",
+  "backgroundObservation": "After KEYCODE_HOME and a 1-second wait plus dumpsys latency; failure console capture shows Launcher. This does not establish the exact onPause/onStop state because no activity dump was retained at that point.",
+  "samples": [
+    {
+      "pose": "flat",
+      "pitchDeg": 90,
+      "rollDeg": 0,
+      "calibrate": false,
+      "timestamp": 1790622783923,
+      "azimuthDeg": 0,
+      "headingRef": "magnetic",
+      "accuracyDeg": 0
+    },
+    {
+      "pose": "flat",
+      "pitchDeg": 90,
+      "rollDeg": 0,
+      "calibrate": false,
+      "timestamp": 1790622787018,
+      "azimuthDeg": 90,
+      "headingRef": "magnetic",
+      "accuracyDeg": 0
+    },
+    {
+      "pose": "upright",
+      "pitchDeg": 0,
+      "rollDeg": 0,
+      "calibrate": false,
+      "timestamp": 1790622789792,
+      "azimuthDeg": 90,
+      "headingRef": "magnetic",
+      "accuracyDeg": 0
+    },
+    {
+      "pose": "upright",
+      "pitchDeg": 10,
+      "rollDeg": 0,
+      "calibrate": false,
+      "timestamp": 1790622792568,
+      "azimuthDeg": 90,
+      "headingRef": "magnetic",
+      "accuracyDeg": 0
+    }
+  ],
+  "rates": [
+    {
+      "rate": 10,
+      "events": 40,
+      "elapsedSeconds": 4.530326467938721
+    },
+    {
+      "rate": 15,
+      "events": 50,
+      "elapsedSeconds": 7.150257366010919
+    },
+    {
+      "rate": 10,
+      "events": 42,
+      "elapsedSeconds": 5.213189622969367
+    },
+    {
+      "rate": 10,
+      "events": 36,
+      "elapsedSeconds": 4.605918109999038
+    },
+    {
+      "rate": 10,
+      "events": 37,
+      "elapsedSeconds": 4.635461530997418
+    }
+  ],
+  "images": {
+    "denied": {
+      "path": "images/orientation-alpha35/denied.png",
+      "sha256": "a3924e2045816af3ff617dd295f1c97b2c4c8f0325c359cd69c79357bb6ffb53"
+    },
+    "failure": {
+      "path": "images/orientation-alpha35/failure.png",
+      "sha256": "90471ce5851ae22b83ebda7708b089abec52a340de69641fb5153e844800e40a"
+    },
+    "flat-east": {
+      "path": "images/orientation-alpha35/flat-east.png",
+      "sha256": "e8ce545d41a2513fa567a551ad5d66986016c1f89f37d32f9dc2a0903d489ba8"
+    },
+    "flat-north": {
+      "path": "images/orientation-alpha35/flat-north.png",
+      "sha256": "91f9c082892b9f290b72a44197fdb1429c13eaab652d96eea5cf2b252fc0bdbf"
+    },
+    "native-grant": {
+      "path": "images/orientation-alpha35/native-grant.png",
+      "sha256": "78e1b3a4eb35104f41eec8c706b8aca3cbb6d4409261d2473628a82abca6fcae"
+    },
+    "pause-resume": {
+      "path": "images/orientation-alpha35/pause-resume.png",
+      "sha256": "0b59e05934ac80745d8816723d5e531f995e86ee2e3d78e36578a170d5783984"
+    },
+    "revoked": {
+      "path": "images/orientation-alpha35/revoked.png",
+      "sha256": "a4cfcab3626ec6a4fcba1deab87876b65d65a0bb52cabe1e8b8bcade9a3fc9d1"
+    },
+    "upright-east": {
+      "path": "images/orientation-alpha35/upright-east.png",
+      "sha256": "fb131e0290235c5009a6333c5b53c8e5a8dadac44cecbab86ed667a30104152f"
+    },
+    "upright-pitch": {
+      "path": "images/orientation-alpha35/upright-pitch.png",
+      "sha256": "4c791ba443df0c252743809f422f93984b16359eda76f4df41ae1c9b525dfdcc"
+    },
+    "watch-10": {
+      "path": "images/orientation-alpha35/watch-10.png",
+      "sha256": "8c72a2d57b7f0a57d0a2b194d5078951e00bb28b57c5668076e2b4f35a84c2ea"
+    }
+  },
+  "localChecks": {
+    "jvm": 254,
+    "lint": "passed (existing warnings remain)",
+    "publisher": 35,
+    "runnerHelpers": 91,
+    "architecture": "passed"
+  },
+  "notReached": [
+    "Process restart after background",
+    "Landscape and 200% text",
+    "Translucent resolver pause-only gate"
+  ],
+  "crashScope": "Retained crash buffer contains the recurring emulator Bluetooth startup SIGABRT; no Construct fatal exception found in retained logs.",
+  "priorRuns": [
+    {
+      "attempt": 1,
+      "moduleSha256": "53adfc5401d49d3273a387e2156d2840d64efff411aec383b3dae0162381a8b4",
+      "passedChecks": 5,
+      "complete": false,
+      "stopped": true,
+      "error": "Switch did not change: Allow reading compass and tilt"
+    },
+    {
+      "attempt": 2,
+      "moduleSha256": "dadd4f88e38cdb907d4fa49b7d8a2d336a95372b5ed101b10fad14a161bd19ac",
+      "passedChecks": 0,
+      "complete": false,
+      "stopped": true,
+      "error": "UI label not found: Read once"
+    }
+  ]
+}

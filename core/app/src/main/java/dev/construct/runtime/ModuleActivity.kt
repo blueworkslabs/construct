@@ -36,12 +36,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.DialogWindowProvider
 import java.util.concurrent.Executors
 
 /** One native accessibility root per launch. Configuration changes retain this session. */
@@ -66,23 +68,28 @@ class ModuleActivity : ComponentActivity() {
     private var captureReturned = false
     private var captureSaved = false
     private var captureClosed = false
-    private var captureCompletion: ((Boolean) -> Unit)? = null
+    private var captureId: String? = null
+    private var captureMetadata: String? = null
+    private var captureOptions = CaptureOptions()
+    private var captureCompletion: ((org.json.JSONObject?, ConstructError?) -> Unit)? = null
     private data class PhotoConfirmation(val op: String, val image: android.graphics.Bitmap, val done: (Boolean) -> Unit)
     private var photoConfirmation by mutableStateOf<PhotoConfirmation?>(null)
     private val photoCapture = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         captureSaved = result.resultCode == RESULT_OK && result.data?.getBooleanExtra("saved", false) == true
         captureClosed = result.data?.getBooleanExtra("closed", false) == true
+        captureId = result.data?.getStringExtra("id")
+        captureMetadata = result.data?.getStringExtra("capture")
         captureReturned = true
     }
-    private fun capturePhoto(done: (Boolean) -> Unit) {
+    private fun capturePhoto(options: CaptureOptions, done: (org.json.JSONObject?, ConstructError?) -> Unit) {
         checkRule(!ending && !pickingImage && !capturingPhoto && !menu && !diagnosticsOpen && photoConfirmation == null,
             "CAMERA_BUSY", "Capture is unavailable")
         val module = selected ?: throw ConstructError("RUN_STALE", "Module closed")
         store.withCapability(module, "camera.photo") { }
         checkRule(PhotoCaptureActivity.hasPermission(this), "ANDROID_PERMISSION_DENIED", "Allow Android camera access in Module access first")
-        capturingPhoto = true; captureCompletion = done
+        capturingPhoto = true; captureCompletion = done; captureOptions = options
         webView?.pauseForPicker()
-        try { photoCapture.launch(PhotoCaptureActivity.intent(this, module)) }
+        try { photoCapture.launch(PhotoCaptureActivity.intent(this, module, options)) }
         catch (e: Exception) {
             capturingPhoto = false; captureCompletion = null; webView?.setMenuPaused(false)
             throw ConstructError("CAMERA_UNAVAILABLE", "Could not open camera capture")
@@ -121,7 +128,10 @@ class ModuleActivity : ComponentActivity() {
             val done = captureCompletion; captureCompletion = null
             if (captureClosed) { finishSession(); return }
             webView?.setMenuPaused(false)
-            done?.invoke(captureSaved)
+            val metadata = captureMetadata?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
+            val id = captureId; captureId = null; captureMetadata = null
+            try { done?.invoke(CaptureResult.forModule(captureOptions.metadata, captureSaved, id, metadata), null) }
+            catch (e: ConstructError) { done?.invoke(null, e) }
         }
         if (pickerReturned && !ending) {
             pickerReturned = false; pickingImage = false
@@ -132,8 +142,50 @@ class ModuleActivity : ComponentActivity() {
         }
     }
 
+    private var screenCapture = ScreenCapturePolicy.Decision(secure = true, hideRecents = false)
+    private var screenResumed = false
+    private val privacyCurtains = PrivacyCurtains(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
+    private val foreground = ForegroundEligibility(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
+    /** Foreground sensors stop on losing eligibility and stay off until the module asks again. */
+    private fun applyForeground() { webView?.setActivityPaused(!foreground.eligible) }
+
+    private fun applyScreenCapture() {
+        if (ScreenCapturePolicy.secureWindow(screenCapture, screenResumed, hasWindowFocus()))
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        foreground.windowFocus(hasFocus); applyForeground()
+        applyScreenCapture()
+    }
+
+    override fun onResume() {
+        super.onResume(); screenResumed = true; applyScreenCapture(); privacyCurtains.resume()
+        // Pickers resume in onPostResume; sensors need top-resumed too on Android 10+.
+        foreground.resume(); applyForeground()
+    }
+
+    override fun onPause() {
+        foreground.pause(); applyForeground()
+        privacyCurtains.pause(); screenResumed = false; applyScreenCapture(); super.onPause()
+    }
+
+    override fun onUserLeaveHint() {
+        privacyCurtains.userLeaving(); super.onUserLeaveHint()
+    }
+
+    override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        // Multi-window: another app can become top-resumed while this one stays resumed.
+        foreground.topResumed(isTopResumedActivity); applyForeground()
+        privacyCurtains.topResumed(isTopResumedActivity)
+        super.onTopResumedActivityChanged(isTopResumedActivity)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        privacyCurtains.register(window)
         // Never resurrect a stopped runtime after process death. Rotation is handled in-place.
         if (savedInstanceState != null) { finishSession(); return }
         store = ModuleStore.shared(this)
@@ -152,8 +204,14 @@ class ModuleActivity : ComponentActivity() {
                     val style = if (dark) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
                         else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
                     enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
-                    if (module.manifest.capabilities.any { it.id == "image.read" })
-                        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    // Pixel-bearing modules stay secure unless this module's "Allow screenshots" switch is on.
+                    val screen = ScreenCapturePolicy.decide(module.manifest.capabilities.map { it.id }, module.allowScreenshots,
+                        android.os.Build.VERSION.SDK_INT)
+                    screenCapture = screen
+                    privacyCurtains.protect(window, ScreenCapturePolicy.sensitive(module.manifest.capabilities.map { it.id }))
+                    applyScreenCapture()
+                    if (screen.hideRecents && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
+                        setRecentsScreenshotEnabled(false)
                     selected = module
                 } }
             } catch (error: Exception) {
@@ -175,12 +233,13 @@ class ModuleActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        if (selected?.manifest?.api in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0"))
+        if (selected?.manifest?.api in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0"))
             webView?.settings?.textZoom = (newConfig.fontScale * 100).toInt().coerceIn(50, 300)
     }
 
     override fun onStop() { if (!pickingImage && !capturingPhoto) finishSession(); super.onStop() }
     override fun onDestroy() {
+        privacyCurtains.close()
         webView?.destroy(); webView = null
         worker.shutdown()
         super.onDestroy()
@@ -196,6 +255,19 @@ class ModuleActivity : ComponentActivity() {
         }
     }
     private fun closeDiagnostics() { diagnosticText = null; diagnosticsOpen = false; menu = true }
+
+    /** Register the actual native dialog window, not the parent activity's decor. */
+    @Composable private fun ProtectDialogWindow() {
+        val view = LocalView.current
+        val dialogWindow = remember(view) {
+            generateSequence(view) { it.parent as? android.view.View }
+                .mapNotNull { (it as? DialogWindowProvider)?.window }.first()
+        }
+        DisposableEffect(dialogWindow) {
+            val registration = privacyCurtains.register(dialogWindow)
+            onDispose { registration.close() }
+        }
+    }
 
     @Composable private fun Session() {
         BackHandler {
@@ -216,7 +288,7 @@ class ModuleActivity : ComponentActivity() {
                         try {
                             moduleWebView(context, store, active, pickImage = ::pickImage, capturePhoto = ::capturePhoto, confirmPhoto = ::confirmPhoto) { failedView, code ->
                                 if (webView === failedView) finishSession(error = code)
-                            }.also { webView = it }
+                            }.also { webView = it; it.setActivityPaused(!foreground.eligible) }
                         } catch (error: Exception) {
                             android.widget.TextView(context).apply {
                                 val code = (error as? ConstructError)?.code ?: "OPEN_FAILED"
@@ -260,9 +332,13 @@ class ModuleActivity : ComponentActivity() {
             }
         }
         photoConfirmation?.let { confirmation -> AlertDialog(
+            // This is a separate native window containing private pixels. It must
+            // not inherit a temporarily relaxed module screenshot preference.
+            properties = androidx.compose.ui.window.DialogProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
             onDismissRequest = { finishPhotoConfirmation(false) },
             title = { Text(if (confirmation.op == "delete") "Delete this private photo?" else "Save this photo to phone gallery?") },
             text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ProtectDialogWindow()
                 Text("Construct confirmation · ${active?.manifest?.name ?: "Module"}")
                 androidx.compose.foundation.Image(confirmation.image.asImageBitmap(), "Selected private photo",
                     Modifier.fillMaxWidth().heightIn(max = 220.dp), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
@@ -273,8 +349,10 @@ class ModuleActivity : ComponentActivity() {
             dismissButton = { TextButton(onClick = { finishPhotoConfirmation(false) }) { Text("Cancel") } }
         ) }
         if (diagnosticsOpen) AlertDialog(onDismissRequest = { closeDiagnostics() },
+            properties = androidx.compose.ui.window.DialogProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
             title = { Text("Diagnostics") },
             text = { Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+                ProtectDialogWindow()
                 Text("Local technical report. Review before sharing; module messages may contain data.", style = MaterialTheme.typography.bodySmall)
                 Text(diagnosticText ?: "Loading diagnostics…", style = MaterialTheme.typography.bodySmall)
             } },
