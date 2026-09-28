@@ -58,9 +58,12 @@ def contains(fragment,timeout=35):
 def absent(fragment):
  assert not any(fragment in (x or '') for x in labels()),'Unexpected text: '+fragment
 def web():
- w=next((n for n in nodes() if n.get('class')=='android.webkit.WebView' and visible(n)),None)
- if w is None:raise RuntimeError('No module WebView')
- return bounds(w)
+ end=time.monotonic()+10
+ while time.monotonic()<end:
+  w=next((n for n in nodes() if n.get('class')=='android.webkit.WebView' and visible(n)),None)
+  if w is not None:return bounds(w)
+  time.sleep(.2)
+ raise RuntimeError('No module WebView after native transition settled')
 def scroll(direction,distance=None):
  dialogs=[n for n in nodes() if n.get('class')=='android.app.AlertDialog' and visible(n)]
  # Scroll in the padding, not across the rewind range or a canvas hit target.
@@ -79,7 +82,12 @@ def reveal(match):
     before=bounds(hits[0]);time.sleep(.5)
     settled=[n for n in nodes() if test(text_of(n)) and visible(n) and bounds(n)==before]
     if settled:return settled[0]
+   # Detect an actual scroll boundary instead of swiping upward 24 times at
+   # the top of the page. Text+geometry avoids confusing equal-height rows.
+   before=tuple((text_of(n),n.get('bounds')) for n in nodes() if visible(n) and text_of(n))
    scroll(direction)
+   after=tuple((text_of(n),n.get('bounds')) for n in nodes() if visible(n) and text_of(n))
+   if before==after:break
  raise RuntimeError('Module control not reachable: '+str(match))
 def click(match):tap_node(reveal(match))
 def reach_text(fragment):return text_of(reveal(lambda t:fragment in t))
@@ -165,7 +173,7 @@ try:
  contains('visible ·');capture('space-dome')
  done('Signed fixture opens its computed dome and equivalent overhead list')
  reach_text('Visible passes · next 12 h')
- reach_text('Now · ISS (Zarya)');capture('space-plan')
+ reach_text('Now · ISS (Zarya)');scroll('down',500);capture('space-plan')
  reach_text('highest 1½ fists up in the SW')
  done('Visible-pass list includes the current ISS pass and pointing/max-height words')
  click(lambda t:'Guowang train' in t and ' · ' in t)
@@ -176,6 +184,9 @@ try:
  click(lambda t:t=='Close');tap('Construct menu');tap('Return to module');reach_text('Preview ')
  click('Back to now');reach_text('Overhead now');capture('space-train-back-now')
  done('Future preview survives native menu pause and Back to now restores the live sky')
+ # Reset the running fixture clock before the old, time-sensitive EAST card.
+ # Planner navigation and real Wikipedia can outlast that original position.
+ adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·')
  click(lambda t:t.startswith('Long March 4B rocket stage'))
  reach_text('EAST · 1½ fists up');reach_text('above Saturn');capture('space-spot')
  done('Fixture stage list selection gives EAST, 1½ fists up and Saturn anchor')
