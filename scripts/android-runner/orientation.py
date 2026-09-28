@@ -7,6 +7,7 @@ from pathlib import Path
 from config import CONFIG,SERIAL,require_runner,catalog
 p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.add_argument('--sha',required=True)
 p.add_argument('--catalog',required=True);p.add_argument('--module-sha',required=True,help='Signed orientation probe digest')
+p.add_argument('--version',default='0.1.1')
 a=p.parse_args();require_runner();catalog(a.catalog)
 if hashlib.sha256(a.apk.read_bytes()).hexdigest()!=a.sha:raise SystemExit('APK checksum mismatch')
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -20,7 +21,7 @@ from host_ui import host_ready,catalog_settings,apply_catalog,library,select_aft
 from catalog_input import replace_text
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'checks':[],'samples':[]}
 started=False
-name='Orientation probe';heading=name+' · 0.1.0'
+name='Orientation probe';heading=name+' · '+a.version
 def save():(run/'result.json').write_text(json.dumps(receipt,indent=2)+'\n')
 def done(text):receipt['checks'].append(text);save();print('PASS:',text,flush=True)
 def require(ok,message):
@@ -91,7 +92,13 @@ def sample():
   if label and label.startswith('Sample: {'):return json.loads(label[len('Sample: '):])
  raise RuntimeError('No sample in fixture')
 def sensor_state(label):
- (run/('sensors-'+label+'.txt')).write_text(adb('shell','dumpsys','sensorservice'))
+ from orientation_checks import active_connections
+ raw=adb('shell','dumpsys','sensorservice');(run/('sensors-'+label+'.txt')).write_text(raw)
+ package=adb('shell','pm','list','packages','-U','dev.construct.runtime')
+ uid=int(re.search(r'uid:(\d+)',package).group(1))
+ connections=active_connections(raw,uid)
+ require(connections==(1 if label=='watching' else 0),'Unexpected native listeners after '+label)
+ receipt.setdefault('nativeConnections',{})[label]=connections;save()
 def count():
  for label in labels():
   if label and re.fullmatch(r'Events: \d+',label):return int(label.split(': ')[1])
@@ -173,7 +180,7 @@ try:
  require(any(t and t.startswith('Paused; stream stopped') for t in labels()),'No pause notification')
  sensor_state('paused')
  done('Native menu pause stops watch and resume does not restart it')
- watch(10);module_access();switch('Allow reading compass and tilt',False);reopen()
+ watch(10);module_access();switch('Allow reading compass and tilt',False,'Turn off');reopen()
  require(act('Read once').startswith('[CAPABILITY_DENIED]'),'Read allowed after revoke')
  require(act('Watch at 10 Hz').startswith('[CAPABILITY_DENIED]'),'Watch allowed after revoke');no_events();capture('revoked')
  sensor_state('revoked')
