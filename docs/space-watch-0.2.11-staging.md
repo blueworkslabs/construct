@@ -1,6 +1,6 @@
 # Space Watch 0.2.11 staging
 
-Status: **exact-package Android acceptance in progress.** No hardware clearance,
+Status: **16/16 passed and stopped cleanly; superseded by 0.2.12.** No hardware clearance,
 merge or production promotion yet. Production remains 0.1.6.
 
 ## Artifacts
@@ -73,3 +73,22 @@ older bytes, with its now-fixed train-planner blocker recorded honestly.
 The [0.2.10 run](space-watch-0.2.10-staging.md) stopped cleanly at 12/16 on a
 native-menu transition race. Its real-module checks were not reached. The
 runner now waits for Mark working before tapping it; native assertions remain.
+
+## Result
+
+Run `20260928T122414Z-space-e46d1c43` completed all 16 checks with
+`complete=true`, `stopped=true`; runner exit 0 and emulator independently
+inactive. Live and offline counts were both 0 visible / 7 above; data was 9 h old.
+[Receipt](evidence/space-watch-0.2.11-staging-2026-09-28.json),
+[train preview](images/space-watch-0.2.11/space-train-preview.png),
+[Details](images/space-watch-0.2.11/space-train-details.png),
+[landscape](images/space-watch-0.2.11/space-landscape.png),
+[200% text](images/space-watch-0.2.11/space-large-text.png),
+[live data](images/space-watch-0.2.11/space-real-network.png),
+[offline reopen](images/space-watch-0.2.11/space-real-offline-cache.png).
+
+Late source review found the below-horizon spot card still used one member's
+next rise, despite Details being corrected. 0.2.12 shares the cancellable
+all-member lookup between both views and omits the representative-only fade
+countdown on train cards. This complete run is retained, not substituted for
+acceptance of the changed bytes.

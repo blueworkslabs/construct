@@ -408,10 +408,16 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   assert.equal(r.el('plan-list').children.filter(b => b.dataset.id === 'train:2026-221').length, 1, 'members merge into one train pass');
   // Train details search all members, not the currently highest representative.
   r=rig({clock:Date.parse('2026-09-28T16:50:00Z')});await flush(8);r.tick(1,0);
-  r.select('train:2026-221');r.el('details').click();await flush(15);
+  r.select('train:2026-221');await flush(15);
+  assert.match(r.el('spot-anchor').textContent,/06:20 PM/, 'grouped spot card uses the earliest member rise');
+  r.el('details').click();await flush(15);
   assert.match(r.el('info-body').text,/06:20 PM/, 'details must use the earliest member rise, not the 18:28 representative');
-  r.el('details').click();const closedBody=r.el('info-body').text;r.el('close-info').click();await flush(15);
+  r=rig({clock:Date.parse('2026-09-28T16:50:00Z')});await flush(8);r.tick(1,0);
+  r.select('train:2026-221');r.el('details').click();const closedBody=r.el('info-body').text;r.el('close-info').click();await flush(15);
   assert.equal(r.el('info-body').text,closedBody,'closed details discard pending member scan');
+  r=rig({clock:Date.parse('2026-09-28T16:50:00Z')});await flush(8);r.tick(1,0);
+  r.select('train:2026-221');r.select(29507);const otherAnchor=r.el('spot-anchor').textContent;await flush(15);
+  assert.equal(r.el('spot-anchor').textContent,otherAnchor,'old train lookup cannot overwrite a new selection');
   // A genuinely empty recent list is valid and remains fresh across reopen.
   r = rig({recentBody: '[]'}); await flush(8);
   r = rig({saved: r.storage, clock: START + HOUR}); await flush(8);

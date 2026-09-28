@@ -659,7 +659,9 @@
       }
     }
   }
+  let spotPassRequest = 0;
   function renderSpot(s) {
+    const request = ++spotPassRequest;
     if (selected === null) {
       $("spot").hidden = true;
       return;
@@ -680,10 +682,16 @@
     $("spot-when").textContent = offset > 0 ? `At ${time(s.t)}:` : offset ? `${K.ago(offset)}:` : "";
     if (!l || st === "below") {
       $("spot-head").textContent = "Below your horizon";
-      const p = nextPass(o, s.t);
-      $("spot-anchor").textContent = p
-        ? `Next time above you: ${day(p.riseMs)}, up to ${K.height(p.maxEl)}${p.visible ? ", visible" : ", not visible (shadow or daylight)"}.`
-        : "Not above you in the next 36 hours.";
+      if (train) {
+        $("spot-anchor").textContent = "Working out the next member above you…";
+        nextTrainPass(train, s.t, () => selected === train.id && request === spotPassRequest,
+          p => { $("spot-anchor").textContent = trainRiseText(p); });
+      } else {
+        const p = nextPass(o, s.t);
+        $("spot-anchor").textContent = p
+          ? `Next time above you: ${day(p.riseMs)}, up to ${K.height(p.maxEl)}${p.visible ? ", visible" : ", not visible (shadow or daylight)"}.`
+          : "Not above you in the next 36 hours.";
+      }
       $("spot-motion").textContent = "";
       $("spot-state").textContent = "";
       for (const id of ["stat-alt", "stat-speed", "stat-range"]) $(id).textContent = "–";
@@ -702,7 +710,7 @@
       O.look(o, place.ob, s.t + MINUTE),
       O.look(o, place.ob, s.t + 4 * MINUTE),
     );
-    const end = st === "visible" && offset === 0 ? passEnd(o, s.t) : null;
+    const end = !train && st === "visible" && offset === 0 ? passEnd(o, s.t) : null;
     const line = train
       ? `A line of ${train.members.length} satellites; early orbits are rough, so look along the track ahead and behind`
       : "";
@@ -726,6 +734,34 @@
     const p = O.nextPass(o, place.ob, t, sunAt);
     passes.set(o.id, { t, p });
     return p;
+  }
+  const trainRiseCache = new Map();
+  const trainRiseText = p => p
+    ? `Next member above you: ${day(p.riseMs)} · ${p.visible ? "visible" : "not visible"}`
+    : "No member rises above 10° in the next 36 hours.";
+  // Both grouped views use the same bounded, cancellable member search.
+  function nextTrainPass(train, t, current, done) {
+    const origin = place, startedEpoch = epoch;
+    const valid = () => active && place === origin && epoch === startedEpoch && current();
+    const cached = trainRiseCache.get(train.id);
+    if (cached && cached.train === train && cached.place === origin && t >= cached.t &&
+        t - cached.t < 5 * MINUTE && (!cached.p || cached.p.riseMs > t)) {
+      if (valid()) done(cached.p);
+      return;
+    }
+    const members = P.planMembers(train);
+    let best = null, i = 0;
+    function step() {
+      if (!valid()) return;
+      const p = nextPass(members[i++], t);
+      if (p && (!best || p.riseMs < best.riseMs)) best = p;
+      if (i < members.length) setTimeout(step, 0);
+      else {
+        trainRiseCache.set(train.id, { train, place: origin, t, p: best });
+        done(best);
+      }
+    }
+    setTimeout(step, 0);
   }
   function select(id, fromList = false, passStart = null) {
     selected = id;
@@ -797,19 +833,8 @@
       );
       const next = element("p", "Working out the next member above you…", "note");
       body.append(next);
-      // Yield between member scans; closing/pausing/replacing the dialog cancels.
-      const members = P.planMembers(train);
-      let best = null, memberIndex = 0;
-      function scanMember() {
-        if (!active || infoTarget !== o || generation !== infoGeneration) return;
-        const p = nextPass(members[memberIndex++], t);
-        if (p && (!best || p.riseMs < best.riseMs)) best = p;
-        if (memberIndex < members.length) setTimeout(scanMember, 0);
-        else next.textContent = best
-          ? `Next member above you: ${day(best.riseMs)} · ${best.visible ? "visible" : "not visible"}`
-          : "No member rises above 10° in the next 36 hours.";
-      }
-      setTimeout(scanMember, 0);
+      nextTrainPass(train, t, () => infoTarget === o && generation === infoGeneration,
+        p => { next.textContent = trainRiseText(p); });
       wikiSection = element("section");
       body.append(wikiSection);
       $("wiki").hidden = false;

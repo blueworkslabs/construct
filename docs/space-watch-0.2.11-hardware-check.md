@@ -1,6 +1,6 @@
 # Space Watch 0.2.11 phone check
 
-Status: **awaiting exact-package Android acceptance; not yet a phone handoff.**
+Status: **superseded by 0.2.12 after a late grouped-card correction; not a phone handoff.**
 
 No new APK: staging uses the existing alpha34 candidate. Install **Space Watch**,
 not Synthetic Space Watch, from this isolated signed catalog:
