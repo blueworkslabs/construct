@@ -256,4 +256,20 @@ class OrientationTest {
         assertFalse(view.gate.paused.get()); assertEquals(2, stops)
         view.destroy()
     }
+    @Test fun queuedOrientationReplyCannotCrossActivityPauseOrResume() {
+        val view = ModuleSessionView(RuntimeEnvironment.getApplication())
+        val request = view.activityGeneration.get()
+        val pickerRequest = view.gate.generation.get()
+        view.authorizeOrientation(request)
+        view.setActivityPaused(true)
+        denied("RUN_PAUSED") { view.authorizeOrientation(request) }
+        denied("RUN_PAUSED") { view.authorizeOrientation() }
+        view.setActivityPaused(false)
+        denied("RUN_PAUSED") { view.authorizeOrientation(request) }
+        view.authorizeOrientation()
+        // Activity transitions do not change the separate picker/menu epoch.
+        view.gate.authorizeReply(pickerRequest)
+        view.destroy()
+    }
+
 }

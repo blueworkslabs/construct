@@ -64,6 +64,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
     }
     fun authorizeCapability(capability: String) {
         checkRule(active.get(), "RUN_STALE", "Module session closed")
+        if (capability == "orientation.read") view.authorizeOrientation()
         view.gate.authorize(capability); store.withCapability(installed, capability) { }
     }
     if (module.capabilities.any { it.id == "net.http" }) http = ModuleHttp(context, module) { authorizeCapability("net.http") }
@@ -73,7 +74,6 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             view.evaluateJavascript("window.dispatchEvent(new CustomEvent('constructorientation',{detail:$detail}));", null)
         orientation = ModuleOrientation(context, {
             // Foreground only: no readings while the activity is paused, even without onStop.
-            checkRule(!view.activityPaused.get(), "RUN_PAUSED", "Return to the module to use compass and tilt")
             authorizeCapability("orientation.read")
         }, { view.display?.rotation ?: 0 }, { sample ->
             // Pushed like constructvisibilitychange; the sample is host-built JSON only.
@@ -221,11 +221,16 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             if (method == "net.http" || method == "location.read" || method == "orientation.read") {
                 authorizeCapability(method)
                 val id = requestId; val generation = view.gate.generation.get()
+                val activityGeneration = view.activityGeneration.get()
                 val complete: (JSONObject?, ConstructError?) -> Unit = { value, error ->
                     view.post {
                         if (active.get()) {
                             val response = JSONObject().put("id", id)
-                            val denied = try { view.gate.authorizeReply(generation); authorizeCapability(method); error } catch (e: ConstructError) { e }
+                            val denied = try {
+                                view.gate.authorizeReply(generation)
+                                if (method == "orientation.read") view.authorizeOrientation(activityGeneration)
+                                authorizeCapability(method); error
+                            } catch (e: ConstructError) { e }
                             if (denied == null) response.put("result", value)
                             else response.put("error", JSONObject().put("code", denied.code).put("message", denied.message))
                             reply.postMessage(response.toString())

@@ -282,7 +282,7 @@ class ModuleActivity : ComponentActivity() {
                         try {
                             moduleWebView(context, store, active, pickImage = ::pickImage, capturePhoto = ::capturePhoto, confirmPhoto = ::confirmPhoto) { failedView, code ->
                                 if (webView === failedView) finishSession(error = code)
-                            }.also { webView = it }
+                            }.also { webView = it; it.setActivityPaused(!screenResumed) }
                         } catch (error: Exception) {
                             android.widget.TextView(context).apply {
                                 val code = (error as? ConstructError)?.code ?: "OPEN_FAILED"

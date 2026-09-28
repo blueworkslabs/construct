@@ -47,11 +47,18 @@ internal open class ModuleSessionView(context: Context) : WebView(context) {
     var stopEffects: () -> Unit = {}
     /** True while the hosting activity is paused (another window in front, Home, Recents). */
     val activityPaused = AtomicBoolean(false)
+    val activityGeneration = AtomicLong(0)
     /** Foreground-only sensors stop here; the module must ask again after resume. */
     var stopForeground: () -> Unit = {}
     fun setActivityPaused(paused: Boolean) {
         if (released || activityPaused.getAndSet(paused) == paused) return
+        activityGeneration.incrementAndGet()
         if (paused) stopForeground()
+    }
+    /** Reject queued orientation data across a pause, including after a subsequent resume. */
+    fun authorizeOrientation(start: Long = activityGeneration.get()) {
+        checkRule(!activityPaused.get() && activityGeneration.get() == start,
+            "RUN_PAUSED", "Activity interrupted orientation; request a fresh reading")
     }
     var stopImageEffects: () -> Unit = {}
     fun pauseForPicker() {
