@@ -1,7 +1,27 @@
 # Space Watch 0.2.4 staging
 
-Status: **exact-package Android acceptance in progress; not yet a hardware handoff.**
+Status: **hardware clearance held for a confirmed planner accuracy issue.**
+Exact-package Android run stopped at **14/16**, with `complete=false` and
+`stopped=true`. The emulator service was independently confirmed inactive.
 PR stays open. Production Space Watch 0.1.6 is unchanged.
+
+## Open planner finding
+
+The 60-second rise scan skips a grazing visible pass between its samples. The
+repository's captured NORAD 16792 (`SL-14 R/B`) at a **synthetic** observer
+49.5°N, 13.4°E, altitude zero has a 5-second-sampled visible interval on
+2026-09-29 from 00:42:20 to 00:42:35 UTC, with maximum elevation 10.0124°.
+Starting the 12-hour planner at 2026-09-28T17:50:40Z misses it at the current
+60-second cadence; `SpacePlan.passes(..., 5000)` finds it.
+
+See the [numeric reproduction](evidence/space-watch-grazing-pass-2026-09-28.json)
+and [review discussion](https://github.com/blueworkslabs/construct/pull/49#issuecomment-5867869561).
+A separate desktop probe over 24 objects measured approximately 138 ms at 60-second
+cadence and 532 ms at 5-second cadence; this is not an Android benchmark. The
+recommended follow-up is adaptive peak/rise refinement with a regression and
+responsiveness evidence. It has been handed back to the feature author for the
+accuracy/performance decision. Android UI checks cannot establish completeness
+of the pass predictor. Do not treat their pass count as release approval.
 
 ## Artifacts and boundary
 
@@ -59,7 +79,49 @@ live CelesTrak loading after native grants; and fully offline process reopen.
 
 The fixture intentionally supplies its own location/orbits. Only the separate
 real-module checks establish native permission behavior and live/offline data.
-All evidence must come from one complete run of the exact package identified above.
+Latest run: `20260928T100229Z-space-f1f5ce4d`, Android API 37, WebView 155.
+The first 14 checks passed, through the real-module permission-denial checks.
+The live-data status did not become reachable within the driver bound; the final
+UI still showed **Downloading orbit data from CelesTrak…**, zero overhead objects,
+and **Now**. Offline reopen was not reached. This does not identify whether the
+remaining wait was provider latency or a driver timing issue; neither check is
+waived. See the [explicitly incomplete receipt](evidence/space-watch-0.2.4-staging-2026-09-28.json)
+and [last screen](images/space-watch-0.2.4/failure.png).
+
+No earlier version's live/offline success is substituted for these missing checks.
+At publication, Pages passed and the broader GitHub source-and-Android builds were
+still pending. No claim of complete CI or release readiness. The retained crash buffer has a
+Bluetooth emulator-service abort during startup; no Construct fatal exception was
+found in that buffer or the runtime log.
+
+## Original Android captures
+
+These captures are from the incomplete 0.2.4 run above. They are original
+emulator-console screenshots, not browser previews or edited mockups. Portrait
+preview captures are scrolled to the pointing card, so the dome can be partially
+outside the viewport; landscape and enlarged-text dome captures require the complete
+square canvas. The landscape PNG retains the emulator's native rotated orientation.
+Wikipedia captures are scrolled to the actual article credit. Details are explicitly
+labelled RIGHT NOW even when opened from a future preview; the spot card instead
+labels the preview time.
+
+- [Visible-pass list](images/space-watch-0.2.4/space-plan.png)
+- [Future train preview](images/space-watch-0.2.4/space-train-preview.png),
+  [train details](images/space-watch-0.2.4/space-train-details.png),
+  [Wikipedia with visible attribution](images/space-watch-0.2.4/space-train-wikipedia.png)
+  and [Back to now](images/space-watch-0.2.4/space-train-back-now.png)
+- [Dome](images/space-watch-0.2.4/space-dome.png),
+  [stage pointing](images/space-watch-0.2.4/space-spot.png),
+  [stage Wikipedia](images/space-watch-0.2.4/space-wikipedia.png)
+- [Red/rewind](images/space-watch-0.2.4/space-red-rewind.png),
+  [red after restart](images/space-watch-0.2.4/space-reopened.png),
+  [canvas-selected ISS](images/space-watch-0.2.4/space-canvas-selected.png)
+- [Landscape dome](images/space-watch-0.2.4/space-landscape.png),
+  [landscape details](images/space-watch-0.2.4/space-landscape-details.png),
+  [200% text dome](images/space-watch-0.2.4/space-large-text.png),
+  [200% details](images/space-watch-0.2.4/space-large-text-details.png)
+- [Real location denied](images/space-watch-0.2.4/space-real-location-denied.png)
+  and [real internet denied](images/space-watch-0.2.4/space-real-internet-denied.png)
 
 ## Prior complete run
 

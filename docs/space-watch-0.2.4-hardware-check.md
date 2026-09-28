@@ -1,6 +1,8 @@
 # Space Watch 0.2.4 phone check
 
-Status: awaiting final Android acceptance; not hardware clearance yet.
+Status: **held — not cleared for hardware handoff.** The current planner can
+miss short grazing passes; see the [open finding](space-watch-0.2.4-staging.md#open-planner-finding).
+The checklist below is retained for the follow-up, not a release recommendation.
 
 No new APK: staging uses the existing alpha34 candidate. Install **Space Watch**,
 not Synthetic Space Watch, from this isolated signed catalog:
