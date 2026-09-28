@@ -1,12 +1,6 @@
-# Space Watch 0.3.0 follow-mode staging
+# Space Watch 0.3.1 follow-mode staging
 
-Status: **incomplete, superseded by [0.3.1](space-watch-0.3.1-staging.md)**.
-Run `20260928T233251Z-space-8f4a921d` passed **14/23** checks and stopped cleanly.
-It stopped at the immediate post-off listener check (one connection still present).
-The capture subsequently showed Follow off; this is not proof of a persistent leak.
-The accessibility announcement was also visibly duplicated because its hidden
-class was removed by a text helper. Neither remaining checks nor phone clearance
-are claimed. Original raw evidence remains retained separately.
+Status: **Android acceptance pending.** Not yet cleared for phone testing.
 No merge, APK release or production-catalog change is included.
 
 ## Ownership and exact artifacts
@@ -17,10 +11,10 @@ pointing UI. The host owns consent, bounded sensor access and lifecycle.
 Optional `orientation.read` adds native opt-in, with no Android permission or
 new network origin. Existing module storage/network privacy boundaries remain.
 
-- Reviewed module source: `b59b222` (author base `4b604ae`).
-- Signed real/fixture packages and runner: `47f038b6d9d0ced166f1b5e03d6a504f9e5fcc6d`.
-- Real module SHA-256: `72a0baea94c47f6224eac4205b0313ef5a5ad940dbcc05838ed44955e18d32f3`.
-- Fixture SHA-256: `874cc6c75eafce030d30b86ea56155bbb07e380178aa68ae82bb45bdc8154dd4`.
+- Reviewed module source: `1ee6551` (review foundation `b59b222`, author base `4b604ae`).
+- Signed real/fixture packages: `e2e7a1d8cb2d6e8906a7cf1d37960ce6ba1ed2cf`.
+- Real module SHA-256: `8ba399c769f72f1a25cdd4b166a933096303ccb5c575690b93589d232d687385`.
+- Fixture SHA-256: `824b25f961347041a017b962af30de3965eb2f3952ca68dd65069ed184840e12`.
 - Host alpha37 source: `4e7f534`.
 - Tested x86_64 APK SHA-256: `23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477`.
 
@@ -60,3 +54,12 @@ Calibration hints, no-compass handling, pending-reply races, missing headings an
 stale samples have controller coverage. Physical compass accuracy, a real sky
 alignment and screen-reader usability remain phone-test work. No earlier
 Space Watch run is substituted for acceptance of these bytes.
+
+The initial 0.3.0 run passed 14/23 checks, then stopped at an immediate listener
+check after Follow off; teardown completed. Its accessibility helper also exposed
+the screen-reader-only paragraph. Version 0.3.1 preserves the hidden class, with
+a before-failing/after-passing browser regression. A first test incorrectly treated
+the clipped element's CSS minimum height as visible output; the corrected check
+verifies that it is absolutely positioned and fully clipped. Package assertions
+now name 0.3.1. The runner waits up to three seconds for asynchronous native
+listener transitions and records each wait. No failed gate is waived.

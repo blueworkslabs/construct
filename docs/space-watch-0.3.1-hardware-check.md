@@ -1,11 +1,11 @@
-# Space Watch 0.3.0 phone checklist
+# Space Watch 0.3.1 phone checklist
 
-Status: **superseded; do not use for hardware acceptance**. See [0.3.1](space-watch-0.3.1-hardware-check.md).
-Use an installed alpha37-or-later host (API 0.14). Older hosts cannot run 0.3.0.
+Status: **held pending this candidate's Android acceptance**.
+Use an installed alpha37-or-later host (API 0.14). Older hosts cannot run 0.3.1.
 This task does not publish the alpha37 APK or change the production catalog.
 
-[Immutable test catalog](https://raw.githubusercontent.com/blueworkslabs/construct/47f038b6d9d0ced166f1b5e03d6a504f9e5fcc6d/catalog/candidates/space-watch-030/index.json).
-Install **Space Watch 0.3.0**, not Synthetic Space Watch. Do not remove your
+[Immutable test catalog](https://raw.githubusercontent.com/blueworkslabs/construct/e2e7a1d8cb2d6e8906a7cf1d37960ce6ba1ed2cf/catalog/candidates/space-watch-031/index.json).
+Install **Space Watch 0.3.1**, not Synthetic Space Watch. Do not remove your
 installed module first: normal signed updates preserve supported preferences/cache.
 The compass-and-tilt grant is optional and starts off until explicitly enabled.
 
@@ -30,6 +30,6 @@ The compass-and-tilt grant is optional and starts off until explicitly enabled.
    the existing host lifecycle.
 8. Check landscape, large text, red mode and, if used, TalkBack. Browse the
    compass and turn text; rapidly changing headings must not constantly interrupt
-   spoken navigation. Try an ordinary 0.2.14 → 0.3.0 update with saved preferences.
+   spoken navigation. Try an ordinary 0.2.14 → 0.3.1 update with saved preferences.
 
-[Exact-artifact staging status](space-watch-0.3.0-staging.md).
+[Exact-artifact staging status](space-watch-0.3.1-staging.md).
