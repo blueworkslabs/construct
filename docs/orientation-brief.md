@@ -9,8 +9,8 @@ Deviations from this proposal:
 - The accuracy prefers the sensor's own estimate (values[4]) over the status
   mapping.
 - The host was built by Fable; Astra handles review and acceptance.
-  **Acceptance is held** for activity-pause enforcement; see the
-  [alpha35 staging report](orientation-alpha35-staging.md).
+  **Acceptance is held** for top-resumed foreground eligibility and full Android
+  acceptance; see the [alpha36 staging report](orientation-alpha36-staging.md).
 
 ## Why
 

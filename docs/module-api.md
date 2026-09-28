@@ -300,8 +300,10 @@ Errors include `LOCATION_PERMISSION`, `LOCATION_PARAMS`, `LOCATION_BUSY`,
 
 ## Foreground compass and tilt (`orientation.read`, API 0.14, source candidate)
 
-**Acceptance held:** alpha35 does not yet enforce the activity-pause boundary below.
-See the [staging report and required lifecycle fix](orientation-alpha35-staging.md).
+**Acceptance held:** alpha36 includes activity-pause enforcement, but top-resumed
+eligibility and full Android acceptance remain unresolved. See the
+[alpha36 staging report](orientation-alpha36-staging.md); the
+[alpha35 failure](orientation-alpha35-staging.md) remains historical evidence.
 
 For modules that point at things: Space Watch's follow mode, and Aimé's compass
 hint. Declare `orientation.read` with a reason and `constructApi` 0.14.0. The
