@@ -11,7 +11,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_space_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.space-watch package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.space-watch-fixture package digest')
-p.add_argument('--version',default='0.2.0')
+p.add_argument('--version',default='0.2.1')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -92,13 +92,16 @@ def reveal(match):
 def click(match):tap_node(reveal(match))
 def reach_text(fragment):return text_of(reveal(lambda t:fragment in t))
 def full_dome():
- reveal('Sky dome:')
- for _ in range(12):
-  c=next(n for n in nodes() if text_of(n).startswith('Sky dome:') and visible(n))
-  b=bounds(c);w=web();size=b[2]-b[0]
-  if abs(size-(b[3]-b[1]))<=6 and b[1]>=w[1] and b[3]<=w[3]:return c
-  scroll('down',min(300,max(30,size-(b[3]-b[1])+16)))
- raise RuntimeError('Whole square dome not visible after scrolling')
+ # Start above the canvas: clipped accessibility bounds do not reveal which
+ # edge is missing, so blindly scrolling down can move a top-clipped dome out.
+ reveal(lambda t:t in (FIXTURE,REAL))
+ for _ in range(18):
+  c=next((n for n in nodes() if text_of(n).startswith('Sky dome:') and visible(n)),None)
+  if c is not None:
+   b=bounds(c);w=web();size=b[2]-b[0]
+   if abs(size-(b[3]-b[1]))<=6 and b[1]>=w[1] and b[3]<=w[3]:return c
+  scroll('down',180)
+ raise RuntimeError('Whole square dome not visible after scrolling from page top')
 def reach_native(label,checkable=False):
  for attempt in range(24):
   tree=nodes()

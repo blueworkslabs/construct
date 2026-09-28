@@ -301,7 +301,7 @@
       let raw = null;
       try { raw = JSON.parse(r.text); } catch (_) { /* Checked below. */ }
       const parsed = O.parseElements(r.text);
-      if (!Array.isArray(raw) || (raw.length && !parsed.length))
+      if (!Array.isArray(raw) || raw.some(o => !O.compact(o)))
         throw Object.assign(new Error("Invalid recent orbit data"), { code: "HTTP_DATA" });
       const rows = P.trainRows(parsed);
       let dates = new Map();
@@ -309,8 +309,11 @@
         const q = await getJson(C.RECENT_SATCAT_URL);
         if (q.status === 403 || q.status === 429) fetchState.recentUntil = t + BACKOFF;
         if (q.status !== 200) return;
+        let rawCatalog = null;
+        try { rawCatalog = JSON.parse(q.text); } catch (_) { /* Checked below. */ }
         const catalog = C.parseSatcat(q.text);
-        if (!catalog.length) throw Object.assign(new Error("Invalid recent catalog"), { code: "HTTP_DATA" });
+        if (!Array.isArray(rawCatalog) || !catalog.length || rawCatalog.some(o => !C.compact(o)))
+          throw Object.assign(new Error("Invalid recent catalog"), { code: "HTTP_DATA" });
         dates = P.launchDates(catalog);
       }
       const keep = new Set(rows.map((x) => x[2].slice(0, 8)));
