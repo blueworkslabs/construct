@@ -7,7 +7,7 @@ from pathlib import Path
 from config import CONFIG,SERIAL,require_runner,catalog
 p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.add_argument('--sha',required=True)
 p.add_argument('--catalog',required=True);p.add_argument('--module-sha',required=True,help='Signed orientation probe digest')
-p.add_argument('--version',default='0.1.1')
+p.add_argument('--version',default='0.1.2')
 a=p.parse_args();require_runner();catalog(a.catalog)
 if hashlib.sha256(a.apk.read_bytes()).hexdigest()!=a.sha:raise SystemExit('APK checksum mismatch')
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -192,11 +192,21 @@ try:
  adb('shell','am','force-stop','dev.construct.runtime');opened();require(count()==0,'New session inherited stream');no_events()
  require(act('Read once')=='Read.','Grant did not survive process restart')
  done('Background/close and process restart do not resurrect the stream; grant persists')
- adb('shell','settings','put','system','user_rotation','1');time.sleep(2);find('Read once');require(act('Read once')=='Read.','Landscape read failed');valid(sample());capture('landscape')
+ adb('shell','settings','put','system','user_rotation','1');time.sleep(2);find('Read once');inject('0:0:9.80665','0:50:-20');reading('flat',90,90);capture('landscape')
  adb('shell','settings','put','system','user_rotation','0');time.sleep(1)
  adb('shell','settings','put','system','font_scale','2.0');adb('shell','am','force-stop','dev.construct.runtime');opened();capture('large-text')
  require(act('Read once')=='Read.','Large-text read failed');require(act('Stop').startswith('Stopped:'),'Large-text stop missing')
  done('Landscape and 200% text retain readable controls and working one-shot access')
+ adb('shell','settings','put','system','font_scale','1.0');adb('shell','am','force-stop','dev.construct.runtime');opened();watch(10)
+ # A system resolver is translucent: onPause without onStop must also revoke orientation authority.
+ adb('shell','am','start','-W','-a','android.intent.action.SEND','-t','text/plain','--es','android.intent.extra.TEXT','Synthetic orientation lifecycle probe')
+ time.sleep(1)
+ activities=adb('shell','dumpsys','activity','activities');(run/'activity-pause.txt').write_text(activities)
+ capture('activity-paused')
+ block=re.search(r'Hist #[^\n]*dev\.construct\.runtime/\.ModuleActivity[^\n]*\n(.*?)(?=\* Hist #|RootTask|$)',activities,re.S)
+ require(block is not None and 'state=PAUSED' in block.group(1) and 'stopped=false' in block.group(1),'No pause-only lifecycle observation; do not count this as covered')
+ sensor_state('activity-paused')
+ done('Translucent system activity pause releases sensor listener before onStop')
  installed_apk();receipt['complete']=True
 except Exception as e:
  receipt['error']=str(e)

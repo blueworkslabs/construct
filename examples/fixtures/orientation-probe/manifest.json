@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "dev.construct.orientation-probe",
   "name": "Orientation probe",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Synthetic acceptance fixture for API 0.14 orientation.read: one reading, a rate-capped stream and stop. Shows the raw samples and a received-sample count.",
   "constructApi": {
     "min": "0.14.0",
