@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.space-watch",
+      "name": "Space Watch",
+      "versions": [
+        {
+          "id": "dev.construct.space-watch",
+          "name": "Space Watch",
+          "version": "0.2.5",
+          "artifact": "dev.construct.space-watch-0.2.5.zip",
+          "sha256": "7fd83f71dea5a742e042be1ef66d1bd2fba6dbece4fe9b419b19a0f29158427a",
+          "signature": "FFNwAonBcgt0compWwmAp3HVXzvWtds9hjgLFORkfiQt2MshmQWH8PADnMz4Je9gs2fpHsASiHrmU2FYgMkXc8k2GjvQ0BPPDURltZM3+XghqIsR/n94CEPsqIybg6TtskaY37aSQq7pfcC0euTqy88EGqdQcC+XCHSRT7nm4NtiGQMHU3dagmIU0yXZwWXr/Ssxl6/+JTUh6/1KwBLe2ID+bGp672Aobhzdck500W7/Oaru+mMNOiLA+Nk9mNZJdg9P2lvPoAmDYxhLfbpDDUfG43W9u3HDHTqz+NVA9+BB9HYffByAtvxOP89bNvpA1Lhrfi9mqjbDOg7es+jBtw=="
+        }
+      ]
+    },
+    {
+      "id": "dev.construct.space-watch-fixture",
+      "name": "Synthetic Space Watch",
+      "versions": [
+        {
+          "id": "dev.construct.space-watch-fixture",
+          "name": "Synthetic Space Watch",
+          "version": "0.2.5",
+          "artifact": "dev.construct.space-watch-fixture-0.2.5.zip",
+          "sha256": "916bd9e23d9fedf667b8f6963c6bb8a7ba5ae74f456614836c52b94b9c43f919",
+          "signature": "aFjWVZ5mdqvjFQFav4BqRhTbD9XjhJ0C8RcMWDYp8YLfd75tH1DBHBIiGKdM0gF5rwX53WA/D0kBHuGTBi2VNsHv7Tx0cPqvZNdqmGFm4BsjVeg1bJSvAfRh6k04XUJDOKK98RYvjWa5MawD5l1Wn6gqM4aoVakmVmMTNafMFFKXnySRce9GZ2QjYmK6MXf3coUCbmPEIXU2REeL4nXgPiiytW/Nm4qyQwhu5+iXMbE1v7UrFpiZ7dUQcB2K3V4N0YMMdGZWcB9ryqbEBpiuU7UrtX+QXyRO3uJslLSsyGy/YKlwLCN40WMPBwbhimztaLkqJ6R+LMlEWiGwJhbKJg==",
+          "testFixture": true
+        }
+      ]
+    }
+  ]
+}
