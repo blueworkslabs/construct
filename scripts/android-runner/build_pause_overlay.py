@@ -10,7 +10,7 @@ src=Path(__file__).parent/'pause-overlay';out=a.out.resolve();out.mkdir(parents=
 classes=out/'classes';classes.mkdir();dex=out/'dex';dex.mkdir()
 def run(*args):subprocess.run([str(x) for x in args],check=True,stdout=subprocess.DEVNULL)
 run(bt/'aapt','package','-f','-M',src/'AndroidManifest.xml','-S',src/'res','-I',jar,'-F',out/'unsigned.apk')
-run(jdk/'bin/javac','-source','8','-target','8','-classpath',jar,'-d',classes,src/'PauseActivity.java')
+run(jdk/'bin/javac','-source','8','-target','8','-classpath',jar,'-d',classes,*src.glob('*.java'))
 run(bt/'d8','--lib',jar,'--min-api','26','--output',dex,*classes.rglob('*.class'))
 with zipfile.ZipFile(out/'unsigned.apk','a') as z:z.write(dex/'classes.dex','classes.dex')
 run(bt/'zipalign','-p','4',out/'unsigned.apk',out/'aligned.apk')

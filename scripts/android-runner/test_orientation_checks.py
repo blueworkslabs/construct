@@ -24,3 +24,14 @@ class OrientationChecksTest(unittest.TestCase):
             self.assertFalse(paused_without_stop(system.replace('state=PAUSED','state=RESUMED'),client))
             self.assertFalse(paused_without_stop(system,client.replace('mStopped=false','mStopped=true')+' ViewRoot:\n mStopped=false'))
             self.assertFalse(paused_without_stop(system.replace('.ModuleActivity','.OtherActivity'),client))
+
+    def test_multi_resume_requires_resumed_client_and_focused_peer(self):
+        from orientation_checks import resumed_unfocused
+        system=' * Hist  #1: ActivityRecord{abc dev.construct.runtime/.ModuleActivity}\n state=RESUMED\n mCurrentFocus=Window{abc dev.construct.test.pause/dev.construct.test.pause.PeerActivity}\n'
+        client='Local Activity abc State:\n mResumed=true mStopped=false mFinished=false\n mHasWindowFocus=false\n mIsInMultiWindowMode=true\n'
+        self.assertTrue(resumed_unfocused(system,client,peer=True))
+        self.assertFalse(resumed_unfocused(system.replace('state=RESUMED','state=PAUSED'),client,peer=True))
+        self.assertFalse(resumed_unfocused(system,client.replace('mResumed=true','mResumed=false'),peer=True))
+        self.assertFalse(resumed_unfocused(system,client.replace('mHasWindowFocus=false','mHasWindowFocus=true'),peer=True))
+        self.assertFalse(resumed_unfocused(system.replace('.PeerActivity','.Other'),client,peer=True))
+        self.assertTrue(resumed_unfocused(system.replace('.PeerActivity','.Other'),client))

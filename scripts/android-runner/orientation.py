@@ -10,6 +10,7 @@ p.add_argument('--catalog',required=True);p.add_argument('--module-sha',required
 p.add_argument('--version',default='0.1.3')
 p.add_argument('--pause-apk',type=Path,required=True);p.add_argument('--pause-sha',required=True)
 p.add_argument('--pause-only',action='store_true',help='Focused denial/pause diagnostic, not full acceptance')
+p.add_argument('--foreground-only',action='store_true',help='Denial, pause, focus and multi-resume diagnostics only')
 a=p.parse_args();require_runner();catalog(a.catalog)
 if hashlib.sha256(a.apk.read_bytes()).hexdigest()!=a.sha:raise SystemExit('APK checksum mismatch')
 if hashlib.sha256(a.pause_apk.read_bytes()).hexdigest()!=a.pause_sha:raise SystemExit('Pause fixture checksum mismatch')
@@ -22,7 +23,7 @@ import ui
 from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
-receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'pauseFixtureSha256':a.pause_sha,'scope':'pause-only' if a.pause_only else 'full','plannedChecks':2 if a.pause_only else 9,'checks':[],'samples':[]}
+receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'pauseFixtureSha256':a.pause_sha,'scope':'pause-only' if a.pause_only else 'foreground-only' if a.foreground_only else 'full','plannedChecks':2 if a.pause_only else 4 if a.foreground_only else 11,'checks':[],'samples':[]}
 started=False
 name='Orientation probe';heading=name+' · '+a.version
 def save():(run/'result.json').write_text(json.dumps(receipt,indent=2)+'\n')
@@ -170,7 +171,7 @@ try:
  require(switch('Allow reading compass and tilt',True)=='false','Orientation must default off')
  capture('native-grant');reopen()
  done('Signed probe installed; one-shot and watch denied before explicit native grant')
- if not a.pause_only:
+ if not (a.pause_only or a.foreground_only):
   reading('flat',0,90);capture('flat-north')
   inject('0:0:9.80665','-50:0:-20');reading('flat',90,90);capture('flat-east')
   done('Flat north/east samples follow injected magnetic field with bounded schema and precision')
@@ -191,8 +192,17 @@ try:
   sensor_state('revoked')
   done('Revocation stops stream; both operations denied after reopening')
   module_access();switch('Allow reading compass and tilt',True);reopen();watch(10)
-  adb('shell','input','keyevent','KEYCODE_HOME');time.sleep(1)
-  (run/'activity-background.txt').write_text(adb('shell','dumpsys','activity','activities'))
+  adb('shell','input','keyevent','KEYCODE_HOME')
+  # Observe the client lifecycle callback, not just the earlier system transition.
+  started_wait=time.monotonic()
+  while True:
+   client=adb('shell','dumpsys','activity','dev.construct.runtime/.ModuleActivity')
+   system=adb('shell','dumpsys','activity','activities')
+   (run/'activity-background-client.txt').write_text(client);(run/'activity-background.txt').write_text(system)
+   if 'mResumed=false' in client or ('Local Activity' not in client and 'dev.construct.runtime/.ModuleActivity' not in system):break
+   require(time.monotonic()-started_wait<8,'Home lifecycle callback not observed within 8 seconds')
+   time.sleep(.25)
+  receipt['homeCallbackObservationSeconds']=time.monotonic()-started_wait;save()
   sensor_state('background')
   # Closing/backgrounding invalidates the module session. Reopen a fresh run.
   adb('shell','am','force-stop','dev.construct.runtime');opened();require(count()==0,'New session inherited stream');no_events()
@@ -220,6 +230,45 @@ try:
  no_events();sensor_state('pause-resumed');capture('pause-only-returned')
  watch(10);require(act('Stop').startswith('Stopped:'),'Explicit re-watch after resume failed');no_events()
  done('Pause-only panel releases listener, denies get/watch, emits one terminal event and requires explicit restart')
+ if not a.pause_only:
+  # System shade takes focus without necessarily pausing or changing top-resumed state.
+  watch(10);before=act('Check paused requests in 3 seconds',wait=False)
+  adb('shell','cmd','statusbar','expand-settings');time.sleep(4)
+  system=adb('shell','dumpsys','activity','activities');client=adb('shell','dumpsys','activity','dev.construct.runtime/.ModuleActivity')
+  (run/'activity-focus-loss.txt').write_text(system);(run/'activity-focus-loss-client.txt').write_text(client)
+  from orientation_checks import resumed_unfocused
+  require(resumed_unfocused(system,client),'No resumed-but-unfocused shade observation')
+  sensor_state('focus-lost');capture('quick-settings')
+  adb('shell','cmd','statusbar','collapse');find('Read once')
+  require(result(before)=='Pause requests: get=RUN_PAUSED; watch=RUN_PAUSED','Unfocused requests were not denied')
+  require('Ended: paused (1)' in labels(),'Missing or duplicate focus-loss terminal event')
+  no_events();sensor_state('focus-returned');capture('focus-returned')
+  watch(10);require(act('Stop').startswith('Stopped:'),'Explicit watch after focus return failed')
+  done('Quick Settings focus loss while resumed denies requests, releases listener and requires explicit restart')
+  # Freeform is a real multi-resume path on this emulator; no onPause substitute.
+  adb('shell','settings','put','global','enable_freeform_support','1')
+  adb('shell','settings','put','global','force_resizable_activities','1')
+  adb('shell','am','force-stop','dev.construct.runtime')
+  adb('shell','am','start','-W','--windowingMode','5','-n','dev.construct.test.pause/.PeerActivity')
+  tap('Close foreground test peer')  # warm the peer so the delayed probe runs after focus transfer
+  adb('shell','am','start','-W','--windowingMode','5','-n','dev.construct.runtime/.MainActivity');host_ready()
+  activities=adb('shell','dumpsys','activity','activities')
+  task=re.search(r'ActivityRecord\{[^\n]*dev\.construct\.runtime/\.MainActivity t(\d+)',activities)
+  require(task is not None,'Missing Construct freeform task')
+  adb('shell','am','task','resize',task.group(1),'0','80','700','1180')
+  library();select_after(heading,('Open',));find('Read once');watch(10)
+  before=act('Check paused requests in 3 seconds',wait=False)
+  adb('shell','am','start','-W','--windowingMode','5','-n','dev.construct.test.pause/.PeerActivity');time.sleep(4)
+  system=adb('shell','dumpsys','activity','activities');client=adb('shell','dumpsys','activity','dev.construct.runtime/.ModuleActivity')
+  (run/'activity-multi-resume.txt').write_text(system);(run/'activity-multi-resume-client.txt').write_text(client)
+  require(resumed_unfocused(system,client,peer=True),'No multi-resumed Construct with foreground peer observation')
+  sensor_state('top-resumed-lost');capture('multi-resume-peer')
+  tap('Close foreground test peer');find('Read once')
+  require(result(before)=='Pause requests: get=RUN_PAUSED; watch=RUN_PAUSED','Non-top-resumed requests were not denied')
+  require('Ended: paused (1)' in labels(),'Missing or duplicate top-resumed terminal event')
+  no_events();sensor_state('top-resumed-returned');capture('multi-resume-returned')
+  watch(10);require(act('Stop').startswith('Stopped:'),'Explicit watch after top-resumed return failed');no_events()
+  done('Freeform top-resumed loss without onPause denies requests, releases listener and requires explicit restart')
  installed_apk();receipt['complete']=True
 except Exception as e:
  receipt['error']=str(e)
