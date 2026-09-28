@@ -1176,7 +1176,7 @@
         $("follow-status"),
         s.reason === "revoked"
           ? "Compass access was turned off in Module access. Follow is off."
-          : "Follow stopped while another screen was in front. Tap Follow to turn it back on.",
+          : "Follow stopped when Space Watch lost the foreground (notifications, Quick Settings or another app). Tap Follow to turn it back on.",
         "attention",
       );
       applyFollow(true);

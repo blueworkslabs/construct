@@ -470,7 +470,7 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   // The host ends the stream on an activity pause: Follow turns off and says so.
   r.orient({watching: false, reason: 'paused'});
   assert.equal(r.el('follow').attributes['aria-pressed'], 'false'); assert.equal(r.rotation(), 0);
-  assert.match(r.el('follow-status').textContent, /another screen was in front/); assert(!r.el('follow-status').hidden);
+  assert.match(r.el('follow-status').textContent, /lost the foreground/); assert(!r.el('follow-status').hidden);
   assert(r.el('spot-turn').hidden);
   r.visibility(false); r.visibility(true); await flush();
   assert.equal(r.calls.filter(c => c.method === 'orientation.read' && c.params.op === 'watch').length, 2, 'no silent re-watch after a host end');
