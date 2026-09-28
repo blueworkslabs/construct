@@ -163,7 +163,8 @@ try:
  launch();catalog_settings()
  replace_text(nodes,lambda v:ui._device(className='android.widget.EditText',packageName='dev.construct.runtime').set_text(v),a.catalog)
  apply_catalog();find('Catalog refreshed.');library();select_after(heading,('Review & install',))
- consent_button=reach_native('Allow & install')
+ # Dialog actions sit outside its scrollable disclosure body.
+ consent_button=find('Allow & install')
  require(any('Revoking access cannot erase copies already delivered.' in (t or '') for t in labels()),'Missing native orientation retention disclosure')
  capture('install-consent');tap_node(consent_button);installed_status()
  require(any(e.get('code')=='INSTALLED_TRIAL' and e.get('packageDigest')==a.module_sha for e in diagnostics()),'Wrong signed module')
