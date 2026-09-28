@@ -290,6 +290,12 @@ test("next-rise lookup finds the same grazing pass as the planner, cheaply", () 
   near(rise.riseMs, "2026-09-29T00:42:19Z", 2);
   assert.ok(Math.abs(rise.riseMs - planned.startMs) <= 2000, "lookup and planner agree");
   assert.ok(rise.maxEl >= 10 && rise.maxEl < 10.1 && rise.visible === true);
+  // A lookup window can end inside the graze, before a following coarse sample.
+  const clipped = O.nextPass(byId(16792), ob2, from, sun2, 195 / 3600);
+  assert.ok(clipped, "grazing rise inside the final lookup interval must be found");
+  near(clipped.riseMs, "2026-09-29T00:42:19Z", 2);
+  assert.equal(O.nextPass(byId(16792), ob2, from, sun2, 185 / 3600), null,
+    "a rise beyond the requested window must not leak into the result");
   // Against a plain 5 s scan (first sample at or above 10° after the current
   // pass) for every fixture object, and at a fraction of its propagations.
   const brute = (o, ob, ms, hours) => {
@@ -398,7 +404,7 @@ test("planner distinguishes clipped windows and keeps short previews inside visi
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
   assert.equal(m.id, "dev.construct.space-watch");
-  assert.equal(m.version, "0.2.13");
+  assert.equal(m.version, "0.2.14");
   assert.deepEqual(m.constructApi, { min: "0.9.0", target: "0.9.0" });
   const caps = Object.fromEntries(m.capabilities.map((c) => [c.id, c]));
   assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "storage.kv"]);
@@ -423,7 +429,7 @@ test("package: manifest, capabilities, scripts and no location in any URL", () =
   for (const shared of ["construct-ui.css", "bridge.js"])
     assert.equal(fs.readFileSync(root + "ui/" + shared, "utf8"), fs.readFileSync("examples/sky-watch-module/ui/" + shared, "utf8"), shared);
   const docs = fs.readFileSync("docs/space-watch.md", "utf8");
-  assert.match(docs, /Space Watch \*\*0\.2\.13\*\*/);
+  assert.match(docs, /Space Watch \*\*0\.2\.14\*\*/);
   // Vendored libraries are pinned by hash in the doc.
   for (const f of ["satellite.min.js", "astronomy.min.js"]) {
     const sha = crypto.createHash("sha256").update(fs.readFileSync(root + "ui/vendor/" + f)).digest("hex");

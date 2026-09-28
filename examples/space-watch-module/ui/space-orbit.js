@@ -279,21 +279,21 @@ const SpaceOrbit = (() => {
   const GRAZE_MARGIN = 4;
   // Next rise above 10° after the current pass, with its highest point and
   // whether any part is visible. Coarse 30 s scan, rises refined to 5 s; a coarse
-  // local maximum within GRAZE_MARGIN of 10° (or a near-10° first interval) gets
+  // local maximum within GRAZE_MARGIN of 10° (or a near-10° first/last interval) gets
   // a peak search, so passes that clear 10° only between samples are found.
   function nextPass(o, ob, ms, sunAltAt, hours = 36, step = 30000) {
     const end = ms + hours * 3600000;
     let t = ms,
       l = look(o, ob, t);
     while (l && l.el >= VISIBLE_EL && t < end) {
-      t += step;
+      t = Math.min(end, t + step);
       l = look(o, ob, t);
     }
     if (!l) return null;
     let back = null,
       prev = { t, el: l.el };
     while (t < end) {
-      const n = t + step,
+      const n = Math.min(end, t + step),
         q = look(o, ob, n);
       if (!q) return null;
       let rise = null;
@@ -308,7 +308,7 @@ const SpaceOrbit = (() => {
         const hump = back && prev.el >= back.el && prev.el >= q.el;
         if (
           (hump && prev.el >= VISIBLE_EL - GRAZE_MARGIN) ||
-          (!back && Math.max(prev.el, q.el) >= VISIBLE_EL - GRAZE_MARGIN)
+          ((!back || n === end) && Math.max(prev.el, q.el) >= VISIBLE_EL - GRAZE_MARGIN)
         ) {
           const left = hump ? back.t : t,
             top = peak(o, ob, left, n);

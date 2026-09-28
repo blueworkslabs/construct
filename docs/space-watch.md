@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.2.13** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
+Space Watch **0.2.14** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
 alpha26** and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -18,7 +18,7 @@ consent. 0.1.6 stays published unchanged. 0.2.4 was the reviewed candidate after
 the initial 0.2.0 package; 0.2.8 added the grazing-pass refinement below and
 passed 16/16 Android checks. 0.2.12 plans trains from all their members (below),
 keeps invisible gaps out of merged passes, tracks selection per pass and maps
-tappable train beads to the grouped train; it passed 16/16. 0.2.13 makes the
+tappable train beads to the grouped train; it passed 16/16. 0.2.14 makes the
 next-rise lookup grazing-aware too and needs its own acceptance.
 Train details and the below-horizon spot card share a search of every distinct member for the next rise above 10°, yielding
 between scans and discarding stale results after selection, place or lifecycle changes.
@@ -54,15 +54,16 @@ it applied to the whole group; merged-pass endings remain in the planner.
       - the peak is found by golden-section search to about 1 s;
       - if it reaches 10°, the stretch is sampled every second.
       - Why 4°: within 60 s of its peak, a low pass drops only about 1°.
-      - **Next-rise lookup (0.2.13).** The same peak search (`SpaceOrbit.peak`)
+      - **Next-rise lookup (0.2.14).** The same peak search (`SpaceOrbit.peak`)
         now also runs in the 30 s next-rise lookup used by the spot card and
         details. It covers "next time above you" (above 10°, next 36 h) for
         objects and train members, including its visible / not visible
         classification.
         - From 49.5° N at 00:39:10 UTC it now finds SL-14 R/B 16792's pass at
           00:42:19, in agreement with the planner, instead of skipping to 02:16:35.
-        - The first minute of each pass is sampled every second.
-        - Cost: about 8% more propagations than the old lookup (156 objects,
+        - The first minute of each pass is sampled every second. Final lookup
+          intervals are refined too, and samples stay within the requested rise window.
+        - Author benchmark: about 8% more propagations than the old lookup (156 objects,
           4 places, 2 start times), and about a fifth of a 5 s scan.
       - The author’s initial adaptive-refinement benchmark checked a 5 s
         reference scan: 156 objects × 8 places over a
@@ -332,8 +333,8 @@ not Android; pre-review wording and stale-train policy):
 - **Android acceptance:** the standalone runner is
   `scripts/android-runner/space_module.py`. The exact signed candidate, native
   grant checks, live/offline results and original Android screenshots are tracked
-  in the [0.2.8 staging report](space-watch-0.2.8-staging.md).
-  The [0.2.8 phone checklist](space-watch-0.2.8-hardware-check.md) tracks the
+  in the [0.2.14 staging report](space-watch-0.2.14-staging.md).
+  The [0.2.14 phone checklist](space-watch-0.2.14-hardware-check.md) tracks the
   next hardware handoff. The earlier [0.1.6 acceptance](space-watch-0.1.6-staging.md)
   remains separate.
   The synthetic fixture exercises UI; the real package separately verifies native
