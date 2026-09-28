@@ -9,8 +9,8 @@ Deviations from this proposal:
 - The accuracy prefers the sensor's own estimate (values[4]) over the status
   mapping.
 - The host was built by Fable; Astra handles review and acceptance.
-  **Acceptance is held** for top-resumed foreground eligibility and full Android
-  acceptance; see the [alpha36 staging report](orientation-alpha36-staging.md).
+  **Alpha37 passes 11/11 Android gates**; physical-phone checks remain pending.
+  See the [staging report](orientation-alpha37-staging.md). The host remains unmerged.
 
 ## Why
 

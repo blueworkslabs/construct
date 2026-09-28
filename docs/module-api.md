@@ -300,10 +300,10 @@ Errors include `LOCATION_PERMISSION`, `LOCATION_PARAMS`, `LOCATION_BUSY`,
 
 ## Foreground compass and tilt (`orientation.read`, API 0.14, source candidate)
 
-**Acceptance held:** alpha36 includes activity-pause enforcement, but top-resumed
-eligibility and full Android acceptance remain unresolved. See the
-[alpha36 staging report](orientation-alpha36-staging.md); the
-[alpha35 failure](orientation-alpha35-staging.md) remains historical evidence.
+**Alpha37 Android acceptance complete:** 11/11 exact-APK gates pass, including
+pause-only, focus loss and real multi-resume. Physical-phone checks remain pending;
+see the [alpha37 staging report](orientation-alpha37-staging.md). The host PR and
+its API 0.13 base remain unmerged; this is not production availability.
 
 For modules that point at things: Space Watch's follow mode, and Aimé's compass
 hint. Declare `orientation.read` with a reason and `constructApi` 0.14.0. The
