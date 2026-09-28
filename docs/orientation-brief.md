@@ -1,4 +1,4 @@
-# Orientation brief — `orientation.read` (proposal, not implemented)
+# Orientation brief — `orientation.read`
 
 Status: **host side implemented as an API 0.14 source candidate** (2026-09-28),
 stacked on API 0.13 (#42) and unreleased. The implemented contract is in
@@ -8,7 +8,9 @@ Deviations from this proposal:
 - `calibrate` is also set when the heading accuracy is worse than 30°.
 - The accuracy prefers the sensor's own estimate (values[4]) over the status
   mapping.
-- The host was built by Fable; Astra accepts.
+- The host was built by Fable; Astra handles review and acceptance.
+  **Acceptance is held** for activity-pause enforcement; see the
+  [alpha35 staging report](orientation-alpha35-staging.md).
 
 ## Why
 

@@ -300,6 +300,9 @@ Errors include `LOCATION_PERMISSION`, `LOCATION_PARAMS`, `LOCATION_BUSY`,
 
 ## Foreground compass and tilt (`orientation.read`, API 0.14, source candidate)
 
+**Acceptance held:** alpha35 does not yet enforce the activity-pause boundary below.
+See the [staging report and required lifecycle fix](orientation-alpha35-staging.md).
+
 For modules that point at things: Space Watch's follow mode, and Aimé's compass
 hint. Declare `orientation.read` with a reason and `constructApi` 0.14.0. The
 capability can be `optional`, and it is off until granted in **Module access**
