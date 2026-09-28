@@ -415,11 +415,25 @@
     }
     return d;
   }
+  // Prefer a member that can actually be spotted now, rather than letting a
+  // low/shadowed cluster centre hide the already-visible end of the train.
+  function trainRepresentative(train, t) {
+    if (!place) return train.centre;
+    const sunAlt = sunAt(t);
+    let highest = null;
+    for (const o of train.members) {
+      const l = O.look(o, place.ob, t);
+      if (!l) continue;
+      if (O.state(l, sunAlt) === "visible") return o;
+      if (!highest || l.el > highest.l.el) highest = { o, l };
+    }
+    return highest ? highest.o : train.centre;
+  }
   // An id is a NORAD number, or "train:YYYY-NNN" for a train.
-  function find(id) {
+  function find(id, t = now()) {
     if (typeof id === "string") {
       const train = trainList.find((x) => x.id === id);
-      return train ? { id, o: train.centre, train, d: trainInfo(train) } : null;
+      return train ? { id, o: trainRepresentative(train, t), train, d: trainInfo(train) } : null;
     }
     const o = objects.find((x) => x.id === id);
     return o ? { id, o, train: null, d: info(o) } : null;
@@ -446,7 +460,7 @@
       items.push({ id: o.id, o, l, state: O.state(l, sunAlt), d: info(o) });
     }
     for (const train of trainList) {
-      const o = train.centre,
+      const o = trainRepresentative(train, t),
         l = O.look(o, place.ob, t);
       if (!l || l.el < 0) continue;
       items.push({ id: train.id, o, train, l, state: O.state(l, sunAlt), d: trainInfo(train) });
@@ -633,7 +647,7 @@
       $("spot").hidden = true;
       return;
     }
-    const found = find(selected);
+    const found = find(selected, s.t);
     if (!found) {
       selected = null;
       $("spot").hidden = true;
@@ -840,7 +854,8 @@
   $("wiki").onclick = async () => {
     const o = infoTarget, generation = infoGeneration;
     if (!o || infoBusy || wikiDone) return;
-    const d = find(selected)?.o === o ? find(selected).d : info(o),
+    const selectedObject = find(selected);
+    const d = selectedObject && (selectedObject.o === o || selectedObject.train?.members.includes(o)) ? selectedObject.d : info(o),
       section = wikiSection;
     infoBusy = true;
     $("wiki").disabled = true;

@@ -1,7 +1,9 @@
 # Space Watch 0.2.7 staging
 
-Status: **fresh exact-package Android acceptance in progress.** No hardware
-clearance, merge or production promotion yet.
+Status: **16/16 exact-package Android checks passed; superseded by 0.2.8.**
+`complete=true`, `stopped=true`; emulator independently inactive. A late grouped
+train-state fix selects a visible member when the centre is low/shadowed. The
+new 0.2.8 package needs its own acceptance. No merge or production promotion.
 
 ## Artifacts
 
@@ -85,3 +87,13 @@ of a missing module control.
 The [0.2.6 run](space-watch-0.2.6-staging.md) passed all 16 checks, including
 automatic live data and offline reopen, and stopped cleanly. Its receipt and
 screenshots are retained separately, not substituted for this version.
+
+[Complete receipt](evidence/space-watch-0.2.7-staging-2026-09-28.json).
+Automatic live CelesTrak and fully offline reopen passed, both showing Now.
+Live/offline counts were both 0 visible / 10 above; data was 32 h old.
+[Train preview](images/space-watch-0.2.7/space-train-preview.png),
+[landscape](images/space-watch-0.2.7/space-landscape.png),
+[large text](images/space-watch-0.2.7/space-large-text.png),
+[live data](images/space-watch-0.2.7/space-real-network.png),
+[offline reopen](images/space-watch-0.2.7/space-real-offline-cache.png).
+Original emulator captures; no results substituted for 0.2.8.

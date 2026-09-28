@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.2.7** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
+Space Watch **0.2.8** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
 alpha26** and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -15,7 +15,7 @@ view, not a map.
 
 Both features are module-only, with no host change, no new origin and no new
 consent. 0.1.6 stays published unchanged. 0.2.4 was the reviewed candidate after
-the initial 0.2.0 package; 0.2.7 adds the grazing-pass refinement below and
+the initial 0.2.0 package; 0.2.8 adds the grazing-pass refinement below and
 needs its own acceptance.
 
 - **Visible passes · next 12 h.** This lists passes of the bright objects (and
@@ -39,7 +39,7 @@ needs its own acceptance.
       displayed horizon between recalculations.
     - Each object is then scanned every 60 s for rises above 10°, refined to
       5 s, and the visible stretch is sampled every 5 s.
-    - **Grazing passes (0.2.7).** A pass that peaks just above 10° can fit
+    - **Grazing passes (0.2.8).** A pass that peaks just above 10° can fit
       between two 60 s samples. The 0.2.4 review found one: SL-14 R/B 16792
       from 49.5° N at 00:42:20–00:42:35 UTC, peak 10.01°. So every coarse local
       maximum within 4° of the 10° line is refined; the first and last
@@ -302,8 +302,8 @@ not Android; pre-review wording and stale-train policy):
 - **Android acceptance:** the standalone runner is
   `scripts/android-runner/space_module.py`. The exact signed candidate, native
   grant checks, live/offline results and original Android screenshots are tracked
-  in the [0.2.7 staging report](space-watch-0.2.7-staging.md).
-  The [0.2.7 phone checklist](space-watch-0.2.7-hardware-check.md) tracks the
+  in the [0.2.8 staging report](space-watch-0.2.8-staging.md).
+  The [0.2.8 phone checklist](space-watch-0.2.8-hardware-check.md) tracks the
   next hardware handoff. The earlier [0.1.6 acceptance](space-watch-0.1.6-staging.md)
   remains separate.
   The synthetic fixture exercises UI; the real package separately verifies native

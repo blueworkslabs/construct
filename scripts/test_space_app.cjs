@@ -382,6 +382,12 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
     assert.match(r.el('info-body').text,/9 of 11 from this launch/);
     assert.match(r.el('info-body').text,/2026-09-23 · 5 days ago/,'launch date beyond first 400 SATCAT rows retained');
   }
+  // The Guowang centre is still low at 18:24, but another member is visible.
+  // Group count/list/dome and selected pointing must agree with that member.
+  r=rig({clock:Date.parse('2026-09-28T18:24:00Z')});await flush(8);r.tick(1,0);
+  assert.equal(r.dome().objects.find(o=>o.id==='train:2026-221')?.state,'visible','visible member makes the grouped train visible');
+  const earlyTrain=r.el('list').children.find(b=>b.dataset.id==='train:2026-221');
+  assert.match(earlyTrain.text,/visible/);earlyTrain.click();assert.match(r.el('spot-state').textContent,/Sunlit · should be visible/);
   // A genuinely empty recent list is valid and remains fresh across reopen.
   r = rig({recentBody: '[]'}); await flush(8);
   r = rig({saved: r.storage, clock: START + HOUR}); await flush(8);
