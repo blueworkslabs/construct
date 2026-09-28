@@ -334,16 +334,16 @@ not Android; pre-review wording and stale-train policy):
   `scripts/android-runner/space_module.py`. The exact signed candidate, native
   grant checks, live/offline results and original Android screenshots are tracked
   in the [0.2.14 staging report](space-watch-0.2.14-staging.md).
-  The [0.2.14 phone checklist](space-watch-0.2.14-hardware-check.md) tracks the
-  next hardware handoff. The earlier [0.1.6 acceptance](space-watch-0.1.6-staging.md)
+  The [0.2.14 phone check](space-watch-0.2.14-hardware-check.md) passed on real
+  hardware on 2026-09-28; the same signed 0.2.14 bytes are the latest Space Watch
+  in the production catalog. The earlier [0.1.6 acceptance](space-watch-0.1.6-staging.md)
   remains separate.
   The synthetic fixture exercises UI; the real package separately verifies native
   location/internet gates and live CelesTrak. Menu pause/resume is exercised on
   cached data; in-flight cancellation is covered by controller regressions.
 
-  [Real-device checks](space-watch-0.1.6-hardware-check.md) passed on
-  2026-09-28, and the same signed 0.1.6 bytes are published in the production
-  catalog.
+  [Real-device checks for 0.1.6](space-watch-0.1.6-hardware-check.md) passed on
+  2026-09-28; 0.1.6 stays published unchanged for rollback.
 
 ## Screenshots (browser preview of Synthetic Space Watch, not Android)
 
