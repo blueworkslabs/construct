@@ -145,6 +145,9 @@ class ModuleActivity : ComponentActivity() {
     private var screenCapture = ScreenCapturePolicy.Decision(secure = true, hideRecents = false)
     private var screenResumed = false
     private val privacyCurtains = PrivacyCurtains(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
+    private val foreground = ForegroundEligibility(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
+    /** Foreground sensors stop on losing eligibility and stay off until the module asks again. */
+    private fun applyForeground() { webView?.setActivityPaused(!foreground.eligible) }
 
     private fun applyScreenCapture() {
         if (ScreenCapturePolicy.secureWindow(screenCapture, screenResumed, hasWindowFocus()))
@@ -159,12 +162,12 @@ class ModuleActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume(); screenResumed = true; applyScreenCapture(); privacyCurtains.resume()
-        // Foreground sensors stay off until the module asks again; pickers resume in onPostResume.
-        webView?.setActivityPaused(false)
+        // Pickers resume in onPostResume; sensors need top-resumed too on Android 10+.
+        foreground.resume(); applyForeground()
     }
 
     override fun onPause() {
-        webView?.setActivityPaused(true)
+        foreground.pause(); applyForeground()
         privacyCurtains.pause(); screenResumed = false; applyScreenCapture(); super.onPause()
     }
 
@@ -173,6 +176,8 @@ class ModuleActivity : ComponentActivity() {
     }
 
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        // Multi-window: another app can become top-resumed while this one stays resumed.
+        foreground.topResumed(isTopResumedActivity); applyForeground()
         privacyCurtains.topResumed(isTopResumedActivity)
         super.onTopResumedActivityChanged(isTopResumedActivity)
     }
@@ -282,7 +287,7 @@ class ModuleActivity : ComponentActivity() {
                         try {
                             moduleWebView(context, store, active, pickImage = ::pickImage, capturePhoto = ::capturePhoto, confirmPhoto = ::confirmPhoto) { failedView, code ->
                                 if (webView === failedView) finishSession(error = code)
-                            }.also { webView = it; it.setActivityPaused(!screenResumed) }
+                            }.also { webView = it; it.setActivityPaused(!foreground.eligible) }
                         } catch (error: Exception) {
                             android.widget.TextView(context).apply {
                                 val code = (error as? ConstructError)?.code ?: "OPEN_FAILED"

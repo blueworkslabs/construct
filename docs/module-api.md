@@ -348,11 +348,14 @@ knows its place converts to true north itself.
 - A menu pause stops the stream and fails a pending `get` with
   `RUN_PAUSED` through the bridge, like other asynchronous capabilities (the
   native sensor session cancels immediately). After resume the module must call `watch` again.
-- An **activity pause** also stops it, even when Android does not stop the
-  activity: another window in front, a system dialog, Home or Recents. It happens
-  in `onPause`, before `onStop`. While the activity is paused, new `get` and `watch`
-  requests fail with `RUN_PAUSED`. Resume does not restart the stream; the module
-  must call `watch` again. Image and camera pickers keep their existing pause and
+- **Losing the foreground** also stops it, even when Android does not stop the
+  activity. That covers another window in front, a system dialog, Home or
+  Recents, and, on Android 10+, another app becoming top-resumed in split screen
+  or freeform while this activity stays resumed. Eligibility needs the activity
+  resumed and, on Android 10+, also top-resumed. It is checked at `onResume`,
+  `onPause` (before `onStop`) and every top-resumed change. While the activity is
+  ineligible, new `get` and `watch` requests fail with `RUN_PAUSED`. Regaining the
+  foreground does not restart the stream; the module must call `watch` again. Image and camera pickers keep their existing pause and
   completion handling.
 - When the host ends an active stream because of an activity pause or a revoked
   grant, it sends one final `constructorientation` event with

@@ -285,4 +285,49 @@ class OrientationTest {
         assertNull(OrientationMath.measurementTime(0L, 1_000_000_000L, 10_000L))
     }
 
+
+    @Test fun foregroundNeedsResumedAndTopResumedOnAndroidQ() {
+        val q = ForegroundEligibility(needsTopResumed = true)
+        assertFalse(q.eligible)
+        q.resume(); assertFalse("onResume precedes top-resumed true", q.eligible)
+        q.topResumed(true); assertTrue(q.eligible)
+        q.topResumed(false); assertFalse("multi-window: another app is top-resumed, no onPause", q.eligible)
+        q.topResumed(true); assertTrue(q.eligible)
+        q.pause(); assertFalse(q.eligible)
+        q.resume(); assertTrue("still top-resumed", q.eligible)
+        q.topResumed(false); q.pause(); q.topResumed(true); assertFalse("paused wins", q.eligible)
+        // Before Android 10 only one activity is resumed at a time.
+        val legacy = ForegroundEligibility(needsTopResumed = false)
+        legacy.resume(); assertTrue(legacy.eligible); legacy.topResumed(false); assertTrue(legacy.eligible)
+        legacy.pause(); assertFalse(legacy.eligible)
+    }
+
+    @Test fun topResumedLossStopsOnceAndRegainingDoesNotRestart() {
+        val view = ModuleSessionView(RuntimeEnvironment.getApplication())
+        val fg = ForegroundEligibility(needsTopResumed = true)
+        val r = Rig()
+        var stops = 0
+        view.stopForeground = { stops++; r.activityPaused = true; r.session.cancel("paused") }
+        fun apply() { view.setActivityPaused(!fg.eligible); r.activityPaused = view.activityPaused.get() }
+        // Late WebView creation before any callback: not eligible, so requests are denied.
+        apply(); denied("RUN_PAUSED") { r.request("{op:'watch'}") }
+        fg.resume(); apply(); denied("RUN_PAUSED") { r.request("{op:'watch'}") }
+        fg.topResumed(true); apply()
+        stops = 0 // the late-created view started ineligible
+        r.request("{op:'watch'}"); r.send(10_000_000L); assertEquals(1, r.emitted.size)
+        // Another app takes top-resumed in split screen: sampling stops, one terminal event.
+        fg.topResumed(false); apply()
+        assertFalse(r.listening); assertEquals(listOf("paused"), r.ended); assertEquals(1, stops)
+        denied("RUN_PAUSED") { r.request("{op:'get'}") }
+        // A later onPause while already ineligible neither stops again nor reports again.
+        fg.pause(); apply(); assertEquals(1, stops); assertEquals(1, r.ended.size)
+        // Regaining eligibility does not restart the watch.
+        fg.resume(); fg.topResumed(true); apply()
+        r.send(500_000_000L); assertEquals(1, r.emitted.size); assertFalse(r.listening)
+        r.request("{op:'watch'}"); r.send(700_000_000L); assertEquals(2, r.emitted.size)
+        // Menu and picker gating stay independent of foreground eligibility.
+        view.pauseForPicker(); assertTrue(view.gate.paused.get()); assertFalse(view.activityPaused.get())
+        view.setMenuPaused(false); assertFalse(view.gate.paused.get())
+        view.destroy()
+    }
 }

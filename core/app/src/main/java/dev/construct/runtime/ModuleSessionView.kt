@@ -24,6 +24,21 @@ internal class ModuleSessionGate {
     }
 }
 
+/**
+ * Whether foreground-only sensors may run: the activity is resumed and, on Android 10+ where
+ * several activities can be resumed at once, also top-resumed. Callback order varies
+ * (onResume usually precedes top-resumed true; multi-window can drop top-resumed without
+ * onPause), so each callback updates one input and [eligible] combines them.
+ */
+internal class ForegroundEligibility(private val needsTopResumed: Boolean) {
+    private var resumed = false
+    private var top = false
+    val eligible: Boolean get() = resumed && (!needsTopResumed || top)
+    fun resume() { resumed = true }
+    fun pause() { resumed = false }
+    fun topResumed(value: Boolean) { top = value }
+}
+
 internal open class ModuleSessionView(context: Context) : WebView(context) {
     init {
         // WRAP_CONTENT makes Android WebView treat CSS viewport-height units as zero,
