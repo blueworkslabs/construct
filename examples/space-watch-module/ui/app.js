@@ -1110,7 +1110,7 @@
     follow.lastSample = 0;
     if (dome && resetDome) dome.turn(0);
   }
-  async function startFollow() {
+  async function startFollow(retryUntil = 0) {
     if (!active || !place) return;
     clearHeading();
     const request = ++follow.request;
@@ -1123,6 +1123,17 @@
       message($("follow-status"), "Hold the phone flat, top pointing where you face.");
     } catch (e) {
       if (request !== follow.request) return;
+      // Menu visibility can be delivered before the window focus callback.
+      // Only explicit menu return gets this bounded retry; terminal events,
+      // a new pause or Follow off invalidate the request and cancel it.
+      if (e.code === "RUN_PAUSED" && active && follow.want && Date.now() < retryUntil) {
+        message($("follow-status"), "Waiting for the module to regain focus…");
+        applyFollow(true);
+        setTimeout(() => {
+          if (request === follow.request && active && follow.want) startFollow(retryUntil);
+        }, 100);
+        return;
+      }
       follow.on = follow.want = false;
       message(
         $("follow-status"),
@@ -1285,7 +1296,7 @@
     if (follow.want) {
       follow.on = false;
       follow.heading = null;
-      startFollow();
+      startFollow(Date.now() + 2000);
     }
     frame();
     refreshData();

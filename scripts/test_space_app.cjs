@@ -19,8 +19,8 @@ const LAUNCH = JSON.stringify([
   {NORAD_CAT_ID: 29507, OBJECT_TYPE: 'R/B', OBJECT_NAME: 'CZ-4B R/B', OBJECT_ID: '2006-046C'},
 ]);
 const WIKI = JSON.stringify({query: {pages: [{title: 'Long March 4B', extract: 'The Long March 4B is a Chinese launch vehicle.', fullurl: 'https://en.wikipedia.org/wiki/Long_March_4B'}]}});
-function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, recentBody = RECENT, recentSatcatBody = RECENT_SATCAT, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false, planScenario = false, orientError = null, pendingOrientation = false} = {}) {
-  const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [], heldOrientation = [];
+function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, recentBody = RECENT, recentSatcatBody = RECENT_SATCAT, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false, planScenario = false, orientError = null, pendingOrientation = false, orientationErrors = []} = {}) {
+  const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [], heldOrientation = [], followRetries = [];
   const storage = structuredClone(saved);
   let now = clock;
   class Element {
@@ -45,7 +45,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
   const Clock = class extends Date { constructor(...a) { super(...(a.length ? a : [now])); } static now() { return now; } };
   const sandbox = {
     document: {getElementById: el, createElement: tag => new Element(tag), body: {classList: {toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)), contains: c => classes.has(c)}}},
-    Date: Clock, setInterval: fn => timers.push(fn), setTimeout: (fn, delay) => delay === 0 ? setImmediate(fn) : 0, Math, JSON, Promise, Map, Set, URLSearchParams,
+    Date: Clock, setInterval: fn => timers.push(fn), setTimeout: (fn, delay) => delay === 0 ? setImmediate(fn) : delay === 100 ? followRetries.push(fn) : 0, Math, JSON, Promise, Map, Set, URLSearchParams,
     addEventListener(type, handler) { events[type] = handler; },
     call: async (method, params) => {
       calls.push({method, params: JSON.parse(JSON.stringify(params))});
@@ -55,6 +55,8 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
       }
       if (method === 'orientation.read') {
         if (pendingOrientation && params.op === 'watch') return new Promise(resolve => heldOrientation.push(() => resolve({watching: true, rateHz: 10})));
+        const denied = params.op === 'watch' ? orientationErrors.shift() : null;
+        if (denied) throw Object.assign(new Error(denied), {code: denied});
         if (orientError) throw Object.assign(new Error(orientError), {code: orientError});
         return params.op === 'watch' ? {watching: true, rateHz: params.rateHz ?? 10} : {watching: false};
       }
@@ -89,6 +91,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
   }
   const http = () => calls.filter(c => c.method === 'net.http').map(c => c.params.url);
   return {el, calls, storage, classes, http, dome: () => sandbox.domeSnapshot, select: id => sandbox.selectObject(id),
+    retryFollow: () => { now += 100; followRetries.splice(0).forEach(f => f()); },
     finishOrientation: () => heldOrientation.splice(0).forEach(f => f()),
     finishLocation: () => heldLocation.splice(0).forEach(f => f()),
     finishHttp: () => held.splice(0).forEach(f => f()),
@@ -527,5 +530,25 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   r.submit(90, 0); r.orient(sample);
   assert.equal(r.rotation(), 0); assert.equal(r.dome().follow, false);
   assert(r.el('spot-turn').hidden); assert.match(r.el('follow-status').textContent, /True-north correction unavailable/);
+  // Menu visibility may arrive before the native window regains focus.
+  r = rig({orientationErrors:[null,'RUN_PAUSED',null]}); await flush(8);
+  await r.el('follow').onclick();r.visibility(false);r.visibility(true);await flush();
+  r.retryFollow();await flush();
+  assert.equal(r.el('follow').attributes['aria-pressed'],'true');
+  assert.equal(r.calls.filter(c=>c.method==='orientation.read'&&c.params.op==='watch').length,3);
+  // A terminal event or explicit off cancels the bounded menu-return retry.
+  for(const cancel of ['terminal','off']) {
+    r = rig({orientationErrors:[null,'RUN_PAUSED',null]});await flush(8);
+    await r.el('follow').onclick();r.visibility(false);r.visibility(true);await flush();
+    if(cancel==='terminal')r.orient({watching:false,reason:'paused'});else r.el('follow').onclick();
+    r.retryFollow();await flush();
+    assert.equal(r.calls.filter(c=>c.method==='orientation.read'&&c.params.op==='watch').length,2,cancel);
+    assert.equal(r.el('follow').attributes['aria-pressed'],'false');
+  }
+  r = rig({orientationErrors:[null,...Array(30).fill('RUN_PAUSED')]});await flush(8);
+  await r.el('follow').onclick();r.visibility(false);r.visibility(true);await flush();
+  for(let i=0;i<25;i++){r.retryFollow();await flush();}
+  assert.equal(r.el('follow').attributes['aria-pressed'],'false');
+  const attempts=r.calls.length;r.retryFollow();await flush();assert.equal(r.calls.length,attempts,'bounded retry stops');
   console.log('Space Watch app checks passed: start, privacy (no coordinates in URLs or storage), list selection, spot words, details, Wikipedia on request, rewind, red mode, visible passes and preview, trains (plan, details, cache, optional failure), cache reuse/expiry/torn cache, CelesTrak back-off, location fallbacks, paused downloads and follow mode (true north, smoothing, guidance, calibration, pause, denial).');
 })().catch(error => { console.error(error); process.exitCode = 1; });

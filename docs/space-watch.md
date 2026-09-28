@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.3.1** (source candidate) is a signed HTML/CSS/JavaScript module for
+Space Watch **0.3.2** (source candidate) is a signed HTML/CSS/JavaScript module for
 host **API 0.14**; the published **0.2.14** runs on API 0.9 / alpha26 and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -11,7 +11,7 @@ Aircraft are a 10–100 km map question. Orbiting objects are seen from well ove
 1,000 km away and cross a 100 km circle in about 25 seconds, so they need a sky
 view, not a map.
 
-## Module 0.3.1: follow mode (API 0.14, source candidate)
+## Module 0.3.2: follow mode (API 0.14, source candidate)
 
 **Follow** turns the dome with the phone. Hold the phone flat with its top pointing
 where you face: your heading is at the top of the dome, and a ±28° wedge shows your
@@ -39,7 +39,9 @@ slightly right.", "Turn left about 40°." or "Behind you: turn around."
   south-west · compass ±12°". When the host flags `calibrate`, it asks for a
   figure-8 wave. Guidance is always a wedge and words, never a crosshair.
 - **Lifecycle.** A menu pause stops the host stream, and Space Watch asks again on
-  return. When the host itself ends the stream, it sends `{watching:false,
+  return, retrying a transient `RUN_PAUSED` for at most two seconds while window
+  focus returns. Follow off, another pause or a terminal event cancels this retry.
+  When the host itself ends the stream, it sends `{watching:false,
   reason}`: that happens for another window in front, Home, Recents, the
   notification shade or Quick Settings (`paused`), and for access turned off (`revoked`). Follow then turns off and
   says why, and a tap turns it back on. It never restarts silently. Turning
@@ -47,7 +49,7 @@ slightly right.", "Turn left about 40°." or "Behind you: turn around."
 - **Storage.** Nothing about headings is stored, and Follow always starts off.
 - **Fallback.** Without the grant or a compass, a note explains what's missing
   and the static compass dome keeps working.
-- **Delivery.** 0.3.1 declares `constructApi` 0.14.0 exactly. Publish it only
+- **Delivery.** 0.3.2 declares `constructApi` 0.14.0 exactly. Publish it only
   after an API 0.14 host is released. Older hosts keep 0.2.14 from the catalog's
   version list.
 

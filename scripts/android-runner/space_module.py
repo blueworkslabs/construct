@@ -11,7 +11,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_space_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.space-watch package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.space-watch-fixture package digest')
-p.add_argument('--version',default='0.3.1')
+p.add_argument('--version',default='0.3.2')
 p.add_argument('--follow',action='store_true',help='Also verify API 0.14 Follow with real host orientation on alpha37+')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
@@ -250,6 +250,11 @@ try:
  open_module(FIXTURE);module_access();switch('Allow approved internet sources',True);reopen()
  contains('visible ·');capture('space-dome')
  done('Signed fixture opens its computed dome and equivalent overhead list')
+ if a.follow:
+  follow_checks()
+  # Follow setup/revocation ends in a fresh process with Follow off; reset the
+  # fixture clock so the original pass and pointing assertions remain meaningful.
+  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·')
  reach_text('Visible passes · next 12 h')
  reach_text('Now · ISS (Zarya)');scroll('down',500);capture('space-plan')
  reach_text('highest 1½ fists up in the SW')
@@ -315,7 +320,6 @@ try:
  # Native menu pause/resume on retained data, then real module gates.
  tap('Construct menu');tap('Return to module');contains('visible ·')
  done('Native menu pause/resume restores the sky')
- if a.follow:follow_checks()
  tap('Construct menu');find('Mark working');tap('Mark working');install(REAL,a.module_sha);open_module(REAL)
  contains('Phone location isn’t enabled');capture('space-real-location-denied')
  done('Real module refuses ungranted phone location and offers manual place')
@@ -375,6 +379,11 @@ except Exception as e:
  receipt['error']=str(e)
  try:(run/'failure-nodes.json').write_text(json.dumps([dict(n.attrib) for n in nodes()],indent=2));capture('failure')
  except Exception:pass
+ if a.follow:
+  try:
+   reveal(lambda t:t in (FIXTURE,REAL));capture('failure-follow-top')
+   (run/'failure-sensors.txt').write_text(adb('shell','dumpsys','sensorservice'))
+  except Exception:pass
  raise
 finally:
  if started:

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "dev.construct.space-watch",
   "name": "Space Watch",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "What's passing overhead: a sky dome of the brightest satellites, rocket stages and fresh satellite trains, with plain-language pointing, rewind, the next visible passes, details and a follow mode that turns the dome with your phone. Positions are computed on the phone; your location is never sent. Requires Construct API 0.14.",
   "constructApi": {
     "min": "0.14.0",
