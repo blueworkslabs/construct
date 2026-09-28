@@ -313,10 +313,14 @@ test("train passes merge member intervals, one bounded scan per member", () => {
   near(centrePass.startMs, "2026-09-28T18:26:50Z", 10);
   near(merged.startMs, "2026-09-28T18:23:55Z", 10);
   assert.ok(merged.endMs >= centrePass.endMs && merged.maxEl >= centrePass.maxEl);
-  // Merge rules: overlap or a gap under a minute joins; a longer gap does not.
+  // Only overlaps/touching intervals join: a real gap is not a visible pass.
   const p = (a, b, el = 20) => ({ startMs: a * 1000, endMs: b * 1000, maxMs: a * 1000, maxEl: el, endReason: "sets", startReason: "rises" });
   assert.deepEqual(P.mergePasses([p(100, 200), p(150, 300, 40), p(350, 400), p(500, 600)]).map((x) => [x.startMs / 1000, x.endMs / 1000, x.maxEl]),
-    [[100, 400, 40], [500, 600, 20]]);
+    [[100, 300, 40], [350, 400, 20], [500, 600, 20]]);
+  assert.equal(P.mergePasses([p(0, 10), p(10, 20)]).length, 1, "touching visibility intervals merge");
+  const short = P.mergePasses([p(0, 10), p(60, 70)]);
+  assert.equal(short.length, 2, "an invisible 50-second gap must not be advertised as visible");
+  assert.equal(P.previewTime(short[0], 0), 5000, "short preview remains in the first visible interval");
 });
 test("trains: fresh batches that still fly bunched, with launch dates", () => {
   const recent = JSON.parse(fs.readFileSync("scripts/space-fixture/recent.json", "utf8")),
@@ -346,7 +350,7 @@ test("planner distinguishes clipped windows and keeps short previews inside visi
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
   assert.equal(m.id, "dev.construct.space-watch");
-  assert.equal(m.version, "0.2.9");
+  assert.equal(m.version, "0.2.10");
   assert.deepEqual(m.constructApi, { min: "0.9.0", target: "0.9.0" });
   const caps = Object.fromEntries(m.capabilities.map((c) => [c.id, c]));
   assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "storage.kv"]);
@@ -371,7 +375,7 @@ test("package: manifest, capabilities, scripts and no location in any URL", () =
   for (const shared of ["construct-ui.css", "bridge.js"])
     assert.equal(fs.readFileSync(root + "ui/" + shared, "utf8"), fs.readFileSync("examples/sky-watch-module/ui/" + shared, "utf8"), shared);
   const docs = fs.readFileSync("docs/space-watch.md", "utf8");
-  assert.match(docs, /Space Watch \*\*0\.2\.9\*\*/);
+  assert.match(docs, /Space Watch \*\*0\.2\.10\*\*/);
   // Vendored libraries are pinned by hash in the doc.
   for (const f of ["satellite.min.js", "astronomy.min.js"]) {
     const sha = crypto.createHash("sha256").update(fs.readFileSync(root + "ui/vendor/" + f)).digest("hex");

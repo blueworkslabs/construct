@@ -80,6 +80,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
     if (f === 'app.js') vm.runInContext('SpaceDome = class extends SpaceDome { constructor(c, cb) { super(c, cb); window.selectObject = cb; } set(s) { window.domeSnapshot = s; } }', context);
     vm.runInContext(fs.readFileSync(root + f, 'utf8'), context, {filename: f});
     if (f === 'space-plan.js' && planScenario) vm.runInContext(`SpacePlan.darkRanges = (from,to)=>[[from,to]]; SpacePlan.passes = (o,ob,ranges)=> { const t=${clock} + 12.25*3600000; return o.id===25544 && ranges.some(([a,b])=>a<=t&&t<=b) ? [{startMs:t,endMs:t+120000,maxMs:t+60000,startAz:90,endAz:180,maxAz:135,startEl:10,endEl:10,maxEl:20,startReason:'rises',endReason:'sets'}] : []; };`,context);
+    if (f === 'space-plan.js' && planScenario === 'repeated') vm.runInContext(`SpacePlan.passes = (o)=>o.id===25544 ? [60000,600000].map(dt=>({startMs:${clock}+dt,endMs:${clock}+dt+120000,maxMs:${clock}+dt+60000,startAz:90,endAz:180,maxAz:135,startEl:10,endEl:10,maxEl:20,startReason:'rises',endReason:'sets'})) : [];`,context);
   }
   const http = () => calls.filter(c => c.method === 'net.http').map(c => c.params.url);
   return {el, calls, storage, classes, http, dome: () => sandbox.domeSnapshot, select: id => sandbox.selectObject(id),
@@ -359,6 +360,15 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
     r.tick(1, 2000);
     assert(button().text.includes('Now ·'), 'pass switches to Now immediately at start');
   }
+  // Two passes of one object must not both announce themselves as selected.
+  r=rig({planScenario:'repeated',recentBody:'[]'});await flush(8);r.tick(1,0);
+  const repeated=()=>r.el('plan-list').children;
+  assert.equal(repeated().length,2);
+  repeated()[1].click();
+  assert.deepEqual(repeated().map(b=>b.attributes['aria-pressed']),['false','true']);
+  repeated()[0].click();
+  assert.deepEqual(repeated().map(b=>b.attributes['aria-pressed']),['true','false']);
+  r.el('now').click();assert(repeated().every(b=>b.attributes['aria-pressed']==='false'));
   // A cached plan must include passes entering the rolling 12-hour window.
   r = rig({planScenario: true, recentBody: '[]'}); await flush(8); r.tick(1,0);
   assert.equal(r.el('plan-list').children.length,0, '12h15m pass is initially outside displayed horizon');

@@ -60,6 +60,14 @@ with sync_playwright() as p:
   page.evaluate('(scale)=>document.documentElement.style.fontSize=(16*scale)+"px"',scale)
   assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'Page horizontal overflow'
   page.locator('#details').click();page.locator('#wiki').click();page.locator('#close-info').click()
+ # Actual canvas render and hit testing: a remote bead maps to its train.
+ assert page.evaluate("""() => {
+   const canvas=document.createElement('canvas');canvas.style.width='320px';document.body.append(canvas);
+   let selected=null;const dome=new SpaceDome(canvas,id=>selected=id);
+   dome.set({red:false,dark:true,stars:[],lines:[],bodies:[],objects:[{id:'train:test',az:0,el:40,state:'visible',members:[{az:180,el:40}]}]});
+   const g=dome.geometry(),p=SpaceDome.project(180,40,g.cx,g.cy,g.r),r=canvas.getBoundingClientRect();
+   dome.tap({clientX:r.left+p[0],clientY:r.top+p[1]});canvas.remove();return selected==='train:test';
+ }"""),'Rendered train beads must be selectable'
  assert not errors,errors
  print('PASS real DOM: spot selection, explicit Wikipedia, rewind, red mode, planned train preview/back-to-now, portrait/landscape/2x train layout and dialogs')
  browser.close()

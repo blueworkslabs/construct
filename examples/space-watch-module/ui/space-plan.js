@@ -269,13 +269,13 @@ const SpacePlan = (() => {
     return out;
   }
   // A train is visible while any member is: merge member intervals that overlap
-  // or touch (within gapMs). Start fields come from the earliest member, end
+  // or touch. Invisible gaps must stay separate. Start fields come from the earliest member, end
   // fields from the latest, and the highest point from the highest member.
-  function mergePasses(list, gapMs = 60000) {
+  function mergePasses(list) {
     const out = [];
     for (const p of [...list].sort((a, b) => a.startMs - b.startMs)) {
       const cur = out[out.length - 1];
-      if (!cur || p.startMs > cur.endMs + gapMs) {
+      if (!cur || p.startMs > cur.endMs) {
         out.push({ ...p });
         continue;
       }

@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.2.9** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
+Space Watch **0.2.10** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
 alpha26** and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -16,8 +16,9 @@ view, not a map.
 Both features are module-only, with no host change, no new origin and no new
 consent. 0.1.6 stays published unchanged. 0.2.4 was the reviewed candidate after
 the initial 0.2.0 package; 0.2.8 added the grazing-pass refinement below and
-passed 16/16 Android checks. 0.2.9 plans trains from all their members (below)
-and needs its own acceptance.
+passed 16/16 Android checks. 0.2.10 plans trains from all their members (below)
+and needs its own acceptance. It also keeps invisible gaps out of merged passes,
+tracks selection per pass, and maps tappable train beads to the grouped train.
 
 - **Visible passes · next 12 h.** This lists passes of the bright objects (and
   trains) that should be visible from your place, soonest first, at most 10.
@@ -71,10 +72,10 @@ and needs its own acceptance.
   - **How it is shown:** a train is one entry, e.g. "Guowang train · 9 satellites
     in a line · launched 5 days ago". Its cluster representative gives the pointing
     words, and the other members are small beads on the dome.
-  - **Planning a train (0.2.9).** A train is visible while *any* member is. So
+  - **Planning a train (0.2.10).** A train is visible while *any* member is. So
     each member with a distinct element set is planned as its own queue entry,
-    and the member intervals are merged. Overlaps, or gaps under a minute, join
-    into one pass. The merged pass takes its start from the earliest member, its
+    and the member intervals are merged. Only overlapping or touching intervals join
+    into one pass; intervals with no visible member stay separate. The merged pass takes its start from the earliest member, its
     end from the latest, and its highest point from the highest member.
     - This keeps the pass list in step with the live state, which already points
       at a visible member.

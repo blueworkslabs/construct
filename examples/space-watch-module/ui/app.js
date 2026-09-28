@@ -32,6 +32,7 @@
     fetchState = { last: 0, until: 0, satcatLast: 0, satcatUntil: 0, recentLast: 0, recentUntil: 0 },
     prefs = { startWithLocation: true, red: false },
     selected = null,
+    selectedPass = null,
     offset = 0,
     active = true,
     epoch = 0,
@@ -598,7 +599,7 @@
         .filter((p) => p.endMs >= t && p.startMs <= t + PLAN_HOURS * HOUR && find(p.id))
         .sort((a, b) => a.startMs - b.startMs)
         .slice(0, 10),
-      key = list.map((p) => p.id + ":" + p.startMs + ":" + (p.startMs <= t)).join() + "|" + plan.i + "|" + plan.done + "|" + Math.floor(t / MINUTE) + "|" + selected + "|" + (offset > 0);
+      key = list.map((p) => p.id + ":" + p.startMs + ":" + (p.startMs <= t)).join() + "|" + plan.i + "|" + plan.done + "|" + Math.floor(t / MINUTE) + "|" + selected + "|" + selectedPass + "|" + (offset > 0);
     if (key === plan.shown) return;
     plan.shown = key;
     $("plan-status").textContent = !plan.ranges.length
@@ -613,7 +614,7 @@
         const f = find(p.id),
           b = element("button", null, "object pass");
         b.dataset.id = String(p.id);
-        b.setAttribute("aria-pressed", String(p.id === selected && offset > 0));
+        b.setAttribute("aria-pressed", String(p.id === selected && p.startMs === selectedPass && offset > 0));
         b.append(
           element("strong", `${p.startMs <= t ? "Now" : time(p.startMs)} · ${f.d.title}`),
           element("span", passLine(p)),
@@ -629,7 +630,7 @@
     offset = Math.max(0, Math.round((P.previewTime(p, now()) - now()) / 1000));
     $("rewind").value = "0";
     plan.shown = "";
-    select(p.id, true);
+    select(p.id, true, p.startMs);
   }
   function listLine(x) {
     const where = `${K.dir16(x.l.az)} · ${K.height(x.l.el)}`,
@@ -637,7 +638,7 @@
     return `${where} · ${state}`;
   }
   function renderList(s) {
-    const key = s.items.map((x) => x.id + x.state).join() + "|" + selected + "|" + (offset > 0);
+    const key = s.items.map((x) => x.id + x.state).join() + "|" + selected + "|" + selectedPass + "|" + (offset > 0);
     if (key !== listKey) {
       listKey = key;
       const rows = s.items.map((x) => {
@@ -726,8 +727,9 @@
     passes.set(o.id, { t, p });
     return p;
   }
-  function select(id, fromList = false) {
+  function select(id, fromList = false, passStart = null) {
     selected = id;
+    selectedPass = passStart;
     listKey = "";
     frame();
     if (fromList && id !== null) $("spot").scrollIntoView({ block: "nearest" });
@@ -1052,12 +1054,14 @@
     frame();
   };
   $("rewind").oninput = () => {
+    selectedPass = null;
     const v = Number($("rewind").value);
     offset = Number.isFinite(v) ? Math.max(-300, Math.min(0, Math.round(v))) : 0;
     listKey = "";
     frame();
   };
   $("now").onclick = () => {
+    selectedPass = null;
     offset = 0;
     $("rewind").value = "0";
     listKey = "";

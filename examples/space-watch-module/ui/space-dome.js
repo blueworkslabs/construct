@@ -191,6 +191,7 @@ class SpaceDome {
         // A train: its other members as small beads, then the stand-in.
         for (const m of o.members || []) {
           const [mx, my] = P(m.az, m.el);
+          this.points.push({ id: o.id, x: mx, y: my, on });
           g.beginPath();
           g.arc(mx, my, 1.8, 0, 2 * Math.PI);
           g.fill();
