@@ -38,7 +38,7 @@ const SpacePlan = (() => {
     let first = null,
       last = null,
       max = null,
-      before = null,
+      before = { ...visibleAt(o, ob, a - 5000, sunAltAt), t: a - 5000 },
       after = null;
     for (let t = a; t <= b; t += 5000) {
       const { l, v } = visibleAt(o, ob, t, sunAltAt);
@@ -55,7 +55,7 @@ const SpacePlan = (() => {
     }
     if (!first) return null;
     const why = (x, edge) =>
-      !x ? edge : x.l.el < O.VISIBLE_EL ? edge : !x.l.sunlit ? "shadow" : "daylight";
+      !x || !x.l ? edge : x.l.el < O.VISIBLE_EL ? edge : !x.l.sunlit ? "shadow" : "daylight";
     return {
       startMs: first.t,
       endMs: last.t,
@@ -66,8 +66,8 @@ const SpacePlan = (() => {
       maxMs: max.t,
       maxAz: max.l.az,
       maxEl: max.l.el,
-      startReason: why(before, "rises"),
-      endReason: why(after, "sets"),
+      startReason: before && before.v ? "ongoing" : why(before, "rises"),
+      endReason: after ? why(after, "sets") : "window",
     };
   }
   // Visible passes of one object within the given dark ranges: coarse 60 s scan
@@ -130,7 +130,8 @@ const SpacePlan = (() => {
     const out = [];
     for (const g of groups.values()) {
       if (g.members.length < TRAIN_MIN) continue;
-      const ps = g.members.map((o) => ({ o, p: O.position(o, ms) })).filter((x) => x.p);
+      const ps = g.members.filter((o) => Math.abs(ms - o.epoch) <= 3 * 86400000)
+        .map((o) => ({ o, p: O.position(o, ms) })).filter((x) => x.p);
       let best = null;
       for (const a of ps) {
         const near = ps.filter((b) => centralAngle(a.p, b.p) <= TRAIN_CLUSTER);
@@ -174,6 +175,7 @@ const SpacePlan = (() => {
     for (const r of rows) if (r && r[9] && r[3] && !out.has(r[9].slice(0, 8))) out.set(r[9].slice(0, 8), r[3]);
     return out;
   }
-  return { darkRanges, passes, examine, family, trains, trainRows, launchDates, TRAIN_MIN, TRAIN_CLUSTER };
+  const previewTime = (p, now) => Math.max(now, Math.min(p.startMs + 20000, (p.startMs + p.endMs) / 2));
+  return { darkRanges, passes, examine, family, trains, trainRows, launchDates, previewTime, TRAIN_MIN, TRAIN_CLUSTER };
 })();
 if (typeof module !== "undefined") module.exports = SpacePlan;

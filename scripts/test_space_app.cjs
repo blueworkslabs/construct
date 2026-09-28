@@ -19,7 +19,7 @@ const LAUNCH = JSON.stringify([
   {NORAD_CAT_ID: 29507, OBJECT_TYPE: 'R/B', OBJECT_NAME: 'CZ-4B R/B', OBJECT_ID: '2006-046C'},
 ]);
 const WIKI = JSON.stringify({query: {pages: [{title: 'Long March 4B', extract: 'The Long March 4B is a Chinese launch vehicle.', fullurl: 'https://en.wikipedia.org/wiki/Long_March_4B'}]}});
-function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false} = {}) {
+function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, recentBody = RECENT, recentSatcatBody = RECENT_SATCAT, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false} = {}) {
   const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [];
   const storage = structuredClone(saved);
   let now = clock;
@@ -64,8 +64,8 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
         if (netError) throw Object.assign(new Error(netError), {code: netError});
         const result = u === GP ? (gpStatus === 200 ? {status: 200, text: elementsBody} : {status: gpStatus})
           : u === SC ? (satcatStatus === 200 ? {status: 200, text: SATCAT} : {status: satcatStatus})
-          : u === RGP ? (recentStatus === 200 ? {status: 200, text: RECENT} : {status: recentStatus})
-          : u === RSC ? {status: 200, text: RECENT_SATCAT}
+          : u === RGP ? (recentStatus === 200 ? {status: 200, text: recentBody} : {status: recentStatus})
+          : u === RSC ? {status: 200, text: recentSatcatBody}
           : u.includes('INTDES=') ? {status: 200, text: launchBody}
           : u.startsWith('https://en.wikipedia.org/') ? {status: 200, text: WIKI} : {status: 404};
         if (typeof pendingHttp === "function" ? pendingHttp(u) : pendingHttp) return new Promise(resolve => held.push(() => resolve(result)));
@@ -291,7 +291,7 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   assert.equal(r.el('plan-status').textContent, 'Tap one to preview it on the dome.');
   const planned = r.el('plan-list').children;
   assert(planned.length >= 5 && planned.length <= 10);
-  assert.match(planned.find(b => b.dataset.id === '25544').text, /^ Now · ISS \(Zarya\) WSW → SSW · highest 1½ fists up in the SW · [34] min rises WSW, sets 1 fist up in the SSW$/);
+  assert.match(planned.find(b => b.dataset.id === '25544').text, /^ Now · ISS \(Zarya\) WSW → SSW · highest 1½ fists up in the SW · [34] min already visible WSW, sets 1 fist up in the SSW$/);
   // Trains come from the last-30-days list and can be planned like anything else.
   const guowang = planned.find(b => b.dataset.id === 'train:2026-221');
   assert(guowang, 'Guowang train pass planned'); assert.match(guowang.text, /^ [\d:]+( [AP]M)? · Guowang train /);
@@ -316,6 +316,22 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   r = rig({saved: withTrains, clock: START + 10 * 60000}); await flush(8); r.tick(1); await flush();
   assert.deepEqual(r.http(), []);
   assert(r.el('plan-list').children.some(b => b.dataset.id === 'train:2026-221'));
+  r.el('plan-list').children.find(b => b.dataset.id === 'train:2026-221').click();
+  r.el('details').click(); await flush(4);
+  assert.match(r.el('info-body').text, /9 of 11 from this launch/, 'cache preserves original batch size');
+  // Bad optional responses must preserve the prior cache and observe backoff.
+  for (const bad of ['{"error":"notice"}', '[{"broken":true}]', 'not json']) {
+    for (const field of ['recentBody', 'recentSatcatBody']) {
+      r = rig({saved: withTrains, clock: START + 9 * HOUR, [field]: bad}); await flush(10);
+      assert.equal(r.storage['recent.meta'].at, withTrains['recent.meta'].at);
+      assert.equal(r.storage['fetch-state'].recentUntil, START + 11 * HOUR);
+      assert.match(r.el('data-status').textContent, /^Orbit data .+ old · CelesTrak$/);
+    }
+  }
+  // A genuinely empty recent list is valid and remains fresh across reopen.
+  r = rig({recentBody: '[]'}); await flush(8);
+  r = rig({saved: r.storage, clock: START + HOUR}); await flush(8);
+  assert.deepEqual(r.http(), [], 'valid empty recent data should not refetch on every reopen');
   // Trains are optional: a failing recent list leaves the sky and its message alone.
   r = rig({recentStatus: 503}); await flush(8);
   assert.deepEqual(r.http(), [GP, SC, RGP]);

@@ -23,9 +23,10 @@ consent. 0.1.6 stays published unchanged; 0.2.0 is a new immutable version.
     duration.
   - It also says how the pass begins and ends: "rises", "comes out of Earth's
     shadow" or "appears as the sky darkens"; "sets", "fades into Earth's shadow"
-    or "fades in the brightening sky".
+    or "fades in the brightening sky". Clipped intervals say "already visible"
+    or "still visible at window end", rather than inventing a rise or set.
   - **Tap one to preview it:** the dome, the list and the spot card jump to 20 s
-    after it becomes visible and run on in real time. The spot card says
+    after it becomes visible (or the midpoint of a shorter interval) and run on in real time. The spot card says
     "At 18:27:", the label says **Preview 18:27**, and **Back to now** returns.
   - **How it is worked out:**
     - Dark stretches (Sun below −6°) are found first on a 10-minute grid, so
@@ -33,7 +34,7 @@ consent. 0.1.6 stays published unchanged; 0.2.0 is a new immutable version.
     - Each object is then scanned every 60 s for rises above 10°, refined to
       5 s, and the visible stretch is sampled every 5 s.
     - The work runs in slices of about 15 ms between frames, with a progress
-      line. It is redone after 30 minutes, a new place or new data.
+      line. It is redone after 30 minutes, a new place, new data or changed train membership.
     - The ISS pass of 28 Sep over Berlin again matches Heavens-Above to within
       10 s.
 - **Trains.** Freshly launched Starlink, Qianfan, Guowang, Kuiper and OneWeb
@@ -42,11 +43,13 @@ consent. 0.1.6 stays published unchanged; 0.2.0 is a new immutable version.
     and 69 KB as of 2026-09-28.
   - **What counts as a train:** at least eight satellites of one family from one
     launch, still within 10° of one of them as seen from Earth's centre.
-    Batches that have spread around their orbit, and stragglers with stale
-    elements, drop out. On 2026-09-28 this found Starlink 2026-219 (23 of 27,
-    launched 20 Sep) and Guowang 2026-221 (9 of 11, launched 23 Sep).
+    Elements more than 72 hours from the displayed real clock do not contribute
+    to a train; membership is rechecked each minute. Spread-out batches drop out.
+    The retained fixture qualifies Guowang 2026-221 (9 of 11, launched 23 Sep).
+    Its 23 clustered Starlinks from 2026-219 share eight-day-old launch elements,
+    so that batch is excluded instead of advertised as a current train.
   - **How it is shown:** a train is one entry, e.g. "Guowang train · 9 satellites
-    in a line · launched 5 days ago". Its middle satellite gives the pointing
+    in a line · launched 5 days ago". Its cluster representative gives the pointing
     words, and the other members are small beads on the dome.
   - **Honest note:** early orbit data for a batch is rough, and CelesTrak often
     gives a whole batch one shared set of elements. The card therefore says to
@@ -57,13 +60,17 @@ consent. 0.1.6 stays published unchanged; 0.2.0 is a new immutable version.
     Guowang, Project Kuiper, OneWeb).
   - **Downloads:** the recent lists are fetched with the orbits (8-hour
     freshness, 15-minute spacing, 2-hour back-off on 403/429 or bad data). Only
-    the current train members are cached (`recent.*`, about 5 KB) plus their
-    launch dates (`recent-launches`). The whole cache stays near 38 KB of the
+    batches that currently contain a qualifying train are cached (`recent.*`),
+    including their stragglers so the original batch count survives reopening,
+    plus launch dates (`recent-launches`). Storage remains subject to the host
     64 KiB quota.
   - **Failure:** trains are optional. If the recent lists fail, the rest of the
-    sky and its status line are unaffected.
+    sky and its status line are unaffected. Invalid replies retain the previous
+    train snapshot and back off for two hours; valid empty lists remain fresh
+    across reopening.
 
-Browser previews of Synthetic Space Watch 0.2.0 (desktop Chromium, not Android):
+Original browser previews of Synthetic Space Watch 0.2.0 (desktop Chromium,
+not Android; pre-review wording and stale-train policy):
 
 ![Visible passes](images/space-watch-0.2.0/plan.jpg)
 ![Previewing the Guowang train pass](images/space-watch-0.2.0/train.jpg)

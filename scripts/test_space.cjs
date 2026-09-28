@@ -230,12 +230,21 @@ test("trains: fresh batches that still fly bunched, with launch dates", () => {
   const trains = P.trains(O.build(rows), dates, at("2026-09-28T18:00:00Z"));
   assert.deepEqual(trains.map((t) => [t.id, t.family, t.launch, t.members.length, t.batch]), [
     ["train:2026-221", "Guowang", "2026-09-23", 9, 11],
-    ["train:2026-219", "Starlink", "2026-09-20", 23, 27],
   ]);
   for (const t of trains) assert.ok(t.spread <= 2 * P.TRAIN_CLUSTER && t.members.includes(t.centre));
   assert.equal(P.family("STARLINK-38381").wiki, "Starlink");
   assert.equal(P.family("KUIPER-P1").wiki, "Project Kuiper");
   assert.equal(P.family("COSMOS 2428"), null);
+  const stale = O.build(rows).map(o => ({...o, epoch: at("2026-09-24T18:00:00Z")}));
+  assert.equal(P.trains(stale, dates, at("2026-09-28T18:00:00Z")).length, 0, "stale elements must not advertise a fresh train");
+});
+test("planner distinguishes clipped windows and keeps short previews inside visibility", () => {
+  const from = at("2026-09-28T17:51:00Z"), to = from + 10000;
+  const p = P.examine(byId(25544), ob, from, to, sunAt);
+  assert.equal(p.startReason, "ongoing");
+  assert.equal(p.endReason, "window");
+  assert(P.previewTime(p, from - 60000) >= p.startMs);
+  assert(P.previewTime(p, from - 60000) < p.endMs);
 });
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
@@ -260,7 +269,7 @@ test("package: manifest, capabilities, scripts and no location in any URL", () =
   const urls = [C.ELEMENTS_URL, C.SATCAT_URL, C.RECENT_URL, C.RECENT_SATCAT_URL, C.launchUrl("1998-067A"), C.wikiUrl({ wiki: "International Space Station" }), C.wikiUrl({ search: "COSMOS 2428" }, true)];
   for (const u of urls) assert.match(u, /^https:\/\/(celestrak\.org|en\.wikipedia\.org)\//);
   const keys = [...app.matchAll(/kvSet\("([^"]+)"/g)].map((x) => x[1]);
-  assert.deepEqual([...new Set(keys)].sort(), ["fetch-state", "preferences", "recent-launches", "recent.meta"]);
+  assert.deepEqual([...new Set(keys)].sort(), ["fetch-state", "preferences", "recent-launches"]);
   assert.doesNotMatch(app, /kvSet\(`?(place|location|coordinates|lat)/);
   for (const shared of ["construct-ui.css", "bridge.js"])
     assert.equal(fs.readFileSync(root + "ui/" + shared, "utf8"), fs.readFileSync("examples/sky-watch-module/ui/" + shared, "utf8"), shared);

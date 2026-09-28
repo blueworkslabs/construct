@@ -126,7 +126,8 @@
   // Chunks first, index last: a torn write leaves a generation mismatch, not bad data.
   async function saveRows(name, rowList, at, max) {
     const parts = O.chunks(rowList);
-    if (!parts.length || parts.length > max) return false;
+    if (!parts.length) parts.push([]);
+    if (parts.length > max) return false;
     for (let i = 0; i < max; i++)
       if (!(await kvSet(`${name}.${i}`, i < parts.length ? { g: at, r: parts[i] } : null)))
         return false;
@@ -178,7 +179,7 @@
     }
     const r = await loadRows("recent", O.validRow, RECENT_CHUNKS),
       dates = await kvGet("recent-launches");
-    if (r.rows.length && dates && dates.at === r.at && Array.isArray(dates.d)) {
+    if (r.at && dates && dates.at === r.at && Array.isArray(dates.d)) {
       recent = O.build(P.trainRows(r.rows));
       launchDates = new Map(dates.d.filter(validLaunch));
       meta.recent = r.at;
@@ -188,10 +189,12 @@
   const validLaunch = (x) =>
     Array.isArray(x) && x.length === 2 && /^\d{4}-\d{3}$/.test(x[0]) && /^\d{4}-\d\d-\d\d$/.test(x[1]);
   function rebuildTrains() {
-    trainList = P.trains(recent, launchDates, now());
+    const key = (trains) => trains.map(t => `${t.id}:${t.centre.id}:${t.members.map(m => m.id).join()}`).join("|");
+    const next = P.trains(recent, launchDates, now()), changed = key(next) !== key(trainList);
+    trainList = next;
     described.clear();
     listKey = "";
-    planKey = "";
+    if (changed) planKey = "";
   }
   const ready = Promise.all([initPrefs(), initCache()]);
 
@@ -295,13 +298,20 @@
       const r = await getJson(C.RECENT_URL);
       if (r.status === 403 || r.status === 429) fetchState.recentUntil = t + BACKOFF;
       if (r.status !== 200) return;
-      const rows = P.trainRows(O.parseElements(r.text));
+      let raw = null;
+      try { raw = JSON.parse(r.text); } catch (_) { /* Checked below. */ }
+      const parsed = O.parseElements(r.text);
+      if (!Array.isArray(raw) || (raw.length && !parsed.length))
+        throw Object.assign(new Error("Invalid recent orbit data"), { code: "HTTP_DATA" });
+      const rows = P.trainRows(parsed);
       let dates = new Map();
       if (rows.length) {
         const q = await getJson(C.RECENT_SATCAT_URL);
         if (q.status === 403 || q.status === 429) fetchState.recentUntil = t + BACKOFF;
         if (q.status !== 200) return;
-        dates = P.launchDates(C.parseSatcat(q.text));
+        const catalog = C.parseSatcat(q.text);
+        if (!catalog.length) throw Object.assign(new Error("Invalid recent catalog"), { code: "HTTP_DATA" });
+        dates = P.launchDates(catalog);
       }
       const keep = new Set(rows.map((x) => x[2].slice(0, 8)));
       recent = O.build(rows);
@@ -310,13 +320,12 @@
       fetchState.recentUntil = 0;
       rebuildTrains();
       frame();
-      // Cache only the satellites that currently form a train.
-      const members = new Set(trainList.flatMap((x) => x.members.map((m) => m.id))),
-        kept = rows.filter((x) => members.has(x[0]));
-      if (kept.length) {
-        if (await saveRows("recent", kept, t, RECENT_CHUNKS))
-          await kvSet("recent-launches", { at: t, d: [...launchDates] });
-      } else await kvSet("recent.meta", null);
+      // Retain the entire source batch for each detected train, including
+      // stragglers: otherwise reopening changes “9 of 11” into “9 of 9”.
+      const batches = new Set(trainList.map((x) => x.intdes)),
+        kept = rows.filter((x) => batches.has(x[2].slice(0, 8)));
+      if (await saveRows("recent", kept, t, RECENT_CHUNKS))
+        await kvSet("recent-launches", { at: t, d: [...launchDates] });
     } catch (e) {
       if (e.code === "HTTP_DATA" || e.code === "HTTP_SIZE") fetchState.recentUntil = t + BACKOFF;
       if (e.code === "RUN_PAUSED" || e.code === "CAPABILITY_DENIED") fetchState.recentLast = previous;
@@ -533,8 +542,8 @@
         planStep();
       }, 30);
   }
-  const START = { rises: "rises", shadow: "comes out of Earth’s shadow", daylight: "appears as the sky darkens" },
-    END = { sets: "sets", shadow: "fades into Earth’s shadow", daylight: "fades in the brightening sky" };
+  const START = { rises: "rises", shadow: "comes out of Earth’s shadow", daylight: "appears as the sky darkens", ongoing: "already visible" },
+    END = { sets: "sets", shadow: "fades into Earth’s shadow", daylight: "fades in the brightening sky", window: "still visible at window end" };
   function passLine(p) {
     const mins = Math.max(1, Math.round((p.endMs - p.startMs) / MINUTE));
     const top = p.maxEl >= 75 ? (p.maxEl >= 84 ? "passes straight overhead" : "passes almost overhead") : `highest ${K.height(p.maxEl)} in the ${K.dir16(p.maxAz)}`;
@@ -575,7 +584,7 @@
   }
   // Show the dome shortly after the pass becomes visible; it then runs in real time.
   function previewPass(p) {
-    offset = Math.max(0, Math.round((p.startMs + 20000 - now()) / 1000));
+    offset = Math.max(0, Math.round((P.previewTime(p, now()) - now()) / 1000));
     $("rewind").value = "0";
     plan.shown = "";
     select(p.id, true);
@@ -1038,7 +1047,10 @@
     if (!active || !place) return;
     frame();
     planStep();
-    if (++ticks % 60 === 0) refreshData();
+    if (++ticks % 60 === 0) {
+      rebuildTrains();
+      refreshData();
+    }
   }, 1000);
   (async () => {
     await ready;

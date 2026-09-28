@@ -7,8 +7,8 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 ROOT=Path(__file__).resolve().parents[1]
 def stub():
  text=(ROOT/'scripts/space-fixture/synthetic-space.js').read_text()
- for marker,name in [('/*ELEMENTS*/ null','elements.json'),('/*SATCAT*/ null','satcat.json')]:
-  text=text.replace(marker,(ROOT/'scripts/space-fixture'/name).read_text())
+ for marker,name in [('ELEMENTS','elements'),('SATCAT','satcat'),('RECENT','recent'),('RECENT_SATCAT','recent-satcat')]:
+  text=text.replace('/*'+marker+'*/ null',(ROOT/'scripts/space-fixture'/(name+'.json')).read_text())
  return text
 with sync_playwright() as p:
  browser=p.chromium.launch(headless=True,args=['--no-sandbox'])
@@ -33,11 +33,29 @@ with sync_playwright() as p:
  page.locator('#close-info').click();page.locator('#red').click()
  page.locator('#rewind').fill('-120');assert page.locator('#spot-when').inner_text()=='2 min ago:'
  page.locator('#now').click()
+ page.wait_for_function("document.querySelector('#plan-status').textContent==='Tap one to preview it on the dome.'")
+ assert page.locator('#plan-list button').count() <= 10
+ train=page.locator('#plan-list button[data-id="train:2026-221"]')
+ assert train.count()==1
+ train.click()
+ assert page.locator('#spot-title').inner_text()=='Guowang train'
+ assert page.locator('#rewind-label').inner_text().startswith('Preview ')
+ assert page.locator('#spot-when').inner_text().startswith('At ')
+ page.locator('#details').click()
+ assert '9 of 11 from this launch' in page.locator('#info-body').inner_text()
+ page.locator('#wiki').click()
+ page.wait_for_function("document.querySelector('#wiki').textContent==='Wikipedia loaded'")
+ assert page.evaluate("mock.calls.some(c=>c.method==='net.http'&&c.params.url.endsWith('&titles=Guowang'))")
+ page.locator('#close-info').click()
+ page.locator('#now').click()
+ assert page.locator('#rewind-label').inner_text()=='Now'
+ # Re-enter the future train for responsive preview/details checks.
+ train.click()
  for width,height,scale in [(393,850,1),(850,393,1),(393,850,2)]:
   page.set_viewport_size({'width':width,'height':height})
   page.evaluate('(scale)=>document.documentElement.style.fontSize=(16*scale)+"px"',scale)
   assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'Page horizontal overflow'
   page.locator('#details').click();page.locator('#wiki').click();page.locator('#close-info').click()
  assert not errors,errors
- print('PASS real DOM: spot selection, explicit Wikipedia, rewind, red mode, portrait/landscape/2x layout and dialogs')
+ print('PASS real DOM: spot selection, explicit Wikipedia, rewind, red mode, planned train preview/back-to-now, portrait/landscape/2x train layout and dialogs')
  browser.close()
