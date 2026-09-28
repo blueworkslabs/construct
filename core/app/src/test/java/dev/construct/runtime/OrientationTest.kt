@@ -287,7 +287,7 @@ class OrientationTest {
 
 
     @Test fun foregroundNeedsResumedAndTopResumedOnAndroidQ() {
-        val q = ForegroundEligibility(needsTopResumed = true)
+        val q = ForegroundEligibility(needsTopResumed = true).also { it.windowFocus(true) }
         assertFalse(q.eligible)
         q.resume(); assertFalse("onResume precedes top-resumed true", q.eligible)
         q.topResumed(true); assertTrue(q.eligible)
@@ -297,14 +297,14 @@ class OrientationTest {
         q.resume(); assertTrue("still top-resumed", q.eligible)
         q.topResumed(false); q.pause(); q.topResumed(true); assertFalse("paused wins", q.eligible)
         // Before Android 10 only one activity is resumed at a time.
-        val legacy = ForegroundEligibility(needsTopResumed = false)
+        val legacy = ForegroundEligibility(needsTopResumed = false).also { it.windowFocus(true) }
         legacy.resume(); assertTrue(legacy.eligible); legacy.topResumed(false); assertTrue(legacy.eligible)
         legacy.pause(); assertFalse(legacy.eligible)
     }
 
     @Test fun topResumedLossStopsOnceAndRegainingDoesNotRestart() {
         val view = ModuleSessionView(RuntimeEnvironment.getApplication())
-        val fg = ForegroundEligibility(needsTopResumed = true)
+        val fg = ForegroundEligibility(needsTopResumed = true).also { it.windowFocus(true) }
         val r = Rig()
         var stops = 0
         view.stopForeground = { stops++; r.activityPaused = true; r.session.cancel("paused") }
@@ -330,4 +330,27 @@ class OrientationTest {
         view.setMenuPaused(false); assertFalse(view.gate.paused.get())
         view.destroy()
     }
+    @Test fun focusLossWithoutPauseStopsOnceAndDoesNotRestart() {
+        for (needsTop in listOf(false, true)) {
+            val fg = ForegroundEligibility(needsTop)
+            val view = ModuleSessionView(RuntimeEnvironment.getApplication())
+            val r = Rig()
+            view.stopForeground = { r.session.cancel("paused") }
+            fun apply() { view.setActivityPaused(!fg.eligible); r.activityPaused = view.activityPaused.get() }
+            fg.resume(); fg.topResumed(true); apply()
+            denied("RUN_PAUSED") { r.request("{op:'watch'}") }
+            fg.windowFocus(true); apply(); r.request("{op:'watch'}"); r.send(10_000_000L)
+            fg.windowFocus(false); apply()
+            assertFalse(r.listening); assertEquals(listOf("paused"), r.ended)
+            for (op in listOf("get", "watch")) denied("RUN_PAUSED") { r.request("{op:'$op'}") }
+            fg.topResumed(false); apply(); fg.pause(); apply()
+            assertEquals(1, r.ended.size)
+            fg.resume(); fg.topResumed(true); apply(); assertFalse(fg.eligible)
+            fg.windowFocus(true); apply(); r.send(500_000_000L)
+            assertFalse(r.listening); assertEquals(1, r.emitted.size)
+            r.request("{op:'watch'}"); r.send(700_000_000L); assertEquals(2, r.emitted.size)
+            r.session.close(); view.destroy()
+        }
+    }
+
 }

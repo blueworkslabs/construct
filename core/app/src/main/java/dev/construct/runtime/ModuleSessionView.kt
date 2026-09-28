@@ -33,10 +33,12 @@ internal class ModuleSessionGate {
 internal class ForegroundEligibility(private val needsTopResumed: Boolean) {
     private var resumed = false
     private var top = false
-    val eligible: Boolean get() = resumed && (!needsTopResumed || top)
+    private var focused = false
+    val eligible: Boolean get() = resumed && focused && (!needsTopResumed || top)
     fun resume() { resumed = true }
     fun pause() { resumed = false }
     fun topResumed(value: Boolean) { top = value }
+    fun windowFocus(value: Boolean) { focused = value }
 }
 
 internal open class ModuleSessionView(context: Context) : WebView(context) {

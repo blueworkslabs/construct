@@ -157,6 +157,7 @@ class ModuleActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        foreground.windowFocus(hasFocus); applyForeground()
         applyScreenCapture()
     }
 

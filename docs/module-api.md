@@ -352,12 +352,13 @@ knows its place converts to true north itself.
   activity. That covers another window in front, a system dialog, Home or
   Recents, and, on Android 10+, another app becoming top-resumed in split screen
   or freeform while this activity stays resumed. Eligibility needs the activity
-  resumed and, on Android 10+, also top-resumed. It is checked at `onResume`,
-  `onPause` (before `onStop`) and every top-resumed change. While the activity is
+  resumed with window focus and, on Android 10+, also top-resumed. It is checked at `onResume`,
+  `onPause` (before `onStop`), window-focus changes and every top-resumed change.
+  Notification shade and Quick Settings focus loss also stop the stream. While the activity is
   ineligible, new `get` and `watch` requests fail with `RUN_PAUSED`. Regaining the
   foreground does not restart the stream; the module must call `watch` again. Image and camera pickers keep their existing pause and
   completion handling.
-- When the host ends an active stream because of an activity pause or a revoked
+- When the host ends an active stream because of foreground eligibility loss or a revoked
   grant, it sends one final `constructorientation` event with
   `detail: {watching: false, reason: "paused" | "revoked"}`. A menu pause is
   signalled by `constructvisibilitychange` instead.

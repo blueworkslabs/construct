@@ -32,6 +32,7 @@ import kotlin.math.sqrt
  *   set `calibrate`.
  */
 internal object OrientationMath {
+    const val DISCLOSURE = "Compass and tilt readings reach this module only while it is open and in front, at most 15 per second. They contain no location or camera image; the heading is magnetic and approximate. Other granted storage or internet access can retain or send these readings. Revoking access cannot erase copies already delivered."
     const val FLAT_COS = 0.7071
     const val MIN_HORIZONTAL = 0.25
     const val CALIBRATE_ABOVE_DEG = 30.0
