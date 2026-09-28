@@ -87,7 +87,7 @@ internal object OrientationMath {
     }
 
     /** At most [rateHz] deliveries per second, by sensor time. */
-    class Throttle(val rateHz: Int) {
+    class Throttle(var rateHz: Int) {
         private var last = Long.MIN_VALUE
         fun admit(nowNs: Long): Boolean {
             if (last != Long.MIN_VALUE && nowNs - last < 1_000_000_000L / rateHz) return false
@@ -110,7 +110,8 @@ internal class ModuleOrientation(context: Context, private val authorize: () -> 
     private val sensor = manager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
     private var registered = false
     private var closed = false
-    private var throttle: OrientationMath.Throttle? = null
+    private val throttle = OrientationMath.Throttle(10)
+    private var watching = false
     private var pending: ((JSONObject?, ConstructError?) -> Unit)? = null
     private var timeout: Runnable? = null
 
@@ -123,7 +124,7 @@ internal class ModuleOrientation(context: Context, private val authorize: () -> 
         checkRule(registered, "ORIENTATION_UNAVAILABLE", "Compass and tilt are unavailable")
     }
     private fun releaseIfIdle() {
-        if (registered && pending == null && throttle == null) { manager?.unregisterListener(this); registered = false }
+        if (registered && pending == null && !watching) { manager?.unregisterListener(this); registered = false }
     }
     fun request(params: JSONObject, done: (JSONObject?, ConstructError?) -> Unit) {
         val keys = params.keys().asSequence().toSet()
@@ -131,7 +132,7 @@ internal class ModuleOrientation(context: Context, private val authorize: () -> 
             "get" -> {
                 checkRule(keys == setOf("op"), "ORIENTATION_PARAMS", "Expected op:get")
                 check(); checkRule(pending == null, "ORIENTATION_BUSY", "An orientation reading is already pending")
-                pending = done; register()
+                register(); pending = done
                 timeout = Runnable {
                     val p = pending; pending = null; timeout = null; releaseIfIdle()
                     p?.invoke(null, ConstructError("ORIENTATION_UNAVAILABLE", "No compass and tilt reading within 2 seconds"))
@@ -141,12 +142,13 @@ internal class ModuleOrientation(context: Context, private val authorize: () -> 
                 checkRule(keys.all { it in setOf("op", "rateHz") }, "ORIENTATION_PARAMS", "Expected op:watch and optional rateHz")
                 val rate = if (params.has("rateHz")) params.get("rateHz") else 10
                 checkRule(rate is Int && rate in OrientationMath.rates, "ORIENTATION_PARAMS", "rateHz must be 5, 10 or 15")
-                check(); throttle = OrientationMath.Throttle(rate as Int); register()
+                check(); register()
+                throttle.rateHz = rate as Int; watching = true
                 done(JSONObject().put("watching", true).put("rateHz", rate), null)
             }
             "stop" -> {
                 checkRule(keys == setOf("op"), "ORIENTATION_PARAMS", "Expected op:stop")
-                throttle = null; releaseIfIdle()
+                watching = false; releaseIfIdle()
                 done(JSONObject().put("watching", false), null)
             }
             else -> throw ConstructError("ORIENTATION_PARAMS", "Expected op get, watch or stop")
@@ -159,16 +161,15 @@ internal class ModuleOrientation(context: Context, private val authorize: () -> 
             pending = null; timeout?.let { handler.removeCallbacks(it) }; timeout = null
             try { authorize(); done(sample, null) } catch (e: ConstructError) { done(null, e) }
         }
-        val t = throttle
-        if (t != null && t.admit(event.timestamp.takeIf { it > 0 } ?: SystemClock.elapsedRealtimeNanos())) {
-            try { authorize(); emit(sample) } catch (_: ConstructError) { throttle = null }
+        if (watching && throttle.admit(event.timestamp.takeIf { it > 0 } ?: SystemClock.elapsedRealtimeNanos())) {
+            try { authorize(); emit(sample) } catch (_: ConstructError) { watching = false }
         }
         releaseIfIdle()
     }
     override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) { }
     /** Menu pause: stop the stream (the module must watch again on resume) and fail a pending get. */
     fun cancel() {
-        throttle = null
+        watching = false
         timeout?.let { handler.removeCallbacks(it) }; timeout = null
         val p = pending; pending = null
         releaseIfIdle()

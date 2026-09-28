@@ -312,6 +312,7 @@ capability can be `optional`, and it is off until granted in **Module access**
   - Samples arrive as `window.dispatchEvent(new CustomEvent('constructorientation',
     {detail: sample}))`, at most `rateHz` per second by sensor time.
   - Only one stream runs per session; a new `watch` replaces its rate.
+    Replacing, stopping or restarting a watch does not reset its delivery budget.
 - **`{op:'stop'}`** returns `{watching:false}` and is idempotent.
 
 A sample has the following fields:
@@ -338,15 +339,17 @@ knows its place converts to true north itself.
 
 **Foreground only.**
 - A menu pause stops the stream and fails a pending `get` with
-  `ORIENTATION_CANCELLED`. After resume the module must call `watch` again.
+  `RUN_PAUSED` through the bridge, like other asynchronous capabilities (the
+  native sensor session cancels immediately). After resume the module must call `watch` again.
 - Closing the module stops everything.
 - Every delivery re-checks the grant and pause state; a revoked grant stops the
   stream at the next sample.
 - There is no background or batched delivery.
 
 **Errors:** `ORIENTATION_PARAMS`, `ORIENTATION_BUSY`, `ORIENTATION_UNAVAILABLE`
-(no rotation-vector sensor, or no reading within 2 s) and `ORIENTATION_CANCELLED`,
-plus the common grant and session errors.
+(no rotation-vector sensor, registration failure, or no reading within 2 s),
+plus the common grant and session errors, including `RUN_PAUSED` for a pending
+read interrupted by the menu. Closing the module discards pending bridge replies.
 
 Fine-grained motion data can reveal activity patterns. The foreground-only
 limit, the rate cap, the rounding and the separate consent line are the bounds;
