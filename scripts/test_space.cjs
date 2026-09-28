@@ -221,6 +221,17 @@ test("visible passes over the next hours reproduce the Heavens-Above ISS pass", 
   assert.ok(all.some((p) => p.endReason === "shadow"));
   for (const p of all) assert.ok(p.startMs <= p.maxMs && p.maxMs <= p.endMs && p.maxEl >= 10);
 });
+test("brief high-latitude twilight between solar samples is retained", () => {
+  const ob=K.observer(60.03,0,0), sun=t=>K.sun(t,ob).el;
+  const from=at("2026-06-25T23:57:00Z"), to=at("2026-06-26T00:17:00Z");
+  assert.ok(sun(from)>-6 && sun(from+600000)>-6);
+  const ranges=P.darkRanges(from,to,sun), middle=at("2026-06-26T00:02:00Z");
+  assert.ok(sun(middle)<-6);
+  assert.ok(ranges.some(([a,b])=>a<=middle&&b>=middle),"short real twilight must not be reported as continuous daylight");
+  for(const [a,b] of [[from,from+600000],[from-600000,from+600000]]) {
+    assert.ok(P.darkRanges(a,b,sun).some(([x,y])=>x<=middle&&y>=middle),"range-edge twilight retained");
+  }
+});
 test("grazing passes between coarse samples are refined, at almost no extra cost", () => {
   // Codex/Astra reproduction on #49: SL-14 R/B (16792) from 49.5 N 13.4 E peaks at
   // 10.01° for about 15 s at 00:42:2x UTC; a plain 60 s scan skipped it.
@@ -296,7 +307,7 @@ test("planner distinguishes clipped windows and keeps short previews inside visi
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
   assert.equal(m.id, "dev.construct.space-watch");
-  assert.equal(m.version, "0.2.6");
+  assert.equal(m.version, "0.2.7");
   assert.deepEqual(m.constructApi, { min: "0.9.0", target: "0.9.0" });
   const caps = Object.fromEntries(m.capabilities.map((c) => [c.id, c]));
   assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "storage.kv"]);
@@ -321,7 +332,7 @@ test("package: manifest, capabilities, scripts and no location in any URL", () =
   for (const shared of ["construct-ui.css", "bridge.js"])
     assert.equal(fs.readFileSync(root + "ui/" + shared, "utf8"), fs.readFileSync("examples/sky-watch-module/ui/" + shared, "utf8"), shared);
   const docs = fs.readFileSync("docs/space-watch.md", "utf8");
-  assert.match(docs, /Space Watch \*\*0\.2\.6\*\*/);
+  assert.match(docs, /Space Watch \*\*0\.2\.7\*\*/);
   // Vendored libraries are pinned by hash in the doc.
   for (const f of ["satellite.min.js", "astronomy.min.js"]) {
     const sha = crypto.createHash("sha256").update(fs.readFileSync(root + "ui/vendor/" + f)).digest("hex");

@@ -17,17 +17,41 @@ const SpacePlan = (() => {
   // Dark stretches (Sun below −6°) between from and to, sampled every 10 min and
   // widened by one sample so a pass at the edge of twilight is not missed.
   function darkRanges(from, to, sunAltAt, step = 10 * MINUTE) {
-    const out = [];
+    const out = [], points = [];
+    for (let t = from; t < to; t += step) points.push({t, el: sunAltAt(t)});
+    points.push({t: to, el: sunAltAt(to)});
     let start = null;
-    for (let t = from; t <= to + step; t += step) {
-      const dark = t <= to && sunAltAt(Math.min(t, to)) < O.DARK_SUN;
-      if (dark && start === null) start = Math.max(from, t - step);
-      if (!dark && start !== null) {
-        out.push([start, Math.min(to, t)]);
-        start = null;
-      }
+    for (const p of points) {
+      const dark = p.el < O.DARK_SUN;
+      if (dark && start === null) start = Math.max(from, p.t - step);
+      if (!dark && start !== null) { out.push([start, p.t]); start = null; }
     }
-    return out;
+    if (start !== null) out.push([start, to]);
+    // Near polar twilight a whole dark interval can fit between bright samples.
+    // Refine local solar minima and clipped first/last intervals to ~1 second.
+    const brackets = [[from, Math.min(to, from + step)], [Math.max(from, to - step), to]];
+    for (let i = 1; i + 1 < points.length; i++) {
+      const p = points[i];
+      if (p.el >= O.DARK_SUN && p.el <= points[i-1].el && p.el <= points[i+1].el)
+        brackets.push([points[i-1].t, points[i+1].t]);
+    }
+    const g = (Math.sqrt(5)-1)/2;
+    for (const [left,right] of brackets) {
+      if (right <= left || out.some(([a,b])=>a<=left && b>=right)) continue;
+      let a=left,b=right,c=b-g*(b-a),d=a+g*(b-a),fc=sunAltAt(c),fd=sunAltAt(d);
+      while (b-a>1000) {
+        if (fc<fd) { b=d;d=c;fd=fc;c=b-g*(b-a);fc=sunAltAt(c); }
+        else { a=c;c=d;fc=fd;d=a+g*(b-a);fd=sunAltAt(d); }
+      }
+      if (sunAltAt((a+b)/2)<O.DARK_SUN) out.push([left,right]);
+    }
+    const merged=[];
+    for (const r of out.sort((a,b)=>a[0]-b[0])) {
+      const last=merged[merged.length-1];
+      if (last && r[0]<=last[1]) last[1]=Math.max(last[1],r[1]);
+      else merged.push(r);
+    }
+    return merged;
   }
   const visibleAt = (o, ob, t, sunAltAt) => {
     const l = O.look(o, ob, t);

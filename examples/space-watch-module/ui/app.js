@@ -320,6 +320,9 @@
         dates = P.launchDates(rawCatalog.map(o => C.compact(o)));
       }
       const keep = new Set(rows.map((x) => x[2].slice(0, 8)));
+      // Orbit and catalog feeds can lag one another. A launch date cannot
+      // change, so preserve known metadata when the fresh catalog omits it.
+      for (const key of keep) if (!dates.has(key) && launchDates.has(key)) dates.set(key, launchDates.get(key));
       recent = O.build(rows);
       launchDates = new Map([...dates].filter(([k]) => keep.has(k)));
       meta.recent = t;

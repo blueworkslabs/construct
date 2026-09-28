@@ -1,7 +1,9 @@
 # Space Watch 0.2.6 staging
 
-Status: **exact-package Android acceptance in progress; no hardware clearance yet.**
-The predictor and provider-feed findings are corrected. No merge or production change.
+Status: **16/16 exact-package Android checks passed; superseded by 0.2.7.**
+`complete=true`, `stopped=true`; emulator independently inactive. Two late review
+findings (brief solar darkness and missing launch-date coverage) are corrected in
+0.2.7, which needs its own acceptance. No merge or production change.
 
 ## Artifacts
 
@@ -74,3 +76,21 @@ stability wait before checks. The new driver may resolve and tap the verified
 native button at fresh bounds after that specific no-click failure; subsequent
 native-menu assertions still establish navigation. This is not a generic retry
 of a missing module control.
+
+## Completed exact-version evidence
+
+[Sanitized receipt](evidence/space-watch-0.2.6-staging-2026-09-28.json).
+Live CelesTrak loaded automatically after native grants, then fully offline
+process reopen used the cache. Live was 0 visible / 12 above; offline was
+0 visible / 11 above at a later time. Both captures show Now. Provider status
+was Orbit data 32 h old. The retained crash buffer has an emulator Bluetooth
+abort, with no Construct fatal exception found in the runtime log or buffer.
+
+[Train preview](images/space-watch-0.2.6/space-train-preview.png),
+[Wikipedia credit](images/space-watch-0.2.6/space-train-wikipedia.png),
+[landscape](images/space-watch-0.2.6/space-landscape.png),
+[200% text](images/space-watch-0.2.6/space-large-text.png),
+[live data](images/space-watch-0.2.6/space-real-network.png),
+[offline cache](images/space-watch-0.2.6/space-real-offline-cache.png).
+Original emulator-console captures, not edited or browser previews. Landscape
+retains native rotated orientation. No results are substituted for 0.2.7.

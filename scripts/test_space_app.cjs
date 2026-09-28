@@ -361,6 +361,14 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   assert.equal(r.el('plan-list').children.length,0, '12h15m pass is initially outside displayed horizon');
   r.advance(29*60000); r.tick(1,0);
   assert(r.el('plan-list').children.some(b=>b.dataset.id==='25544'), 'buffered pass enters horizon before 30-minute refresh');
+  // Recent orbit/SATCAT feeds can be temporarily out of sync. Launch dates
+  // are immutable metadata: incomplete coverage must not erase a known date.
+  for(const omitBatch of [false,true]) {
+    let rows=JSON.parse(RECENT_SATCAT);
+    rows=omitBatch?rows.filter(o=>!o.OBJECT_ID.startsWith('2026-221')):rows.map(o=>({...o,LAUNCH_DATE:undefined}));
+    r=rig({saved:withTrains,clock:START+9*HOUR,recentSatcatBody:JSON.stringify(rows)});await flush(10);
+    assert.equal(r.storage['recent-launches'].d.find(([id])=>id==='2026-221')?.[1],'2026-09-23','prior launch date survives missing provider coverage');
+  }
   // Recent provider feeds may exceed the ordinary 400-object visual catalog.
   // Qualifying batches and launch dates after an unrelated prefix still count.
   {
