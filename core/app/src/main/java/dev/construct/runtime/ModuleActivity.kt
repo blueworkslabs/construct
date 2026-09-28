@@ -145,6 +145,9 @@ class ModuleActivity : ComponentActivity() {
     private var screenCapture = ScreenCapturePolicy.Decision(secure = true, hideRecents = false)
     private var screenResumed = false
     private val privacyCurtains = PrivacyCurtains(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
+    private val foreground = ForegroundEligibility(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
+    /** Foreground sensors stop on losing eligibility and stay off until the module asks again. */
+    private fun applyForeground() { webView?.setActivityPaused(!foreground.eligible) }
 
     private fun applyScreenCapture() {
         if (ScreenCapturePolicy.secureWindow(screenCapture, screenResumed, hasWindowFocus()))
@@ -154,14 +157,18 @@ class ModuleActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        foreground.windowFocus(hasFocus); applyForeground()
         applyScreenCapture()
     }
 
     override fun onResume() {
         super.onResume(); screenResumed = true; applyScreenCapture(); privacyCurtains.resume()
+        // Pickers resume in onPostResume; sensors need top-resumed too on Android 10+.
+        foreground.resume(); applyForeground()
     }
 
     override fun onPause() {
+        foreground.pause(); applyForeground()
         privacyCurtains.pause(); screenResumed = false; applyScreenCapture(); super.onPause()
     }
 
@@ -170,6 +177,8 @@ class ModuleActivity : ComponentActivity() {
     }
 
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        // Multi-window: another app can become top-resumed while this one stays resumed.
+        foreground.topResumed(isTopResumedActivity); applyForeground()
         privacyCurtains.topResumed(isTopResumedActivity)
         super.onTopResumedActivityChanged(isTopResumedActivity)
     }
@@ -224,7 +233,7 @@ class ModuleActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        if (selected?.manifest?.api in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0"))
+        if (selected?.manifest?.api in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0"))
             webView?.settings?.textZoom = (newConfig.fontScale * 100).toInt().coerceIn(50, 300)
     }
 
@@ -279,7 +288,7 @@ class ModuleActivity : ComponentActivity() {
                         try {
                             moduleWebView(context, store, active, pickImage = ::pickImage, capturePhoto = ::capturePhoto, confirmPhoto = ::confirmPhoto) { failedView, code ->
                                 if (webView === failedView) finishSession(error = code)
-                            }.also { webView = it }
+                            }.also { webView = it; it.setActivityPaused(!foreground.eligible) }
                         } catch (error: Exception) {
                             android.widget.TextView(context).apply {
                                 val code = (error as? ConstructError)?.code ?: "OPEN_FAILED"

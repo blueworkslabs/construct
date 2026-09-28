@@ -1,0 +1,7 @@
+<resources><style name="PauseOverlay" parent="android:style/Theme.Material.Light.NoActionBar">
+  <item name="android:windowIsTranslucent">true</item>
+  <item name="android:windowBackground">#40000000</item>
+  <item name="android:windowNoTitle">true</item>
+  <item name="android:windowDisablePreview">true</item>
+  <item name="android:backgroundDimEnabled">false</item>
+</style></resources>

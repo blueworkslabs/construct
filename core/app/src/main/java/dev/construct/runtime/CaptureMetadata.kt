@@ -32,7 +32,7 @@ internal data class CaptureOptions(val level: Boolean = false, val zoom: List<Do
         const val MAX_ZOOM_RATIO = 10.0
         /** Steps closer than this would be indistinguishable chips; they are rejected, never merged. */
         const val MIN_ZOOM_STEP = 0.05
-        private val metadataApis = setOf("0.13.0")
+        private val metadataApis = setOf("0.13.0", "0.14.0")
         fun metadataApi(api: String) = api in metadataApis
         fun parse(args: JSONObject, api: String): CaptureOptions {
             val modern = metadataApi(api)

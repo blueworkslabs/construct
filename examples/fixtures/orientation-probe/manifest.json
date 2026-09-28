@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "dev.construct.orientation-probe",
+  "name": "Orientation probe",
+  "version": "0.1.3",
+  "description": "Synthetic acceptance fixture for API 0.14 orientation.read: one reading, a rate-capped stream and stop. Shows the raw samples and a received-sample count.",
+  "constructApi": {
+    "min": "0.14.0",
+    "target": "0.14.0"
+  },
+  "runtime": {
+    "kind": "webview-js"
+  },
+  "entry": "ui/index.html",
+  "capabilities": [
+    {
+      "id": "orientation.read",
+      "reason": "Read the phone's compass heading and tilt while this probe is open, to show the raw samples."
+    }
+  ]
+}
