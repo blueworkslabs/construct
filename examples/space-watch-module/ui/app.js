@@ -1147,7 +1147,7 @@
     $("follow").setAttribute("aria-pressed", String(follow.on));
     $("follow-status").hidden = !follow.on && !keepStatus;
     if (!follow.on) dome.turn(0);
-    message($("follow-announcement"), keepStatus ? $("follow-status").textContent : "Follow off.");
+    message($("follow-announcement"), keepStatus ? $("follow-status").textContent : "Follow off.", "sr-only");
     frame();
   }
   function renderFollow() {
@@ -1168,7 +1168,7 @@
     message($("follow-status"), text, tone);
     message($("follow-announcement"), follow.calibrate
       ? "Wave the phone in a figure 8 to calibrate the compass."
-      : follow.heading !== null ? "Follow active. Compass direction and turn guidance are available below." : text);
+      : follow.heading !== null ? "Follow active. Compass direction and turn guidance are available below." : text, "sr-only");
   }
   // "Ahead of you", or which way to turn, for the selected object.
   function renderTurn() {

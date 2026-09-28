@@ -62,6 +62,8 @@ with sync_playwright() as p:
  assert 'Facing east' in page.locator('#follow-status').inner_text()
  assert page.locator('#follow-status').get_attribute('aria-live')=='off'
  assert page.locator('#spot-turn').get_attribute('aria-live')=='off'
+ assert page.locator('#follow-announcement').get_attribute('class')=='sr-only'
+ assert page.locator('#follow-announcement').bounding_box()['height']<=1
  spoken=page.locator('#follow-announcement').inner_text()
  orient({'pose':'flat','azimuthDeg':95,'accuracyDeg':14,'calibrate':False})
  assert page.locator('#follow-announcement').inner_text()==spoken
