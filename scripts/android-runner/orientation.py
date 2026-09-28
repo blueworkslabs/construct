@@ -90,6 +90,8 @@ def sample():
  for label in labels():
   if label and label.startswith('Sample: {'):return json.loads(label[len('Sample: '):])
  raise RuntimeError('No sample in fixture')
+def sensor_state(label):
+ (run/('sensors-'+label+'.txt')).write_text(adb('shell','dumpsys','sensorservice'))
 def count():
  for label in labels():
   if label and re.fullmatch(r'Events: \d+',label):return int(label.split(': ')[1])
@@ -163,18 +165,22 @@ try:
  inject('0:9.80665:0','-50:-20:0');reading('upright',90,0);capture('upright-east')
  inject('0:9.65766:1.70291','-50:-19.6962:-3.47296');reading('upright',90,10);capture('upright-pitch')
  done('Upright camera bearing and positive pitch follow synthetic orientation')
- watch(10);capture('watch-10');require(act('Stop').startswith('Stopped:'),'Stop failed');no_events()
+ watch(10);sensor_state('watching');capture('watch-10');require(act('Stop').startswith('Stopped:'),'Stop failed');no_events()
  watch(15);require(act('Stop').startswith('Stopped:'),'Stop failed');no_events()
+ sensor_state('stopped')
  done('10 and 15 Hz streams deliver within their caps; stop leaves event counts stable')
  watch(10);tap('Construct menu');find('Return to module');tap('Return to module');find('Read once');no_events();capture('pause-resume')
  require(any(t and t.startswith('Paused; stream stopped') for t in labels()),'No pause notification')
+ sensor_state('paused')
  done('Native menu pause stops watch and resume does not restart it')
  watch(10);module_access();switch('Allow reading compass and tilt',False);reopen()
  require(act('Read once').startswith('[CAPABILITY_DENIED]'),'Read allowed after revoke')
  require(act('Watch at 10 Hz').startswith('[CAPABILITY_DENIED]'),'Watch allowed after revoke');no_events();capture('revoked')
+ sensor_state('revoked')
  done('Revocation stops stream; both operations denied after reopening')
  module_access();switch('Allow reading compass and tilt',True);reopen();watch(10)
  adb('shell','input','keyevent','KEYCODE_HOME');time.sleep(1)
+ sensor_state('background')
  # Closing/backgrounding invalidates the module session. Reopen a fresh run.
  adb('shell','am','force-stop','dev.construct.runtime');opened();require(count()==0,'New session inherited stream');no_events()
  require(act('Read once')=='Read.','Grant did not survive process restart')
