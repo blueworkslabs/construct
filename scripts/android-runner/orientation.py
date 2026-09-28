@@ -97,8 +97,8 @@ def sensor_state(label):
  package=adb('shell','pm','list','packages','-U','dev.construct.runtime')
  uid=int(re.search(r'uid:(\d+)',package).group(1))
  connections=active_connections(raw,uid)
- require(connections==(1 if label=='watching' else 0),'Unexpected native listeners after '+label)
  receipt.setdefault('nativeConnections',{})[label]=connections;save()
+ require(connections==(1 if label=='watching' else 0),'Unexpected native listeners after '+label)
 def count():
  for label in labels():
   if label and re.fullmatch(r'Events: \d+',label):return int(label.split(': ')[1])
@@ -187,6 +187,7 @@ try:
  done('Revocation stops stream; both operations denied after reopening')
  module_access();switch('Allow reading compass and tilt',True);reopen();watch(10)
  adb('shell','input','keyevent','KEYCODE_HOME');time.sleep(1)
+ (run/'activity-background.txt').write_text(adb('shell','dumpsys','activity','activities'))
  sensor_state('background')
  # Closing/backgrounding invalidates the module session. Reopen a fresh run.
  adb('shell','am','force-stop','dev.construct.runtime');opened();require(count()==0,'New session inherited stream');no_events()
