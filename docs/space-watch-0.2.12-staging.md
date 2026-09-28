@@ -1,7 +1,25 @@
 # Space Watch 0.2.12 staging
 
-Status: **exact-package Android acceptance in progress.** No hardware clearance,
+Status: **16/16 Android checks passed; hardware handoff held for next-rise accuracy.** No hardware clearance,
 merge or production promotion yet. Production remains 0.1.6.
+
+## Remaining blocker
+
+The planner's adaptive grazing-pass fix does not cover the legacy next-rise
+lookup. `SpaceOrbit.nextPass` still samples every 30 seconds, and is used by
+ordinary-object Details/spot cards and the grouped member search.
+
+Reproduction: bundled NORAD 16792, synthetic observer 49.5°N, 13.4°E, 40 m,
+lookup start 2026-09-29 00:39:10 UTC. The lookup returns **02:16:35**; adaptive
+`SpacePlan.passes` finds **00:42:18.834–00:42:34.834**, peak **10.011864°**.
+The fixture object is a rocket body, not asserted to be a qualifying train;
+the underlying next-rise helper is shared by both paths.
+
+The feature author has been asked to apply grazing-aware next-rise detection,
+preserving the above-10°/36-hour semantics, daylight/shadow classification,
+current-pass behavior and per-member work yields/cancellation. Cross-path
+regression and propagation/responsiveness evidence are required. Existing
+Android scenarios do not exercise this grazing lookup and cannot clear it.
 
 ## Artifacts
 
@@ -82,3 +100,30 @@ runner now waits for Mark working before tapping it; native assertions remain.
 
 The [0.2.11 run](space-watch-0.2.11-staging.md) passed 16/16 and stopped
 cleanly before the final grouped-card correction. Its evidence stays separate.
+
+## Android result
+
+Run `20260928T123528Z-space-e4655982` completed all 16 checks.
+[Exact-package receipt](evidence/space-watch-0.2.12-staging-2026-09-28.json):
+`complete=true`, `stopped=true`. Runner service exited 0; runner and emulator
+services independently confirmed inactive. The real module loaded live
+CelesTrak data automatically after grants without a Refresh tap, then reopened
+with Wi-Fi and mobile data disabled. Both captures show Now, 0 visible / 10 above;
+provider elements were 9 h old. No physical spotting claim follows from this.
+
+Original Android captures: [pass list](images/space-watch-0.2.12/space-plan.png),
+[18:24 train preview](images/space-watch-0.2.12/space-train-preview.png),
+[member lookup](images/space-watch-0.2.12/space-train-details.png),
+[Wikipedia credit](images/space-watch-0.2.12/space-train-wikipedia.png),
+[landscape](images/space-watch-0.2.12/space-landscape.png),
+[200% text](images/space-watch-0.2.12/space-large-text.png),
+[live data](images/space-watch-0.2.12/space-real-network.png), and
+[offline reopen](images/space-watch-0.2.12/space-real-offline-cache.png).
+All 19 original captures have SHA-256 digests in the receipt. Landscape keeps
+the original capture orientation; rotate for viewing. The crash buffer contains
+an emulator Bluetooth startup abort, not a Construct fatal exception; it is not
+claimed to be globally empty.
+
+The remaining next-rise blocker is outside those 16 scenarios. No hardware
+clearance, merge or production promotion. Broader GitHub source-and-android CI
+was still pending when this evidence was finalized.

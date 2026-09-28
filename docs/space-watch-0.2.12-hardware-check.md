@@ -1,6 +1,9 @@
 # Space Watch 0.2.12 phone check
 
-Status: **awaiting exact-package Android acceptance; not yet a phone handoff.**
+Status: **held for next-rise accuracy; not a phone handoff.** The legacy rise
+lookup can skip a short grazing pass found by the planner. See the
+[staging report](space-watch-0.2.12-staging.md). Retain this checklist for the
+follow-up candidate; this is not promotion approval.
 
 No new APK: staging uses the existing alpha34 candidate. Install **Space Watch**,
 not Synthetic Space Watch, from this isolated signed catalog:
