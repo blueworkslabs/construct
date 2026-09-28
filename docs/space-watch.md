@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.2.1** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
+Space Watch **0.2.2** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
 alpha26** and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -14,7 +14,7 @@ view, not a map.
 ## Module 0.2.0: visible passes and trains
 
 Both features are module-only, with no host change, no new origin and no new
-consent. 0.1.6 stays published unchanged; 0.2.1 is the reviewed candidate following the
+consent. 0.1.6 stays published unchanged; 0.2.2 is the reviewed candidate following the
 initial 0.2.0 package.
 
 - **Visible passes · next 12 h.** This lists passes of the bright objects (and
@@ -270,8 +270,9 @@ not Android; pre-review wording and stale-train policy):
   Space Watch is the real UI plus `scripts/space-fixture/synthetic-space.js`:
   - a clock starting at 2026-09-28 17:50:40 UTC and running in real time;
   - a fixed Berlin viewpoint;
-  - a captured 24-object CelesTrak subset, plus two trains from the last-30-days
-    lists (Starlink 2026-219 and Guowang 2026-221; the Guowang train has a
+  - a captured 24-object CelesTrak subset, plus two candidate batches from the
+    last-30-days lists (stale Starlink 2026-219, excluded from trains, and fresh
+    Guowang 2026-221; the Guowang train has a
     visible pass at about 18:26 UTC, 1 fist up in the SW).
 
   Storage, same-launch lookups and Wikipedia use the real host. The synthetic

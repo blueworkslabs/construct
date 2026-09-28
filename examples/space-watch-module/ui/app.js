@@ -559,7 +559,7 @@
         .filter((p) => p.endMs >= t && find(p.id))
         .sort((a, b) => a.startMs - b.startMs)
         .slice(0, 10),
-      key = list.map((p) => p.id + ":" + p.startMs).join() + "|" + plan.done + "|" + Math.floor(t / MINUTE) + "|" + selected;
+      key = list.map((p) => p.id + ":" + p.startMs).join() + "|" + plan.done + "|" + Math.floor(t / MINUTE) + "|" + selected + "|" + (offset > 0);
     if (key === plan.shown) return;
     plan.shown = key;
     $("plan-status").textContent = !plan.ranges.length
@@ -598,7 +598,7 @@
     return `${where} · ${state}`;
   }
   function renderList(s) {
-    const key = s.items.map((x) => x.id + x.state).join() + "|" + selected;
+    const key = s.items.map((x) => x.id + x.state).join() + "|" + selected + "|" + (offset > 0);
     if (key !== listKey) {
       listKey = key;
       const rows = s.items.map((x) => {

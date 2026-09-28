@@ -309,6 +309,12 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   assert.equal(r.http().length, before + 1); assert.match(r.http().at(-1), /&titles=Guowang$/);
   r.el('close-info').click();
   r.el('now').click(); assert.equal(r.el('rewind-label').textContent, 'Now'); assert.equal(r.el('list-title').textContent, 'Overhead now');
+  const trainButton = () => r.el('plan-list').children.find(b => b.dataset.id === 'train:2026-221');
+  assert.equal(trainButton().attributes['aria-pressed'], 'false', 'Back to now clears preview selection immediately');
+  trainButton().click(); assert.equal(trainButton().attributes['aria-pressed'], 'true');
+  r.el('rewind').value = '-120'; r.el('rewind').oninput();
+  assert.equal(trainButton().attributes['aria-pressed'], 'false', 'rewind clears preview selection immediately');
+  r.el('now').click();
   for (const key of Object.keys(r.storage)) assert(allowedKeys(key), key);
   assert(r.storage['recent.meta'] && r.storage['recent-launches'].d.length === 2);
   // Reopen: trains come from the cache, no download.

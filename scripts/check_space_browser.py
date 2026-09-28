@@ -49,6 +49,10 @@ with sync_playwright() as p:
  page.locator('#close-info').click()
  page.locator('#now').click()
  assert page.locator('#rewind-label').inner_text()=='Now'
+ assert train.get_attribute('aria-pressed')=='false'
+ train.click();assert train.get_attribute('aria-pressed')=='true'
+ page.locator('#rewind').fill('-120');assert train.get_attribute('aria-pressed')=='false'
+ page.locator('#now').click()
  # Re-enter the future train for responsive preview/details checks.
  train.click()
  for width,height,scale in [(393,850,1),(850,393,1),(393,850,2)]:
