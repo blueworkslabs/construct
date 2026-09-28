@@ -7,7 +7,7 @@ from pathlib import Path
 from config import CONFIG,SERIAL,require_runner,catalog
 p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.add_argument('--sha',required=True)
 p.add_argument('--catalog',required=True);p.add_argument('--module-sha',required=True,help='Signed orientation probe digest')
-p.add_argument('--version',default='0.1.2')
+p.add_argument('--version',default='0.1.3')
 a=p.parse_args();require_runner();catalog(a.catalog)
 if hashlib.sha256(a.apk.read_bytes()).hexdigest()!=a.sha:raise SystemExit('APK checksum mismatch')
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -199,15 +199,21 @@ try:
  require(act('Read once')=='Read.','Large-text read failed');require(act('Stop').startswith('Stopped:'),'Large-text stop missing')
  done('Landscape and 200% text retain readable controls and working one-shot access')
  adb('shell','settings','put','system','font_scale','1.0');adb('shell','am','force-stop','dev.construct.runtime');opened();watch(10)
- # A system resolver is translucent: onPause without onStop must also revoke orientation authority.
- adb('shell','am','start','-W','-a','android.intent.action.SEND','-t','text/plain','--es','android.intent.extra.TEXT','Synthetic orientation lifecycle probe')
- time.sleep(1)
+ # A system settings panel is translucent: verify pause without onStop and denied new requests.
+ before=act('Check paused requests in 3 seconds',wait=False)
+ adb('shell','am','start','-W','-a','android.settings.panel.action.INTERNET_CONNECTIVITY')
+ time.sleep(4)
  activities=adb('shell','dumpsys','activity','activities');(run/'activity-pause.txt').write_text(activities)
  capture('activity-paused')
  block=re.search(r'Hist #[^\n]*dev\.construct\.runtime/\.ModuleActivity[^\n]*\n(.*?)(?=\* Hist #|RootTask|$)',activities,re.S)
  require(block is not None and 'state=PAUSED' in block.group(1) and 'stopped=false' in block.group(1),'No pause-only lifecycle observation; do not count this as covered')
  sensor_state('activity-paused')
- done('Translucent system activity pause releases sensor listener before onStop')
+ adb('shell','input','keyevent','KEYCODE_BACK');find('Read once')
+ require(result(before)=='Pause requests: get=RUN_PAUSED; watch=RUN_PAUSED','Paused requests were not denied')
+ require('Ended: paused (1)' in labels(),'Missing or repeated terminal pause event')
+ no_events();sensor_state('pause-resumed');capture('pause-only-returned')
+ watch(10);require(act('Stop').startswith('Stopped:'),'Explicit re-watch after resume failed');no_events()
+ done('Pause-only panel releases listener, denies get/watch, emits one terminal event and requires explicit restart')
  installed_apk();receipt['complete']=True
 except Exception as e:
  receipt['error']=str(e)
