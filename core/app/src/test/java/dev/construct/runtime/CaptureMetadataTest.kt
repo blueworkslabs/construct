@@ -586,7 +586,7 @@ class CaptureMetadataTest {
         for (retired in listOf("camera.capture", "photo.measure", "sky.watch"))
             denied("API_INCOMPATIBLE") { Packages.manifest(manifest("0.13.0", retired)) }
         denied("API_INCOMPATIBLE") { Packages.manifest(manifest("0.12.0", "image.read", target = "0.13.0")) }
-        denied("API_INCOMPATIBLE") { Packages.manifest(manifest("0.14.0", "image.read")) }
+        denied("API_INCOMPATIBLE") { Packages.manifest(manifest("0.15.0", "image.read")) }
         // 0.12 modules keep working unchanged.
         assertEquals("0.12.0", Packages.manifest(manifest("0.12.0", "camera.photo", "image.read", "photos.library")).api)
     }

@@ -37,6 +37,7 @@ def prepare(output):
     prepare_sensitive(output, key)
     prepare_photo_identity(output, key)
     prepare_capture_metadata(output, key)
+    prepare_orientation(output, key)
     print('Prepared complete JVM fixtures plus home/test catalogs under the selected output.')
 
 def prepare_sensitive(output, key):
@@ -85,6 +86,10 @@ def prepare_capture_metadata(output, key):
                 js=probe/'ui/app.js';js.write_text(js.read_text().replace('r.deleted?', 'r.completed?'))
             (probe/'manifest.json').write_text(json.dumps({**manifest,'version':version,'constructApi':dict(min=api,target=api)}))
             publish(output/'capture-metadata-registry',*build(probe,key),fixture=True)
+
+def prepare_orientation(output, key):
+    # API 0.14 orientation.read probe: one reading, a rate-capped stream and stop.
+    publish(output/'orientation-registry',*build(ROOT/'examples/fixtures/orientation-probe',key),fixture=True)
 
 def prepare_transport(output, key):
     # Signed scopes exercise expansion, removal/reintroduction and rollback.
