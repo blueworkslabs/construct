@@ -35,7 +35,11 @@ slightly right.", "Turn left about 40°." or "Behind you: turn around."
   south-west · compass ±12°". When the host flags `calibrate`, it asks for a
   figure-8 wave. Guidance is always a wedge and words, never a crosshair.
 - **Lifecycle.** A menu pause stops the host stream, and Space Watch asks again on
-  return. Turning Follow off sends `stop` and puts north back at the top.
+  return. When the host itself ends the stream, it sends `{watching:false,
+  reason}`: that happens for another window in front, Home or Recents
+  (`paused`), and for access turned off (`revoked`). Follow then turns off and
+  says why, and a tap turns it back on. It never restarts silently. Turning
+  Follow off sends `stop` and puts north back at the top.
 - **Storage.** Nothing about headings is stored, and Follow always starts off.
 - **Fallback.** Without the grant or a compass, a note explains what's missing
   and the static compass dome keeps working.

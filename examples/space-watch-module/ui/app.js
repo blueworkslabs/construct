@@ -1167,6 +1167,21 @@
   window.addEventListener("constructorientation", (event) => {
     if (!follow.on || !active || !place) return;
     const s = event.detail || {};
+    if (s.watching === false) {
+      // The host ended the stream (another screen in front, or access revoked).
+      follow.request++;
+      follow.on = follow.want = false;
+      follow.heading = null;
+      message(
+        $("follow-status"),
+        s.reason === "revoked"
+          ? "Compass access was turned off in Module access. Follow is off."
+          : "Follow stopped while another screen was in front. Tap Follow to turn it back on.",
+        "attention",
+      );
+      applyFollow(true);
+      return;
+    }
     follow.pose = s.pose === "flat" ? "flat" : "upright";
     follow.calibrate = s.calibrate === true;
     follow.accuracy = Number.isFinite(s.accuracyDeg) ? s.accuracyDeg : null;

@@ -467,6 +467,19 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   // Pause: the host stops the stream; on return Space Watch asks again.
   r.visibility(false); r.visibility(true); await flush();
   assert.equal(r.calls.filter(c => c.method === 'orientation.read' && c.params.op === 'watch').length, 2);
+  // The host ends the stream on an activity pause: Follow turns off and says so.
+  r.orient({watching: false, reason: 'paused'});
+  assert.equal(r.el('follow').attributes['aria-pressed'], 'false'); assert.equal(r.rotation(), 0);
+  assert.match(r.el('follow-status').textContent, /another screen was in front/); assert(!r.el('follow-status').hidden);
+  assert(r.el('spot-turn').hidden);
+  r.visibility(false); r.visibility(true); await flush();
+  assert.equal(r.calls.filter(c => c.method === 'orientation.read' && c.params.op === 'watch').length, 2, 'no silent re-watch after a host end');
+  await r.el('follow').onclick(); await flush();
+  assert.equal(r.el('follow').attributes['aria-pressed'], 'true');
+  r.orient({pose: 'flat', azimuthDeg: 100, pitchDeg: 88, rollDeg: 0, calibrate: false, accuracyDeg: 12});
+  r.orient({watching: false, reason: 'revoked'});
+  assert.match(r.el('follow-status').textContent, /turned off in Module access/);
+  await r.el('follow').onclick(); await flush();
   // Off: stop, north up again, no guidance.
   r.el('follow').onclick(); await flush();
   assert.equal(r.calls.at(-1).params.op, 'stop'); assert.equal(r.rotation(), 0);
