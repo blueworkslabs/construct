@@ -1,0 +1,380 @@
+/* Space Watch: module-specific rules on top of construct-ui.css tokens. */
+main {
+  max-width: 760px;
+  padding-bottom: 12px;
+}
+.construct-head .purpose {
+  overflow-wrap: anywhere;
+}
+h2 {
+  font-size: 17px;
+  margin: 6px 0;
+}
+#welcome {
+  max-width: 620px;
+  margin: 20px auto;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+#welcome-progress {
+  width: 100%;
+  height: 3px;
+  accent-color: var(--jade);
+  display: block;
+  margin: 6px 0;
+}
+.actions.start {
+  justify-content: flex-start;
+  padding: 0;
+  margin-top: 12px;
+}
+label {
+  display: block;
+}
+input[type="text"] {
+  display: block;
+  width: 100%;
+  margin: 4px 0 10px;
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+.toolbar button {
+  flex: none;
+}
+.chip {
+  order: 2;
+  flex: 1 1 100%;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.chip.live {
+  border-color: #2f6b52;
+  color: var(--jade);
+}
+#red[aria-pressed="true"] {
+  border-color: var(--error);
+  color: var(--error);
+}
+.work-grid {
+  display: grid;
+  gap: 10px;
+}
+#dome-wrap {
+  min-width: 0;
+}
+#dome {
+  display: block;
+  width: 100%;
+  max-width: 520px;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  touch-action: manipulation;
+}
+.scrub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  max-width: 520px;
+  margin: 4px auto 0;
+}
+.scrub input {
+  flex: 1 1 140px;
+  min-height: 44px;
+  margin: 0;
+  background: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+/* Drawn from the tokens so red mode has no bright native track. */
+.scrub input::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+.scrub input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  margin-top: -10px;
+  border-radius: 50%;
+  background: var(--jade);
+  border: 0;
+}
+.scrub input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+#rewind-label {
+  min-width: 6.5em;
+  font-size: 0.9rem;
+  color: var(--jade);
+}
+#spot {
+  border: 1px solid var(--jade);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  padding: 12px;
+  margin: 6px 0 12px;
+}
+#spot h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.sub {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 2px 0 10px;
+}
+.spot-card {
+  background: #0f2a1e;
+  border: 1px solid #2f6b52;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.spot-card p {
+  margin: 3px 0;
+  font-size: 0.92rem;
+}
+.spot-card .head {
+  color: var(--jade);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.spot-card .when {
+  color: var(--amber);
+  font-size: 0.85rem;
+}
+.spot-card .state {
+  color: var(--muted);
+}
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+.stats p {
+  flex: 1 1 90px;
+  margin: 0;
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.stats b {
+  display: block;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+#list {
+  display: grid;
+  gap: 6px;
+}
+.object {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-radius: var(--r-card);
+  border-color: var(--border);
+  background: var(--surface);
+  padding: 9px 12px;
+  font-weight: 400;
+}
+.object strong {
+  display: block;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.object span {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.object.visible strong {
+  color: var(--jade);
+}
+.object[aria-pressed="true"] {
+  border-color: var(--jade);
+  background: #1b3327;
+}
+.list-more {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.error {
+  color: var(--error) !important;
+}
+.attention {
+  color: var(--amber) !important;
+}
+#refresh {
+  margin-top: 4px;
+}
+dialog {
+  background: var(--surface);
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 18px;
+  width: min(94vw, 620px);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+dialog::backdrop {
+  background: #0009;
+}
+dialog h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  overflow-wrap: anywhere;
+}
+.dialog-body {
+  overflow-wrap: anywhere;
+}
+.dialog-body h3 {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--jade);
+  margin: 14px 0 4px;
+}
+.dialog-body dl {
+  margin: 0;
+}
+.fact {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid #1c2e24;
+}
+.fact dt {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.fact dd {
+  margin: 0;
+  text-align: right;
+}
+.wiki-text {
+  color: var(--text);
+  font-size: 0.92rem;
+}
+.credit {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+dialog .actions {
+  position: sticky;
+  bottom: -18px;
+  background: var(--surface);
+  padding: 12px 0 6px;
+}
+.wide {
+  width: 100%;
+}
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 14px 0 6px;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
+.note {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  color: var(--text);
+  font-size: 14px;
+}
+.switch input {
+  accent-color: var(--jade);
+  width: 24px;
+  height: 24px;
+  margin: 0;
+}
+/* Red mode keeps dark-adapted eyes dark: every colour becomes a dim red. */
+body.red {
+  --bg: #050000;
+  --surface: #0d0101;
+  --surface2: #140202;
+  --border: #3a0b0b;
+  --control-border: #5a1717;
+  --text: #c24848;
+  --muted: #8a2a2a;
+  --jade: #d65a5a;
+  --jade-ink: #050000;
+  --focus: #ff7a66;
+  --amber: #e06a4a;
+  --error: #ff7a66;
+  --disabled: #4a1212;
+}
+html:has(body.red) {
+  background: #050000;
+}
+body.red .spot-card {
+  background: #140202;
+  border-color: #5a1717;
+}
+body.red #spot {
+  border-color: #5a1717;
+}
+body.red .object[aria-pressed="true"] {
+  background: #1d0404;
+}
+body.red .fact {
+  border-color: #2a0808;
+}
+@media (min-width: 680px) and (orientation: landscape) {
+  main {
+    max-width: none;
+  }
+  .work-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(260px, 1fr);
+    align-items: start;
+  }
+  #dome-wrap {
+    position: sticky;
+    top: 8px;
+  }
+  #dome {
+    max-width: min(520px, calc(100vh - 90px));
+  }
+  aside {
+    min-width: 0;
+  }
+}
