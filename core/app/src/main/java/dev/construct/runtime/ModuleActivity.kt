@@ -159,9 +159,12 @@ class ModuleActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume(); screenResumed = true; applyScreenCapture(); privacyCurtains.resume()
+        // Foreground sensors stay off until the module asks again; pickers resume in onPostResume.
+        webView?.setActivityPaused(false)
     }
 
     override fun onPause() {
+        webView?.setActivityPaused(true)
         privacyCurtains.pause(); screenResumed = false; applyScreenCapture(); super.onPause()
     }
 

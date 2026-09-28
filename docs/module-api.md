@@ -344,9 +344,19 @@ knows its place converts to true north itself.
 - A menu pause stops the stream and fails a pending `get` with
   `RUN_PAUSED` through the bridge, like other asynchronous capabilities (the
   native sensor session cancels immediately). After resume the module must call `watch` again.
+- An **activity pause** also stops it, even when Android does not stop the
+  activity: another window in front, a system dialog, Home or Recents. It happens
+  in `onPause`, before `onStop`. While the activity is paused, new `get` and `watch`
+  requests fail with `RUN_PAUSED`. Resume does not restart the stream; the module
+  must call `watch` again. Image and camera pickers keep their existing pause and
+  completion handling.
+- When the host ends an active stream because of an activity pause or a revoked
+  grant, it sends one final `constructorientation` event with
+  `detail: {watching: false, reason: "paused" | "revoked"}`. A menu pause is
+  signalled by `constructvisibilitychange` instead.
 - Closing the module stops everything.
-- Every delivery re-checks the grant and pause state; a revoked grant stops the
-  stream at the next sample.
+- Every delivery re-checks the grant and both pause states; a revoked grant stops
+  the stream at the next sample.
 - There is no background or batched delivery.
 
 **Errors:** `ORIENTATION_PARAMS`, `ORIENTATION_BUSY`, `ORIENTATION_UNAVAILABLE`

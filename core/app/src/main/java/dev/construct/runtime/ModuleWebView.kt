@@ -68,11 +68,18 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
     }
     if (module.capabilities.any { it.id == "net.http" }) http = ModuleHttp(context, module) { authorizeCapability("net.http") }
     if (module.capabilities.any { it.id == "location.read" }) location = ModuleLocation(context) { authorizeCapability("location.read") }
-    if (module.capabilities.any { it.id == "orientation.read" }) orientation = ModuleOrientation(context, { authorizeCapability("orientation.read") },
-        { view.display?.rotation ?: 0 }) { sample ->
-        // Pushed like constructvisibilitychange; the sample is host-built JSON only.
-        if (active.get() && !view.gate.paused.get())
-            view.evaluateJavascript("window.dispatchEvent(new CustomEvent('constructorientation',{detail:$sample}));", null)
+    if (module.capabilities.any { it.id == "orientation.read" }) {
+        fun push(detail: JSONObject) =
+            view.evaluateJavascript("window.dispatchEvent(new CustomEvent('constructorientation',{detail:$detail}));", null)
+        orientation = ModuleOrientation(context, {
+            // Foreground only: no readings while the activity is paused, even without onStop.
+            checkRule(!view.activityPaused.get(), "RUN_PAUSED", "Return to the module to use compass and tilt")
+            authorizeCapability("orientation.read")
+        }, { view.display?.rotation ?: 0 }, { sample ->
+            // Pushed like constructvisibilitychange; the sample is host-built JSON only.
+            if (active.get() && !view.gate.paused.get() && !view.activityPaused.get()) push(sample)
+        }) { reason -> if (active.get()) push(JSONObject().put("watching", false).put("reason", reason)) }
+        view.stopForeground = { orientation?.cancel("paused") }
     }
     if (module.capabilities.any { it.id == "image.read" }) images = ModuleImageSession(context, origin, ::authorizeCapability, pickImage)
     if (module.capabilities.any { it.id == "photos.library" }) library = ModulePhotoLibrary(context, module.id, images!!, ::authorizeCapability,

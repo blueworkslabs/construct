@@ -104,7 +104,9 @@ internal object OrientationMath {
  * [authorize]; a failure stops the stream. [cancel] (menu pause) and [close] stop everything.
  */
 internal class ModuleOrientation(context: Context, private val authorize: () -> Unit,
-    private val displayRotation: () -> Int, private val emit: (JSONObject) -> Unit) : SensorEventListener {
+    private val displayRotation: () -> Int, private val emit: (JSONObject) -> Unit,
+    /** Told why the host ended an active stream: "paused" or "revoked". */
+    private val ended: (String) -> Unit = {}) : SensorEventListener {
     private val handler = Handler(Looper.getMainLooper())
     private val manager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
     private val sensor = manager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
@@ -162,18 +164,26 @@ internal class ModuleOrientation(context: Context, private val authorize: () -> 
             try { authorize(); done(sample, null) } catch (e: ConstructError) { done(null, e) }
         }
         if (watching && throttle.admit(event.timestamp.takeIf { it > 0 } ?: SystemClock.elapsedRealtimeNanos())) {
-            try { authorize(); emit(sample) } catch (_: ConstructError) { watching = false }
+            try { authorize(); emit(sample) } catch (e: ConstructError) {
+                watching = false
+                ended(if (e.code == "RUN_PAUSED") "paused" else "revoked")
+            }
         }
         releaseIfIdle()
     }
     override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) { }
-    /** Menu pause: stop the stream (the module must watch again on resume) and fail a pending get. */
-    fun cancel() {
+    /**
+     * Menu or activity pause: stop the stream (the module must watch again on resume) and fail
+     * a pending get. With a [reason], an active stream's end is reported through [ended].
+     */
+    fun cancel(reason: String? = null) {
+        val wasWatching = watching
         watching = false
         timeout?.let { handler.removeCallbacks(it) }; timeout = null
         val p = pending; pending = null
         releaseIfIdle()
         p?.invoke(null, ConstructError("ORIENTATION_CANCELLED", "Orientation reading cancelled"))
+        if (wasWatching && reason != null) ended(reason)
     }
     fun close() { closed = true; cancel() }
 }

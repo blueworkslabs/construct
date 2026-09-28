@@ -45,6 +45,14 @@ internal open class ModuleSessionView(context: Context) : WebView(context) {
     }
     val gate = ModuleSessionGate()
     var stopEffects: () -> Unit = {}
+    /** True while the hosting activity is paused (another window in front, Home, Recents). */
+    val activityPaused = AtomicBoolean(false)
+    /** Foreground-only sensors stop here; the module must ask again after resume. */
+    var stopForeground: () -> Unit = {}
+    fun setActivityPaused(paused: Boolean) {
+        if (released || activityPaused.getAndSet(paused) == paused) return
+        if (paused) stopForeground()
+    }
     var stopImageEffects: () -> Unit = {}
     fun pauseForPicker() {
         if (released) return

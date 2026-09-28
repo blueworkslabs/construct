@@ -141,8 +141,13 @@ class OrientationTest {
         val shadow: ShadowSensorManager = shadowOf(manager)
         val sensor: Sensor = ShadowSensor.newInstance(Sensor.TYPE_ROTATION_VECTOR).also { shadow.addSensor(it) }
         var granted = true
+        var activityPaused = false
         val emitted = mutableListOf<JSONObject>()
-        val session = ModuleOrientation(context, { checkRule(granted, "CAPABILITY_DENIED", "off") }, { 0 }) { emitted += it }
+        val ended = mutableListOf<String>()
+        // Mirrors ModuleWebView: an activity pause denies before the grant is checked.
+        val session = ModuleOrientation(context, {
+            checkRule(!activityPaused, "RUN_PAUSED", "paused"); checkRule(granted, "CAPABILITY_DENIED", "off")
+        }, { 0 }, { emitted += it }) { ended += it }
         var result: JSONObject? = null; var error: ConstructError? = null
         fun request(json: String) { result = null; error = null; session.request(JSONObject(json)) { v, e -> result = v; error = e } }
         fun send(ns: Long, values: FloatArray = floatArrayOf(0f, 0f, 0f, 1f, 0.1f)) {
@@ -169,6 +174,7 @@ class OrientationTest {
         // A revoked grant stops the stream at the next sample.
         r.request("{op:'watch',rateHz:15}"); r.granted = false
         r.send(4_000_000_000L); assertEquals(5, r.emitted.size); assertFalse(r.listening)
+        assertEquals(listOf("revoked"), r.ended)
         r.granted = true; r.request("{op:'watch'}"); r.session.close(); assertFalse(r.listening)
         denied("RUN_STALE") { r.request("{op:'watch'}") }
     }
@@ -190,7 +196,7 @@ class OrientationTest {
 
     @Test fun noRotationSensorIsUnavailable() {
         val context: Context = RuntimeEnvironment.getApplication()
-        val session = ModuleOrientation(context, { }, { 0 }) { }
+        val session = ModuleOrientation(context, { }, { 0 }, { })
         denied("ORIENTATION_UNAVAILABLE") { session.request(JSONObject("{op:'watch'}")) { _, _ -> } }
     }
 
@@ -213,5 +219,41 @@ class OrientationTest {
         r.send(1_000_000L)
         assertNotNull(r.result)
         assertFalse(r.listening)
+    }
+
+    @Test fun activityPauseStopsTheStreamDeniesRequestsAndNeedsAFreshWatch() {
+        val r = Rig()
+        r.request("{op:'watch'}"); r.send(10_000_000L); assertEquals(1, r.emitted.size)
+        // onPause without onStop (another window in front): ModuleSessionView.stopForeground.
+        r.activityPaused = true; r.session.cancel("paused")
+        assertFalse(r.listening); assertEquals(listOf("paused"), r.ended)
+        r.send(500_000_000L); assertEquals(1, r.emitted.size)
+        for (op in listOf("{op:'watch'}", "{op:'get'}")) denied("RUN_PAUSED") { r.request(op) }
+        // A second pause signal for an idle session reports nothing more.
+        r.session.cancel("paused"); assertEquals(listOf("paused"), r.ended)
+        // Resume does not restart it; the module asks again.
+        r.activityPaused = false
+        r.send(1_000_000_000L); assertEquals(1, r.emitted.size); assertFalse(r.listening)
+        r.request("{op:'watch'}"); r.send(1_200_000_000L); assertEquals(2, r.emitted.size)
+        // A sample arriving while paused (before the pause hook ran) ends the stream too.
+        r.activityPaused = true; r.send(1_400_000_000L)
+        assertEquals(2, r.emitted.size); assertFalse(r.listening); assertEquals(listOf("paused", "paused"), r.ended)
+        // Menu pause (stopEffects → cancel without a reason) keeps its visibility-event contract.
+        r.activityPaused = false; r.request("{op:'watch'}"); r.session.cancel()
+        assertEquals(2, r.ended.size); assertFalse(r.listening)
+    }
+
+    @Test fun sessionViewForwardsActivityPauseOnce() {
+        val view = ModuleSessionView(RuntimeEnvironment.getApplication())
+        var stops = 0
+        view.stopForeground = { stops++ }
+        view.setActivityPaused(true); view.setActivityPaused(true)
+        assertTrue(view.activityPaused.get()); assertEquals(1, stops)
+        view.setActivityPaused(false); assertFalse(view.activityPaused.get()); assertEquals(1, stops)
+        // Picker flow is independent: the menu gate still pauses and resumes as before.
+        view.pauseForPicker(); assertTrue(view.gate.paused.get())
+        view.setActivityPaused(true); view.setActivityPaused(false); view.setMenuPaused(false)
+        assertFalse(view.gate.paused.get()); assertEquals(2, stops)
+        view.destroy()
     }
 }
