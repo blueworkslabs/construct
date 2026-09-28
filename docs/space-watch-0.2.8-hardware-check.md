@@ -1,6 +1,10 @@
 # Space Watch 0.2.8 phone check
 
-Status: **awaiting exact-package Android acceptance; not yet a phone handoff.**
+Status: **held for the train-planner mismatch; not a phone handoff.** All 16
+Android scenarios passed, but the planner still starts a train pass from its
+fixed centre rather than its first visible member. See the
+[staging report](space-watch-0.2.8-staging.md). The checklist below is retained
+for the follow-up candidate, not an approval to promote this one.
 
 No new APK: staging uses the existing alpha34 candidate. Install **Space Watch**,
 not Synthetic Space Watch, from this isolated signed catalog:

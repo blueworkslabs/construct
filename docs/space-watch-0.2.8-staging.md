@@ -1,7 +1,21 @@
 # Space Watch 0.2.8 staging
 
-Status: **fresh exact-package Android acceptance in progress.** No hardware
-clearance, merge or production promotion yet.
+Status: **16/16 Android checks passed; hardware handoff held for a remaining
+train-planner mismatch.** No merge or production promotion.
+
+## Remaining blocker
+
+The live train state now chooses an individually visible member, but the planner
+still queues only the fixed cluster centre. In the Berlin fixture at
+2026-09-28 18:24 UTC, member 100799 is visible while centre 100793 is below 10°.
+The actual controller renders `06:26 PM · Guowang train` rather than `Now`.
+An assertion requiring a current pass fails on this signed candidate's source.
+The display uses minute truncation; the centre rises at approximately 18:26:50.
+
+The feature author has been asked to compute and merge member visibility
+intervals, with this regression and a propagation/responsiveness check preserving
+the incremental work budget. The 16 Android scenarios below do not cover that
+earlier member-only interval; their success does not clear this finding.
 
 ## Artifacts
 
@@ -58,7 +72,7 @@ repeated here. Sampling comparisons do not prove completeness for every orbit.
 
 ## Android scope
 
-New run `20260928T110237Z-space-b65de3d4`, using the signed bytes above. The
+Completed run `20260928T110237Z-space-b65de3d4`, using the signed bytes above. The
 16-check runner covers the planner and future train preview, Back to now,
 lookup/Wikipedia, red/rewind, process restart, canvas selection, landscape and
 200% text, native menu resume, real denial gates, automatic live CelesTrak
@@ -69,6 +83,24 @@ native grant return, without tapping Refresh or accepting a downloading state.
 The earlier driver could exhaust its scrolling search before that asynchronous
 reply. This is a wait correction, not a waiver of real network or offline checks.
 Synthetic location/orbit answers exercise UI only; real-module checks are separate.
+
+[Complete receipt](evidence/space-watch-0.2.8-staging-2026-09-28.json):
+`complete=true`, `stopped=true`, 16 checks; runner service exited successfully
+and both runner and emulator services were independently confirmed inactive.
+Live CelesTrak loading after grants and fully offline reopen passed, both at Now.
+Live counts were 0 visible / 8 above, and later offline counts 0 visible / 9 above;
+these are different instants, not an equal-time cache comparison. Data was 32 h old.
+The crash buffer contains an emulator Bluetooth startup abort, not a Construct
+fatal exception; it is not claimed to be globally empty.
+
+Original Android captures: [pass list](images/space-watch-0.2.8/space-plan.png),
+[train preview](images/space-watch-0.2.8/space-train-preview.png),
+[Wikipedia credit](images/space-watch-0.2.8/space-train-wikipedia.png),
+[landscape](images/space-watch-0.2.8/space-landscape.png),
+[200% text](images/space-watch-0.2.8/space-large-text.png),
+[live data](images/space-watch-0.2.8/space-real-network.png), and
+[offline reopen](images/space-watch-0.2.8/space-real-offline-cache.png).
+Landscape retains the original display-capture orientation; rotate for viewing.
 
 ## Limits and prior evidence
 
