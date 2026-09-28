@@ -63,7 +63,7 @@ with sync_playwright() as p:
  assert page.locator('#follow-status').get_attribute('aria-live')=='off'
  assert page.locator('#spot-turn').get_attribute('aria-live')=='off'
  assert page.locator('#follow-announcement').get_attribute('class')=='sr-only'
- assert page.locator('#follow-announcement').bounding_box()['height']<=1
+ assert page.locator('#follow-announcement').evaluate("el=>{const s=getComputedStyle(el);return s.position==='absolute' && s.clipPath==='inset(50%)' && s.width==='1px';}")
  spoken=page.locator('#follow-announcement').inner_text()
  orient({'pose':'flat','azimuthDeg':95,'accuracyDeg':14,'calibrate':False})
  assert page.locator('#follow-announcement').inner_text()==spoken

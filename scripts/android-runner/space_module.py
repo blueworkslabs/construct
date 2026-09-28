@@ -173,9 +173,15 @@ def inject(acc,mag):
  adb('emu','sensor','set','magnetic-field',mag)
 def follow_sensors(label,expected):
  from orientation_checks import active_connections
- raw=adb('shell','dumpsys','sensorservice');(run/('sensors-'+label+'.txt')).write_text(raw)
  uid=int(re.search(r'uid:(\d+)',adb('shell','pm','list','packages','-U','dev.construct.runtime')).group(1))
- value=active_connections(raw,uid);receipt.setdefault('followNativeConnections',{})[label]=value;save()
+ started=time.monotonic();deadline=started+3
+ while True:
+  raw=adb('shell','dumpsys','sensorservice');value=active_connections(raw,uid)
+  if value==expected or time.monotonic()>=deadline:break
+  time.sleep(.1)
+ (run/('sensors-'+label+'.txt')).write_text(raw)
+ receipt.setdefault('followNativeConnections',{})[label]=value
+ receipt.setdefault('followListenerWaitSeconds',{})[label]=round(time.monotonic()-started,3);save()
  assert value==expected,('Follow listeners',label,value,expected)
 def follow_checks():
  # Use the real host sensor/grant path; the fixture does not replace orientation.
