@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "dev.construct.capture-metadata",
+  "name": "Capture metadata probe",
+  "version": "0.2.0",
+  "description": "Synthetic acceptance fixture for API 0.13 capture metadata: level, fixed zoom steps, FOV, tilt, heading and the new photo's stable ID. Shows the raw result.",
+  "constructApi": {
+    "min": "0.13.0",
+    "target": "0.13.0"
+  },
+  "runtime": {
+    "kind": "webview-js"
+  },
+  "entry": "ui/index.html",
+  "capabilities": [
+    {
+      "id": "camera.photo",
+      "reason": "Open the visible native viewfinder with a level and fixed zoom steps; only you can press the shutter."
+    },
+    {
+      "id": "photos.library",
+      "reason": "List this module’s private photos to confirm the captured photo's stable ID."
+    },
+    {
+      "id": "image.read",
+      "reason": "Required alongside the private photo library."
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.construct.test.pause" android:versionCode="1" android:versionName="1">
+  <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
+  <application android:label="Lifecycle test overlay" android:theme="@style/PauseOverlay" android:allowBackup="false">
+    <activity android:name=".PauseActivity" android:exported="true" android:excludeFromRecents="true" />
+  <activity android:name=".PeerActivity" android:exported="true" android:resizeableActivity="true" android:taskAffinity="dev.construct.test.peer" android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+  </application>
+</manifest>

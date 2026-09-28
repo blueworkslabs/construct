@@ -36,7 +36,7 @@ internal fun moduleChromeClient(onError: (Int) -> Unit, onPopup: () -> Unit) = o
 @SuppressLint("SetJavaScriptEnabled")
 internal fun moduleWebView(context: Context, store: ModuleStore, installed: Installed,
     pickImage: ((Uri?) -> Unit) -> Unit = { throw ConstructError("IMAGE_UNAVAILABLE", "Image picker unavailable") },
-    capturePhoto: ((Boolean) -> Unit) -> Unit = { throw ConstructError("CAMERA_UNAVAILABLE", "Capture unavailable") },
+    capturePhoto: (CaptureOptions, (JSONObject?, ConstructError?) -> Unit) -> Unit = { _, _ -> throw ConstructError("CAMERA_UNAVAILABLE", "Capture unavailable") },
     confirmPhoto: (String, Bitmap, (Boolean) -> Unit) -> Unit = { _, _, _ -> throw ConstructError("PHOTO_UNAVAILABLE", "Confirmation unavailable") },
     onFailure: (WebView, String) -> Unit): ModuleSessionView {
     if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
@@ -52,10 +52,11 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
     lateinit var contacts: ContactsReader
     var http: ModuleHttp? = null
     var location: ModuleLocation? = null
+    var orientation: ModuleOrientation? = null
     var images: ModuleImageSession? = null
     var library: ModulePhotoLibrary? = null
     val view = object : ModuleSessionView(context) {
-        override fun releaseSession() { active.set(false); contacts.close(); tone.close(); http?.close(); location?.close(); images?.close(); library?.close() }
+        override fun releaseSession() { active.set(false); contacts.close(); tone.close(); http?.close(); location?.close(); orientation?.close(); images?.close(); library?.close() }
     }
     contacts = ContactsReader(context) {
         view.gate.authorize("contacts.read")
@@ -63,17 +64,30 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
     }
     fun authorizeCapability(capability: String) {
         checkRule(active.get(), "RUN_STALE", "Module session closed")
+        if (capability == "orientation.read") view.authorizeOrientation()
         view.gate.authorize(capability); store.withCapability(installed, capability) { }
     }
     if (module.capabilities.any { it.id == "net.http" }) http = ModuleHttp(context, module) { authorizeCapability("net.http") }
     if (module.capabilities.any { it.id == "location.read" }) location = ModuleLocation(context) { authorizeCapability("location.read") }
+    if (module.capabilities.any { it.id == "orientation.read" }) {
+        fun push(detail: JSONObject) =
+            view.evaluateJavascript("window.dispatchEvent(new CustomEvent('constructorientation',{detail:$detail}));", null)
+        orientation = ModuleOrientation(context, {
+            // Foreground only: no readings while the activity is paused, even without onStop.
+            authorizeCapability("orientation.read")
+        }, { view.display?.rotation ?: 0 }, { sample ->
+            // Pushed like constructvisibilitychange; the sample is host-built JSON only.
+            if (active.get() && !view.gate.paused.get() && !view.activityPaused.get()) push(sample)
+        }) { reason -> if (active.get()) push(JSONObject().put("watching", false).put("reason", reason)) }
+        view.stopForeground = { orientation?.cancel("paused") }
+    }
     if (module.capabilities.any { it.id == "image.read" }) images = ModuleImageSession(context, origin, ::authorizeCapability, pickImage)
     if (module.capabilities.any { it.id == "photos.library" }) library = ModulePhotoLibrary(context, module.id, images!!, ::authorizeCapability,
         { action -> store.withCapability(installed, "photos.library") {
             authorizeCapability("image.read"); view.gate.authorize("photos.library"); action()
-        } }, confirmPhoto, stableIds = module.api == "0.12.0")
+        } }, confirmPhoto, stableIds = module.api in setOf("0.12.0", "0.13.0", "0.14.0"))
     view.stopImageEffects = { images?.cancel(); library?.cancel() }
-    view.stopEffects = { tone.pause(); http?.cancel(); location?.cancel() }
+    view.stopEffects = { tone.pause(); http?.cancel(); location?.cancel(); orientation?.cancel() }
     val reportedBlocks = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     var calls = 0
     var window = android.os.SystemClock.elapsedRealtime()
@@ -85,14 +99,14 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
         // Persist failure before posting the UI transition, so a queued Mark working
         // action cannot confirm a failed run even if the view has not closed yet.
         runCatching { store.runtimeFailed(installed, code) }
-        view.post { contacts.close(); tone.close(); http?.close(); location?.close(); images?.close(); library?.close(); onFailure(view, code) }
+        view.post { contacts.close(); tone.close(); http?.close(); location?.close(); orientation?.close(); images?.close(); library?.close(); onFailure(view, code) }
     }
     fun auditBlock(code: String, category: String = "policy") {
         if (active.get() && reportedBlocks.add("$code:$category"))
             store.log("runtime", code, module, "Blocked category=$category; URL/payload omitted")
     }
     with(view.settings) {
-        if (module.api in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0")) textZoom = (context.resources.configuration.fontScale * 100).toInt().coerceIn(50, 300)
+        if (module.api in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0")) textZoom = (context.resources.configuration.fontScale * 100).toInt().coerceIn(50, 300)
         javaScriptEnabled = true
         domStorageEnabled = false
         allowFileAccess = false
@@ -123,7 +137,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             // Android intercepts data: resources too. Keep this local raster path
             // bounded; returning null here would bypass our byte/format policy.
             if (request.url.scheme == "data") {
-                if (module.api !in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0") || request.isForMainFrame || request.method != "GET") return reject("inline-image-context")
+                if (module.api !in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0") || request.isForMainFrame || request.method != "GET") return reject("inline-image-context")
                 val raster = runCatching { ModuleImages.dataUrl(request.url.toString()) }.getOrNull()
                     ?: return reject("inline-image-format")
                 return WebResourceResponse(raster.first, null, 200, "OK",
@@ -149,7 +163,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                     "X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-store"), stream)
             }
             if (!Packages.safePath(path)) return reject("path")
-            if (module.api in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0") && path == "construct-host.css") {
+            if (module.api in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0") && path == "construct-host.css") {
                 return WebResourceResponse("text/css", "UTF-8", 200, "OK",
                     mapOf("X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-store"),
                     ByteArrayInputStream(ModuleLayout.css.toByteArray()))
@@ -204,21 +218,30 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             val method = request.getString("method")
             val params = request.getJSONObject("params")
             view.gate.authorize(method)
-            if (method == "net.http" || method == "location.read") {
+            if (method == "net.http" || method == "location.read" || method == "orientation.read") {
                 authorizeCapability(method)
                 val id = requestId; val generation = view.gate.generation.get()
+                val activityGeneration = view.activityGeneration.get()
                 val complete: (JSONObject?, ConstructError?) -> Unit = { value, error ->
                     view.post {
                         if (active.get()) {
                             val response = JSONObject().put("id", id)
-                            val denied = try { view.gate.authorizeReply(generation); authorizeCapability(method); error } catch (e: ConstructError) { e }
+                            val denied = try {
+                                view.gate.authorizeReply(generation)
+                                if (method == "orientation.read") view.authorizeOrientation(activityGeneration)
+                                authorizeCapability(method); error
+                            } catch (e: ConstructError) { e }
                             if (denied == null) response.put("result", value)
                             else response.put("error", JSONObject().put("code", denied.code).put("message", denied.message))
                             reply.postMessage(response.toString())
                         }
                     }
                 }
-                if (method == "net.http") http!!.get(params, complete) else location!!.get(params, complete)
+                when (method) {
+                    "net.http" -> http!!.get(params, complete)
+                    "location.read" -> location!!.get(params, complete)
+                    else -> orientation!!.request(params, complete)
+                }
                 return@addWebMessageListener
             }
             if (method == "camera.photo" || method == "photos.library") {
@@ -242,10 +265,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                         reply.postMessage(response.toString())
                     } }
                 }
-                if (method == "camera.photo") {
-                    PhotoCaptureActivity.validate(params)
-                    capturePhoto { saved -> complete(JSONObject().put("saved", saved), null) }
-                } else library!!.request(params, complete)
+                if (method == "camera.photo") capturePhoto(PhotoCaptureActivity.validate(params, module.api), complete) else library!!.request(params, complete)
                 return@addWebMessageListener
             }
             if (method == "image.read" || method == "image.markers" || method == "image.analyze") {

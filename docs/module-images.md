@@ -61,8 +61,12 @@ declaration order does not matter. Neither declaration substitutes for live gran
 Detection reads only the current run's opaque handle; no path/image uploads.
 
 Selected-image module windows retain Android’s secure-window protection against
-ordinary screenshots/screen recording. Synthetic emulator display capture, if
-available, is an operator-owned test surface, not an app capability.
+ordinary screenshots/screen recording by default. The person can turn on a
+per-module **Allow screenshots** switch in Module access (off by default; API 0.13
+source candidate host, applies to any module API version); see
+[screenshots](module-photos.md#allow-screenshots--api-013-source-candidate).
+Synthetic emulator display capture, if available, is an operator-owned test
+surface, not an app capability.
 
 ## Data composition and limits
 

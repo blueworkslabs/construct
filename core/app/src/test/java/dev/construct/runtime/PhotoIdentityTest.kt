@@ -210,6 +210,25 @@ class PhotoIdentityTest {
         assertEquals(1, CameraPhotos(app, module).list().size)
     }
 
+    @Test fun api013CaptureIdMatchesTheListedIdAndIdentityFailureDiscardsTheOriginal() {
+        capture()
+        var id: String? = null
+        val saved = CameraPhotos(app, module).commit(File.createTempFile("capture-", ".jpg", app.cacheDir).apply { writeBytes(bytes) },
+            published = { id = CameraPhotos(app, module).identify(it) }) { }
+        val listed = CameraPhotos(app, module).listIdentified()
+        assertEquals(listed.single { it.first == saved }.second, id)
+        assertEquals(ids(), listed.map { it.second })
+        denied("CAMERA_STORAGE") { CameraPhotos(app, "dev.construct.other").identify(saved) }
+        // A damaged identity key must not publish an original the module cannot identify.
+        key.writeBytes(ByteArray(12))
+        val before = CameraPhotos(app, module).list()
+        denied("PHOTO_FAILED") {
+            CameraPhotos(app, module).commit(File.createTempFile("capture-", ".jpg", app.cacheDir).apply { writeBytes(bytes) },
+                published = { CameraPhotos(app, module).identify(it) }) { }
+        }
+        assertEquals(before, CameraPhotos(app, module).list())
+    }
+
     @Test fun api012IsAcceptedForPhotoModulesButNotForRetiredCapabilities() {
         fun manifest(api: String, vararg caps: String) = JSONObject().put("schemaVersion", 1)
             .put("id", module).put("name", "Aimé").put("version", "0.1.0")

@@ -8,7 +8,9 @@ import java.net.URI
 import javax.net.ssl.HttpsURLConnection
 
 data class Installed(val manifest: ModuleManifest, val digest: String, val previous: String?,
-    val confirmed: Boolean, val enabled: Boolean, val failureCode: String? = null, val granted: Set<String> = emptySet())
+    val confirmed: Boolean, val enabled: Boolean, val failureCode: String? = null, val granted: Set<String> = emptySet(),
+    /** Per-module "Allow screenshots" choice; off unless explicitly turned on. See [ScreenCapturePolicy]. */
+    val allowScreenshots: Boolean = false)
 data class DamagedModule(val id: String, val code: String, val previousVersion: String?)
 data class Inventory(val modules: List<Installed>, val damaged: List<DamagedModule>, val indexError: String? = null)
 
@@ -165,6 +167,18 @@ class ModuleStore(private val context: Context) {
         log("access", if (allowed) "CAPABILITY_GRANTED" else "CAPABILITY_REVOKED", manifest, capability)
     }
 
+    /** Only an explicit stored `true` allows screenshots; absent or malformed values keep the secure default. */
+    private fun screenshotsAllowed(record: JSONObject?) = record?.opt("allowScreenshots") == true
+
+    @Synchronized fun setScreenshots(id: String, allowed: Boolean) {
+        val state = readState()
+        val record = state.getJSONObject(id)
+        val manifest = verifiedInstalled(id, record.getString("active"))
+        record.put("allowScreenshots", allowed)
+        writeAtomic(stateFile, state.toString())
+        log("access", if (allowed) "SCREENSHOTS_ALLOWED" else "SCREENSHOTS_BLOCKED", manifest, "Per-module screen capture choice")
+    }
+
     @Synchronized fun <T> withCapability(module: Installed, capability: String, action: () -> T): T {
         val record = readState().optJSONObject(module.manifest.id)
         checkRule(record != null && record.optString("active") == module.digest && record.optBoolean("enabled") &&
@@ -188,7 +202,7 @@ class ModuleStore(private val context: Context) {
                 val previous = record.optString("previous").takeIf { Regex("[a-f0-9]{64}").matches(it) }
                 modules.add(Installed(m, digest, previous, record.getBoolean("confirmed"), record.getBoolean("enabled"),
                     record.optString("failureCode").takeIf { it.isNotEmpty() },
-                    m.capabilities.map { it.id }.filter { grants(record, m).optBoolean(it) }.toSet()))
+                    m.capabilities.map { it.id }.filter { grants(record, m).optBoolean(it) }.toSet(), screenshotsAllowed(record)))
             } catch (error: Exception) {
                 val record = state.optJSONObject(id)
                 val previous = record?.optString("previous")?.let { runCatching { verifiedInstalled(id, it).version }.getOrNull() }
@@ -250,7 +264,7 @@ class ModuleStore(private val context: Context) {
         }
         state.put(id, JSONObject().put("httpOrigins", org.json.JSONArray(httpOrigins)).put("grants", approved).put("active", candidate.digest)
             .put("previous", old?.getString("active") ?: JSONObject.NULL)
-            .put("confirmed", false).put("enabled", true))
+            .put("confirmed", false).put("enabled", true).put("allowScreenshots", screenshotsAllowed(old)))
         writeAtomic(stateFile, state.toString())
         log("install", "INSTALLED_TRIAL", candidate.manifest, "Installed; waiting for you to mark it working")
         collectUnused(state)

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.orientation-probe",
+      "name": "Orientation probe",
+      "versions": [
+        {
+          "id": "dev.construct.orientation-probe",
+          "name": "Orientation probe",
+          "version": "0.1.0",
+          "artifact": "dev.construct.orientation-probe-0.1.0.zip",
+          "sha256": "53adfc5401d49d3273a387e2156d2840d64efff411aec383b3dae0162381a8b4",
+          "signature": "BOTJBItckcwd1TV69nyNxenT9Lqvv0EYYPZDrp2tF7WcsAuzLdUoEEPJ2f1LDRXJ8UPBSiHHRfNwepHye4IxND0aki96FyXITGlHp0iklWtXjR88Tw1rJ0JESkQw0R187xewLSbr2Nnp+NxRAJc08mU6klIx7Vr4T3RUdtKHRL7y2ZoXPF50dCcyFwHVUsptKRtHzxOBleE4wAL8QJV547NCNGqYAnl6838SJdNCOT8D567Q/8c+HLlU4Utql4wo9sIiW3p7a81fpKj0du5m98gRjB5C9PuhZXLl/InSRKL9jrZIRmW37yPebPfWVlsKO7dIvUczWluKeChZWDrWoA==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.orientation-probe",
+          "name": "Orientation probe",
+          "version": "0.1.1",
+          "artifact": "dev.construct.orientation-probe-0.1.1.zip",
+          "sha256": "dadd4f88e38cdb907d4fa49b7d8a2d336a95372b5ed101b10fad14a161bd19ac",
+          "signature": "NvXTLVxnNM1Otepikc4Xk4ExrzB6go26JYwIsylX5XS1knpyBAoQueHg3z9EKtz5CL0ABcfvqScCwrA9n4bpA5oNWySdw7n7FTAzOERO9AzTKNeizWxRhlh+/g97GuLrOCXxHaDKSf1K2FBJ43lCkyt4Lx+o/qE8++I89LHlO5CV7P/y23JbCqpF09NoY+gNj9tYCCc77lhAezGfixXvM1xcQ+P1ssHdgOqwW1i6RqqoxXDFdy93dgU0H8sT5DtB/rpkvCkEVjY1v9TyLfRzj4VAYwvwsgBXVK4a4vPghD0VMbTOD4MF1YUiRknKblRFnd4tpOD7i3mAeyT2lSlXCA==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.orientation-probe",
+          "name": "Orientation probe",
+          "version": "0.1.2",
+          "artifact": "dev.construct.orientation-probe-0.1.2.zip",
+          "sha256": "cc1633a35c8ec6ac1f6f2372d060325b060d7e1d4dc4e512ad1ae6f8f8b3df23",
+          "signature": "PJXL72OkI8bhBcF6UBam5vpvPMQsO+uRpYY6FVY+EK5j98W5g3cU4bzKUPyelozm1C9NLDRHIrU6Xg+16ZgnUMb3awYUthWFy4YqYLzaTHfyHf40zM6zqFzQbt6mvUWA/cGEZxUDHW+85AT4f1q/iPJDcyxIDz0+G3q7ODVOlD2z+7b1HGXoFG3+f+cAO5qgtohj0JGTEeMz7AGcm7NS563zvAaOO0cYM9E2J/iGT5kwJ5Z3dwlelS41ob+GElsIvMxnJPloFCZzEMo0DyNI0uHyI54ACDMthTJkcBxdQAf2ToIA5V+Ua+EbrhLz1CiMrczDnkdAcHNhrXCyfN2u/w==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.orientation-probe",
+          "name": "Orientation probe",
+          "version": "0.1.3",
+          "artifact": "dev.construct.orientation-probe-0.1.3.zip",
+          "sha256": "7ddfcef340238db112eae99f255fec5e1beb02061f29308d5a9e7c6ed85b51ea",
+          "signature": "WbuhR0kcD9cQy7VsZfaXlOZlVMuXWGjJXp8sw4st9n3Q/QaM0hkbXz42r1Jan9TbAG5/JYBz2EF1SleGS1s/EtkcmmNGGj8ruj+DGdziz5QPep5qsMDRRx9i6xb9Y65XqHE23R51m+bLqy/gKrhnGyH+TKfEt2nIv19fdcCXi+yB720qbkRdFvSyNJNP0J0Ew+bzStfOkpoPS6xsie0ANLAky90ompCLJv3v5EhmJfp68MpNsSZ93TjxaioJwM3ckYRRMIMnv96/QbFdYrE+AmpkiEmBtdsOns326ZdLdPzZum8X1VvjkCmlYbdQuTHs9jp6aAb4TEuyCNmRs5q0bA==",
+          "testFixture": true
+        }
+      ]
+    }
+  ]
+}

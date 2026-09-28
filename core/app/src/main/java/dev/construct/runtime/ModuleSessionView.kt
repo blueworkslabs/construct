@@ -24,6 +24,23 @@ internal class ModuleSessionGate {
     }
 }
 
+/**
+ * Whether foreground-only sensors may run: the activity is resumed and, on Android 10+ where
+ * several activities can be resumed at once, also top-resumed. Callback order varies
+ * (onResume usually precedes top-resumed true; multi-window can drop top-resumed without
+ * onPause), so each callback updates one input and [eligible] combines them.
+ */
+internal class ForegroundEligibility(private val needsTopResumed: Boolean) {
+    private var resumed = false
+    private var top = false
+    private var focused = false
+    val eligible: Boolean get() = resumed && focused && (!needsTopResumed || top)
+    fun resume() { resumed = true }
+    fun pause() { resumed = false }
+    fun topResumed(value: Boolean) { top = value }
+    fun windowFocus(value: Boolean) { focused = value }
+}
+
 internal open class ModuleSessionView(context: Context) : WebView(context) {
     init {
         // WRAP_CONTENT makes Android WebView treat CSS viewport-height units as zero,
@@ -45,6 +62,21 @@ internal open class ModuleSessionView(context: Context) : WebView(context) {
     }
     val gate = ModuleSessionGate()
     var stopEffects: () -> Unit = {}
+    /** True while the hosting activity is paused (another window in front, Home, Recents). */
+    val activityPaused = AtomicBoolean(false)
+    val activityGeneration = AtomicLong(0)
+    /** Foreground-only sensors stop here; the module must ask again after resume. */
+    var stopForeground: () -> Unit = {}
+    fun setActivityPaused(paused: Boolean) {
+        if (released || activityPaused.getAndSet(paused) == paused) return
+        activityGeneration.incrementAndGet()
+        if (paused) stopForeground()
+    }
+    /** Reject queued orientation data across a pause, including after a subsequent resume. */
+    fun authorizeOrientation(start: Long = activityGeneration.get()) {
+        checkRule(!activityPaused.get() && activityGeneration.get() == start,
+            "RUN_PAUSED", "Activity interrupted orientation; request a fresh reading")
+    }
     var stopImageEffects: () -> Unit = {}
     fun pauseForPicker() {
         if (released) return
