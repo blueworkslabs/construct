@@ -36,7 +36,8 @@
           ><button id="follow" aria-pressed="false">Follow</button
           ><button id="area">Place</button>
         </div>
-        <p id="follow-status" role="status" hidden></p>
+        <p id="follow-status" aria-live="off" hidden></p>
+        <p id="follow-announcement" class="sr-only" role="status"></p>
         <p id="sky-note" role="status"></p>
         <div class="work-grid">
           <div id="dome-wrap">
@@ -60,7 +61,7 @@
               <div class="spot-card" aria-live="polite">
                 <p id="spot-when" class="when" hidden></p>
                 <p id="spot-head" class="head"></p>
-                <p id="spot-turn" class="turn" hidden></p>
+                <p id="spot-turn" class="turn" aria-live="off" hidden></p>
                 <p id="spot-anchor"></p>
                 <p id="spot-motion"></p>
                 <p id="spot-state" class="state"></p>
@@ -111,6 +112,7 @@
           where you face, and the green wedge shows your view. It needs
           “Allow reading compass and tilt” in Construct’s Module access.
           Headings are corrected to true north with the World Magnetic Model.
+          If that correction is unavailable, the sky stays north-up and pointing guidance pauses.
           Phone compasses are rough (often ±10–20°) and metal nearby confuses
           them; wave the phone in a figure 8 when asked. Compass readings are
           used only while Follow is on and are never stored or sent.

@@ -25,12 +25,14 @@ slightly right.", "Turn left about 40°." or "Behind you: turn around."
 - **True north.** Headings arrive magnetic. The module converts them with the
   **WMM2025** declination for the chosen place (`ui/space-magnetic.js`, checked
   against NOAA's 12 published test values; Berlin is about +5°). Outside the
-  model's use (the poles, or after 2031) it says "magnetic north" instead of
-  guessing.
+  model's use (the poles, or after 2031), the dome stays north-up and
+  relative pointing pauses with an explanation; magnetic and true bearings are never mixed.
 - **Smoothing.** Each reading moves the heading a quarter of the way, along the
   shorter way round.
 - **Poses.** Upright readings do not turn the dome: the status asks you to hold
-  the phone flat.
+  the phone flat. Directional guidance and the view wedge are hidden until a
+  fresh flat reading arrives. Missing headings or a 1.5-second sample gap also
+  suspend guidance rather than retaining a stale direction.
 - **Accuracy.** The status line shows the compass accuracy, e.g. "Facing
   south-west · compass ±12°". When the host flags `calibrate`, it asks for a
   figure-8 wave. Guidance is always a wedge and words, never a crosshair.
@@ -60,7 +62,7 @@ the initial 0.2.0 package; 0.2.8 added the grazing-pass refinement below and
 passed 16/16 Android checks. 0.2.12 plans trains from all their members (below),
 keeps invisible gaps out of merged passes, tracks selection per pass and maps
 tappable train beads to the grouped train; it passed 16/16. 0.2.14 makes the
-next-rise lookup grazing-aware too and needs its own acceptance.
+next-rise lookup grazing-aware too and passed its own 16/16 Android acceptance.
 Train details and the below-horizon spot card share a search of every distinct member for the next rise above 10°, yielding
 between scans and discarding stale results after selection, place or lifecycle changes.
 Train spot cards do not show a single representative's fade countdown as though

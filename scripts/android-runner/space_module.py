@@ -12,6 +12,7 @@ p.add_argument('--catalog',required=True,help='HTTPS index with both packages fr
 p.add_argument('--module-sha',required=True,help='dev.construct.space-watch package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.space-watch-fixture package digest')
 p.add_argument('--version',default='0.3.0')
+p.add_argument('--follow',action='store_true',help='Also verify API 0.14 Follow with real host orientation on alpha37+')
 a=p.parse_args();require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -141,7 +142,9 @@ def switch(label,checked=True):
   if (node.get('checked')=='true')==checked:return
   print('Native grant tap:',label,bounds(node),'attempt',attempt+1,flush=True)
   tap_node(node)
-  if not checked:tap('Turn off')
+  if not checked:
+   time.sleep(.3)
+   if 'Turn off' in labels():tap('Turn off')
   until=time.monotonic()+4
   while time.monotonic()<until:
    if any(n.get('content-desc')==label and n.get('checkable')=='true' and n.get('checked')==('true' if checked else 'false') for n in nodes()):return
@@ -164,6 +167,49 @@ def reopen():tap_node(reach_native('Reopen module'));contains('Space Watch')
 def install(name,digest):
  library();select_after(name+' · '+a.version,('Review & install',));tap('Allow & install');installed_status()
  assert any(e.get('code')=='INSTALLED_TRIAL' and e.get('packageDigest')==digest for e in diagnostics()),'Wrong signed module '+name
+def inject(acc,mag):
+ adb('emu','sensor','set','gyroscope','0:0:0')
+ adb('emu','sensor','set','acceleration',acc)
+ adb('emu','sensor','set','magnetic-field',mag)
+def follow_sensors(label,expected):
+ from orientation_checks import active_connections
+ raw=adb('shell','dumpsys','sensorservice');(run/('sensors-'+label+'.txt')).write_text(raw)
+ uid=int(re.search(r'uid:(\d+)',adb('shell','pm','list','packages','-U','dev.construct.runtime')).group(1))
+ value=active_connections(raw,uid);receipt.setdefault('followNativeConnections',{})[label]=value;save()
+ assert value==expected,('Follow listeners',label,value,expected)
+def follow_checks():
+ # Use the real host sensor/grant path; the fixture does not replace orientation.
+ click(lambda t:t=='Follow');reach_text('Allow reading compass and tilt');capture('follow-denied')
+ follow_sensors('denied',0)
+ done('Follow denied without native orientation grant; static sky remains usable')
+ module_access();switch('Allow reading compass and tilt',True);reopen()
+ inject('0:0:9.80665','0:50:-20');click(lambda t:t=='Follow')
+ reach_text('Facing north · compass');full_dome();capture('follow-north');follow_sensors('watching',1)
+ inject('0:0:9.80665','-50:0:-20');reach_text('Facing east · compass');full_dome();capture('follow-east')
+ done('Granted real rotation-vector readings drive true-north-corrected north/east Follow dome')
+ inject('0:9.80665:0','-50:-20:0');reach_text('Hold the phone flat');capture('follow-upright')
+ inject('0:0:9.80665','-50:0:-20');reach_text('Facing east · compass')
+ click(lambda t:t=='Follow');follow_sensors('off',0);full_dome();capture('follow-off')
+ done('Upright pose suspends Follow guidance; explicit off returns north-up and releases native listener')
+ click(lambda t:t=='Follow');reach_text('Facing east · compass')
+ tap('Construct menu');follow_sensors('menu',0);tap('Return to module');reach_text('Facing east · compass');follow_sensors('menu-return',1)
+ done('Native menu pause releases compass and explicit menu return re-establishes Follow')
+ adb('shell','cmd','statusbar','expand-settings');time.sleep(3);follow_sensors('quick-settings',0);capture('follow-quick-settings')
+ adb('shell','cmd','statusbar','collapse');time.sleep(2)
+ reach_text('Follow stopped when Space Watch lost the foreground');capture('follow-ended');follow_sensors('focus-return',0)
+ inject('0:0:9.80665','0:50:-20');time.sleep(2);follow_sensors('still-off',0)
+ click(lambda t:t=='Follow');reach_text('Facing north · compass');follow_sensors('explicit-restart',1)
+ done('Quick Settings ends Follow, explains focus loss, and requires an explicit tap to restart')
+ adb('shell','settings','put','system','user_rotation','1');time.sleep(3)
+ reach_text('Facing east · compass');full_dome();capture('follow-landscape')
+ adb('shell','settings','put','system','user_rotation','0');adb('shell','settings','put','system','font_scale','2.0');time.sleep(3)
+ reach_text('Facing north · compass');full_dome();capture('follow-large-text')
+ adb('shell','settings','put','system','font_scale','1.0');time.sleep(2)
+ done('Follow remains operable with display rotation and 200% Android text')
+ module_access();switch('Allow reading compass and tilt',False);reopen()
+ click(lambda t:t=='Follow');reach_text('Allow reading compass and tilt');follow_sensors('revoked',0)
+ adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·');follow_sensors('process-restart',0)
+ done('Revoked orientation cannot restart Follow; a fresh process starts with Follow off')
 try:
  print('RESULTS:',run,flush=True);save();(CONFIG.root/'camera-emulated.flag').write_text('emulated\n')
  avd,snapshot,_=CONFIG.profile(True);started=True
@@ -261,6 +307,7 @@ try:
  # Native menu pause/resume on retained data, then real module gates.
  tap('Construct menu');tap('Return to module');contains('visible ·')
  done('Native menu pause/resume restores the sky')
+ if a.follow:follow_checks()
  tap('Construct menu');find('Mark working');tap('Mark working');install(REAL,a.module_sha);open_module(REAL)
  contains('Phone location isn’t enabled');capture('space-real-location-denied')
  done('Real module refuses ungranted phone location and offers manual place')

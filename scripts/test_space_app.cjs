@@ -19,8 +19,8 @@ const LAUNCH = JSON.stringify([
   {NORAD_CAT_ID: 29507, OBJECT_TYPE: 'R/B', OBJECT_NAME: 'CZ-4B R/B', OBJECT_ID: '2006-046C'},
 ]);
 const WIKI = JSON.stringify({query: {pages: [{title: 'Long March 4B', extract: 'The Long March 4B is a Chinese launch vehicle.', fullurl: 'https://en.wikipedia.org/wiki/Long_March_4B'}]}});
-function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, recentBody = RECENT, recentSatcatBody = RECENT_SATCAT, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false, planScenario = false, orientError = null} = {}) {
-  const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [];
+function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, recentBody = RECENT, recentSatcatBody = RECENT_SATCAT, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false, planScenario = false, orientError = null, pendingOrientation = false} = {}) {
+  const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [], heldOrientation = [];
   const storage = structuredClone(saved);
   let now = clock;
   class Element {
@@ -54,6 +54,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
         return structuredClone(storage[params.key] ?? null);
       }
       if (method === 'orientation.read') {
+        if (pendingOrientation && params.op === 'watch') return new Promise(resolve => heldOrientation.push(() => resolve({watching: true, rateHz: 10})));
         if (orientError) throw Object.assign(new Error(orientError), {code: orientError});
         return params.op === 'watch' ? {watching: true, rateHz: params.rateHz ?? 10} : {watching: false};
       }
@@ -88,6 +89,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
   }
   const http = () => calls.filter(c => c.method === 'net.http').map(c => c.params.url);
   return {el, calls, storage, classes, http, dome: () => sandbox.domeSnapshot, select: id => sandbox.selectObject(id),
+    finishOrientation: () => heldOrientation.splice(0).forEach(f => f()),
     finishLocation: () => heldLocation.splice(0).forEach(f => f()),
     finishHttp: () => held.splice(0).forEach(f => f()),
     tick: (n = 1, ms = 1000) => { for (let i = 0; i < n; i++) { now += ms; timers.forEach(f => f()); } },
@@ -460,10 +462,10 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   assert.match(r.el('spot-turn').textContent, /^Ahead of you/, 'ISS is SW-ish and we face it');
   for (let i = 0; i < 60; i++) r.orient({pose: 'flat', azimuthDeg: 50 - dec, pitchDeg: 88, rollDeg: 0, calibrate: false, accuracyDeg: 12});
   assert.equal(r.el('spot-turn').textContent, 'Behind you: turn around.');
-  // An unreliable compass asks for calibration and keeps the last heading.
+  // Unreliable readings must not retain stale heading or turn guidance.
   const kept = r.rotation();
   r.orient({pose: 'flat', pitchDeg: 88, rollDeg: 0, calibrate: true});
-  assert.equal(r.rotation(), kept); assert.match(r.el('follow-status').textContent, /figure 8/); assert.equal(r.el('follow-status').className, 'attention');
+  assert.equal(r.rotation(), 0); assert(r.el('spot-turn').hidden); assert.equal(r.dome().follow, false); assert.match(r.el('follow-status').textContent, /figure 8/); assert.equal(r.el('follow-status').className, 'attention');
   // Pause: the host stops the stream; on return Space Watch asks again.
   r.visibility(false); r.visibility(true); await flush();
   assert.equal(r.calls.filter(c => c.method === 'orientation.read' && c.params.op === 'watch').length, 2);
@@ -494,5 +496,33 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   r = rig({orientError: 'ORIENTATION_UNAVAILABLE'}); await flush(8);
   await r.el('follow').onclick(); await flush();
   assert.match(r.el('follow-status').textContent, /no compass/);
+  // A terminal event can overtake the watch reply. It must cancel pending Follow.
+  r = rig({pendingOrientation: true}); await flush(8);
+  const starting = r.el('follow').onclick();
+  r.orient({watching: false, reason: 'paused'});
+  r.finishOrientation(); await starting; await flush();
+  assert.equal(r.el('follow').attributes['aria-pressed'], 'false');
+  assert.match(r.el('follow-status').textContent, /lost the foreground/);
+  r.visibility(false); r.visibility(true); await flush();
+  assert.equal(r.calls.filter(c => c.method === 'orientation.read' && c.params.op === 'watch').length, 1);
+  // Menu pause invalidates an in-flight acknowledgement, but preserves explicit intent.
+  r = rig({pendingOrientation: true}); await flush(8);
+  const pausedStart = r.el('follow').onclick(); r.visibility(false);
+  r.finishOrientation(); await pausedStart;
+  assert.notEqual(r.el('follow').attributes['aria-pressed'], 'true');
+  r.visibility(true); r.finishOrientation(); await flush();
+  assert.equal(r.el('follow').attributes['aria-pressed'], 'true');
+  // Upright pose and stale streams never retain live directional instructions.
+  r = rig(); await flush(8); await r.el('follow').onclick();
+  r.select(25544);
+  const sample = {pose:'flat', azimuthDeg:90, accuracyDeg:12, calibrate:false};
+  r.orient(sample); assert(!r.el('spot-turn').hidden);
+  r.orient({...sample, pose:'upright'}); assert(r.el('spot-turn').hidden);
+  r.orient(sample); r.tick(2); assert(r.el('spot-turn').hidden); assert.equal(r.dome().follow, false);
+  r.orient(sample); assert(!r.el('spot-turn').hidden);
+  // A true-coordinate sky cannot be rotated by uncorrected magnetic headings.
+  r.submit(90, 0); r.orient(sample);
+  assert.equal(r.rotation(), 0); assert.equal(r.dome().follow, false);
+  assert(r.el('spot-turn').hidden); assert.match(r.el('follow-status').textContent, /True-north correction unavailable/);
   console.log('Space Watch app checks passed: start, privacy (no coordinates in URLs or storage), list selection, spot words, details, Wikipedia on request, rewind, red mode, visible passes and preview, trains (plan, details, cache, optional failure), cache reuse/expiry/torn cache, CelesTrak back-off, location fallbacks, paused downloads and follow mode (true north, smoothing, guidance, calibration, pause, denial).');
 })().catch(error => { console.error(error); process.exitCode = 1; });
