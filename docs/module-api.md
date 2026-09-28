@@ -311,7 +311,8 @@ capability can be `optional`, and it is off until granted in **Module access**
 ("Allow reading compass and tilt"). No Android runtime permission is involved.
 
 - **`{op:'get'}`** answers one sample within 2 s, or `ORIENTATION_UNAVAILABLE`.
-  One pending `get` is allowed per session.
+  One pending `get` is allowed per session. All get/watch deliveries share a
+  persistent 15-readings/second session budget; a read may wait for the next slot.
 - **`{op:'watch', rateHz?}`** returns `{watching:true, rateHz}`.
   - `rateHz` is 5, 10 or 15; the default is 10.
   - Samples arrive as `window.dispatchEvent(new CustomEvent('constructorientation',

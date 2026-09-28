@@ -353,4 +353,26 @@ class OrientationTest {
         }
     }
 
+    @Test fun getAndWatchShareOnePersistentDeliveryBudget() {
+        for (withWatch in listOf(false, true)) {
+            val r = Rig()
+            if (withWatch) r.request("{op:'watch',rateHz:15}")
+            r.request("{op:'get'}")
+            var reads = 0
+            // The module asks again after every answer; 100 sensor callbacks per second.
+            for (i in 1..100) {
+                r.send(i * 10_000_000L)
+                if (r.result?.has("pose") == true) {
+                    reads++
+                    // Neither repeated stop/watch nor a new get may reset the budget.
+                    if (withWatch) { r.request("{op:'stop'}"); r.request("{op:'watch',rateHz:15}") }
+                    r.request("{op:'get'}")
+                }
+            }
+            assertTrue(reads > 0)
+            assertTrue("combined get/watch exceeded 15 per second", reads + r.emitted.size <= 15)
+            r.session.close()
+        }
+    }
+
 }

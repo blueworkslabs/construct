@@ -100,7 +100,7 @@ internal object OrientationMath {
     class Throttle(var rateHz: Int) {
         private var last = Long.MIN_VALUE
         fun admit(nowNs: Long): Boolean {
-            if (last != Long.MIN_VALUE && nowNs - last < 1_000_000_000L / rateHz) return false
+            if (last != Long.MIN_VALUE && nowNs - last < (1_000_000_000L + rateHz - 1) / rateHz) return false
             last = nowNs; return true
         }
     }
@@ -123,6 +123,8 @@ internal class ModuleOrientation(context: Context, private val authorize: () -> 
     private var registered = false
     private var closed = false
     private val throttle = OrientationMath.Throttle(10)
+    // Shared across get/watch and never reset by stop, rate replacement or pause.
+    private val deliveryBudget = OrientationMath.Throttle(15)
     private var watching = false
     private var pending: ((JSONObject?, ConstructError?) -> Unit)? = null
     private var timeout: Runnable? = null
@@ -170,11 +172,12 @@ internal class ModuleOrientation(context: Context, private val authorize: () -> 
         if (closed || event.sensor.type != Sensor.TYPE_ROTATION_VECTOR) return
         val timestamp = OrientationMath.measurementTime(event.timestamp, SystemClock.elapsedRealtimeNanos(), System.currentTimeMillis()) ?: return
         val sample = OrientationMath.sample(event.values, event.accuracy, displayRotation(), timestamp) ?: return
-        pending?.let { done ->
+        val deliveryTime = SystemClock.elapsedRealtimeNanos()
+        pending?.takeIf { deliveryBudget.admit(deliveryTime) }?.let { done ->
             pending = null; timeout?.let { handler.removeCallbacks(it) }; timeout = null
             try { authorize(); done(sample, null) } catch (e: ConstructError) { done(null, e) }
         }
-        if (watching && throttle.admit(event.timestamp)) {
+        if (watching && throttle.admit(event.timestamp) && deliveryBudget.admit(deliveryTime)) {
             try { authorize(); emit(sample) } catch (e: ConstructError) {
                 watching = false
                 ended(if (e.code == "RUN_PAUSED") "paused" else "revoked")
