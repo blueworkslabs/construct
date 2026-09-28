@@ -1,6 +1,9 @@
 # Space Watch 0.2.14 phone check
 
-Status: **awaiting exact-package Android acceptance; not yet a phone handoff.**
+Status: **ready for physical-device checks.** The exact signed 0.2.14 package
+passed all 16 Android checks and stopped cleanly. See the
+[staging report](space-watch-0.2.14-staging.md). PR remains unmerged; production
+is unchanged. Broader GitHub Android-build CI was still pending at handoff.
 
 No new APK: staging uses the existing alpha34 candidate. Install **Space Watch**,
 not Synthetic Space Watch, from this isolated signed catalog:

@@ -271,8 +271,8 @@ not Android; pre-review wording and stale-train policy):
 - **Stars and horizon.** Star positions are BSC5 J2000, precessed to the date.
   The horizon uses the phone's location only; the height above sea level is
   taken as 0.
-- **Not included:** compass or orientation, AR, background alerts,
-  notifications and pass planning.
+- **Not included:** compass or orientation, AR, background alerts and
+  notifications. Foreground visible-pass planning covers the next 12 hours.
 
 ## Third-party code and data
 

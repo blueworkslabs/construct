@@ -1,7 +1,8 @@
 # Space Watch 0.2.14 staging
 
-Status: **signed candidate verified; exact-package Android acceptance in progress.**
-No hardware clearance, merge or production promotion. Production stays 0.1.6.
+Status: **review complete; exact signed candidate passed 16/16 Android checks.**
+Ready for physical-device checks. No merge or production promotion; production
+stays 0.1.6 until the hardware handoff is accepted.
 
 The shared grazing-aware next-rise search fixes the 00:42 SL-14 reproduction.
 Review additionally refines the final lookup interval and clips coarse samples
@@ -11,8 +12,8 @@ versus 99,483 for the plain 5-second reference. This is propagation-count eviden
 not a universal Android latency guarantee. The author's larger +8% benchmark
 is attributed separately, not claimed as independently repeated.
 
-Exact signed artifacts, Android receipt and original captures will be recorded
-here once available. Earlier [0.2.12 evidence](space-watch-0.2.12-staging.md)
+Exact signed artifacts, Android receipt and original captures are recorded
+below. Earlier [0.2.12 evidence](space-watch-0.2.12-staging.md)
 belongs to different module bytes and is not acceptance of this version.
 
 ## Reviewed artifacts and scope
@@ -52,3 +53,32 @@ checks separately exercise grants and actual providers. Screenshots must come
 from this exact signed version. Physical spotting, brightness/weather and
 orientation/compass alignment remain untested; follow mode is not included.
 Earlier complete and partial runs stay tied to their own bytes.
+
+## Android result
+
+Run `20260928T143338Z-space-7db34c99`: **16/16**, `complete=true`,
+`stopped=true`. Runner service exited 0; runner and emulator services were
+independently confirmed inactive. [Exact-package receipt](evidence/space-watch-0.2.14-staging-2026-09-28.json).
+Native grants triggered automatic live CelesTrak loading without a Refresh tap.
+The real module then reopened with Wi-Fi and mobile data disabled. Both captures
+show Now; live had 0 visible / 14 above and the later offline view 0 visible / 15
+above. These are different instants, not an equal-time cache comparison.
+Provider elements were 11 h old.
+
+Original Android captures: [pass list](images/space-watch-0.2.14/space-plan.png),
+[train preview](images/space-watch-0.2.14/space-train-preview.png),
+[Details](images/space-watch-0.2.14/space-train-details.png),
+[Wikipedia credit](images/space-watch-0.2.14/space-train-wikipedia.png),
+[landscape](images/space-watch-0.2.14/space-landscape.png),
+[200% text](images/space-watch-0.2.14/space-large-text.png),
+[live data](images/space-watch-0.2.14/space-real-network.png), and
+[offline reopen](images/space-watch-0.2.14/space-real-offline-cache.png).
+All 19 original PNGs have SHA-256 digests in the receipt. Landscape retains its
+original capture orientation; rotate for viewing. The crash buffer contains an
+emulator Bluetooth startup abort, not a Construct fatal exception; it is not
+claimed to be globally empty.
+
+All confirmed code findings are resolved. A stale docs exclusion claiming that
+pass planning was absent is corrected without changing tested module bytes.
+Broader GitHub source-and-android CI was still pending when evidence was
+finalized; this module-only handoff does not claim that CI was green.
