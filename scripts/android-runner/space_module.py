@@ -86,7 +86,7 @@ def scroll(direction,distance=None):
  # Scroll in the padding, not across the rewind range or a canvas hit target.
  x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=min(x1+72,x2-24);lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
  if distance is not None:lo=hi-max(24,min(hi-lo,round(distance)))
- ui._device.swipe(x,hi if direction=='down' else lo,x,lo if direction=='down' else hi,duration=.08);time.sleep(.35)
+ ui._device.swipe(x,hi if direction=='down' else lo,x,lo if direction=='down' else hi,duration=.15);time.sleep(.8)
 def reveal(match):
  """First visible node whose text satisfies match (a string prefix or predicate), scrolling the module page."""
  test=match if callable(match) else (lambda t:t.startswith(match))
@@ -106,7 +106,11 @@ def reveal(match):
    before=scroll_signature(nodes())
    scroll(direction)
    after=scroll_signature(nodes())
-   if before==after:break
+   if before==after:
+    # Accessibility geometry can lag a completed gesture. A single unchanged
+    # dump is not a boundary: retry the same gesture once and let layout settle.
+    time.sleep(.5);scroll(direction)
+    if before==scroll_signature(nodes()):break
  raise RuntimeError('Module control not reachable: '+str(match))
 def click(match):tap_node(reveal(match))
 def reach_text(fragment):return text_of(reveal(lambda t:fragment in t))
