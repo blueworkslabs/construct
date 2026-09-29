@@ -11,9 +11,12 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_space_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.space-watch package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.space-watch-fixture package digest')
-p.add_argument('--version',default='0.3.2')
-p.add_argument('--follow',action='store_true',help='Also verify API 0.14 Follow with real host orientation on alpha37+')
-a=p.parse_args();require_runner();catalog(a.catalog)
+p.add_argument('--version',default='0.3.3')
+p.add_argument('--follow',action='store_true',help='Enable Follow checks for older versions; mandatory automatically for 0.3.0+')
+a=p.parse_args()
+# Follow is mandatory for the feature version, even when the flag is omitted.
+a.follow = a.follow or tuple(map(int, a.version.split('.'))) >= (0, 3, 0)
+require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
 assert subprocess.run(['systemctl','--user','is-active','--quiet',CONFIG.service]).returncode!=0,'Preserve running emulator'
@@ -26,7 +29,7 @@ from keyboard_prompt import gboard_contacts_denial
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'fixtureSha256':a.fixture_sha,'version':a.version,
- 'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{}}
+ 'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{},'plannedChecks':23 if a.follow else 16,'followRequired':a.follow}
 started=False
 def nodes():
  current=ui.nodes();deny=gboard_contacts_denial(current)
@@ -373,6 +376,7 @@ try:
  receipt['offlineCounts']=text_of(reveal(lambda t:bool(re.fullmatch(r'\d+ visible · \d+ above you',t))))
  capture('space-real-offline-cache')
  done('Real cached sky reopens with Wi-Fi and mobile data disabled')
+ assert len(receipt['checks']) == receipt['plannedChecks'], 'Required acceptance gates missing'
  receipt['complete']=True
 
 except Exception as e:

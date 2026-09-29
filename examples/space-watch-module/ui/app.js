@@ -1217,7 +1217,7 @@
       return;
     }
     if (!follow.on || !active || !place) return;
-    const previous = follow.heading;
+    const previous = Date.now() - follow.lastSample > 1500 ? null : follow.heading;
     clearHeading(false);
     follow.pose = s.pose === "flat" ? "flat" : "upright";
     follow.calibrate = s.calibrate === true;

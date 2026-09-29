@@ -526,6 +526,11 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   assert.equal(r.dome().follow, false);
   r.orient(sample); r.tick(2); assert(r.el('spot-turn').hidden); assert.equal(r.dome().follow, false);
   r.orient(sample); assert(!r.el('spot-turn').hidden);
+  // A resumed sensor event can precede the frame timer after a WebView stall.
+  r.orient({...sample, azimuthDeg:0});
+  r.advance(1600); // Deliberately do not invoke the periodic frame callback.
+  r.orient({...sample, azimuthDeg:180});
+  assert(Math.abs(r.rotation() - (flatRotation + 90)) < 0.01, 'first reading after gap resets obsolete smoothing');
   // A true-coordinate sky cannot be rotated by uncorrected magnetic headings.
   r.submit(90, 0); r.orient(sample);
   assert.equal(r.rotation(), 0); assert.equal(r.dome().follow, false);
