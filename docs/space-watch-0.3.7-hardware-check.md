@@ -1,6 +1,10 @@
 # Space Watch 0.3.7 phone checklist
 
-Status: **ready for phone testing after 23/23 Android acceptance checks**.
+Status: **passed on hardware** (2026-09-29, pilot tester: "works as expected")
+after 23/23 Android acceptance checks. The exact signed 0.3.7 package is
+SHA-256 `6c376ca889fa7887c08f70f822508a176f87f5e694b832c044ba60094c22d3c2`. **Production-catalog promotion waits for a released API 0.14
+(alpha37-or-later) host**, because older hosts cannot install 0.3.x and the
+catalog shows the newest version first.
 If alpha37 is already installed, **no new APK is needed**.
 Use an installed alpha37-or-later host (API 0.14). Older hosts cannot run 0.3.7.
 This task does not publish the alpha37 APK or change the production catalog.
