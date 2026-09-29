@@ -1,9 +1,11 @@
 # Space Watch 0.4.1 phone checklist
 
-Status: **ready for phone checks after 25/25 exact-package Android checks.**
+Status: **passed on hardware** (2026-09-29, pilot tester: "working as expected
+on real hardware") after 25/25 exact-package Android checks. **Production-catalog
+promotion waits for a released API 0.14 (alpha37-or-later) host**, because older
+hosts cannot install 0.3.x/0.4.x and the catalog shows the newest version first.
 Use an installed alpha37-or-later host (API 0.14). **No new APK is needed if
-alpha37 is already installed.** This review does not release an APK or promote
-the production catalog.
+alpha37 is already installed.**
 
 [Immutable test catalog](https://raw.githubusercontent.com/blueworkslabs/construct/301fd638e329a76ef02a5c8b11a880973371eb86/catalog/candidates/space-watch-041/index.json).
 Install **Space Watch 0.4.1**, not Synthetic Space Watch, as a normal signed
