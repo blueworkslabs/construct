@@ -1,6 +1,6 @@
 # Space Watch 0.4.1 phone checklist
 
-Status: **awaiting exact-package Android acceptance; do not treat as clearance.**
+Status: **ready for phone checks after 25/25 exact-package Android checks.**
 Use an installed alpha37-or-later host (API 0.14). **No new APK is needed if
 alpha37 is already installed.** This review does not release an APK or promote
 the production catalog.

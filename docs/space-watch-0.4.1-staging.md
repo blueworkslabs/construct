@@ -1,6 +1,6 @@
 # Space Watch 0.4.1 pointing-view staging
 
-Status: **Android acceptance pending. Not cleared for phone handoff yet.**
+Status: **25/25 Android checks passed on the exact signed 0.4.1 packages. Ready for physical-phone checks.**
 No merge, APK release or production-catalog update is included.
 
 ## Ownership and immutable artifacts
@@ -48,13 +48,51 @@ real-world pointing accuracy or validate the physical feel of the 4° lock.
 
 ## Android acceptance
 
-Run `20260929T113458Z-space-e0c18d0d` is in progress. Required count: **25**.
-Expanded coverage includes native high-elevation (60°, host flat pose), rolled
-pointing, landscape and 200% text alongside existing grants, Follow lifecycle,
-pass/train/lookup, real live download and offline-cache gates. Final receipt,
-original captures and teardown result will be added only after completion.
-The fixture is reopened before pointing layout checks to reset its advancing
-clock; Follow is explicitly started and the satellite reselected.
+Run `20260929T115722Z-space-c0df65aa` completed **25/25** unaided, using runner
+`5354e6285b9616084a98da1af95bd27be698c74b`. Emulator teardown independently reported `Result=success`,
+`ExecMainStatus=0`, `MainPID=0`, `ActiveState=inactive`.
+
+[Sanitized exact-artifact receipt](evidence/space-watch-0.4.1-staging-2026-09-29.json)
+contains all gate names, native listener counts and SHA-256 hashes of the original
+emulator-console captures. Earlier partial and assisted runs below are not used
+to manufacture this complete result.
+
+Coverage includes real native north/east Follow, raised viewfinder, 60° camera aim
+through the host's flat pose, rolled screen-relative guidance, landscape and
+200% text. Off, menu pause, Quick Settings, revoke and fresh-process checks
+verify native listener release; focus return stays off until an explicit tap.
+Baseline pass/train previews, live Wikipedia and same-launch lookups, rewind,
+red persistence, canvas selection and accessible dialog layouts also pass.
+The real module separately passes denied location/HTTP, automatic live CelesTrak
+loading after native grants, and cache reopen with Wi-Fi/mobile data disabled.
+
+Native sensor connections are 1 while watching and after explicit restart/menu
+return; 0 after Off, menu pause, Quick Settings, focus return, revoke and process
+restart. The fixture is reopened before pointing layout checks to reset its
+advancing clock, with Follow explicitly started and the satellite reselected.
+
+The retained crash buffer contains a system `com.google.android.bluetooth`
+SIGABRT (hardware error 0x42) during setup, not a Construct process crash.
+The receipt records its hash; the run and independent emulator teardown succeeded.
+
+### Original Android captures
+
+These are retained console captures of the real alpha37 WebView, not browser
+previews. Landscape images preserve the emulator's original rotated orientation.
+Canvas and guidance have separate captures where scrolling is required.
+
+- [Raised viewfinder](images/space-watch-0.4.1-staging/android-pointing-view.png)
+- [60° camera aim](images/space-watch-0.4.1-staging/android-pointing-high.png)
+- [Rolled camera aim](images/space-watch-0.4.1-staging/android-pointing-rolled.png)
+- [Landscape guidance](images/space-watch-0.4.1-staging/android-pointing-landscape-guidance.png)
+- [200% text guidance](images/space-watch-0.4.1-staging/android-pointing-large-guidance.png)
+- [Explicit restart after focus loss](images/space-watch-0.4.1-staging/android-follow-ended.png)
+- [Train attribution](images/space-watch-0.4.1-staging/android-space-train-wikipedia.png)
+- [200% text dialog](images/space-watch-0.4.1-staging/android-space-large-text-details.png)
+
+Physical sky alignment, practical lock-on accuracy and real TalkBack interaction
+remain phone checks. No camera access is requested. Full GitHub Android-build CI
+is tracked separately from these local and exact-package results.
 
 [Phone checklist](space-watch-0.4.1-hardware-check.md).
 
@@ -86,3 +124,19 @@ run. Teardown succeeded. The driver now gestures through the content column
 and uses margins compatible with the landscape sticky panel. Layout captures
 also accept the full visual below-horizon message if the selected object sets;
 the earlier high-elevation gates still require directional guidance.
+
+
+`20260929T113458Z-space-e0c18d0d` stopped at 4/25 while the capture helper
+tried to return to the page title. Native north/east, high-elevation and rolled
+guidance passed, but no layout gate is inferred. Teardown succeeded (exit 0,
+PID 0). The capture helper now positions the actual canvas from its clipped
+edge, without requiring the page title first. A separate half-fist matcher
+correction is covered by a helper regression. No module or APK bytes changed.
+
+
+The focused run `20260929T114656Z-space-8a0d452e` was paused for assisted
+gesture comparison, then interrupted with successful teardown. Direct execution
+of the revised capture helpers produced readable landscape and 200%-text
+canvas/guidance images. Those assisted images are diagnostic only, not counted
+toward full acceptance. The final driver uses short padding gestures and direct
+canvas positioning; the full run must reproduce the checks without assistance.
