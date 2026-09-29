@@ -422,12 +422,17 @@ test("WMM2025 declination matches NOAA's published test values", () => {
   assert.equal(M.declination(75,130,at("2026-09-28T18:00:00Z")),null,"caution zone also suspends precise pointing");
   assert(Number.isFinite(M.declination(70,130,at("2026-09-28T18:00:00Z"))));
   assert.equal(M.declination(52, 13, at("2033-01-01T00:00:00Z")), null);
+  for (const date of ['2024-12-31T23:59:59.999Z','2030-01-01T00:00:00.001Z'])
+    assert.equal(M.declination(52,13,at(date)),null,'outside documented WMM2025 validity: '+date);
+  for (const date of ['2025-01-01T00:00:00Z','2030-01-01T00:00:00Z'])
+    assert(Number.isFinite(M.declination(52,13,at(date))),'valid model boundary: '+date);
+
   assert.ok(Math.abs(M.decimalYear(at("2027-07-02T12:00:00Z")) - 2027.5) < 0.002);
 });
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
   assert.equal(m.id, "dev.construct.space-watch");
-  assert.equal(m.version, "0.3.6");
+  assert.equal(m.version, "0.3.7");
   assert.deepEqual(m.constructApi, { min: "0.14.0", target: "0.14.0" });
   const caps = Object.fromEntries(m.capabilities.map((c) => [c.id, c]));
   assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "orientation.read", "storage.kv"]);

@@ -154,7 +154,7 @@ const SpaceMagnetic = (() => {
   // (geographic poles, magnetic caution/blackout zones, or unsupported dates).
   function declination(latDeg, lonDeg, ms, hKm = 0) {
     const year = decimalYear(ms);
-    if (!(Math.abs(latDeg) <= 89.5) || !(Math.abs(lonDeg) <= 180) || year < EPOCH - 1 || year > EPOCH + 6) return null;
+    if (!(Math.abs(latDeg) <= 89.5) || !(Math.abs(lonDeg) <= 180) || !Number.isFinite(year) || year < EPOCH || year > EPOCH + 5) return null;
     const b = field(latDeg, lonDeg, hKm, year);
     // NOAA: H < 2000 nT is blackout; 2000 <= H < 6000 nT is caution.
     // This pointing UI conservatively suspends correction in both zones.
