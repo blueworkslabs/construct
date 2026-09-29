@@ -133,16 +133,19 @@ def wiki_credit():
   time.sleep(.3)
  reach_text('CC BY-SA 4.0')
 def full_dome(prefix="Sky dome:"):
- # Start above the canvas: clipped accessibility bounds do not reveal which
- # edge is missing, so blindly scrolling down can move a top-clipped dome out.
- reveal(lambda t:t in (FIXTURE,REAL))
- for _ in range(18):
+ # Position the canvas directly. A sticky landscape canvas does not require
+ # the page title to be reachable, and its clipped edge gives the direction.
+ print('POSITION canvas:',prefix,flush=True)
+ for attempt in range(18):
   c=next((n for n in nodes() if text_of(n).startswith(prefix) and visible(n)),None)
-  if c is not None:
-   b=bounds(c);w=web();size=b[2]-b[0]
-   if abs(size-(b[3]-b[1]))<=6 and b[1]>=w[1] and b[3]<=w[3]:return c
-  scroll('down',180)
- raise RuntimeError('Whole square dome not visible after scrolling from page top')
+  if c is None:
+   reveal(lambda t:t.startswith(prefix));continue
+  b=bounds(c);w=web();size=b[2]-b[0]
+  if abs(size-(b[3]-b[1]))<=6 and b[1]>=w[1] and b[3]<=w[3]:return c
+  direction='up' if b[1]<=w[1]+2 else 'down'
+  print('POSITION canvas bounds:',b,'viewport:',w,'scroll:',direction,flush=True)
+  scroll(direction,180)
+ raise RuntimeError('Whole square dome not visible after positioning')
 def center_point_guidance():
  # WebView can report clipped text bounds as a complete accessible node. Keep
  # the full visual instruction away from both viewport edges before capture.
