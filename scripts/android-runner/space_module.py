@@ -188,19 +188,13 @@ def follow_sensors(label,expected):
  receipt.setdefault('followNativeConnections',{})[label]=value
  receipt.setdefault('followListenerWaitSeconds',{})[label]=round(time.monotonic()-started,3);save()
  assert value==expected,('Follow listeners',label,value,expected)
-def follow_button():
- # The left-padding gesture can leave the header just above the viewport.
- # Use the platform scroll-to-start action, then locate the actual control.
- nodes()
- ui._device(className='android.webkit.WebView',scrollable=True).scroll.toBeginning(max_swipes=5)
- click(lambda t:t=='Follow')
 def follow_checks():
  # Use the real host sensor/grant path; the fixture does not replace orientation.
- follow_button();reach_text('Allow reading compass and tilt');capture('follow-denied')
+ click(lambda t:t=='Follow');reach_text('Allow reading compass and tilt');capture('follow-denied')
  follow_sensors('denied',0)
  done('Follow denied without native orientation grant; static sky remains usable')
  module_access();switch('Allow reading compass and tilt',True);reopen()
- inject('0:0:9.80665','0:50:-20');follow_button()
+ inject('0:0:9.80665','0:50:-20');click(lambda t:t=='Follow')
  reach_text('Facing north · compass');full_dome();capture('follow-north');follow_sensors('watching',1)
  inject('0:0:9.80665','-50:0:-20');reach_text('Facing east · compass');full_dome();capture('follow-east')
  click(lambda t:t.startswith('Long March 4B rocket stage'))
@@ -211,16 +205,16 @@ def follow_checks():
  done('Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and relative turn guidance')
  inject('0:9.80665:0','-50:-20:0');reach_text('Hold the phone flat');capture('follow-upright')
  inject('0:0:9.80665','-50:0:-20');reach_text('Facing east · compass')
- follow_button();follow_sensors('off',0);full_dome();capture('follow-off')
+ click(lambda t:t=='Follow');follow_sensors('off',0);full_dome();capture('follow-off')
  done('Upright pose suspends Follow guidance; explicit off returns north-up and releases native listener')
- follow_button();reach_text('Facing east · compass')
+ click(lambda t:t=='Follow');reach_text('Facing east · compass')
  tap('Construct menu');follow_sensors('menu',0);tap('Return to module');reach_text('Facing east · compass');follow_sensors('menu-return',1)
  done('Native menu pause releases compass and explicit menu return re-establishes Follow')
  adb('shell','cmd','statusbar','expand-settings');time.sleep(3);follow_sensors('quick-settings',0);capture('follow-quick-settings')
  adb('shell','cmd','statusbar','collapse');time.sleep(2)
  reach_text('Follow stopped when Space Watch lost the foreground');capture('follow-ended');follow_sensors('focus-return',0)
  inject('0:0:9.80665','0:50:-20');time.sleep(2);follow_sensors('still-off',0)
- follow_button();reach_text('Facing north · compass');follow_sensors('explicit-restart',1)
+ click(lambda t:t=='Follow');reach_text('Facing north · compass');follow_sensors('explicit-restart',1)
  done('Quick Settings ends Follow, explains focus loss, and requires an explicit tap to restart')
  adb('shell','settings','put','system','user_rotation','1');time.sleep(3)
  reach_text('Facing east · compass');full_dome();capture('follow-landscape')
@@ -229,7 +223,7 @@ def follow_checks():
  adb('shell','settings','put','system','font_scale','1.0');time.sleep(2)
  done('Follow remains operable with display rotation and 200% Android text')
  module_access();switch('Allow reading compass and tilt',False);reopen()
- follow_button();reach_text('Allow reading compass and tilt');follow_sensors('revoked',0)
+ click(lambda t:t=='Follow');reach_text('Allow reading compass and tilt');follow_sensors('revoked',0)
  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·');follow_sensors('process-restart',0)
  done('Revoked orientation cannot restart Follow; a fresh process starts with Follow off')
 try:
