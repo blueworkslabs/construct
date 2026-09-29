@@ -1,6 +1,7 @@
 # Space Watch 0.3.7 phone checklist
 
-Status: **held pending this candidate's Android acceptance**.
+Status: **ready for phone testing after 23/23 Android acceptance checks**.
+If alpha37 is already installed, **no new APK is needed**.
 Use an installed alpha37-or-later host (API 0.14). Older hosts cannot run 0.3.7.
 This task does not publish the alpha37 APK or change the production catalog.
 

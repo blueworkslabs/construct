@@ -1,6 +1,6 @@
 # Space Watch 0.3.7 follow-mode staging
 
-Status: **Android acceptance pending.** Not yet cleared for phone testing.
+Status: **23/23 Android checks passed; ready for physical-phone testing.**
 No merge, APK release or production-catalog change is included.
 
 ## Ownership and exact artifacts
@@ -53,7 +53,10 @@ rotation and suppress live wedge/turn guidance; explicit Follow off restores nor
 
 ## Android acceptance
 
-Pending exact-package run `20260929T012150Z-space-925801ac`, 23 required checks.
+Exact-package run `20260929T012150Z-space-925801ac` passed **23/23 required checks**.
+[Sanitized receipt, artifact hashes and original-image hashes](evidence/space-watch-0.3.7-staging-2026-09-29.json).
+The emulator stopped with systemd `Result=success`, exit 0, inactive/dead and PID 0.
+This is one complete run of the final signed bytes, not a combination of earlier attempts.
 Follow is exercised immediately after signed installation, including native
 compass denial/grant, north/east injection, relative pointing, upright/off,
 menu return, Quick Settings, explicit restart, landscape/200% text, revocation
@@ -139,3 +142,45 @@ The original Follow landscape and 200%-text captures include driver-induced sele
 on the Rewind label. The full rotated dome remains visible; this is not presented
 as an untouched-layout capture. No screenshot pixels have been edited. Emulator
 captures may retain portrait file orientation while the display is in landscape.
+
+## Final observations and handoff
+
+- Real native orientation: one listener while watching or after an explicit restart;
+  zero without grant, after off/menu pause/Quick Settings, while still off after
+  focus returns, after revocation and after a fresh process starts.
+- The Quick Settings receipt observes a resumed, non-stopped, unfocused client
+  before checking listener release. Observation took 1.844 s; individual listener
+  waits are retained (largest 0.403 s), rather than assumed synchronous.
+- Native east reading produced the rotated east-facing dome and “Ahead of you,
+  slightly left.” for the selected stage. Emulator ±0° is an ideal injected
+  sensor value, not a physical accuracy claim.
+- Real provider status: “Orbit data 12 h old · CelesTrak”, loaded automatically
+  after grants. Online and offline captures both show **Now**. Counts differ
+  (2 visible/7 above versus 2/9) as time and the location fix advance; equality
+  is not asserted. Offline reopen used actual disabled Wi-Fi and mobile data.
+- The Android crash buffer contains one system Bluetooth hardware-error abort,
+  not a Construct crash. Emulator teardown independently succeeded. This system
+  log caveat is retained in the receipt; the buffer is not claimed empty.
+- No source review findings remain at handoff. Local checks pass; Pages is green.
+  The broader GitHub `source-and-android` jobs are still pending at report time.
+  No PR merge, APK release or production-catalog promotion was performed.
+
+### Original Android captures
+
+- [Native east Follow](images/space-watch-0.3.7/follow-east.png)
+- [Relative pointing card](images/space-watch-0.3.7/follow-pointing.png)
+- [Upright suspension](images/space-watch-0.3.7/follow-upright.png)
+- [Focus-loss explanation](images/space-watch-0.3.7/follow-ended.png)
+- [Follow landscape](images/space-watch-0.3.7/follow-landscape.png) and
+  [200% text](images/space-watch-0.3.7/follow-large-text.png), with the selection caveat above
+- [Train preview](images/space-watch-0.3.7/space-train-preview.png) and
+  [Wikipedia attribution](images/space-watch-0.3.7/space-train-wikipedia.png)
+- [Train landscape](images/space-watch-0.3.7/space-landscape.png) and
+  [large-text dialog](images/space-watch-0.3.7/space-large-text-details.png)
+- [Real live data](images/space-watch-0.3.7/space-real-network.png) and
+  [offline reopen](images/space-watch-0.3.7/space-real-offline-cache.png)
+
+[Immutable catalog and physical-phone checklist](space-watch-0.3.7-hardware-check.md).
+Use real Space Watch, not Synthetic. Existing alpha37 users need no new APK.
+Physical compass/sky alignment, calibration in local magnetic conditions and
+TalkBack remain phone checks, not claims from this emulator run.
