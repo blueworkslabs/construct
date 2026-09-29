@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
+const hostSample = require('./space-fixture/orientation-sample.cjs');
 const root = 'examples/space-watch-module/ui/';
 const flush = async (n = 3) => { for (let i = 0; i < n; i++) await new Promise(resolve => setImmediate(resolve)); };
 const HOUR = 3600000, START = Date.parse('2026-09-28T17:50:40Z');
@@ -82,7 +83,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
     }};
   sandbox.window = sandbox;
   const context = vm.createContext(sandbox);
-  const scripts = ['vendor/satellite.min.js', 'vendor/astronomy.min.js', 'space-stars.js', 'space-orbit.js', 'space-sky.js', 'space-catalog.js', 'space-plan.js', 'space-magnetic.js', 'space-dome.js', 'app.js'];
+  const scripts = ['vendor/satellite.min.js', 'vendor/astronomy.min.js', 'space-stars.js', 'space-orbit.js', 'space-sky.js', 'space-catalog.js', 'space-plan.js', 'space-magnetic.js', 'space-dome.js', 'space-pointer.js', 'app.js'];
   for (const f of scripts) {
     if (f === 'app.js') vm.runInContext('SpaceDome = class extends SpaceDome { constructor(c, cb) { super(c, cb); window.selectObject = cb; } set(s) { window.domeSnapshot = s; window.domeFrames = (window.domeFrames || 0) + 1; } turn(h) { window.domeRotation = h; } }', context);
     vm.runInContext(fs.readFileSync(root + f, 'utf8'), context, {filename: f});
@@ -447,10 +448,15 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   await r.el('follow').onclick(); await flush();
   assert.deepEqual(r.calls.filter(c => c.method === 'orientation.read').map(c => c.params), [{op: 'watch', rateHz: 10}]);
   assert.equal(r.el('follow').attributes['aria-pressed'], 'true'); assert(!r.el('follow-status').hidden);
-  assert.match(r.el('follow-status').textContent, /Hold the phone flat/);
-  // Upright readings do not turn the dome.
+  assert.match(r.el('follow-status').textContent, /^Hold the phone flat for the dome, or raise it like a camera to point\.$/);
+  // Raised like a camera, the pointing view replaces the dome, which does not turn.
   r.orient({pose: 'upright', azimuthDeg: 200, pitchDeg: 5, rollDeg: 0, calibrate: false, accuracyDeg: 12});
-  assert.equal(r.rotation() ?? 0, 0); assert.match(r.el('follow-status').textContent, /Hold the phone flat/);
+  assert.equal(r.rotation() ?? 0, 0); assert.equal(r.el('follow-status').textContent, 'Pointing south-west, below the horizon · compass ±12°');
+  assert(!r.el('pointer-wrap').hidden); assert(r.el('dome').hidden); assert(r.el('scrub').hidden);
+  // Upright but aimed at the ground: neither view is live.
+  r.orient({pose: 'upright', azimuthDeg: 200, pitchDeg: 40, rollDeg: 0, calibrate: false, accuracyDeg: 12});
+  assert(r.el('pointer-wrap').hidden); assert(!r.el('dome').hidden);
+  assert.equal(r.el('follow-status').textContent, 'Raise the phone like a camera to point, or hold it flat for the dome.');
   // Flat, magnetic 220°: Berlin's ~5° east declination makes it ~225° true (SW).
   r.orient({pose: 'flat', azimuthDeg: 220, pitchDeg: 88, rollDeg: 0, calibrate: false, accuracyDeg: 12, headingRef: 'magnetic'});
   const dec = r.rotation() - 220;
@@ -560,6 +566,57 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   r.orient(sample);r.expire(1000);r.orient({...sample,azimuthDeg:0});
   r.expire(501);assert(!r.el('spot-turn').hidden,'old expiry must not clear new sample');
   r.expire(1000);assert(r.el('spot-turn').hidden);
+  // Pointing: raised like a camera, the phone is guided to the selected object.
+  r = rig(); await flush(8); await r.el('follow').onclick();
+  r.orient({pose: 'flat', azimuthDeg: 0, pitchDeg: 88, rollDeg: 0, calibrate: false, accuracyDeg: 8});
+  const decl = r.rotation(); assert(decl > 4.5 && decl < 6);
+  const point = (az, el, roll = 0, n = 25) => { for (let i = 0; i < n; i++) r.orient(hostSample(az, el, roll, {declination: decl})); };
+  // Nothing selected: name what sits in the middle, from the same sky as the dome.
+  const saturn = r.dome().bodies.find(b => b.label === 'Saturn');
+  point(saturn.az, saturn.el);
+  assert(!r.el('pointer-wrap').hidden);
+  assert.equal(r.el('point-guide').textContent, 'In the middle: Saturn. Tap a satellite in the list to be guided to it.');
+  assert.equal(r.el('follow-announcement').textContent, r.el('point-guide').textContent);
+  r.el('list').children.find(b => b.dataset.id === '25544').click();
+  const issNow = r.dome().objects.find(o => o.id === 25544);
+  point(issNow.az, issNow.el);
+  assert.equal(r.el('point-guide').textContent, 'On target. Look past the top of the phone.');
+  assert.equal(r.el('point-guide').className, 'locked'); assert.equal(r.el('follow-announcement').textContent, 'On target.');
+  assert(r.el('spot-turn').hidden, 'the viewfinder gives the guidance');
+  assert.match(r.el('follow-status').textContent, /^Pointing (north|south|east|west|north-east|north-west|south-east|south-west), .* · compass ±8°$/);
+  point(issNow.az - 20, issNow.el);
+  assert.match(r.el('point-guide').textContent, /^Move the phone 2 fists (up and )?to the right\.$/);
+  assert.equal(r.el('point-guide').className, '');
+  const announced = r.el('follow-announcement').textContent;
+  assert.match(announced, /^Move the phone (up and )?to the right\.$/, 'announced once per way, without a distance that goes stale');
+  point(issNow.az - 25, issNow.el);
+  assert.match(r.el('point-guide').textContent, /^Move the phone 2½ fists/);
+  assert.equal(r.el('follow-announcement').textContent, announced, 'no re-announcement for a few degrees');
+  point(issNow.az + 180, Math.max(0, issNow.el - 5));
+  assert.match(r.el('point-guide').textContent, /^Turn around: it is behind you/);
+  // High in the sky the host reports the flat pose; pointing continues.
+  const high = hostSample(issNow.az, 70, 0, {declination: decl}); assert.equal(high.pose, 'flat');
+  point(issNow.az, 70);
+  assert(!r.el('pointer-wrap').hidden); assert.match(r.el('point-guide').textContent, /^Move the phone \d½? fists down\.$/);
+  assert.match(r.el('follow-status').textContent, /^Pointing .*, 7 fists up/);
+  // A calibration request keeps the view but drops the aim.
+  r.orient({...hostSample(issNow.az, issNow.el), azimuthDeg: undefined, calibrate: true});
+  assert.equal(r.el('point-guide').textContent, 'Waiting for the compass…'); assert.match(r.el('follow-status').textContent, /figure 8/);
+  // Raising the phone leaves rewind: pointing is about the sky now.
+  r.orient({pose: 'flat', azimuthDeg: 0, pitchDeg: 88, rollDeg: 0, calibrate: false, accuracyDeg: 8});
+  assert(r.el('pointer-wrap').hidden); assert(!r.el('dome').hidden); assert(!r.el('scrub').hidden);
+  r.el('rewind').value = '-120'; r.el('rewind').oninput(); assert(!r.el('now').hidden);
+  point(issNow.az, issNow.el, 0, 1);
+  assert.equal(r.el('rewind').value, '0'); assert.equal(r.el('rewind-label').textContent, 'Now');
+  // Silence ends pointing like it ends the dome heading; Follow off hides the view.
+  r.expire(1501); assert(r.el('pointer-wrap').hidden); assert(!r.el('dome').hidden);
+  point(issNow.az, issNow.el, 0, 1); assert(!r.el('pointer-wrap').hidden);
+  r.el('follow').onclick(); await flush();
+  assert(r.el('pointer-wrap').hidden); assert(!r.el('dome').hidden); assert(!r.el('scrub').hidden);
+  assert(!Object.keys(r.storage).some(k => /follow|orient|heading|point/.test(k)));
+  // A place without a true-north correction never shows a pointing view.
+  r = rig(); await flush(8); await r.el('follow').onclick(); r.submit(85, 130);
+  r.orient(hostSample(90, 20)); assert(r.el('pointer-wrap').hidden); assert.match(r.el('follow-status').textContent, /True-north correction unavailable/);
   // Menu visibility may arrive before the native window regains focus.
   r = rig({orientationErrors:[null,'RUN_PAUSED',null]}); await flush(8);
   await r.el('follow').onclick();r.visibility(false);r.visibility(true);await flush();
@@ -580,5 +637,5 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   for(let i=0;i<25;i++){r.retryFollow();await flush();}
   assert.equal(r.el('follow').attributes['aria-pressed'],'false');
   const attempts=r.calls.length;r.retryFollow();await flush();assert.equal(r.calls.length,attempts,'bounded retry stops');
-  console.log('Space Watch app checks passed: start, privacy (no coordinates in URLs or storage), list selection, spot words, details, Wikipedia on request, rewind, red mode, visible passes and preview, trains (plan, details, cache, optional failure), cache reuse/expiry/torn cache, CelesTrak back-off, location fallbacks, paused downloads and follow mode (true north, smoothing, guidance, calibration, pause, denial).');
+  console.log('Space Watch app checks passed: start, privacy (no coordinates in URLs or storage), list selection, spot words, details, Wikipedia on request, rewind, red mode, visible passes and preview, trains (plan, details, cache, optional failure), cache reuse/expiry/torn cache, CelesTrak back-off, location fallbacks, paused downloads and follow mode (true north, smoothing, guidance, calibration, pause, denial) and pointing (camera aim to the zenith, words, lock, announcements, rewind exit).');
 })().catch(error => { console.error(error); process.exitCode = 1; });

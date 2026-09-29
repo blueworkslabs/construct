@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "dev.construct.space-watch",
   "name": "Space Watch",
-  "version": "0.3.7",
-  "description": "What's passing overhead: a sky dome of the brightest satellites, rocket stages and fresh satellite trains, with plain-language pointing, rewind, the next visible passes, details and a follow mode that turns the dome with your phone. Positions are computed on the phone; your location is never sent. Requires Construct API 0.14.",
+  "version": "0.4.0",
+  "description": "What's passing overhead: a sky dome of the brightest satellites, rocket stages and fresh satellite trains, with plain-language pointing, rewind, the next visible passes, details, a follow mode that turns the dome with your phone and a pointing view that guides the raised phone to a satellite. Positions are computed on the phone; your location is never sent. Requires Construct API 0.14.",
   "constructApi": {
     "min": "0.14.0",
     "target": "0.14.0"
@@ -28,7 +28,7 @@
     },
     {
       "id": "orientation.read",
-      "reason": "Optionally read the phone's compass and tilt while Follow is on, to turn the sky dome to where you face. Readings stay on this phone.",
+      "reason": "Optionally read the phone's compass and tilt while Follow is on, to turn the sky dome to where you face or guide the raised phone to the selected object. Readings stay on this phone.",
       "optional": true
     },
     {

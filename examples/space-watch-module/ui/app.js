@@ -54,8 +54,11 @@
     ends = new Map(),
     launches = new Map();
   // Follow mode state (see "follow mode" below); declared early for frame().
-  const follow = { on: false, want: false, heading: null, accuracy: null, calibrate: false, pose: null, trueNorth: false, unavailable: false, lastSample: 0, request: 0, expiry: null };
-  let spotAz = null;
+  // pointing: the phone is raised like a camera; attitude is its smoothed
+  // orientation (SpacePointer frame) while pointing.
+  const follow = { on: false, want: false, heading: null, accuracy: null, calibrate: false, pose: null, trueNorth: false, unavailable: false, lastSample: 0, request: 0, expiry: null, pointing: false, attitude: null };
+  let spotAz = null,
+    lastSky = null;
   const message = (el, text, tone = "") => {
     if (el.textContent !== text) el.textContent = text;
     if (el.className !== tone) el.className = tone;
@@ -476,7 +479,7 @@
   let dome = null;
   function frame() {
     if (!place || !active) return;
-    if (follow.on && follow.heading !== null && Date.now() - follow.lastSample > 1500) {
+    if (follow.on && (follow.heading !== null || follow.attitude !== null) && Date.now() - follow.lastSample > 1500) {
       clearHeading();
       renderFollow();
     }
@@ -484,6 +487,7 @@
     context(t);
     const s = snapshot(t),
       visible = s.items.filter((x) => x.state === "visible").length;
+    lastSky = s;
     dome.set({
       stars: sky.stars,
       asterisms: K.asterisms,
@@ -537,6 +541,7 @@
     $("now").hidden = offset === 0;
     planStart();
     renderPlan();
+    renderPoint();
   }
 
   // ---- visible passes over the next hours, worked out in small slices ----
@@ -1099,6 +1104,7 @@
   // ---- follow mode: the dome turns with the phone (orientation.read, API 0.14) ----
   // Headings arrive as magnetic; WMM2025 declination for the chosen place makes
   // them true. Readings are smoothed along the circle. Nothing is stored.
+  // Raising the phone like a camera switches to the pointing view (SpacePointer).
   const wrap360 = (x) => ((x % 360) + 360) % 360,
     wrap180 = (x) => ((((x + 180) % 360) + 360) % 360) - 180;
   function clearHeading(resetDome = true) {
@@ -1110,6 +1116,8 @@
     follow.calibrate = false;
     follow.unavailable = false;
     follow.lastSample = 0;
+    follow.attitude = null;
+    if (resetDome) follow.pointing = false;
     if (dome && resetDome) dome.turn(0);
   }
   async function startFollow(retryUntil = 0) {
@@ -1122,7 +1130,7 @@
       if (request !== follow.request) return;
       if (!active || !follow.want) return;
       follow.on = true;
-      message($("follow-status"), "Hold the phone flat, top pointing where you face.");
+      message($("follow-status"), "Hold the phone flat for the dome, or raise it like a camera to point.");
     } catch (e) {
       if (request !== follow.request) return;
       // Menu visibility can be delivered before the window focus callback.
@@ -1160,33 +1168,108 @@
     $("follow").setAttribute("aria-pressed", String(follow.on));
     $("follow-status").hidden = !follow.on && !keepStatus;
     if (!follow.on) dome.turn(0);
+    applyPointing();
     message($("follow-announcement"), keepStatus ? $("follow-status").textContent : "Follow off.", "sr-only");
     frame();
   }
   function renderFollow() {
+    applyPointing();
     if (!follow.on) return;
     let text, tone = "";
     if (follow.unavailable)
       text = "True-north correction unavailable for this place or date. The sky stays north-up; Follow guidance is paused.";
-    else if (follow.heading === null)
-      text = follow.pose === "upright" ? "Hold the phone flat, top pointing where you face." : "Waiting for the compass…";
+    else if (follow.pointing && follow.attitude) {
+      const a = SpacePointer.aim(follow.attitude);
+      text = `Pointing ${K.dir8(a.az)}, ${a.el < 0 ? "below the horizon" : K.height(a.el)}${follow.accuracy !== null ? ` · compass ±${Math.round(follow.accuracy)}°` : ""}`;
+    } else if (follow.heading === null)
+      text = follow.pointing
+        ? "Waiting for the compass…"
+        : follow.pose === "upright"
+          ? "Raise the phone like a camera to point, or hold it flat for the dome."
+          : "Waiting for the compass…";
     else {
       text = `Facing ${K.dir8(follow.heading)}${follow.accuracy !== null ? ` · compass ±${Math.round(follow.accuracy)}°` : ""}${follow.trueNorth ? "" : " · magnetic north"}`;
-      if (follow.pose === "upright") text += " · hold the phone flat to keep following";
     }
     if (follow.calibrate) {
       text += ". Wave the phone in a figure 8 to calibrate the compass.";
       tone = "attention";
     }
     message($("follow-status"), text, tone);
-    message($("follow-announcement"), follow.calibrate
-      ? "Wave the phone in a figure 8 to calibrate the compass."
-      : follow.heading !== null ? "Follow active. Compass direction and turn guidance are available below." : text, "sr-only");
+    if (follow.calibrate) message($("follow-announcement"), "Wave the phone in a figure 8 to calibrate the compass.", "sr-only");
+    else if (!follow.pointing) message($("follow-announcement"), follow.heading !== null ? "Follow active. Compass direction and turn guidance are available below." : text, "sr-only");
+  }
+  // ---- pointing view: the phone raised like a camera ----
+  let pointer = null,
+    pointGuide = null;
+  function applyPointing() {
+    const on = follow.on && follow.pointing && !follow.unavailable;
+    $("pointer-wrap").hidden = !on;
+    $("dome").hidden = on;
+    $("scrub").hidden = on;
+    if (!on) pointGuide = null;
+  }
+  // The selected object, if it is above the horizon now, with its track
+  // (recomputed every two seconds; the dot itself moves with every reading).
+  let pointTrack = { id: null, t: 0, points: null };
+  function pointTarget(t) {
+    if (selected === null || offset !== 0) return null;
+    const found = find(selected, t),
+      l = found && O.look(found.o, place.ob, t);
+    if (!l || l.el < 0) return null;
+    if (pointTrack.id !== selected || Math.abs(t - pointTrack.t) > 2000)
+      pointTrack = { id: selected, t, points: O.trail(found.o, place.ob, t) };
+    return { az: l.az, el: l.el, label: shortLabel(found.o, found.d), track: pointTrack.points };
+  }
+  // Something bright near the middle of the view, to name what the phone points at.
+  function centred(a) {
+    let best = null;
+    const near = (x, name) => {
+      const sep = SpacePointer.separation(a, x);
+      if (sep <= 6 && (!best || sep < best.sep)) best = { sep, name, id: x.id };
+    };
+    for (const x of lastSky ? lastSky.items : [])
+      if (x.state === "visible") near(x.l, shortLabel(x.o, x.d));
+    for (const b of sky.bodies || []) if (b.el > 0) near(b, b.label);
+    for (const st of sky.stars || []) if (st.name && st.mag < 2 && st.el > 0) near(st, st.name);
+    return best;
+  }
+  function renderPoint() {
+    if (!follow.on || !follow.pointing || follow.unavailable || !place || !active) return;
+    const f = follow.attitude,
+      t = now(),
+      target = f ? pointTarget(t) : null,
+      g = target ? SpacePointer.guide(f, target) : null;
+    let text;
+    if (!f) text = "Waiting for the compass…";
+    else if (g) text = g.text;
+    else {
+      const c = centred(SpacePointer.aim(f));
+      text = selected !== null
+        ? "The selected object is below your horizon now."
+        : c ? `In the middle: ${c.name}. Tap a satellite in the list to be guided to it.` : "Tap a satellite in the list to be guided to it.";
+    }
+    message($("point-guide"), text, g && g.locked ? "locked" : "");
+    // Announce only when the kind of guidance changes, not every few degrees.
+    const key = g ? g.key : text;
+    if (!pointGuide || pointGuide.key !== key) {
+      pointGuide = { key, text };
+      if (!follow.calibrate) message($("follow-announcement"), g ? g.short : text, "sr-only");
+    }
+    pointer.draw({
+      frame: f,
+      target,
+      guide: g,
+      stars: sky.stars,
+      bodies: sky.bodies,
+      objects: lastSky ? lastSky.items.filter((x) => x.id !== selected).map((x) => ({ az: x.l.az, el: x.l.el, state: x.state })) : [],
+      palette: SpaceDome.palette(prefs.red),
+      dark: lastSky ? lastSky.sunAlt < O.DARK_SUN : true,
+    });
   }
   // "Ahead of you", or which way to turn, for the selected object.
   function renderTurn() {
     const el = $("spot-turn");
-    if (!follow.on || follow.heading === null || spotAz === null) {
+    if (!follow.on || follow.pointing || follow.heading === null || spotAz === null) {
       el.hidden = true;
       return;
     }
@@ -1227,13 +1310,26 @@
       renderFollow(); renderTurn();
       return;
     }
-    const previous = Date.now() - follow.lastSample > 1500 ? null : follow.heading;
-    const wasUnavailable = follow.unavailable;
+    const fresh = Date.now() - follow.lastSample <= 1500,
+      previous = fresh ? follow.heading : null,
+      previousAttitude = fresh ? follow.attitude : null,
+      wasPointing = follow.pointing,
+      wasUnavailable = follow.unavailable;
     clearHeading(false);
     follow.pose = s.pose === "flat" ? "flat" : "upright";
     follow.calibrate = s.calibrate === true;
     follow.accuracy = Number.isFinite(s.accuracyDeg) ? s.accuracyDeg : null;
-    if (follow.pose === "flat" && Number.isFinite(s.azimuthDeg)) {
+    // Camera axis above about −25° (pitch < 25) means the phone is raised to
+    // point; a margin keeps the view from flickering at the threshold.
+    follow.pointing = Number.isFinite(s.pitchDeg) && s.pitchDeg < (wasPointing ? 35 : 25);
+    // Pointing is always about the sky now: leave rewind and pass previews.
+    if (follow.pointing && !wasPointing && offset !== 0) {
+      selectedPass = null;
+      offset = 0;
+      $("rewind").value = "0";
+      listKey = "";
+    }
+    if ((follow.pose === "flat" || follow.pointing) && Number.isFinite(s.azimuthDeg)) {
       const dec = SpaceMagnetic.declination(place.lat, place.lon, now());
       follow.trueNorth = dec !== null;
       follow.unavailable = dec === null;
@@ -1244,9 +1340,15 @@
         return;
       }
       const heading = wrap360(s.azimuthDeg + dec);
-      const first = previous === null;
-      // A quarter of the way toward each reading, along the shorter way round.
-      follow.heading = first ? heading : wrap360(previous + 0.25 * wrap180(heading - previous));
+      if (follow.pointing) {
+        // The bearing is the camera axis when upright, the screen's top edge when flat.
+        const next = SpacePointer.orient({ pitchDeg: s.pitchDeg, rollDeg: s.rollDeg, bearingDeg: heading, axis: follow.pose === "upright" ? "camera" : "top" });
+        follow.attitude = next && SpacePointer.smooth(previousAttitude, next, 0.35);
+      } else {
+        const first = previous === null;
+        // A quarter of the way toward each reading, along the shorter way round.
+        follow.heading = first ? heading : wrap360(previous + 0.25 * wrap180(heading - previous));
+      }
       follow.lastSample = s.timestamp;
       const measuredAt = s.timestamp;
       follow.expiry = setTimeout(() => {
@@ -1254,13 +1356,14 @@
         clearHeading();
         frame(); renderFollow(); renderTurn();
       }, Math.max(1, 1501 - sampleAge));
-      dome.turn(follow.heading);
+      if (follow.heading !== null) dome.turn(follow.heading);
     }
     if (follow.heading === null && follow.pose !== "upright") dome.turn(0);
     // Refresh wedge/spot validity on pose and reliability transitions only.
-    if ((previous === null) !== (follow.heading === null)) frame();
+    if ((previous === null) !== (follow.heading === null) || follow.pointing !== wasPointing) frame();
     renderFollow();
     renderTurn();
+    renderPoint();
   });
   $("follow").onclick = () => (follow.want ? stopFollow() : startFollow());
   function applyRed() {
@@ -1289,6 +1392,7 @@
   };
   $("refresh").onclick = () => refreshData(true);
   dome = new SpaceDome($("dome"), (id) => select(id));
+  pointer = new SpacePointer.View($("pointer"));
 
   window.addEventListener("constructvisibilitychange", (event) => {
     active = event.detail?.visible !== false;

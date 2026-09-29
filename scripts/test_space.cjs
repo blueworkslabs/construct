@@ -10,6 +10,8 @@ const C = require("../" + root + "ui/space-catalog.js");
 const Stars = require("../" + root + "ui/space-stars.js");
 const P = require("../" + root + "ui/space-plan.js");
 const M = require("../" + root + "ui/space-magnetic.js");
+const SP = require("../" + root + "ui/space-pointer.js");
+const hostSample = require("./space-fixture/orientation-sample.cjs");
 let count = 0;
 function test(name, body) {
   body();
@@ -429,10 +431,58 @@ test("WMM2025 declination matches NOAA's published test values", () => {
 
   assert.ok(Math.abs(M.decimalYear(at("2027-07-02T12:00:00Z")) - 2027.5) < 0.002);
 });
+test("pointing: host samples give the camera direction from horizon to zenith", () => {
+  const frameOf = (s) => SP.orient({ pitchDeg: s.pitchDeg, rollDeg: s.rollDeg, bearingDeg: s.azimuthDeg, axis: s.pose === "upright" ? "camera" : "top" });
+  let flat = 0, upright = 0;
+  for (const rotation of [0, 1])
+    for (const az of [0, 37, 123, 200, 315])
+      for (const el of [-20, 0, 10, 30, 44, 46, 60, 75, 85, 89])
+        for (const roll of [-40, 0, 15, 60]) {
+          const s = hostSample(az, el, roll, { rotation });
+          assert.ok(Number.isFinite(s.azimuthDeg), `${az}/${el}/${roll}`);
+          s.pose === "flat" ? flat++ : upright++;
+          const f = frameOf(s), a = SP.aim(f);
+          assert.ok(SP.separation(a, { az, el }) < 0.3, `aim ${az}/${el}/${roll}/${rotation}: ${JSON.stringify(a)}`);
+          if (el < 80) assert.ok(Math.abs(a.roll - roll) < 0.5, `roll ${az}/${el}/${roll}`);
+          // Unrolled, higher in the sky is up on the screen and clockwise is right.
+          if (roll === 0 && el < 80) {
+            const up = SP.toScreen(f, { az, el: el + 5 }), right = SP.toScreen(f, { az: az + 5, el });
+            assert.ok(up.y > 0.08 && Math.abs(up.x) < 0.01 && right.x > 0.01, `${az}/${el}`);
+          }
+        }
+  // Above 45° the host reports the flat pose and the top edge's bearing.
+  assert.ok(flat > 100 && upright > 100);
+  // Smoothing moves part of the way and keeps a proper frame, even across the zenith.
+  const a = frameOf(hostSample(90, 20)), b = frameOf(hostSample(100, 30)), m = SP.smooth(a, b, 0.5);
+  const mid = SP.aim(m);
+  assert.ok(SP.separation(mid, SP.aim(a)) > 3 && SP.separation(mid, SP.aim(b)) > 3);
+  const z = SP.smooth(frameOf(hostSample(0, 88)), frameOf(hostSample(180, 88)), 0.5);
+  assert.ok(SP.aim(z).el > 85);
+  for (const v of [z.E, z.N, z.U]) assert.ok(Math.abs(Math.hypot(...v) - 1) < 1e-9);
+  assert.equal(SP.orient({ pitchDeg: 10, rollDeg: 0, axis: "camera" }), null, "no bearing, no frame");
+});
+test("pointing: plain words match the screen, the arrow and the lock ring", () => {
+  const f = (az, el, roll = 0) => { const s = hostSample(az, el, roll); return SP.orient({ pitchDeg: s.pitchDeg, rollDeg: s.rollDeg, bearingDeg: s.azimuthDeg, axis: s.pose === "upright" ? "camera" : "top" }); };
+  const g = (frame, az, el) => SP.guide(frame, { az, el });
+  assert.equal(g(f(90, 20), 92, 21).text, "On target. Look past the top of the phone.");
+  assert.equal(g(f(90, 20), 92, 21).locked, true);
+  assert.equal(g(f(90, 20), 60, 20).text, "Move the phone 3 fists to the left.");
+  assert.equal(g(f(90, 20), 100, 30).text, "Move the phone 1½ fists up and to the right.");
+  assert.equal(g(f(90, 20), 90, 5).text, "Move the phone 1½ fists down.");
+  assert.equal(g(f(90, 20), 270, 30).text, "Turn around: it is behind you, 3 fists up.");
+  assert.equal(g(f(90, 20), 270, 30).turnAround, true);
+  // Straight up, azimuth stops mattering: the words follow the screen.
+  assert.match(g(f(90, 20), 180, 88).text, /^Move the phone 7 fists up/);
+  assert.equal(g(f(0, 89), 180, 70).text, "Move the phone 2 fists up.", "tipped back past north, the top edge leans south");
+  // Rolled a quarter turn right side down, "higher in the sky" is to the screen's left.
+  assert.equal(g(f(90, 20, 90), 90, 35).text, "Move the phone 1½ fists to the left.");
+  assert.equal(SP.guide(null, { az: 0, el: 0 }), null);
+  assert.equal(SP.guide(f(90, 20), null), null);
+});
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
   assert.equal(m.id, "dev.construct.space-watch");
-  assert.equal(m.version, "0.3.7");
+  assert.equal(m.version, "0.4.0");
   assert.deepEqual(m.constructApi, { min: "0.14.0", target: "0.14.0" });
   const caps = Object.fromEntries(m.capabilities.map((c) => [c.id, c]));
   assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "orientation.read", "storage.kv"]);
@@ -446,7 +496,7 @@ test("package: manifest, capabilities, scripts and no location in any URL", () =
   // Module CSP: no inline script or style.
   assert.doesNotMatch(html, /\sstyle=|<style|<script(?![^>]*\ssrc=)/);
   const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map((x) => x[1]);
-  assert.deepEqual(scripts, ["bridge.js", "vendor/satellite.min.js", "vendor/astronomy.min.js", "space-stars.js", "space-orbit.js", "space-sky.js", "space-catalog.js", "space-plan.js", "space-magnetic.js", "space-dome.js", "app.js"]);
+  assert.deepEqual(scripts, ["bridge.js", "vendor/satellite.min.js", "vendor/astronomy.min.js", "space-stars.js", "space-orbit.js", "space-sky.js", "space-catalog.js", "space-plan.js", "space-magnetic.js", "space-dome.js", "space-pointer.js", "app.js"]);
   for (const s of scripts) assert.ok(fs.existsSync(root + "ui/" + s), s);
   assert.doesNotMatch(app, /\bfetch\s*\(|XMLHttpRequest|navigator\.geolocation|console\./);
   // Every URL the module can request is built from fixed strings plus a
