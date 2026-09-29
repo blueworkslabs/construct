@@ -36,7 +36,7 @@ This is new module acceptance, not a new APK build or a substitute for hardware.
 Lifecycle, stale-stream and reference-frame regressions fail on original source
 and pass after the fixes. Nineteen orbit/model groups, including all 12 bundled
 NOAA WMM2025 values, controller regressions, actual-browser DOM/canvas/layout
-checks, 36 Python publisher/package tests, 95 runner-helper tests and the
+checks, 36 Python publisher/package tests, 96 runner-helper tests and the
 architecture check pass. Browser accessibility assertions are not a claim of
 physical TalkBack testing. Code review/fixes assisted by Codex.
 
@@ -53,7 +53,7 @@ rotation and suppress live wedge/turn guidance; explicit Follow off restores nor
 
 ## Android acceptance
 
-Pending exact-package run, 23 required checks.
+Pending exact-package run `20260929T012150Z-space-925801ac`, 23 required checks.
 Follow is exercised immediately after signed installation, including native
 compass denial/grant, north/east injection, relative pointing, upright/off,
 menu return, Quick Settings, explicit restart, landscape/200% text, revocation
@@ -124,3 +124,11 @@ Correction is available only for WMM2025’s documented decimal-year interval
 it and accept both endpoints; the old extrapolating guard fails this test.
 All twelve NOAA field values remain green. 0.3.6 was signed but superseded
 before Android execution and has no acceptance run.
+
+## Driver corrections retained separately
+
+The current driver excludes fixed Android system-bar controls from scroll-progress
+signatures and searches down first for later pass entries. The status-bar
+regression fails before and passes after the driver correction. This changes no
+module or host bytes and does not turn earlier incomplete receipts into passes.
+Original captures from each run remain tied to their own run ID.

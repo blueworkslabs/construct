@@ -1,0 +1,61 @@
+{
+  "complete": false,
+  "stopped": true,
+  "checks": [
+    "Signed fixture opens its computed dome and equivalent overhead list",
+    "Follow denied without native orientation grant; static sky remains usable",
+    "Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and relative turn guidance",
+    "Upright pose suspends Follow guidance; explicit off returns north-up and releases native listener",
+    "Native menu pause releases compass and explicit menu return re-establishes Follow",
+    "Quick Settings ends Follow, explains focus loss, and requires an explicit tap to restart",
+    "Follow remains operable with display rotation and 200% Android text",
+    "Revoked orientation cannot restart Follow; a fresh process starts with Follow off",
+    "Visible-pass list includes the current ISS pass and pointing/max-height words"
+  ],
+  "apkSha256": "23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477",
+  "moduleSha256": "e8adfd0a526d67b64b667f3a5ad5ac932cd2d56db02ca2e4923bd0526de8fea1",
+  "fixtureSha256": "408c6c636dab6d8df64ff410d86ad6c91c9a0b90bbf15b7bb451e4b807fb1e3e",
+  "version": "0.3.5",
+  "followNativeConnections": {
+    "denied": 0,
+    "watching": 1,
+    "off": 0,
+    "menu": 0,
+    "menu-return": 1,
+    "quick-settings": 0,
+    "focus-return": 0,
+    "still-off": 0,
+    "explicit-restart": 1,
+    "revoked": 0,
+    "process-restart": 0
+  },
+  "followListenerWaitSeconds": {
+    "denied": 0.054,
+    "watching": 0.069,
+    "off": 0.723,
+    "menu": 0.046,
+    "menu-return": 0.059,
+    "quick-settings": 0.034,
+    "focus-return": 0.066,
+    "still-off": 0.071,
+    "explicit-restart": 0.038,
+    "revoked": 0.032,
+    "process-restart": 0.03
+  },
+  "followGuidance": "Ahead of you, slightly left.",
+  "followForegroundObservationSeconds": 1.854,
+  "runId": "20260929T010623Z-space-7bf3aa30",
+  "plannedChecks": 23,
+  "error": "Driver timed out reaching lower Guowang pass entry",
+  "independentTeardown": {
+    "activeState": "inactive",
+    "mainPid": 0,
+    "result": "success",
+    "exitStatus": 0
+  },
+  "limitations": [
+    "Incomplete 9/23; all Follow gates passed, later original sky checks not complete",
+    "Fixed system-bar anchors caused false list scroll boundaries; excluded with a failing-before/passing-after helper regression",
+    "Superseded by 0.3.7; not final-package acceptance"
+  ]
+}

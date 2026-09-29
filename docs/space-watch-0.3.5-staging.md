@@ -53,7 +53,7 @@ rotation and suppress live wedge/turn guidance; explicit Follow off restores nor
 
 ## Android acceptance
 
-Attempt 10 (`20260929T005357Z-space-4267d43b`) stopped at **9/23** when the driver could not reach the lower Guowang pass control. All seven Follow gates passed. [Partial receipt](evidence/space-watch-0.3.5-attempt10-2026-09-29.json). Emulator teardown independently returned success, exit 0 and PID 0. A separate run with a settled-scroll correction is in progress; neither substitutes for 0.3.6 acceptance.
+Attempt 10 (`20260929T005357Z-space-4267d43b`) stopped at **9/23** when the driver could not reach the lower Guowang pass control. All seven Follow gates passed. [Partial receipt](evidence/space-watch-0.3.5-attempt10-2026-09-29.json). Emulator teardown independently returned success, exit 0 and PID 0. Attempt 11 (`20260929T010623Z-space-7bf3aa30`) also stopped at 9/23; fixed system-bar anchors caused a false page boundary. The driver now excludes them, with a failing-before/passing-after regression. [Receipt](evidence/space-watch-0.3.5-attempt11-2026-09-29.json). Its emulator also exited successfully. Neither run substitutes for 0.3.7 acceptance.
 Follow is exercised immediately after signed installation, including native
 compass denial/grant, north/east injection, relative pointing, upright/off,
 menu return, Quick Settings, explicit restart, landscape/200% text, revocation
