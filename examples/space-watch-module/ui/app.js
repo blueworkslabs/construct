@@ -1217,6 +1217,14 @@
       return;
     }
     if (!follow.on || !active || !place) return;
+    const sampleAge = Date.now() - s.timestamp;
+    if (!Number.isFinite(s.timestamp) || sampleAge < 0 || sampleAge > 1500) {
+      const changed = follow.heading !== null || follow.unavailable;
+      clearHeading();
+      if (changed) frame();
+      renderFollow(); renderTurn();
+      return;
+    }
     const previous = Date.now() - follow.lastSample > 1500 ? null : follow.heading;
     const wasUnavailable = follow.unavailable;
     clearHeading(false);
@@ -1237,7 +1245,7 @@
       const first = previous === null;
       // A quarter of the way toward each reading, along the shorter way round.
       follow.heading = first ? heading : wrap360(previous + 0.25 * wrap180(heading - previous));
-      follow.lastSample = Date.now();
+      follow.lastSample = s.timestamp;
       dome.turn(follow.heading);
     }
     if (follow.heading === null && follow.pose !== "upright") dome.turn(0);

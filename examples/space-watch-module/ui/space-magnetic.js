@@ -151,11 +151,15 @@ const SpaceMagnetic = (() => {
     return { x: bx * Math.cos(psi) - bz * Math.sin(psi), y: by, z: bx * Math.sin(psi) + bz * Math.cos(psi) };
   }
   // Declination in degrees east of true north, or null outside the model's use
-  // (poles, or dates beyond the five-year validity with a year's grace).
+  // (geographic poles, magnetic caution/blackout zones, or unsupported dates).
   function declination(latDeg, lonDeg, ms, hKm = 0) {
     const year = decimalYear(ms);
     if (!(Math.abs(latDeg) <= 89.5) || !(Math.abs(lonDeg) <= 180) || year < EPOCH - 1 || year > EPOCH + 6) return null;
     const b = field(latDeg, lonDeg, hKm, year);
+    // NOAA: H < 2000 nT is blackout; 2000 <= H < 6000 nT is caution.
+    // This pointing UI conservatively suspends correction in both zones.
+    // https://www.ncei.noaa.gov/products/world-magnetic-model/accuracy-limitations-error-model
+    if (!(Math.hypot(b.x, b.y) >= 6000)) return null;
     return (Math.atan2(b.y, b.x) * 180) / Math.PI;
   }
   return { EPOCH, field, declination, decimalYear };

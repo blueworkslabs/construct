@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.3.4** (source candidate) is a signed HTML/CSS/JavaScript module for
+Space Watch **0.3.5** (source candidate) is a signed HTML/CSS/JavaScript module for
 host **API 0.14**; the published **0.2.14** runs on API 0.9 / alpha26 and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -11,7 +11,7 @@ Aircraft are a 10–100 km map question. Orbiting objects are seen from well ove
 1,000 km away and cross a 100 km circle in about 25 seconds, so they need a sky
 view, not a map.
 
-## Module 0.3.4: follow mode (API 0.14, source candidate)
+## Module 0.3.5: follow mode (API 0.14, source candidate)
 
 **Follow** turns the dome with the phone. Hold the phone flat with its top pointing
 where you face: your heading is at the top of the dome, and a ±28° wedge shows your
@@ -49,7 +49,7 @@ slightly right.", "Turn left about 40°." or "Behind you: turn around."
 - **Storage.** Nothing about headings is stored, and Follow always starts off.
 - **Fallback.** Without the grant or a compass, a note explains what's missing
   and the static compass dome keeps working.
-- **Delivery.** 0.3.4 declares `constructApi` 0.14.0 exactly. Publish it only
+- **Delivery.** 0.3.5 declares `constructApi` 0.14.0 exactly. Publish it only
   after an API 0.14 host is released. Older hosts keep 0.2.14 from the catalog's
   version list.
 
@@ -411,3 +411,8 @@ see the staging report above for actual emulator captures.
 ![Details with the same-launch lookup](images/space-watch-0.1.0/details.jpg)
 ![Red mode, rewound two minutes](images/space-watch-0.1.0/red-rewind.jpg)
 ![Landscape](images/space-watch-0.1.0/landscape.jpg)
+
+Follow also rejects missing/future measurement timestamps and samples older than
+1.5 seconds, so queued events cannot refresh a stale heading. WMM correction is
+conservatively unavailable when the horizontal field is below 6000 nT, covering
+NOAA's magnetic caution and blackout zones; the static north-up sky remains usable.

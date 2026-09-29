@@ -98,7 +98,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
     tick: (n = 1, ms = 1000) => { for (let i = 0; i < n; i++) { now += ms; timers.forEach(f => f()); } },
     advance: ms => { now += ms; },
     visibility: visible => events.constructvisibilitychange({detail: {visible}}),
-    orient: detail => events.constructorientation({detail}),
+    orient: detail => events.constructorientation({detail: {timestamp: now, ...detail}}),
     rotation: () => sandbox.domeRotation,
     frames: () => sandbox.domeFrames,
     submit: (lat, lon) => { el('latitude').value = lat; el('longitude').value = lon; el('area-form').onsubmit({preventDefault() {}}); }};
@@ -539,6 +539,19 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   const pausedFrames = r.frames();
   for (let i=0;i<10;i++) r.orient(sample);
   assert.equal(r.frames(), pausedFrames, 'unavailable correction does not recompute sky at sensor rate');
+  // Measurement time, not handler time, bounds a heading's usable age.
+  r = rig(); await flush(8); await r.el('follow').onclick();r.select(25544);
+  r.orient(sample);r.advance(2000);
+  r.orient({...sample,timestamp:START});
+  assert.equal(r.rotation(),0,'queued stale sample must not rotate sky');
+  assert(r.el('spot-turn').hidden);assert.equal(r.dome().follow,false);
+  for(const timestamp of [undefined, NaN, START+3000]) {
+    r.orient({...sample,timestamp});assert.equal(r.rotation(),0,'invalid/future measurement time rejected');
+  }
+  r.orient({...sample,timestamp:START+1000});assert(!r.el('spot-turn').hidden);
+  r.tick(1,600);assert(r.el('spot-turn').hidden,'expiry uses measurement time');
+  r.submit(85,130);r.orient(sample);
+  assert.equal(r.rotation(),0);assert(r.el('spot-turn').hidden,'magnetic blackout has no guidance');
   // Menu visibility may arrive before the native window regains focus.
   r = rig({orientationErrors:[null,'RUN_PAUSED',null]}); await flush(8);
   await r.el('follow').onclick();r.visibility(false);r.visibility(true);await flush();

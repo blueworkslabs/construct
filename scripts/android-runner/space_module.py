@@ -11,7 +11,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_space_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.space-watch package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.space-watch-fixture package digest')
-p.add_argument('--version',default='0.3.4')
+p.add_argument('--version',default='0.3.5')
 p.add_argument('--follow',action='store_true',help='Enable Follow checks for older versions; mandatory automatically for 0.3.0+')
 a=p.parse_args()
 # Follow is mandatory for the feature version, even when the flag is omitted.
@@ -28,6 +28,7 @@ from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from keyboard_prompt import gboard_contacts_denial
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
+from space_checks import scroll_signature
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'fixtureSha256':a.fixture_sha,'version':a.version,
  'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{},'plannedChecks':23 if a.follow else 16,'followRequired':a.follow}
 started=False
@@ -85,7 +86,7 @@ def scroll(direction,distance=None):
  # Scroll in the padding, not across the rewind range or a canvas hit target.
  x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=min(x1+72,x2-24);lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
  if distance is not None:lo=hi-max(24,min(hi-lo,round(distance)))
- ui._device.swipe(x,hi if direction=='down' else lo,x,lo if direction=='down' else hi,duration=.3);time.sleep(.35)
+ ui._device.swipe(x,hi if direction=='down' else lo,x,lo if direction=='down' else hi,duration=.08);time.sleep(.35)
 def reveal(match):
  """First visible node whose text satisfies match (a string prefix or predicate), scrolling the module page."""
  test=match if callable(match) else (lambda t:t.startswith(match))
@@ -101,10 +102,10 @@ def reveal(match):
     settled=[n for n in nodes() if test(text_of(n)) and visible(n) and bounds(n)==before]
     if settled:return settled[0]
    # Detect an actual scroll boundary instead of swiping upward 24 times at
-   # the top of the page. Text+geometry avoids confusing equal-height rows.
-   before=tuple((text_of(n),n.get('bounds')) for n in nodes() if visible(n) and text_of(n))
+   # the top of the page. Named-control geometry ignores live sky text.
+   before=scroll_signature(nodes())
    scroll(direction)
-   after=tuple((text_of(n),n.get('bounds')) for n in nodes() if visible(n) and text_of(n))
+   after=scroll_signature(nodes())
    if before==after:break
  raise RuntimeError('Module control not reachable: '+str(match))
 def click(match):tap_node(reveal(match))

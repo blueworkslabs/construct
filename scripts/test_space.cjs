@@ -416,13 +416,18 @@ test("WMM2025 declination matches NOAA's published test values", () => {
   assert.ok(berlin > 4.5 && berlin < 6, String(berlin));
   // Outside the model's use: no guess.
   assert.equal(M.declination(90, 0, at("2026-09-28T18:00:00Z")), null);
+  const blackout = M.field(85,130,0,2026.75);
+  assert(Math.hypot(blackout.x,blackout.y)<2000);
+  assert.equal(M.declination(85,130,at("2026-09-28T18:00:00Z")),null,'magnetic blackout is distinct from geographic pole');
+  assert.equal(M.declination(75,130,at("2026-09-28T18:00:00Z")),null,"caution zone also suspends precise pointing");
+  assert(Number.isFinite(M.declination(70,130,at("2026-09-28T18:00:00Z"))));
   assert.equal(M.declination(52, 13, at("2033-01-01T00:00:00Z")), null);
   assert.ok(Math.abs(M.decimalYear(at("2027-07-02T12:00:00Z")) - 2027.5) < 0.002);
 });
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
   assert.equal(m.id, "dev.construct.space-watch");
-  assert.equal(m.version, "0.3.4");
+  assert.equal(m.version, "0.3.5");
   assert.deepEqual(m.constructApi, { min: "0.14.0", target: "0.14.0" });
   const caps = Object.fromEntries(m.capabilities.map((c) => [c.id, c]));
   assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "orientation.read", "storage.kv"]);
@@ -449,7 +454,7 @@ test("package: manifest, capabilities, scripts and no location in any URL", () =
   for (const shared of ["construct-ui.css", "bridge.js"])
     assert.equal(fs.readFileSync(root + "ui/" + shared, "utf8"), fs.readFileSync("examples/sky-watch-module/ui/" + shared, "utf8"), shared);
   const docs = fs.readFileSync("docs/space-watch.md", "utf8");
-  assert.match(docs, /Space Watch \*\*0\.3\.4\*\* \(source candidate\)/);
+  assert.match(docs, /Space Watch \*\*0\.3\.5\*\* \(source candidate\)/);
   // Vendored libraries are pinned by hash in the doc.
   for (const f of ["satellite.min.js", "astronomy.min.js"]) {
     const sha = crypto.createHash("sha256").update(fs.readFileSync(root + "ui/vendor/" + f)).digest("hex");

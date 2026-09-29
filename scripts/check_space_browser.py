@@ -57,7 +57,7 @@ with sync_playwright() as p:
  page.locator('#list button[data-id="29507"]').click()
  page.locator('#follow').click()
  page.wait_for_function("document.querySelector('#follow').getAttribute('aria-pressed')==='true'")
- def orient(sample):page.evaluate("s=>dispatchEvent(new CustomEvent('constructorientation',{detail:s}))",sample)
+ def orient(sample):page.evaluate("s=>dispatchEvent(new CustomEvent('constructorientation',{detail:{timestamp:Date.now(),...s}}))",sample)
  orient({'pose':'flat','azimuthDeg':85,'accuracyDeg':12,'calibrate':False})
  assert 'Facing east' in page.locator('#follow-status').inner_text()
  assert page.locator('#follow-status').get_attribute('aria-live')=='off'
