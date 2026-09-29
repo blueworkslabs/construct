@@ -1,0 +1,30 @@
+{
+  "complete": false,
+  "stopped": false,
+  "checks": [
+    "Signed fixture opens its computed dome and equivalent overhead list",
+    "Follow denied without native orientation grant; static sky remains usable"
+  ],
+  "apkSha256": "23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477",
+  "moduleSha256": "1ae50cccdbed685744c654bf56e30c4b72d80779e90637df5c0e7f5b89671132",
+  "fixtureSha256": "e57261f177e626228198f8feb705d0fdaba9bc766cca40168e749049f5a2ae77",
+  "version": "0.3.4",
+  "followNativeConnections": {
+    "denied": 0,
+    "watching": 1
+  },
+  "runId": "20260929T001903Z-space-950c63b2",
+  "plannedChecks": 23,
+  "interruption": "Driver padding swipe did not expose selected card; fixed gesture and moving-target assertion",
+  "independentTeardown": {
+    "activeState": "inactive",
+    "mainPid": 0,
+    "result": "success",
+    "exitStatus": 0
+  },
+  "limitations": [
+    "Partial 2/23; deliberately interrupted, not acceptance",
+    "Diagnostic platform swipe exposed correct NORTH/Turn left about 80 degrees card",
+    "Subsequent run uses same module/APK bytes"
+  ]
+}
