@@ -39,7 +39,7 @@ permission/live/offline gates remain separate from fixture checks.
   through 90° and rolled poses near ±180° (1,760 combinations).
 - 22 unit groups, controller tests, real-browser DOM/canvas checks including
   pointing recovery/expiry and portrait/landscape/2x layout, 36 Python package
-  tests, 97 runner-helper tests and the architecture check pass.
+  tests, 98 runner-helper tests and the architecture check pass.
 - Stale documentation excluding upright pointing was corrected.
 
 Review and fixes assisted by Codex. Automated accessibility assertions do not
@@ -48,7 +48,7 @@ real-world pointing accuracy or validate the physical feel of the 4° lock.
 
 ## Android acceptance
 
-Run `20260929T105608Z-space-02b65b18` is in progress. Required count: **25**.
+Run `20260929T111124Z-space-a8fc1d29` is in progress. Required count: **25**.
 Expanded coverage includes native high-elevation (60°, host flat pose), rolled
 pointing, landscape and 200% text alongside existing grants, Follow lifecycle,
 pass/train/lookup, real live download and offline-cache gates. Final receipt,
@@ -61,3 +61,15 @@ clock; Follow is explicitly started and the satellite reselected.
 
 Earlier [0.4.0 driver evidence](space-watch-0.4.0-staging.md) stays separate and
 is not substituted for acceptance of these updated bytes.
+
+## Retained 0.4.1 driver attempt
+
+`20260929T105608Z-space-02b65b18` stopped at 5/25 recorded gates while trying
+to reach Clear after enlarged-text checks. The layout capture still clipped the
+visible guidance despite accessible bounds reporting it reachable, so that image
+is not accepted as complete guidance evidence. The driver now centres the visual
+instruction away from viewport edges and uses stable toolbar positions when a
+WebView omits DOM IDs, rather than treating changing pointing words as scroll
+movement. It searches downward first for controls below the canvas. Emulator
+teardown was independently successful (exit 0, PID 0). This incomplete attempt
+is not combined with a later run to claim full acceptance.
