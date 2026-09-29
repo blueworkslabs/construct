@@ -85,9 +85,9 @@ def web():
  raise RuntimeError('No module WebView after native transition settled')
 def scroll(direction,distance=None):
  dialogs=[n for n in nodes() if n.get('class')=='android.app.AlertDialog' and visible(n)]
- # Use the main content column: edge/padding gestures can be ignored by
- # Android/WebView. Keep the touch-down away from a range control.
- x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=x1+(x2-x1)*3//4;lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
+ # Short padding gestures avoid text-selection/long-press interception on
+ # the busy emulator. Keep the touch-down away from a range control.
+ x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=min(x1+72,x2-24);lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
  if distance is not None:lo=hi-max(24,min(hi-lo,round(distance)))
  start=hi if direction=='down' else lo;end=lo if direction=='down' else hi
  for n in nodes():
@@ -95,7 +95,7 @@ def scroll(direction,distance=None):
    b=bounds(n)
    if b[0]<=x<=b[2] and b[1]-12<=start<=b[3]+12:
     start=max(y1+30,b[1]-30) if direction=='down' else min(y2-30,b[3]+30)
- ui._device.swipe(x,start,x,end,duration=.25);time.sleep(.8)
+ ui._device.swipe(x,start,x,end,duration=.08);time.sleep(.8)
 def reveal(match,directions=('up','down')):
  """First visible node whose text satisfies match (a string prefix or predicate), scrolling the module page."""
  test=match if callable(match) else (lambda t:t.startswith(match))
