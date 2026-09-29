@@ -30,4 +30,4 @@ def scroll_signature(nodes):
 
 def visible_point_guidance(text):
     """Match the full visual instruction, not the abbreviated live-region text."""
-    return bool(re.match(r'^(On target\. Look|Move the phone [0-9]|Turn around: it is behind you,)', text))
+    return bool(re.match(r'^(On target\. Look|Move the phone [0-9½]|Turn around: it is behind you,)', text))

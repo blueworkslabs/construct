@@ -36,7 +36,7 @@ class ScrollBoundaryTest(unittest.TestCase):
 
 class PointingGuidanceTest(unittest.TestCase):
     def test_distinguishes_visual_guidance_from_hidden_announcement(self):
-        for text in ['Move the phone 2 fists up.', 'Move the phone 1½ fists down and to the left.',
+        for text in ['Move the phone ½ fist up.', 'Move the phone 2 fists up.', 'Move the phone 1½ fists down and to the left.',
                      'On target. Look past the top of the phone.',
                      'Turn around: it is behind you, 3 fists up.']:
             self.assertTrue(visible_point_guidance(text), text)

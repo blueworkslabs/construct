@@ -48,7 +48,7 @@ real-world pointing accuracy or validate the physical feel of the 4° lock.
 
 ## Android acceptance
 
-Run `20260929T111124Z-space-a8fc1d29` is in progress. Required count: **25**.
+Run `20260929T113458Z-space-e0c18d0d` is in progress. Required count: **25**.
 Expanded coverage includes native high-elevation (60°, host flat pose), rolled
 pointing, landscape and 200% text alongside existing grants, Follow lifecycle,
 pass/train/lookup, real live download and offline-cache gates. Final receipt,
@@ -73,3 +73,16 @@ WebView omits DOM IDs, rather than treating changing pointing words as scroll
 movement. It searches downward first for controls below the canvas. Emulator
 teardown was independently successful (exit 0, PID 0). This incomplete attempt
 is not combined with a later run to claim full acceptance.
+
+
+`20260929T111124Z-space-a8fc1d29` stopped at 4/25 locating the offscreen
+heading after rotation. Its failure image shows a rendered viewfinder; no
+acceptance is inferred from that capture. Teardown succeeded (exit 0, PID 0).
+
+A separate assisted diagnostic (`20260929T112344Z-space-08a0bfc3`) confirmed
+the expected high-elevation heading and actual content scrolling. It was
+interrupted after its five-minute inspection pause; it is not an acceptance
+run. Teardown succeeded. The driver now gestures through the content column
+and uses margins compatible with the landscape sticky panel. Layout captures
+also accept the full visual below-horizon message if the selected object sets;
+the earlier high-elevation gates still require directional guidance.
