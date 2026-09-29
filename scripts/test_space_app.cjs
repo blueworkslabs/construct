@@ -20,7 +20,7 @@ const LAUNCH = JSON.stringify([
 ]);
 const WIKI = JSON.stringify({query: {pages: [{title: 'Long March 4B', extract: 'The Long March 4B is a Chinese launch vehicle.', fullurl: 'https://en.wikipedia.org/wiki/Long_March_4B'}]}});
 function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, recentBody = RECENT, recentSatcatBody = RECENT_SATCAT, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false, planScenario = false, orientError = null, pendingOrientation = false, orientationErrors = []} = {}) {
-  const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [], heldOrientation = [], followRetries = [];
+  const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [], heldOrientation = [], followRetries = [], expiryTimers = new Set();
   const storage = structuredClone(saved);
   let now = clock;
   class Element {
@@ -45,7 +45,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
   const Clock = class extends Date { constructor(...a) { super(...(a.length ? a : [now])); } static now() { return now; } };
   const sandbox = {
     document: {getElementById: el, createElement: tag => new Element(tag), body: {classList: {toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)), contains: c => classes.has(c)}}},
-    Date: Clock, setInterval: fn => timers.push(fn), setTimeout: (fn, delay) => delay === 0 ? setImmediate(fn) : delay === 100 ? followRetries.push(fn) : 0, Math, JSON, Promise, Map, Set, URLSearchParams,
+    Date: Clock, setInterval: fn => timers.push(fn), setTimeout: (fn, delay) => delay === 0 ? setImmediate(fn) : delay === 100 ? followRetries.push(fn) : (()=>{const t={fn,at:now+delay};expiryTimers.add(t);return t;})(), clearTimeout: t => expiryTimers.delete(t), Math, JSON, Promise, Map, Set, URLSearchParams,
     addEventListener(type, handler) { events[type] = handler; },
     call: async (method, params) => {
       calls.push({method, params: JSON.parse(JSON.stringify(params))});
@@ -97,6 +97,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
     finishHttp: () => held.splice(0).forEach(f => f()),
     tick: (n = 1, ms = 1000) => { for (let i = 0; i < n; i++) { now += ms; timers.forEach(f => f()); } },
     advance: ms => { now += ms; },
+    expire: ms => { now += ms; for(const t of [...expiryTimers]) if(t.at <= now) { expiryTimers.delete(t); t.fn(); } },
     visibility: visible => events.constructvisibilitychange({detail: {visible}}),
     orient: detail => events.constructorientation({detail: {timestamp: now, ...detail}}),
     rotation: () => sandbox.domeRotation,
@@ -552,6 +553,13 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   r.tick(1,600);assert(r.el('spot-turn').hidden,'expiry uses measurement time');
   r.submit(85,130);r.orient(sample);
   assert.equal(r.rotation(),0);assert(r.el('spot-turn').hidden,'magnetic blackout has no guidance');
+  // Silence expiry does not depend on the next one-second sky frame.
+  r=rig();await flush(8);await r.el('follow').onclick();r.select(25544);r.orient(sample);
+  r.expire(1500);assert(!r.el('spot-turn').hidden);
+  r.expire(1);assert(r.el('spot-turn').hidden,'deadline timer clears silence without frame tick');
+  r.orient(sample);r.expire(1000);r.orient({...sample,azimuthDeg:0});
+  r.expire(501);assert(!r.el('spot-turn').hidden,'old expiry must not clear new sample');
+  r.expire(1000);assert(r.el('spot-turn').hidden);
   // Menu visibility may arrive before the native window regains focus.
   r = rig({orientationErrors:[null,'RUN_PAUSED',null]}); await flush(8);
   await r.el('follow').onclick();r.visibility(false);r.visibility(true);await flush();

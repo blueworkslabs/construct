@@ -54,7 +54,7 @@
     ends = new Map(),
     launches = new Map();
   // Follow mode state (see "follow mode" below); declared early for frame().
-  const follow = { on: false, want: false, heading: null, accuracy: null, calibrate: false, pose: null, trueNorth: false, unavailable: false, lastSample: 0, request: 0 };
+  const follow = { on: false, want: false, heading: null, accuracy: null, calibrate: false, pose: null, trueNorth: false, unavailable: false, lastSample: 0, request: 0, expiry: null };
   let spotAz = null;
   const message = (el, text, tone = "") => {
     if (el.textContent !== text) el.textContent = text;
@@ -1102,6 +1102,8 @@
   const wrap360 = (x) => ((x % 360) + 360) % 360,
     wrap180 = (x) => ((((x + 180) % 360) + 360) % 360) - 180;
   function clearHeading(resetDome = true) {
+    if (follow.expiry !== null) clearTimeout(follow.expiry);
+    follow.expiry = null;
     follow.heading = null;
     follow.accuracy = null;
     follow.pose = null;
@@ -1246,6 +1248,12 @@
       // A quarter of the way toward each reading, along the shorter way round.
       follow.heading = first ? heading : wrap360(previous + 0.25 * wrap180(heading - previous));
       follow.lastSample = s.timestamp;
+      const measuredAt = s.timestamp;
+      follow.expiry = setTimeout(() => {
+        if (!follow.on || follow.lastSample !== measuredAt) return;
+        clearHeading();
+        frame(); renderFollow(); renderTurn();
+      }, Math.max(1, 1501 - sampleAge));
       dome.turn(follow.heading);
     }
     if (follow.heading === null && follow.pose !== "upright") dome.turn(0);
