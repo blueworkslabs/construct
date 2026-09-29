@@ -83,14 +83,16 @@ def web():
 def scroll(direction,distance=None):
  dialogs=[n for n in nodes() if n.get('class')=='android.app.AlertDialog' and visible(n)]
  # Scroll in the padding, not across the rewind range or a canvas hit target.
- x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=x1+12;lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
+ x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=min(x1+72,x2-24);lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
  if distance is not None:lo=hi-max(24,min(hi-lo,round(distance)))
- adb('shell','input','swipe',str(x),str(hi if direction=='down' else lo),str(x),str(lo if direction=='down' else hi),'300');time.sleep(.35)
+ ui._device.swipe(x,hi if direction=='down' else lo,x,lo if direction=='down' else hi,duration=.3);time.sleep(.35)
 def reveal(match):
  """First visible node whose text satisfies match (a string prefix or predicate), scrolling the module page."""
  test=match if callable(match) else (lambda t:t.startswith(match))
+ deadline=time.monotonic()+60
  for direction in ('up','down'):
   for _ in range(24):
+   if time.monotonic()>deadline:raise RuntimeError('Module control scroll timed out: '+str(match))
    viewport=web()
    hits=[n for n in nodes() if test(text_of(n)) and visible(n) and n.get('package')=='dev.construct.runtime' and bounds(n)[1]>=viewport[1] and bounds(n)[3]<=viewport[3]]
    if hits:
@@ -202,8 +204,11 @@ def follow_checks():
  reach_text('Facing north · compass');full_dome();capture('follow-north');follow_sensors('watching',1)
  inject('0:0:9.80665','-50:0:-20');reach_text('Facing east · compass');full_dome();capture('follow-east')
  click(lambda t:t.startswith('Long March 4B rocket stage'))
- reach_text('Ahead of you');capture('follow-pointing');click(lambda t:t=='Clear')
- done('Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and ahead-of-you guidance')
+ # The fixture satellite moves while native navigation runs. Retain the actual
+ # relative instruction rather than requiring it to remain directly ahead.
+ receipt['followGuidance']=text_of(reveal(lambda t:bool(re.match(r'^(Ahead of you|Turn (left|right) about [0-9]+°|Behind you:)',t))))
+ save();capture('follow-pointing');click(lambda t:t=='Clear')
+ done('Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and relative turn guidance')
  inject('0:9.80665:0','-50:-20:0');reach_text('Hold the phone flat');capture('follow-upright')
  inject('0:0:9.80665','-50:0:-20');reach_text('Facing east · compass')
  follow_button();follow_sensors('off',0);full_dome();capture('follow-off')
