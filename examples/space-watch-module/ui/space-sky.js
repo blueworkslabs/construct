@@ -167,7 +167,26 @@ const SpaceSky = (() => {
     shadow: "In Earth’s shadow · not visible now",
     daylight: "Sky too bright to see it now",
     below: "Below your horizon",
+    faint: "Far too faint to see without a telescope",
   };
+  // The geostationary belt as seen from here: where a satellite parked above
+  // each longitude on the equator appears (spherical Earth; a fraction of a
+  // degree is plenty for a guide line). Points below the horizon are dropped.
+  function geoBelt(lat, lon) {
+    const R = 6378.137, G = 42164.0, f = rad(lat), out = [];
+    for (let d = -90; d <= 90; d += 2) {
+      const dl = rad(d),
+        // Satellite relative to the observer in local east/north/up.
+        x = G * Math.sin(dl),
+        yz = G * Math.cos(dl),
+        e = x,
+        n = -yz * Math.sin(f),
+        u = yz * Math.cos(f) - R,
+        el = deg(Math.atan2(u, Math.hypot(e, n)));
+      if (el >= -1) out.push({ az: ((deg(Math.atan2(e, n)) % 360) + 360) % 360, el, lon: ((lon + d + 540) % 360) - 180 });
+    }
+    return out;
+  }
   function clock(s) {
     s = Math.max(0, Math.round(s));
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -205,6 +224,7 @@ const SpaceSky = (() => {
     anchor,
     motion,
     STATE,
+    geoBelt,
     clock,
     ending,
     ago,

@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.4.1** (source candidate) is a signed HTML/CSS/JavaScript module for
+Space Watch **0.5.0** (source candidate) is a signed HTML/CSS/JavaScript module for
 host **API 0.14**; the published **0.2.14** runs on API 0.9 / alpha26 and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -11,7 +11,55 @@ Aircraft are a 10–100 km map question. Orbiting objects are seen from well ove
 1,000 km away and cross a 100 km circle in about 25 seconds, so they need a sky
 view, not a map.
 
-## Module 0.4.1: point at the sky (API 0.14, source candidate)
+## Module 0.5.0: data mirror and layers (API 0.14, source candidate)
+
+- **Data mirror.** Orbit lists and catalogues now come from
+  [space-data](https://github.com/blueworkslabs/space-data) at
+  `https://space-data.pages.dev`. That repository fetches CelesTrak's lists
+  once per 4 hours and serves them as the module's own compact rows. It follows
+  CelesTrak's usage policy, which asks services with many devices to cache.
+  - **Checks.** The module reads `v1/index.json` (data contract schema 1) and
+    rejects an index that is malformed, from the future or **older than 12
+    hours**. File names must match `<group>/<kind>-<n>.json` for their own group.
+    Every row passes the same checks as cached rows (`validRow`).
+  - **Fallback.** Any doubt makes the mirror rest for 30 minutes, and the
+    module asks CelesTrak directly, exactly as 0.4.x did. The back-off rules
+    for CelesTrak are unchanged.
+  - **Consent.** `net.http` gains the origin `https://space-data.pages.dev`, so
+    updating asks to approve it. Same-launch lookups stay on CelesTrak and
+    Wikipedia stays on request.
+  - **Privacy.** Unchanged: whole lists only, nothing about the place.
+- **Layers** (toolbar **Layers**, both off by default, remembered with the
+  other preferences). They add objects that are far too faint to see:
+  - **Navigation:** GPS, Galileo, GLONASS, BeiDou, QZSS, NavIC and augmentation
+    satellites, about 20,000 km up, drawn as small squares. The spot card names
+    the constellation and operator. Wikipedia opens the constellation's article.
+  - **Geostationary:** communication, TV and weather satellites 35,786 km
+    above the equator, drawn as small diamonds. The **geostationary belt** is a
+    dotted line: seen from Berlin it arcs across the south, highest about 30°
+    up. The spot card says which longitude a satellite is parked above (e.g.
+    Astra at 19.2°E) and that dishes aimed at it point that way. It also says
+    that it stays put.
+  - Layer objects are selectable on the dome (naked-eye objects win ties) and
+    from **List them** under each layer's summary, e.g. "31 navigation
+    satellites above you: 12 BeiDou, 9 Galileo, 6 GPS, 4 GLONASS". Pointing
+    mode guides to them and shows them in the viewfinder.
+  - They never count as "visible". Their state reads "Far too faint to see
+    without a telescope", and passes are not planned for them.
+  - Layers load only from the mirror (no CelesTrak fallback) while switched
+    on. They are too large for `storage.kv`, so each open downloads them
+    again: about 40 KB (navigation) and 120 KB (geostationary).
+- **Synthetic Space Watch** serves a synthetic mirror (dataset
+  `20260928T1700Z`) with the captured lists plus 172 navigation and 190
+  geostationary satellites. `?mirror=off` shows the CelesTrak fallback, and
+  `?celestrak=503` still shows the error path.
+
+Browser preview of Synthetic Space Watch with both layers (desktop Chromium, not Android):
+
+![Both layers: navigation squares, the geostationary belt in the south](images/space-watch-0.5.0/layers-dome.jpg)
+![Astra 1KR selected: parked above 19°E, where dishes point](images/space-watch-0.5.0/layers-astra.jpg)
+
+## Module 0.4.1: point at the sky (API 0.14)
 
 Raise the phone like a camera while **Follow** is on, and the dome gives way to
 a **pointing view**: a drawn viewfinder (no camera image) centred on where the

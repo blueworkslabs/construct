@@ -83,7 +83,7 @@ const SpaceOrbit = (() => {
       MEAN_MOTION_DDOT: r[12],
     });
   }
-  function rows(list, check = compact) {
+  function rows(list, check = compact, max = MAX_OBJECTS) {
     if (!Array.isArray(list)) return [];
     const seen = new Set(),
       out = [];
@@ -92,7 +92,7 @@ const SpaceOrbit = (() => {
       if (!r || seen.has(r[0])) continue;
       seen.add(r[0]);
       out.push(r);
-      if (out.length >= MAX_OBJECTS) break;
+      if (out.length >= max) break;
     }
     return out;
   }
@@ -198,6 +198,13 @@ const SpaceOrbit = (() => {
     }
     const p = pv && pv.position;
     return p && typeof p === "object" && Number.isFinite(p.x) ? p : null;
+  }
+  // Longitude (degrees, east positive) of the point below the object.
+  function subLon(o, ms) {
+    const p = position(o, ms);
+    if (!p) return null;
+    const lon = deg(S.eciToGeodetic(p, S.gstime(new Date(ms))).longitude);
+    return ((lon + 540) % 360) - 180;
   }
   // visible: sunlit against a dark sky and high enough to clear most horizons.
   function state(l, sunAlt) {
@@ -376,6 +383,7 @@ const SpaceOrbit = (() => {
     observer,
     look,
     position,
+    subLon,
     state,
     trail,
     passEnd,

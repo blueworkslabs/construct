@@ -34,6 +34,7 @@
           <p id="counts" class="chip">Loading…</p>
           <button id="red" aria-pressed="false">Red mode</button
           ><button id="follow" aria-pressed="false">Follow</button
+          ><button id="layers">Layers</button
           ><button id="area">Place</button>
         </div>
         <p id="follow-status" aria-live="off" hidden></p>
@@ -86,6 +87,17 @@
             </section>
             <h2 id="list-title">Overhead now</h2>
             <div id="list"></div>
+            <section id="layer-section" hidden>
+              <h2>Layers</h2>
+              <div id="layer-gnss" class="layer-block" hidden>
+                <p id="layer-gnss-summary"></p>
+                <details><summary>List them</summary><div id="layer-gnss-list" class="layer-list"></div></details>
+              </div>
+              <div id="layer-geo" class="layer-block" hidden>
+                <p id="layer-geo-summary"></p>
+                <details><summary>List them</summary><div id="layer-geo-list" class="layer-list"></div></details>
+              </div>
+            </section>
             <section id="plan">
               <h2>Visible passes · next 12 h</h2>
               <p id="plan-status" role="status"></p>
@@ -130,6 +142,13 @@
           used only while Follow is on and are never stored or sent.
         </p>
         <p>
+          Layers adds satellites that are far too faint to see: navigation
+          satellites (GPS, Galileo, GLONASS, BeiDou) as small squares and
+          geostationary satellites as small diamonds, with a dotted line for the
+          geostationary belt. Satellite dishes point at that belt. Select one to
+          see what it is, or point at it with Follow.
+        </p>
+        <p>
           The list covers CelesTrak’s ~150 brightest objects, not every
           satellite. Brightness varies and tumbling rocket stages flicker.
           Positions come from published orbits and can be off by seconds, more
@@ -143,7 +162,9 @@
           name, only when you tap Read on Wikipedia.
         </p>
         <p>
-          Orbits and catalog: CelesTrak (celestrak.org). Stars: Yale Bright
+          Orbits and catalog: CelesTrak (celestrak.org), through the Space Watch
+          data mirror (space-data.pages.dev, refreshed every 4 hours) with
+          CelesTrak itself as the fallback. Stars: Yale Bright
           Star Catalog. Positions: satellite.js and Astronomy Engine (MIT).
           Magnetic declination: World Magnetic Model WMM2025 (NOAA/BGS).
           Descriptions: Wikipedia, CC BY-SA 4.0.
@@ -189,6 +210,26 @@
           ><button type="submit" class="primary" id="show-sky">Show sky</button>
         </div>
       </form>
+    </dialog>
+    <dialog id="layers-dialog">
+      <h2>Layers</h2>
+      <p class="note">
+        Satellites you cannot see with your eyes, drawn fainter on the dome and
+        listed below the sky list. They load from the Space Watch data mirror
+        while switched on.
+      </p>
+      <label class="switch"
+        ><input id="layer-gnss-switch" type="checkbox" role="switch" /> Navigation:
+        GPS, Galileo, GLONASS and BeiDou, about 20,000 km up</label
+      >
+      <label class="switch"
+        ><input id="layer-geo-switch" type="checkbox" role="switch" /> Geostationary:
+        TV, weather and relay satellites parked 35,786 km above the equator</label
+      >
+      <p id="layers-status" class="note" role="status"></p>
+      <div class="actions">
+        <button id="close-layers" class="primary">Done</button>
+      </div>
     </dialog>
     <dialog id="info-dialog">
       <h2 id="info-title">Details</h2>
