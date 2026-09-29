@@ -85,10 +85,17 @@ def web():
  raise RuntimeError('No module WebView after native transition settled')
 def scroll(direction,distance=None):
  dialogs=[n for n in nodes() if n.get('class')=='android.app.AlertDialog' and visible(n)]
- # Scroll in the padding, not across the rewind range or a canvas hit target.
- x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=min(x1+72,x2-24);lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
+ # Use the main content column: edge/padding gestures can be ignored by
+ # Android/WebView. Keep the touch-down away from a range control.
+ x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=x1+(x2-x1)*3//4;lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
  if distance is not None:lo=hi-max(24,min(hi-lo,round(distance)))
- ui._device.swipe(x,hi if direction=='down' else lo,x,lo if direction=='down' else hi,duration=.15);time.sleep(.8)
+ start=hi if direction=='down' else lo;end=lo if direction=='down' else hi
+ for n in nodes():
+  if n.get('class')=='android.widget.SeekBar' and visible(n):
+   b=bounds(n)
+   if b[0]<=x<=b[2] and b[1]-12<=start<=b[3]+12:
+    start=max(y1+30,b[1]-30) if direction=='down' else min(y2-30,b[3]+30)
+ ui._device.swipe(x,start,x,end,duration=.25);time.sleep(.8)
 def reveal(match,directions=('up','down')):
  """First visible node whose text satisfies match (a string prefix or predicate), scrolling the module page."""
  test=match if callable(match) else (lambda t:t.startswith(match))
@@ -140,9 +147,9 @@ def center_point_guidance():
  # WebView can report clipped text bounds as a complete accessible node. Keep
  # the full visual instruction away from both viewport edges before capture.
  for _ in range(6):
-  n=reveal(visible_point_guidance,directions=('down','up'));b=bounds(n);w=web()
-  if b[1]>=w[1]+50 and b[3]<=w[3]-80:return text_of(n)
-  scroll('down' if b[3]>w[3]-80 else 'up',260)
+  n=reveal(lambda t:visible_point_guidance(t) or t=='The selected object is below your horizon now.',directions=('down','up'));b=bounds(n);w=web()
+  if b[1]>=w[1]+24 and b[3]<=w[3]-24:return text_of(n)
+  scroll('down' if b[3]>w[3]-24 else 'up',260)
  raise RuntimeError('Pointing instruction not centred for visual evidence')
 def reach_native(label,checkable=False):
  for attempt in range(24):
@@ -457,7 +464,7 @@ try:
  receipt['complete']=True
 
 except Exception as e:
- receipt['error']=str(e)
+ receipt['error']=str(e);save();print('FAIL:',str(e),flush=True)
  try:(run/'failure-nodes.json').write_text(json.dumps([dict(n.attrib) for n in nodes()],indent=2));capture('failure')
  except Exception:pass
  if a.follow:
