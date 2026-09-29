@@ -17,7 +17,9 @@ The compass-and-tilt grant is optional and starts off until explicitly enabled.
 3. Turn slowly through known directions. The dome should rotate and the wedge
    stay at the top. Headings use true north where WMM2025 correction is available;
    the displayed uncertainty is the sensor estimate, not a guaranteed error bound.
-4. Pick a visible star, planet or satellite and check the relative turn guidance.
+4. Select a visible satellite or train from the dome or list and check its
+   relative turn guidance. Stars and planets are visual reference anchors, not
+   selectable pointing cards.
    Confirm the physical target independently; predicted visibility is not proof
    of an observable object in current weather/light.
 5. Hold upright: flat-phone guidance replaces directional instructions. Return

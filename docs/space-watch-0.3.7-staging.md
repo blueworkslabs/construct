@@ -132,3 +132,10 @@ signatures and searches down first for later pass entries. The status-bar
 regression fails before and passes after the driver correction. This changes no
 module or host bytes and does not turn earlier incomplete receipts into passes.
 Original captures from each run remain tied to their own run ID.
+
+## Capture caveats
+
+The original Follow landscape and 200%-text captures include driver-induced selection handles
+on the Rewind label. The full rotated dome remains visible; this is not presented
+as an untouched-layout capture. No screenshot pixels have been edited. Emulator
+captures may retain portrait file orientation while the display is in landscape.
