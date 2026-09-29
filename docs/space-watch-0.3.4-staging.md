@@ -1,6 +1,6 @@
-# Space Watch 0.3.3 follow-mode staging
+# Space Watch 0.3.4 follow-mode staging
 
-Status: **superseded by 0.3.4; incomplete.** Not cleared for phone testing.
+Status: **Android acceptance pending.** Not yet cleared for phone testing.
 No merge, APK release or production-catalog change is included.
 
 ## Ownership and exact artifacts
@@ -11,10 +11,10 @@ pointing UI. The host owns consent, bounded sensor access and lifecycle.
 Optional `orientation.read` adds native opt-in, with no Android permission or
 new network origin. Existing module storage/network privacy boundaries remain.
 
-- Reviewed module source: `923e5fb` (review foundation `b59b222`, author base `4b604ae`).
-- Signed real/fixture packages: `8aadc397bc5543eee8b0c11c727f6b226160dd5f`.
-- Real module SHA-256: `7ec92078b6608a91fc5c31919ff64f48fcc225949e01b5f18dd3e94abcf3f4d5`.
-- Fixture SHA-256: `b53a17626aff142efb5cf9eac9e3eb95f1ff91381e435e61aa29161ffee59653`.
+- Reviewed module source: `128118f` (review foundation `b59b222`, author base `4b604ae`).
+- Signed real/fixture packages: `9ecfbf0aca044b0d449709df04f74a0d9a22f9f5`.
+- Real module SHA-256: `1ae50cccdbed685744c654bf56e30c4b72d80779e90637df5c0e7f5b89671132`.
+- Fixture SHA-256: `e57261f177e626228198f8feb705d0fdaba9bc766cca40168e749049f5a2ae77`.
 - Host alpha37 source: `4e7f534`.
 - Tested x86_64 APK SHA-256: `23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477`.
 
@@ -53,7 +53,7 @@ rotation and suppress live wedge/turn guidance; explicit Follow off restores nor
 
 ## Android acceptance
 
-Interrupted exact-package run `20260929T001514Z-space-84d5f2b3`, 23 required checks.
+Pending exact-package run `20260929T001903Z-space-950c63b2`, 23 required checks.
 Follow is exercised immediately after signed installation, including native
 compass denial/grant, north/east injection, relative pointing, upright/off,
 menu return, Quick Settings, explicit restart, landscape/200% text, revocation
@@ -78,12 +78,9 @@ and completion requires the expected gate count. This run intentionally omits
 `--follow` to exercise that default. [0.3.2 partial evidence](space-watch-0.3.2-staging.md)
 is also retained separately; its menu/focus checks are not substituted for this run.
 
-The first 0.3.3 attempt was interrupted after three gates when padding swipes
-failed to reach the Follow button. A platform scroll-to-start diagnostic restored
-the header; the driver now uses that action before Follow taps. Module/APK bytes
-are unchanged. Independent teardown succeeded.
-[Partial receipt](evidence/space-watch-0.3.3-attempt4-2026-09-29.json).
-
-The retry was superseded after two gates for the unavailable-correction redraw
-fix. No failed or incomplete run is acceptance.
-[Retry receipt](evidence/space-watch-0.3.3-attempt5-2026-09-29.json).
+Repeated readings without a supported WMM correction now update the full sky
+only on entry to that state, not at 10 Hz. A regression measures ten samples:
+ten redundant frames before the fix, none after. The paused message remains.
+Earlier [0.3.3 attempts](space-watch-0.3.3-staging.md) are retained separately.
+The driver uses a bounded platform scroll-to-start before Follow taps, followed
+by locating the actual button, avoiding the failed left-padding gesture.
