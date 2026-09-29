@@ -4,6 +4,8 @@ import re
 def scroll_signature(nodes):
     visible = []
     for node in nodes:
+        if node.get('package') not in (None, '', 'dev.construct.runtime'):
+            continue  # Fixed system bars are not part of the scrolling module.
         b = list(map(int, re.findall(r'-?\d+', node.get('bounds', ''))))
         if len(b) == 4 and b[2] > b[0] and b[3] - b[1] >= 8:
             visible.append(node)

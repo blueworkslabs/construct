@@ -87,11 +87,11 @@ def scroll(direction,distance=None):
  x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=min(x1+72,x2-24);lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
  if distance is not None:lo=hi-max(24,min(hi-lo,round(distance)))
  ui._device.swipe(x,hi if direction=='down' else lo,x,lo if direction=='down' else hi,duration=.15);time.sleep(.8)
-def reveal(match):
+def reveal(match,directions=('up','down')):
  """First visible node whose text satisfies match (a string prefix or predicate), scrolling the module page."""
  test=match if callable(match) else (lambda t:t.startswith(match))
  deadline=time.monotonic()+60
- for direction in ('up','down'):
+ for direction in directions:
   for _ in range(24):
    if time.monotonic()>deadline:raise RuntimeError('Module control scroll timed out: '+str(match))
    viewport=web()
@@ -112,7 +112,7 @@ def reveal(match):
     time.sleep(.5);scroll(direction)
     if before==scroll_signature(nodes()):break
  raise RuntimeError('Module control not reachable: '+str(match))
-def click(match):tap_node(reveal(match))
+def click(match,directions=('up','down')):tap_node(reveal(match,directions))
 def reach_text(fragment):return text_of(reveal(lambda t:fragment in t))
 def wiki_credit():
  contains('Wikipedia loaded',45)
@@ -283,7 +283,7 @@ try:
  reach_text('Now · ISS (Zarya)');scroll('down',500);capture('space-plan')
  reach_text('highest 1½ fists up in the SW')
  done('Visible-pass list includes the current ISS pass and pointing/max-height words')
- click(lambda t:'Guowang train' in t and ' · ' in t)
+ click(lambda t:'Guowang train' in t and ' · ' in t,directions=('down','up'))
  reach_text('Preview ');reach_text('At ');reach_text('9 satellites in a line');capture('space-train-preview')
  click(lambda t:t=='Details');reach_text('9 of 11 from this launch');reach_text('2026-221');capture('space-train-details')
  click('Read on Wikipedia');wiki_credit();capture('space-train-wikipedia')
@@ -333,7 +333,7 @@ try:
  reach_text('ISS (Zarya)');reach_text('International Space Station · crewed');capture('space-canvas-selected')
  done('Canvas touch selects the ISS, independently of the list')
  # This preview uses the cached train after the genuine process restart.
- click(lambda t:'Guowang train' in t and ' · ' in t);reach_text('Preview ')
+ click(lambda t:'Guowang train' in t and ' · ' in t,directions=('down','up'));reach_text('Preview ')
  adb('shell','settings','put','system','user_rotation','1');time.sleep(3)
  full_dome();capture('space-landscape');click('Details');reach_text('9 of 11 from this launch');reach_text('2026-221');capture('space-landscape-details');click(lambda t:t=='Close')
  done('Landscape train preview/details remain operable and cached batch identity survives restart')

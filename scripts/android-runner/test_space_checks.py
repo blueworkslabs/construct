@@ -16,5 +16,13 @@ class ScrollBoundaryTest(unittest.TestCase):
         b = dict(a, text='Guowang train · above you')
         self.assertNotEqual(scroll_signature([a]), scroll_signature([b]))
 
+    def test_fixed_system_bar_does_not_hide_unnamed_list_progress(self):
+        clock = {'package':'com.android.systemui','resource-id':'com.android.systemui:id/clock',
+                 'class':'android.widget.TextView','bounds':'[6,1][71,34]','text':'1:17'}
+        a = {'package':'dev.construct.runtime','class':'android.widget.ToggleButton',
+             'bounds':'[24,100][696,200]','text':'ISS · above you'}
+        b = dict(a,text='Guowang train · above you')
+        self.assertNotEqual(scroll_signature([clock,a]),scroll_signature([clock,b]))
+
 if __name__ == '__main__':
     unittest.main()
