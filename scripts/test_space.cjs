@@ -495,7 +495,7 @@ test("pointing: plain words match the screen, the arrow and the lock ring", () =
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
   assert.equal(m.id, "dev.construct.space-watch");
-  assert.equal(m.version, "0.4.0");
+  assert.equal(m.version, "0.4.1");
   assert.deepEqual(m.constructApi, { min: "0.14.0", target: "0.14.0" });
   const caps = Object.fromEntries(m.capabilities.map((c) => [c.id, c]));
   assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "orientation.read", "storage.kv"]);

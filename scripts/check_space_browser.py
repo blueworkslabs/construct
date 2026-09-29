@@ -78,6 +78,10 @@ with sync_playwright() as p:
   for _ in range(25):orient(sample)
  point(90,15)
  assert page.locator('#pointer-wrap').is_visible()
+ train.click()
+ assert page.locator('#rewind-label').inner_text()=='Now','pass selection while pointing stays live'
+ assert train.get_attribute('aria-pressed')=='false'
+ page.locator('#list button[data-id="29507"]').click()
  assert page.locator('#dome').is_hidden() and page.locator('#scrub').is_hidden()
  assert page.locator('#pointer').evaluate("c=>c.width>0 && c.getContext('2d').getImageData(0,0,c.width,c.height).data.some(v=>v!==0)")
  point(90,70,30)

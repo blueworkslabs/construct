@@ -621,6 +621,20 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   // A place without a true-north correction never shows a pointing view.
   r = rig(); await flush(8); await r.el('follow').onclick(); r.submit(85, 130);
   r.orient(hostSample(90, 20)); assert(r.el('pointer-wrap').hidden); assert.match(r.el('follow-status').textContent, /True-north correction unavailable/);
+  // Selecting another pass while already pointing must not trap a future sky
+  // behind the hidden rewind controls. Keep the selection, but point at Now.
+  r = rig({planScenario: 'repeated'}); await flush(8); r.tick(1); await flush();
+  await r.el('follow').onclick();
+  const pointingSample = hostSample(230, 14, 0, {declination: 5.2});
+  r.orient(pointingSample);
+  assert(!r.el('pointer-wrap').hidden);
+  const futurePass = r.el('plan-list').children[1]; assert(futurePass);
+  futurePass.click();
+  assert.equal(r.el('rewind-label').textContent, 'Now', 'active pointing cannot enter a future preview');
+  assert(!r.el('point-guide').textContent.includes('below your horizon'), 'currently visible ISS still has guidance');
+  assert(r.el('plan-list').children.every(b => b.attributes['aria-pressed'] === 'false'));
+  r.orient(pointingSample);
+  assert.equal(r.el('rewind-label').textContent, 'Now');
   // Menu visibility may arrive before the native window regains focus.
   r = rig({orientationErrors:[null,'RUN_PAUSED',null]}); await flush(8);
   await r.el('follow').onclick();r.visibility(false);r.visibility(true);await flush();

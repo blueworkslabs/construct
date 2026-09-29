@@ -640,10 +640,13 @@
   }
   // Show the dome shortly after the pass becomes visible; it then runs in real time.
   function previewPass(p) {
-    offset = Math.max(0, Math.round((P.previewTime(p, now()) - now()) / 1000));
+    // Pointing is live even when a pass is selected after the phone was raised.
+    // Keep the object selection, but never hide a future sky behind the viewfinder.
+    const live = follow.on && follow.pointing;
+    offset = live ? 0 : Math.max(0, Math.round((P.previewTime(p, now()) - now()) / 1000));
     $("rewind").value = "0";
     plan.shown = "";
-    select(p.id, true, p.startMs);
+    select(p.id, true, live ? null : p.startMs);
   }
   function listLine(x) {
     const where = `${K.dir16(x.l.az)} · ${K.height(x.l.el)}`,
@@ -1323,7 +1326,8 @@
     // point; a margin keeps the view from flickering at the threshold.
     follow.pointing = Number.isFinite(s.pitchDeg) && s.pitchDeg < (wasPointing ? 35 : 25);
     // Pointing is always about the sky now: leave rewind and pass previews.
-    if (follow.pointing && !wasPointing && offset !== 0) {
+    const leftPreview = follow.pointing && offset !== 0;
+    if (leftPreview) {
       selectedPass = null;
       offset = 0;
       $("rewind").value = "0";
@@ -1360,7 +1364,7 @@
     }
     if (follow.heading === null && follow.pose !== "upright") dome.turn(0);
     // Refresh wedge/spot validity on pose and reliability transitions only.
-    if ((previous === null) !== (follow.heading === null) || follow.pointing !== wasPointing) frame();
+    if ((previous === null) !== (follow.heading === null) || follow.pointing !== wasPointing || leftPreview) frame();
     renderFollow();
     renderTurn();
     renderPoint();

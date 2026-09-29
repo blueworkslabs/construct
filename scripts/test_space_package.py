@@ -18,7 +18,7 @@ class SpacePackageTest(unittest.TestCase):
         self.assertEqual(manifest['constructApi'], {'min': '0.14.0', 'target': '0.14.0'})
         net = next(c for c in manifest['capabilities'] if c['id'] == 'net.http')
         self.assertEqual(net['origins'], ['https://celestrak.org', 'https://en.wikipedia.org'])
-        self.assertIn('Space Watch · 0.4.0', z.read('ui/index.html').decode())
+        self.assertIn('Space Watch · '+json.loads(z.read('manifest.json'))['version'], z.read('ui/index.html').decode())
         synthetic = zipfile.ZipFile(io.BytesIO(fixture))
         html = synthetic.read('ui/index.html').decode()
         self.assertLess(html.index('synthetic-space.js'), html.index('app.js'))

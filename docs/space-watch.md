@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.4.0** (source candidate) is a signed HTML/CSS/JavaScript module for
+Space Watch **0.4.1** (source candidate) is a signed HTML/CSS/JavaScript module for
 host **API 0.14**; the published **0.2.14** runs on API 0.9 / alpha26 and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -11,7 +11,7 @@ Aircraft are a 10–100 km map question. Orbiting objects are seen from well ove
 1,000 km away and cross a 100 km circle in about 25 seconds, so they need a sky
 view, not a map.
 
-## Module 0.4.0: point at the sky (API 0.14, source candidate)
+## Module 0.4.1: point at the sky (API 0.14, source candidate)
 
 Raise the phone like a camera while **Follow** is on, and the dome gives way to
 a **pointing view**: a drawn viewfinder (no camera image) centred on where the
@@ -22,7 +22,8 @@ view says how to move the phone ("Move the phone 2 fists up and to the right.",
 the same way. Within 4° the ring turns solid: "On target. Look past the top of
 the phone." With nothing selected it names a bright object near the middle
 ("In the middle: Saturn."). Module-only; it uses the same `orientation.read`
-grant, stream and lifecycle as Follow.
+grant, stream and lifecycle as Follow. Selecting a future pass while pointing
+keeps the object selected but stays at Now; lower the phone to browse previews.
 
 - **Whole sky.** The host reports the rear-camera bearing while the phone is
   upright, but switches to `flat` (bearing of the screen's top edge) once the
