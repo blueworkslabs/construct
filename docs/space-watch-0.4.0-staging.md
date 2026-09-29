@@ -63,3 +63,12 @@ The driver now distinguishes full visual guidance from abbreviated announcements
 with a regression. The module and APK bytes are unchanged. After cancelling the
 runner, the emulator was explicitly stopped; the interrupted receipt is retained
 without rewriting its completion/teardown fields.
+
+A second unchanged-byte driver attempt, `20260929T104255Z-space-a72879d1`,
+reached 4/25 gates and timed out looking for directional text after the chosen
+rocket stage had set. Its captured “below your horizon” message was correct.
+The driver now reopens the fixture before the layout sequence to reset its
+advancing clock, then explicitly restarts Follow and reselects the target.
+The second run was interrupted during failure-evidence collection; its receipt
+records incomplete/stopped, and the emulator independently exited successfully
+with exit 0 and PID 0. Neither attempt clears 0.4.0 or 0.4.1 for phone testing.

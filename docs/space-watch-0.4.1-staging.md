@@ -48,11 +48,13 @@ real-world pointing accuracy or validate the physical feel of the 4° lock.
 
 ## Android acceptance
 
-A fresh corrected-driver run is pending. Required count: **25**.
+Run `20260929T105608Z-space-02b65b18` is in progress. Required count: **25**.
 Expanded coverage includes native high-elevation (60°, host flat pose), rolled
 pointing, landscape and 200% text alongside existing grants, Follow lifecycle,
 pass/train/lookup, real live download and offline-cache gates. Final receipt,
 original captures and teardown result will be added only after completion.
+The fixture is reopened before pointing layout checks to reset its advancing
+clock; Follow is explicitly started and the satellite reselected.
 
 [Phone checklist](space-watch-0.4.1-hardware-check.md).
 
