@@ -28,7 +28,7 @@ from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from keyboard_prompt import gboard_contacts_denial
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
-from space_checks import scroll_signature
+from space_checks import scroll_signature,visible_point_guidance
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'fixtureSha256':a.fixture_sha,'version':a.version,
  'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{},'plannedChecks':25 if a.follow else 16,'followRequired':a.follow}
 started=False
@@ -235,19 +235,20 @@ def follow_checks():
  # Raised like a camera (upright, axis level): the pointing view replaces the dome.
  inject('0:9.80665:0','-50:-20:0');reach_text('Pointing ')
  click(lambda t:t.startswith('Long March 4B rocket stage'))
- receipt['pointGuidance']=text_of(reveal(lambda t:bool(re.match(r'^(On target\.|Move the phone |Turn around: )',t))))
+ receipt['pointGuidance']=text_of(reveal(visible_point_guidance))
  save();full_dome('Pointing view:');capture('pointing-view')
  inject_point(85,60);reach_text('Pointing east, 6 fists up')
  full_dome('Pointing view:');capture('pointing-high')
  inject_point(85,60,35);reach_text('Pointing east, 6 fists up')
  time.sleep(2);full_dome('Pointing view:');capture('pointing-rolled')
- receipt['pointHighGuidance']=text_of(reveal(lambda t:bool(re.match(r'^(On target\.|Move the phone |Turn around: )',t))));save()
+ receipt['pointHighGuidance']=text_of(reveal(visible_point_guidance));save()
  done('High 60-degree camera aim stays in pointing through host flat pose; rolled view and screen-relative guidance remain available')
  adb('shell','settings','put','system','user_rotation','1');time.sleep(3)
  reach_text('Pointing east, 6 fists up');full_dome('Pointing view:');capture('pointing-landscape')
+ reveal(visible_point_guidance);capture('pointing-landscape-guidance')
  adb('shell','settings','put','system','user_rotation','0');adb('shell','settings','put','system','font_scale','2.0');time.sleep(3)
  reach_text('Pointing east, 6 fists up');full_dome('Pointing view:');capture('pointing-large-text')
- reveal(lambda t:bool(re.match(r'^(On target\.|Move the phone |Turn around: )',t)));capture('pointing-large-guidance')
+ reveal(visible_point_guidance);capture('pointing-large-guidance')
  adb('shell','settings','put','system','font_scale','1.0');time.sleep(2)
  done('Pointing canvas and guidance stay reachable in landscape and 200% Android text')
  click(lambda t:t=='Clear')

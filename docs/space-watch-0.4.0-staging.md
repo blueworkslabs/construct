@@ -36,7 +36,7 @@ permission/live/offline gates remain separate from fixture checks.
   through 90° and rolled poses near ±180° (1,760 combinations).
 - 22 unit groups, controller tests, real-browser DOM/canvas checks including
   pointing recovery/expiry and portrait/landscape/2x layout, 36 Python package
-  tests, 96 runner-helper tests and the architecture check pass.
+  tests, 97 runner-helper tests and the architecture check pass.
 - Stale documentation excluding upright pointing was corrected.
 
 Review and fixes assisted by Codex. Automated accessibility assertions do not
@@ -45,10 +45,21 @@ real-world pointing accuracy or validate the physical feel of the 4° lock.
 
 ## Android acceptance
 
-Run `20260929T103325Z-space-e29494d6` is in progress. Required count: **25**.
+A fresh corrected-driver run is pending. Required count: **25**.
 Expanded coverage includes native high-elevation (60°, host flat pose), rolled
 pointing, landscape and 200% text alongside existing grants, Follow lifecycle,
 pass/train/lookup, real live download and offline-cache gates. Final receipt,
 original captures and teardown result will be added only after completion.
 
 [Phone checklist](space-watch-0.4.0-hardware-check.md).
+
+## Retained driver attempt
+
+`20260929T103325Z-space-e29494d6` was stopped after the new layout step.
+The raw receipt recorded five gates, but the fifth matched the hidden spoken
+announcement instead of scrolling the visible large-text instruction into view.
+It is **not accepted layout evidence** and is not combined with a later run.
+The driver now distinguishes full visual guidance from abbreviated announcements,
+with a regression. The module and APK bytes are unchanged. After cancelling the
+runner, the emulator was explicitly stopped; the interrupted receipt is retained
+without rewriting its completion/teardown fields.

@@ -19,3 +19,8 @@ def scroll_signature(nodes):
     # Inside a long list with no named controls, distinguish successive rows.
     return ('rows', tuple((n.get('text') or n.get('content-desc'), n.get('bounds'))
                           for n in visible if n.get('text') or n.get('content-desc')))
+
+
+def visible_point_guidance(text):
+    """Match the full visual instruction, not the abbreviated live-region text."""
+    return bool(re.match(r'^(On target\. Look|Move the phone [0-9]|Turn around: it is behind you,)', text))

@@ -1,5 +1,5 @@
 import unittest
-from space_checks import scroll_signature
+from space_checks import scroll_signature, visible_point_guidance
 
 class ScrollBoundaryTest(unittest.TestCase):
     def test_dynamic_sky_text_does_not_hide_top_boundary(self):
@@ -23,6 +23,16 @@ class ScrollBoundaryTest(unittest.TestCase):
              'bounds':'[24,100][696,200]','text':'ISS · above you'}
         b = dict(a,text='Guowang train · above you')
         self.assertNotEqual(scroll_signature([clock,a]),scroll_signature([clock,b]))
+
+class PointingGuidanceTest(unittest.TestCase):
+    def test_distinguishes_visual_guidance_from_hidden_announcement(self):
+        for text in ['Move the phone 2 fists up.', 'Move the phone 1½ fists down and to the left.',
+                     'On target. Look past the top of the phone.',
+                     'Turn around: it is behind you, 3 fists up.']:
+            self.assertTrue(visible_point_guidance(text), text)
+        for text in ['Move the phone up.', 'On target.', 'Turn around: it is behind you.',
+                     'Waiting for the compass…']:
+            self.assertFalse(visible_point_guidance(text), text)
 
 if __name__ == '__main__':
     unittest.main()
