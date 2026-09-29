@@ -7,7 +7,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 ROOT=Path(__file__).resolve().parents[1]
 def stub():
  text=(ROOT/'scripts/space-fixture/synthetic-space.js').read_text()
- for marker,name in [('ELEMENTS','elements'),('SATCAT','satcat'),('RECENT','recent'),('RECENT_SATCAT','recent-satcat')]:
+ for marker,name in [('ELEMENTS','elements'),('SATCAT','satcat'),('RECENT','recent'),('RECENT_SATCAT','recent-satcat'),('GNSS','gnss'),('GNSS_SATCAT','gnss-satcat'),('GEO','geo'),('GEO_SATCAT','geo-satcat')]:
   text=text.replace('/*'+marker+'*/ null',(ROOT/'scripts/space-fixture'/(name+'.json')).read_text())
  return text
 with sync_playwright() as p:
@@ -111,6 +111,36 @@ with sync_playwright() as p:
   page.evaluate('(scale)=>document.documentElement.style.fontSize=(16*scale)+"px"',scale)
   assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'Page horizontal overflow'
   page.locator('#details').click();page.locator('#wiki').click();page.locator('#close-info').click()
+ # Layers, wrapped toolbar and real-DOM responsive dialogs.
+ page.set_viewport_size({'width':393,'height':850})
+ page.evaluate('document.documentElement.style.fontSize="16px"')
+ page.locator('#now').click()
+ page.locator('#layers').click()
+ page.locator('#layer-gnss-switch').check()
+ page.locator('#layer-geo-switch').check()
+ page.wait_for_function("document.querySelector('#layer-geo-list button[data-id=\"29055\"]')")
+ page.locator('#close-layers').click()
+ page.locator('#layer-geo summary').click()
+ page.locator('#layer-geo-list button[data-id="29055"]').click()
+ assert page.locator('#spot-title').inner_text()=='ASTRA 1KR'
+ assert page.locator('#spot-head').inner_text()=='SOUTH · 3 fists up'
+ for width,height,scale in [(393,850,1),(850,393,1),(393,850,2)]:
+  page.set_viewport_size({'width':width,'height':height})
+  page.evaluate('(scale)=>document.documentElement.style.fontSize=(16*scale)+"px"',scale)
+  assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'Layer horizontal overflow'
+  page.locator('#layers').click()
+  assert page.locator('#layer-gnss-switch').is_checked()
+  assert page.locator('#layer-geo-switch').is_checked()
+  page.locator('#close-layers').click()
+  page.locator('#details').click()
+  assert 'ASTRA 1KR' in page.locator('#info-title').inner_text()
+  page.locator('#close-info').click()
+ page.locator('#layers').click()
+ page.locator('#layer-geo-switch').uncheck()
+ page.locator('#close-layers').click()
+ assert page.locator('#spot').is_hidden()
+ assert page.locator('#layer-geo').is_hidden()
+ assert page.locator('#layer-gnss').is_visible()
  # Actual canvas render and hit testing: a remote bead maps to its train.
  assert page.evaluate("""() => {
    const canvas=document.createElement('canvas');canvas.style.width='320px';document.body.append(canvas);

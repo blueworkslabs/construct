@@ -41,7 +41,7 @@ function mirrorFiles({built = '2026-09-28T17:00:00Z', dataset = '20260928T1700Z'
   return files;
 }
 const WIKI = JSON.stringify({query: {pages: [{title: 'Long March 4B', extract: 'The Long March 4B is a Chinese launch vehicle.', fullurl: 'https://en.wikipedia.org/wiki/Long_March_4B'}]}});
-function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, recentBody = RECENT, recentSatcatBody = RECENT_SATCAT, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false, planScenario = false, orientError = null, pendingOrientation = false, orientationErrors = [], mirror = null} = {}) {
+function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, recentBody = RECENT, recentSatcatBody = RECENT_SATCAT, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false, planScenario = false, orientError = null, pendingOrientation = false, orientationErrors = [], mirror = null, mirrorError = null} = {}) {
   const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [], heldOrientation = [], followRetries = [], expiryTimers = new Set();
   const storage = structuredClone(saved);
   let now = clock;
@@ -92,8 +92,10 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
         const u = params.url;
         if (netError) throw Object.assign(new Error(netError), {code: netError});
         if (u.startsWith(MIRROR)) {
-          const body = mirror && mirror[u];
-          return body ? {status: 200, text: JSON.stringify(body)} : {status: 404};
+          if (mirrorError) throw Object.assign(new Error(mirrorError), {code: mirrorError});
+          const body = mirror && mirror[u], result = body ? {status: 200, text: JSON.stringify(body)} : {status: 404};
+          if (typeof pendingHttp === 'function' && pendingHttp(u)) return new Promise(resolve => held.push(() => resolve(result)));
+          return result;
         }
         const result = u === GP ? (gpStatus === 200 ? {status: 200, text: elementsBody} : {status: gpStatus})
           : u === SC ? (satcatStatus === 200 ? {status: 200, text: SATCAT} : {status: satcatStatus})
@@ -711,6 +713,21 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   r = rig({mirror: mirrorFiles({tamper: (f, d) => { f[`${MIRROR}${d}/last-30-days/elements-1.json`].rows[0][2] = null; }})}); await flush(8);
   assert.deepEqual(r.http(), [RGP, RSC]);
 
+  // Native origin denial must fall back without treating it as a pause.
+  r = rig({mirror: mirrorFiles(), mirrorError: 'HTTP_SOURCE'}); await flush(8);
+  assert.deepEqual(r.http(), [GP, SC, RGP, RSC]);
+  assert.equal(r.el('counts').textContent, baseCounts);
+  // Empty and duplicate-row mirror snapshots cannot erase or duplicate the sky.
+  for (const kind of ['empty-recent', 'duplicate-visual']) {
+    r = rig({mirror: mirrorFiles({tamper: (f, d) => {
+      const key = kind === 'empty-recent' ? 'last-30-days' : 'visual';
+      const rows = f[`${MIRROR}${d}/${key}/elements-1.json`].rows;
+      if (kind === 'empty-recent') rows.length = 0; else rows[1] = rows[0];
+    }})}); await flush(8);
+    assert(r.http().includes(kind === 'empty-recent' ? RGP : GP), kind + ' falls back');
+    assert.equal(r.el('counts').textContent, baseCounts);
+  }
+
   // ---- 0.5.0: layers ----
   r = rig({mirror: mirrorFiles()}); await flush(8);
   assert(r.el('layer-section').hidden, 'layers are off by default');
@@ -769,6 +786,19 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   r.el('layers').click(); r.el('layer-geo-switch').checked = true; r.el('layer-geo-switch').onchange(); await flush(4);
   assert.match(r.el('layer-geo-summary').textContent, /come from the Space Watch data mirror, which is not reachable right now/);
   assert.equal(r.el('counts').textContent, baseCounts);
+
+  // Repeated toggles share a pending layer request, and a pause does not
+  // impose the network-failure retry delay on an uncompleted download.
+  r = rig({mirror: mirrorFiles(), pendingHttp: u => u.includes('/gnss/')}); await flush(8);
+  r.el('layer-gnss-switch').checked = true; r.el('layer-gnss-switch').onchange(); await flush();
+  r.el('layer-gnss-switch').checked = false; r.el('layer-gnss-switch').onchange();
+  r.el('layer-gnss-switch').checked = true; r.el('layer-gnss-switch').onchange(); await flush();
+  assert.equal(r.mirrorHttp().filter(u => u.endsWith('gnss/elements-1.json')).length, 1, 'only one layer request in flight');
+  r.visibility(false); r.finishHttp(); await flush();
+  r.visibility(true); await flush();
+  assert.equal(r.mirrorHttp().filter(u => u.endsWith('gnss/elements-1.json')).length, 2, 'pause retries on return, not after 15 minutes');
+  r.finishHttp(); await flush(); r.finishHttp(); await flush(6);
+  assert(r.dome().layers.length > 10, 'retried layer completes');
 
   console.log('Space Watch app checks passed: start, privacy (no coordinates in URLs or storage), list selection, spot words, details, Wikipedia on request, rewind, red mode, visible passes and preview, trains (plan, details, cache, optional failure), cache reuse/expiry/torn cache, CelesTrak back-off, location fallbacks, paused downloads and follow mode (true north, smoothing, guidance, calibration, pause, denial), pointing (camera aim to the zenith, words, lock, announcements, rewind exit), the space-data mirror (fresh, stale, bad row, rest) and layers (navigation, geostationary belt, selection, details, persistence, mirror down).');
 })().catch(error => { console.error(error); process.exitCode = 1; });

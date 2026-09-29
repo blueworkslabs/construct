@@ -255,15 +255,16 @@
     const idx = await mirrorIndex(t),
       files = idx && idx.groups[group] && idx.groups[group][kind];
     if (!files) return null;
-    const out = [];
+    const out = [], seen = new Set();
     try {
       for (const url of files) {
         const r = await getJson(url),
           list = r.status === 200 ? C.parseMirrorFile(r.text, kind) : null;
-        if (!list) throw new Error("mirror file");
+        if (!list || !list.length) throw new Error("mirror file");
         for (const x of list) {
           const v = check(x);
-          if (!v || out.length >= max) throw new Error("mirror row");
+          if (!v || seen.has(v[0]) || out.length >= max) throw new Error("mirror row");
+          seen.add(v[0]);
           out.push(v);
         }
       }
@@ -433,23 +434,34 @@
   // are extras, and CelesTrak's big lists are what the mirror is for.
   async function fetchLayer(name, t) {
     const L = layers[name];
-    L.tried = t;
-    const rows = await mirrorRows(t, name, "elements", O.validRow, 5000);
-    if (!rows || !rows.length) {
-      L.note = `${LAYER_NAMES[name]} satellites come from the Space Watch data mirror, which is not reachable right now. Retrying in a while.`;
-      renderLayers();
-      return;
+    if (L.loading) return;
+    const previous = L.tried;
+    L.loading = true;
+    try {
+      L.tried = t;
+      const rows = await mirrorRows(t, name, "elements", O.validRow, 5000);
+      if (!rows || !rows.length) {
+        L.note = `${LAYER_NAMES[name]} satellites come from the Space Watch data mirror, which is not reachable right now. Retrying in a while.`;
+        renderLayers();
+        return;
+      }
+      const cat = await mirrorRows(t, name, "satcat", C.validRow, 5000);
+      L.objects = O.build(rows);
+      L.byId = new Map(L.objects.map((o) => [o.id, o]));
+      L.satcat = cat ? C.index(cat) : new Map();
+      L.at = t;
+      L.note = "";
+      layerSky[name] = null;
+      for (const o of L.objects) layerDescribed.delete(o.id);
+      frame();
+    } catch (e) {
+      if (e.code === "RUN_PAUSED") L.tried = previous;
+      throw e;
+    } finally {
+      L.loading = false;
     }
-    const cat = await mirrorRows(t, name, "satcat", C.validRow, 5000);
-    L.objects = O.build(rows);
-    L.byId = new Map(L.objects.map((o) => [o.id, o]));
-    L.satcat = cat ? C.index(cat) : new Map();
-    L.at = t;
-    L.note = "";
-    layerSky[name] = null;
-    for (const o of L.objects) layerDescribed.delete(o.id);
-    frame();
   }
+
   async function refreshData(manual = false) {
     if (fetching || !active) return;
     const t = now(),
