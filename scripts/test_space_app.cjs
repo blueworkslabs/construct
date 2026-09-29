@@ -84,7 +84,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
   const context = vm.createContext(sandbox);
   const scripts = ['vendor/satellite.min.js', 'vendor/astronomy.min.js', 'space-stars.js', 'space-orbit.js', 'space-sky.js', 'space-catalog.js', 'space-plan.js', 'space-magnetic.js', 'space-dome.js', 'app.js'];
   for (const f of scripts) {
-    if (f === 'app.js') vm.runInContext('SpaceDome = class extends SpaceDome { constructor(c, cb) { super(c, cb); window.selectObject = cb; } set(s) { window.domeSnapshot = s; } turn(h) { window.domeRotation = h; } }', context);
+    if (f === 'app.js') vm.runInContext('SpaceDome = class extends SpaceDome { constructor(c, cb) { super(c, cb); window.selectObject = cb; } set(s) { window.domeSnapshot = s; window.domeFrames = (window.domeFrames || 0) + 1; } turn(h) { window.domeRotation = h; } }', context);
     vm.runInContext(fs.readFileSync(root + f, 'utf8'), context, {filename: f});
     if (f === 'space-plan.js' && planScenario) vm.runInContext(`SpacePlan.darkRanges = (from,to)=>[[from,to]]; SpacePlan.passes = (o,ob,ranges)=> { const t=${clock} + 12.25*3600000; return o.id===25544 && ranges.some(([a,b])=>a<=t&&t<=b) ? [{startMs:t,endMs:t+120000,maxMs:t+60000,startAz:90,endAz:180,maxAz:135,startEl:10,endEl:10,maxEl:20,startReason:'rises',endReason:'sets'}] : []; };`,context);
     if (f === 'space-plan.js' && planScenario === 'repeated') vm.runInContext(`SpacePlan.passes = (o)=>o.id===25544 ? [60000,600000].map(dt=>({startMs:${clock}+dt,endMs:${clock}+dt+120000,maxMs:${clock}+dt+60000,startAz:90,endAz:180,maxAz:135,startEl:10,endEl:10,maxEl:20,startReason:'rises',endReason:'sets'})) : [];`,context);
@@ -100,6 +100,7 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
     visibility: visible => events.constructvisibilitychange({detail: {visible}}),
     orient: detail => events.constructorientation({detail}),
     rotation: () => sandbox.domeRotation,
+    frames: () => sandbox.domeFrames,
     submit: (lat, lon) => { el('latitude').value = lat; el('longitude').value = lon; el('area-form').onsubmit({preventDefault() {}}); }};
 }
 const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.(meta|[0-7])|(satcat|recent)\.(meta|[0-3]))$/.test(key);
@@ -535,6 +536,9 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   r.submit(90, 0); r.orient(sample);
   assert.equal(r.rotation(), 0); assert.equal(r.dome().follow, false);
   assert(r.el('spot-turn').hidden); assert.match(r.el('follow-status').textContent, /True-north correction unavailable/);
+  const pausedFrames = r.frames();
+  for (let i=0;i<10;i++) r.orient(sample);
+  assert.equal(r.frames(), pausedFrames, 'unavailable correction does not recompute sky at sensor rate');
   // Menu visibility may arrive before the native window regains focus.
   r = rig({orientationErrors:[null,'RUN_PAUSED',null]}); await flush(8);
   await r.el('follow').onclick();r.visibility(false);r.visibility(true);await flush();

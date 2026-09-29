@@ -1218,6 +1218,7 @@
     }
     if (!follow.on || !active || !place) return;
     const previous = Date.now() - follow.lastSample > 1500 ? null : follow.heading;
+    const wasUnavailable = follow.unavailable;
     clearHeading(false);
     follow.pose = s.pose === "flat" ? "flat" : "upright";
     follow.calibrate = s.calibrate === true;
@@ -1228,7 +1229,8 @@
       follow.unavailable = dec === null;
       if (dec === null) {
         dome.turn(0);
-        frame(); renderFollow(); renderTurn();
+        if (!wasUnavailable) frame();
+        renderFollow(); renderTurn();
         return;
       }
       const heading = wrap360(s.azimuthDeg + dec);
