@@ -1,0 +1,53 @@
+{
+  "complete": false,
+  "stopped": true,
+  "checks": [
+    "Signed fixture opens its computed dome and equivalent overhead list",
+    "Visible-pass list includes the current ISS pass and pointing/max-height words",
+    "Future Guowang pass previews on the dome with train details and live Wikipedia attribution",
+    "Future preview survives native menu pause and Back to now restores the live sky",
+    "Fixture stage list selection gives EAST, 1\u00bd fists up and Saturn anchor",
+    "Real same-launch lookup and explicit Wikipedia request render attributed results",
+    "Red mode and native touch rewind update the selected-object view",
+    "Red preference survives a genuine process restart",
+    "Canvas touch selects the ISS, independently of the list",
+    "Landscape train preview/details remain operable and cached batch identity survives restart",
+    "200% Android text: train preview, scrolling details and close controls remain operable",
+    "Native menu pause/resume restores the sky",
+    "Follow denied without native orientation grant; static sky remains usable",
+    "Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and ahead-of-you guidance",
+    "Upright pose suspends Follow guidance; explicit off returns north-up and releases native listener"
+  ],
+  "error": "Module control not reachable: <function reach_text.<locals>.<lambda> at 0x750c4bb8e980>",
+  "apkSha256": "23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477",
+  "moduleSha256": "8ba399c769f72f1a25cdd4b166a933096303ccb5c575690b93589d232d687385",
+  "fixtureSha256": "824b25f961347041a017b962af30de3965eb2f3952ca68dd65069ed184840e12",
+  "version": "0.3.1",
+  "followNativeConnections": {
+    "denied": 0,
+    "watching": 1,
+    "off": 0,
+    "menu": 0
+  },
+  "followListenerWaitSeconds": {
+    "denied": 0.087,
+    "watching": 0.066,
+    "off": 0.073,
+    "menu": 0.103
+  },
+  "runId": "20260928T234407Z-space-8d070276",
+  "plannedChecks": 23,
+  "packageCommit": "e2e7a1d8cb2d6e8906a7cf1d37960ce6ba1ed2cf",
+  "runnerCommit": "80a78dcee3571df2206766383c3c8418ed13aa4e",
+  "emulatorTeardown": {
+    "activeState": "inactive",
+    "mainPid": 0,
+    "result": "core-dump",
+    "signal": "SIGABRT (6)"
+  },
+  "limitations": [
+    "Incomplete 15/23; menu-return watch denied during native focus transition",
+    "Stopped is not a clean-exit claim; emulator aborted during teardown",
+    "Superseded by 0.3.2; no hardware clearance"
+  ]
+}

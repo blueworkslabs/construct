@@ -1,6 +1,6 @@
 # Space Watch 0.3.1 follow-mode staging
 
-Status: **Android acceptance pending.** Not yet cleared for phone testing.
+Status: **superseded by 0.3.2; incomplete, 15/23 checks passed.** Not cleared for phone testing.
 No merge, APK release or production-catalog change is included.
 
 ## Ownership and exact artifacts
@@ -63,3 +63,15 @@ the clipped element's CSS minimum height as visible output; the corrected check
 verifies that it is absolutely positioned and fully clipped. Package assertions
 now name 0.3.1. The runner waits up to three seconds for asynchronous native
 listener transitions and records each wait. No failed gate is waived.
+
+## Retained incomplete run
+
+Run `20260928T234407Z-space-8d070276` passed the original twelve UI checks,
+Follow denial, north/east pointing, upright suspension and explicit off. Menu
+return then failed: the host correctly denied the watch with `RUN_PAUSED` while
+the native menu still held window focus. Version 0.3.2 adds a bounded, cancellable
+menu-return retry; no general background restart is introduced.
+
+The emulator is stopped, but teardown reported `SIGABRT` (exit signal 6), not a
+clean process exit. The receipt’s `stopped` flag only means the service is inactive.
+[Retained receipt](evidence/space-watch-0.3.1-staging-2026-09-28.json).
