@@ -46,7 +46,15 @@
               role="img"
               aria-label="Sky dome. Use the Overhead now list for the same objects as text."
             ></canvas>
-            <div class="scrub">
+            <div id="pointer-wrap" hidden>
+              <canvas
+                id="pointer"
+                role="img"
+                aria-label="Pointing view: the sky where the back of the phone points. The guidance below says where to move."
+              ></canvas>
+              <p id="point-guide" aria-live="off"></p>
+            </div>
+            <div id="scrub" class="scrub">
               <label for="rewind">Rewind</label
               ><input id="rewind" type="range" min="-300" max="0" step="10" value="0" /><span
                 id="rewind-label"
@@ -109,7 +117,11 @@
         </p>
         <p>
           Follow turns the dome with your phone: hold it flat, top pointing
-          where you face, and the green wedge shows your view. It needs
+          where you face, and the green wedge shows your view. Raise the phone
+          like a camera and it becomes a pointing view: the back of the phone
+          is the aim, and the words and arrow say where to move it until the
+          selected satellite sits in the ring. There is no camera image; the
+          view is drawn. It needs
           “Allow reading compass and tilt” in Construct’s Module access.
           Headings are corrected to true north with the World Magnetic Model.
           If that correction is unavailable, the sky stays north-up and pointing guidance pauses.
@@ -197,6 +209,7 @@
     <script src="space-plan.js"></script>
     <script src="space-magnetic.js"></script>
     <script src="space-dome.js"></script>
+    <script src="space-pointer.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

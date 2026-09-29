@@ -1,0 +1,245 @@
+{
+  "version": "0.4.1",
+  "scope": "Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy",
+  "complete": true,
+  "stopped": true,
+  "apkSha256": "23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477",
+  "moduleSha256": "10dcb4fc379af3606a32f227cafc68f1f77d98c01ab581724975b2eb7aad9e83",
+  "fixtureSha256": "d130aa79a5d9942cb764eafef3599628b02483e9dcdd35d88b169ce8de6a7b69",
+  "plannedChecks": 25,
+  "checks": [
+    "Signed fixture opens its computed dome and equivalent overhead list",
+    "Follow denied without native orientation grant; static sky remains usable",
+    "Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and relative turn guidance",
+    "High 60-degree camera aim stays in pointing through host flat pose; rolled view and screen-relative guidance remain available",
+    "Pointing canvas and guidance stay reachable in landscape and 200% Android text",
+    "Raised phone switches to the pointing view with plain guidance; flat returns the dome; explicit off returns north-up and releases native listener",
+    "Native menu pause releases compass and explicit menu return re-establishes Follow",
+    "Quick Settings ends Follow, explains focus loss, and requires an explicit tap to restart",
+    "Follow remains operable with display rotation and 200% Android text",
+    "Revoked orientation cannot restart Follow; a fresh process starts with Follow off",
+    "Visible-pass list includes the current ISS pass and pointing/max-height words",
+    "Future Guowang pass previews on the dome with train details and live Wikipedia attribution",
+    "Future preview survives native menu pause and Back to now restores the live sky",
+    "Fixture stage list selection gives EAST, 1½ fists up and Saturn anchor",
+    "Real same-launch lookup and explicit Wikipedia request render attributed results",
+    "Red mode and native touch rewind update the selected-object view",
+    "Red preference survives a genuine process restart",
+    "Canvas touch selects the ISS, independently of the list",
+    "Landscape train preview/details remain operable and cached batch identity survives restart",
+    "200% Android text: train preview, scrolling details and close controls remain operable",
+    "Native menu pause/resume restores the sky",
+    "Real module refuses ungranted phone location and offers manual place",
+    "Real manual-place flow works without location, but ungranted HTTP stays denied",
+    "Real module: native granted fix and live CelesTrak orbits populate the sky",
+    "Real cached sky reopens with Wi-Fi and mobile data disabled"
+  ],
+  "followNativeConnections": {
+    "denied": 0,
+    "watching": 1,
+    "off": 0,
+    "menu": 0,
+    "menu-return": 1,
+    "quick-settings": 0,
+    "focus-return": 0,
+    "still-off": 0,
+    "explicit-restart": 1,
+    "revoked": 0,
+    "process-restart": 0
+  },
+  "followListenerWaitSeconds": {
+    "denied": 0.041,
+    "watching": 0.052,
+    "off": 0.675,
+    "menu": 0.058,
+    "menu-return": 0.047,
+    "quick-settings": 0.031,
+    "focus-return": 0.038,
+    "still-off": 0.075,
+    "explicit-restart": 0.04,
+    "revoked": 0.03,
+    "process-restart": 0.041
+  },
+  "followForegroundObservationSeconds": 3.438,
+  "followGuidance": "Ahead of you, slightly left.",
+  "pointGuidance": "Move the phone 3½ fists up and to the left.",
+  "pointHighGuidance": "Move the phone 6 fists down and to the left.",
+  "pointingInputs": [
+    {
+      "magneticAz": 85,
+      "elevation": 60,
+      "roll": 0
+    },
+    {
+      "magneticAz": 85,
+      "elevation": 60,
+      "roll": 35
+    },
+    {
+      "magneticAz": 85,
+      "elevation": 60,
+      "roll": 35
+    }
+  ],
+  "runId": "20260929T115722Z-space-c0df65aa",
+  "packageCommit": "301fd638e329a76ef02a5c8b11a880973371eb86",
+  "runnerCommit": "5354e6285b9616084a98da1af95bd27be698c74b",
+  "hostSource": "4e7f534",
+  "teardown": {
+    "MainPID": "0",
+    "Result": "success",
+    "ExecMainStatus": "0",
+    "ActiveState": "inactive"
+  },
+  "captures": {
+    "android-follow-denied.png": {
+      "sha256": "01d695a42db5bf35337ba74c44b96d39a09d6c85cd8d281557a23298ac671ada",
+      "bytes": 334017
+    },
+    "android-follow-east.png": {
+      "sha256": "3e7c3035f436a19ee669111469560444623737c5aef3258b6a1230bbb66e0b90",
+      "bytes": 319898
+    },
+    "android-follow-ended.png": {
+      "sha256": "3ca1af3f78fcba61f97275012a7b1b6d678a4e8d2e6aeb277e25738ae7166132",
+      "bytes": 325262
+    },
+    "android-follow-landscape.png": {
+      "sha256": "4de54096f4429377ececc674abea8473be980cab95d5af89c74d580fbc516985",
+      "bytes": 249798
+    },
+    "android-follow-large-text.png": {
+      "sha256": "98ac318f380a891891b4364d2b4561e37aa12634b9cc0320cd215dfee0132254",
+      "bytes": 328125
+    },
+    "android-follow-north.png": {
+      "sha256": "405e85eb5188c4618f1f4300bcba60efbde7e03194459ba272677fbccccde458",
+      "bytes": 330584
+    },
+    "android-follow-off.png": {
+      "sha256": "bbae8e44cdf76d23ead07ab750f1b2eaffd766474478b3e1e9e0d8d1d179accf",
+      "bytes": 309787
+    },
+    "android-follow-pointing.png": {
+      "sha256": "4cbf9a8156c23edd648325e66a0b6035fe16c352e25209512cd341adf3663c77",
+      "bytes": 317824
+    },
+    "android-follow-quick-settings.png": {
+      "sha256": "adb16d6e2076cd3f1ae680c6c9358d63be10c7c6b9196bcc61582d72d9c6ae2a",
+      "bytes": 184227
+    },
+    "android-pointing-high.png": {
+      "sha256": "6ff4218468926b8613324d312378e0d550cb4a0a0c5f9430075d8ae1fab420e4",
+      "bytes": 97696
+    },
+    "android-pointing-landscape.png": {
+      "sha256": "b312255f368cd78ade16a6b20f0810b31449a64659c21c86540e7172c8e813ee",
+      "bytes": 132467
+    },
+    "android-pointing-landscape-guidance.png": {
+      "sha256": "1f152022812e47a672b1c0eff85ba2dbe2081fd51d997859691e65332fc3f4bf",
+      "bytes": 133356
+    },
+    "android-pointing-large-guidance.png": {
+      "sha256": "12123a3a72e0cfd16f8c0da1e99a952fd6b88ecc3fdb9a63973430d2aff5a054",
+      "bytes": 96357
+    },
+    "android-pointing-large-text.png": {
+      "sha256": "b379633776cc5c6434e4293add5d556b21c22c035f25afa6a5156f19f53b7457",
+      "bytes": 96969
+    },
+    "android-pointing-rolled.png": {
+      "sha256": "d8d98fa1d6e218dea0c08f988c7ea1bc7f23bff855301ed148beb3506a4b76f8",
+      "bytes": 98820
+    },
+    "android-pointing-view.png": {
+      "sha256": "e1cb6d217212131a51e92576791c57d81d06b9a42debddbf04c18577f07cbf93",
+      "bytes": 102920
+    },
+    "android-space-canvas-selected.png": {
+      "sha256": "eeb9cf109a8d9de9fb4b942a86691beb4812a44b002ea6b7a086cfe8b0807521",
+      "bytes": 321943
+    },
+    "android-space-details.png": {
+      "sha256": "6a562cc993630dc8abe37f3d182d49e9846fb9291a8f4af7146c5910c554f3aa",
+      "bytes": 147364
+    },
+    "android-space-dome.png": {
+      "sha256": "42aec0b2c0b0396ac56bdb029d900000de58ae80591bf5ce9f8fbb97e296cee0",
+      "bytes": 321020
+    },
+    "android-space-landscape-details.png": {
+      "sha256": "3fa9fad345c91a6fd274890530a184b48b40319bc8dffcf0faf031d89f926539",
+      "bytes": 133069
+    },
+    "android-space-landscape.png": {
+      "sha256": "e07726e373d1dae16d3f7324d8ce01102b586c2a13b73946eae067ff8ea904be",
+      "bytes": 276310
+    },
+    "android-space-large-text-details.png": {
+      "sha256": "b462a562ea62f03ea132edb68a54cc72f56d846107e374f6e87725bf6ec62825",
+      "bytes": 142592
+    },
+    "android-space-large-text.png": {
+      "sha256": "d6bc624aaeed7bbfa1a8b3451ed11f4cfd9bf6142ffa7653e91e41ee9185c014",
+      "bytes": 309482
+    },
+    "android-space-plan.png": {
+      "sha256": "dbef69744ba38a4b8d080992700279a087295dfa656ad79d679727881c4657a4",
+      "bytes": 154211
+    },
+    "android-space-real-internet-denied.png": {
+      "sha256": "851fa7991a756ad6597c38e1ce6d3a971ab335a638b17435734c4f1a14e475ae",
+      "bytes": 292705
+    },
+    "android-space-real-location-denied.png": {
+      "sha256": "313fa679e2c0d56ca617bb42d413462d66d887ea541c3b4335a9f61d17b75f06",
+      "bytes": 92668
+    },
+    "android-space-real-network.png": {
+      "sha256": "7a1ab6d14153c940323a925559861eddb52e00113f6bd30dac5f46b951d1af6f",
+      "bytes": 304920
+    },
+    "android-space-real-offline-cache.png": {
+      "sha256": "b93198d24cca085b57ccea3f2ae68d0357b7b981bae21fe259192ed8fdd34fed",
+      "bytes": 305427
+    },
+    "android-space-red-rewind.png": {
+      "sha256": "8971e08b7b55d4de845c33d5c161bbfb93acc6b46b010069bbf75ac7bdf4b510",
+      "bytes": 229537
+    },
+    "android-space-reopened.png": {
+      "sha256": "dfaea6efd2b356cf1861eb3d5b17ea5e9697eed281f9a3302f49f110e0fe498b",
+      "bytes": 222888
+    },
+    "android-space-spot.png": {
+      "sha256": "3f0dcbc387fb4c64b873c479b89ac273697d968dae0695ca483668073f41d083",
+      "bytes": 330211
+    },
+    "android-space-train-back-now.png": {
+      "sha256": "92b6722923dedf60e4d1ec1fed565dcb04fbdd2db34af5669dc9ebe58cd0168f",
+      "bytes": 219241
+    },
+    "android-space-train-details.png": {
+      "sha256": "2cfaf45c2c004816589d44f5c14ac95e7c200c93a0e5a6f3b59dba5f175fa3fa",
+      "bytes": 202584
+    },
+    "android-space-train-preview.png": {
+      "sha256": "b3bd2a8946aebe628f2b18f7a114ba316ae9a5874861ef56e639ecc7bf215162",
+      "bytes": 285884
+    },
+    "android-space-train-wikipedia.png": {
+      "sha256": "af8077e63f62399d18ca1069d987f1e610f25154b8740ce27bd97de9d3d20517",
+      "bytes": 221572
+    },
+    "android-space-wikipedia.png": {
+      "sha256": "aac79005f77a47d90c7287c2e22e5f95d8cf75ef94da1c6a4bbffd66db706e43",
+      "bytes": 214106
+    }
+  },
+  "crashBuffer": {
+    "sha256": "dd83216062195d6e76e0a02f666b438a44dc9be9dd4ba05bd1b9f3d6dee21b5e",
+    "bytes": 6576,
+    "summary": "System com.google.android.bluetooth SIGABRT / Hardware Error Event 0x42 during setup; no Construct process crash in retained crash buffer."
+  }
+}

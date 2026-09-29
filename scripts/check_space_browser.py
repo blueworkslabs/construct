@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Optional real-DOM Space Watch checks with a fake bridge, not Android consent proof."""
 from pathlib import Path
-import json, sys
+import json, sys, subprocess
 from playwright.sync_api import sync_playwright
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 ROOT=Path(__file__).resolve().parents[1]
@@ -71,6 +71,36 @@ with sync_playwright() as p:
  orient({'pose':'flat','calibrate':True})
  assert 'figure 8' in page.locator('#follow-status').inner_text()
  assert page.locator('#spot-turn').is_hidden()
+ # Full pointing canvas with host-equivalent samples, not just DOM stubs.
+ def point(az,el,roll=0,calibrate=False):
+  sample=json.loads(subprocess.check_output(['node','-e',"console.log(JSON.stringify(require('./scripts/space-fixture/orientation-sample.cjs')(...JSON.parse(process.argv[1]),{declination:5.2})))",json.dumps([az,el,roll])],cwd=ROOT,text=True))
+  sample['calibrate']=calibrate
+  for _ in range(25):orient(sample)
+ point(90,15)
+ assert page.locator('#pointer-wrap').is_visible()
+ train.click()
+ assert page.locator('#rewind-label').inner_text()=='Now','pass selection while pointing stays live'
+ assert train.get_attribute('aria-pressed')=='false'
+ page.locator('#list button[data-id="29507"]').click()
+ assert page.locator('#dome').is_hidden() and page.locator('#scrub').is_hidden()
+ assert page.locator('#pointer').evaluate("c=>c.width>0 && c.getContext('2d').getImageData(0,0,c.width,c.height).data.some(v=>v!==0)")
+ point(90,70,30)
+ assert '7 fists up' in page.locator('#follow-status').inner_text()
+ point(90,15,0,True)
+ assert 'figure 8' in page.locator('#follow-announcement').inner_text()
+ point(90,15)
+ assert 'figure 8' not in page.locator('#follow-announcement').inner_text()
+ for width,height,scale in [(393,850,1),(850,393,1),(393,850,2)]:
+  page.set_viewport_size({'width':width,'height':height})
+  page.evaluate('(scale)=>document.documentElement.style.fontSize=(16*scale)+"px"',scale)
+  point(90,60,35)
+  assert page.locator('#pointer').is_visible()
+  assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'Pointing horizontal overflow'
+ page.set_viewport_size({'width':393,'height':850})
+ page.evaluate('document.documentElement.style.fontSize="16px"')
+ page.wait_for_timeout(1600)
+ assert page.locator('#pointer-wrap').is_hidden(),'silence removes stale aim'
+ point(90,15)
  orient({'watching':False,'reason':'paused'})
  assert page.locator('#follow').get_attribute('aria-pressed')=='false'
  assert 'lost the foreground' in page.locator('#follow-status').inner_text()

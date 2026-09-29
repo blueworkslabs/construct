@@ -4,18 +4,19 @@
 Synthetic wrapper tests UI only; the real package tests authority and providers.
 Screenshots need human review; hardware spotting accuracy is not claimed.
 """
-import argparse,datetime,fcntl,hashlib,json,os,re,subprocess,time,uuid
+import argparse,datetime,fcntl,hashlib,json,math,os,re,subprocess,time,uuid
 from pathlib import Path
 from config import CONFIG,SERIAL,require_runner,catalog
 p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.add_argument('--sha',required=True)
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_space_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.space-watch package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.space-watch-fixture package digest')
-p.add_argument('--version',default='0.3.7')
+p.add_argument('--version',default='0.4.1')
 p.add_argument('--follow',action='store_true',help='Enable Follow checks for older versions; mandatory automatically for 0.3.0+')
+p.add_argument('--pointing-layout-only',action='store_true',help='Focused same-package visual evidence only; not full acceptance')
 a=p.parse_args()
 # Follow is mandatory for the feature version, even when the flag is omitted.
-a.follow = a.follow or tuple(map(int, a.version.split('.'))) >= (0, 3, 0)
+a.follow = a.pointing_layout_only or a.follow or tuple(map(int, a.version.split('.'))) >= (0, 3, 0)
 require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -28,9 +29,10 @@ from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from keyboard_prompt import gboard_contacts_denial
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
-from space_checks import scroll_signature
+from space_checks import scroll_signature,visible_point_guidance
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'fixtureSha256':a.fixture_sha,'version':a.version,
- 'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{},'plannedChecks':23 if a.follow else 16,'followRequired':a.follow}
+ 'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{},'plannedChecks':3 if a.pointing_layout_only else (25 if a.follow else 16),'followRequired':a.follow,'pointingLayoutOnly':a.pointing_layout_only}
+if a.pointing_layout_only:receipt['scope']='Focused pointing layout and native grant checks only; not full module acceptance'
 started=False
 def nodes():
  current=ui.nodes();deny=gboard_contacts_denial(current)
@@ -83,10 +85,17 @@ def web():
  raise RuntimeError('No module WebView after native transition settled')
 def scroll(direction,distance=None):
  dialogs=[n for n in nodes() if n.get('class')=='android.app.AlertDialog' and visible(n)]
- # Scroll in the padding, not across the rewind range or a canvas hit target.
+ # Short padding gestures avoid text-selection/long-press interception on
+ # the busy emulator. Keep the touch-down away from a range control.
  x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=min(x1+72,x2-24);lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
  if distance is not None:lo=hi-max(24,min(hi-lo,round(distance)))
- ui._device.swipe(x,hi if direction=='down' else lo,x,lo if direction=='down' else hi,duration=.15);time.sleep(.8)
+ start=hi if direction=='down' else lo;end=lo if direction=='down' else hi
+ for n in nodes():
+  if n.get('class')=='android.widget.SeekBar' and visible(n):
+   b=bounds(n)
+   if b[0]<=x<=b[2] and b[1]-12<=start<=b[3]+12:
+    start=max(y1+30,b[1]-30) if direction=='down' else min(y2-30,b[3]+30)
+ ui._device.swipe(x,start,x,end,duration=.08);time.sleep(.8)
 def reveal(match,directions=('up','down')):
  """First visible node whose text satisfies match (a string prefix or predicate), scrolling the module page."""
  test=match if callable(match) else (lambda t:t.startswith(match))
@@ -123,17 +132,28 @@ def wiki_credit():
   adb('shell','input','swipe',str(x),str(y1+(y2-y1)*3//4),str(x),str(y1+(y2-y1)//3),'350')
   time.sleep(.3)
  reach_text('CC BY-SA 4.0')
-def full_dome():
- # Start above the canvas: clipped accessibility bounds do not reveal which
- # edge is missing, so blindly scrolling down can move a top-clipped dome out.
- reveal(lambda t:t in (FIXTURE,REAL))
- for _ in range(18):
-  c=next((n for n in nodes() if text_of(n).startswith('Sky dome:') and visible(n)),None)
-  if c is not None:
-   b=bounds(c);w=web();size=b[2]-b[0]
-   if abs(size-(b[3]-b[1]))<=6 and b[1]>=w[1] and b[3]<=w[3]:return c
-  scroll('down',180)
- raise RuntimeError('Whole square dome not visible after scrolling from page top')
+def full_dome(prefix="Sky dome:"):
+ # Position the canvas directly. A sticky landscape canvas does not require
+ # the page title to be reachable, and its clipped edge gives the direction.
+ print('POSITION canvas:',prefix,flush=True)
+ for attempt in range(18):
+  c=next((n for n in nodes() if text_of(n).startswith(prefix) and visible(n)),None)
+  if c is None:
+   reveal(lambda t:t.startswith(prefix));continue
+  b=bounds(c);w=web();size=b[2]-b[0]
+  if abs(size-(b[3]-b[1]))<=6 and b[1]>=w[1] and b[3]<=w[3]:return c
+  direction='up' if b[1]<=w[1]+2 else 'down'
+  print('POSITION canvas bounds:',b,'viewport:',w,'scroll:',direction,flush=True)
+  scroll(direction,180)
+ raise RuntimeError('Whole square dome not visible after positioning')
+def center_point_guidance():
+ # WebView can report clipped text bounds as a complete accessible node. Keep
+ # the full visual instruction away from both viewport edges before capture.
+ for _ in range(6):
+  n=reveal(lambda t:visible_point_guidance(t) or t=='The selected object is below your horizon now.',directions=('down','up'));b=bounds(n);w=web()
+  if b[1]>=w[1]+24 and b[3]<=w[3]-24:return text_of(n)
+  scroll('down' if b[3]>w[3]-24 else 'up',260)
+ raise RuntimeError('Pointing instruction not centred for visual evidence')
 def reach_native(label,checkable=False):
  for attempt in range(24):
   tree=nodes()
@@ -181,6 +201,19 @@ def inject(acc,mag):
  adb('emu','sensor','set','gyroscope','0:0:0')
  adb('emu','sensor','set','acceleration',acc)
  adb('emu','sensor','set','magnetic-field',mag)
+def inject_point(az,el,roll=0):
+ # Independent physical ENU basis -> Android device sensor inputs. Portrait
+ # device axes are right, up, and out of the screen; camera looks along -Z.
+ a,e,r=map(math.radians,(az,el,roll))
+ right=(math.cos(a),-math.sin(a),0)
+ up=(-math.sin(e)*math.sin(a),-math.sin(e)*math.cos(a),math.cos(e))
+ z=(-math.cos(e)*math.sin(a),-math.cos(e)*math.cos(a),-math.sin(e))
+ x=tuple(right[i]*math.cos(r)-up[i]*math.sin(r) for i in range(3))
+ y=tuple(right[i]*math.sin(r)+up[i]*math.cos(r) for i in range(3))
+ acc=':'.join(str(9.80665*v[2]) for v in (x,y,z))
+ mag=':'.join(str(50*v[1]-20*v[2]) for v in (x,y,z))
+ inject(acc,mag)
+ receipt.setdefault('pointingInputs',[]).append({'magneticAz':az,'elevation':el,'roll':roll});save()
 def follow_sensors(label,expected):
  from orientation_checks import active_connections
  uid=int(re.search(r'uid:(\d+)',adb('shell','pm','list','packages','-U','dev.construct.runtime')).group(1))
@@ -210,19 +243,52 @@ def follow_checks():
  follow_sensors('denied',0)
  done('Follow denied without native orientation grant; static sky remains usable')
  module_access();switch('Allow reading compass and tilt',True);reopen()
- inject('0:0:9.80665','0:50:-20');click(lambda t:t=='Follow')
- reach_text('Facing north · compass');full_dome();capture('follow-north');follow_sensors('watching',1)
- inject('0:0:9.80665','-50:0:-20');reach_text('Facing east · compass');full_dome();capture('follow-east')
- click(lambda t:t.startswith('Long March 4B rocket stage'))
- # The fixture satellite moves while native navigation runs. Retain the actual
- # relative instruction rather than requiring it to remain directly ahead.
- receipt['followGuidance']=text_of(reveal(lambda t:bool(re.match(r'^(Ahead of you|Turn (left|right) about [0-9]+°|Behind you:)',t))))
- save();capture('follow-pointing');click(lambda t:t=='Clear')
- done('Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and relative turn guidance')
- inject('0:9.80665:0','-50:-20:0');reach_text('Hold the phone flat');capture('follow-upright')
+ if a.pointing_layout_only:
+  inject_point(85,60,35);click(lambda t:t=='Follow');reach_text('Pointing east, 6 fists up')
+  click(lambda t:t.startswith('Long March 4B rocket stage'))
+ else:
+  inject('0:0:9.80665','0:50:-20');click(lambda t:t=='Follow')
+  reach_text('Facing north · compass');full_dome();capture('follow-north');follow_sensors('watching',1)
+  inject('0:0:9.80665','-50:0:-20');reach_text('Facing east · compass');full_dome();capture('follow-east')
+  click(lambda t:t.startswith('Long March 4B rocket stage'))
+  # The fixture satellite moves while native navigation runs. Retain the actual
+  # relative instruction rather than requiring it to remain directly ahead.
+  receipt['followGuidance']=text_of(reveal(lambda t:bool(re.match(r'^(Ahead of you|Turn (left|right) about [0-9]+°|Behind you:)',t))))
+  save();capture('follow-pointing');click(lambda t:t=='Clear')
+  done('Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and relative turn guidance')
+  # Raised like a camera (upright, axis level): the pointing view replaces the dome.
+  inject('0:9.80665:0','-50:-20:0');reach_text('Pointing ')
+  click(lambda t:t.startswith('Long March 4B rocket stage'))
+  receipt['pointGuidance']=text_of(reveal(visible_point_guidance))
+  save();full_dome('Pointing view:');capture('pointing-view')
+  inject_point(85,60);reach_text('Pointing east, 6 fists up')
+  full_dome('Pointing view:');capture('pointing-high')
+  inject_point(85,60,35);reach_text('Pointing east, 6 fists up')
+  time.sleep(2);full_dome('Pointing view:');capture('pointing-rolled')
+  receipt['pointHighGuidance']=text_of(reveal(visible_point_guidance));save()
+  done('High 60-degree camera aim stays in pointing through host flat pose; rolled view and screen-relative guidance remain available')
+  # The fixture clock advances with navigation. Reopen it before the layout
+  # sequence so this short-lived satellite is still above the horizon; do not
+  # mistake a correct below-horizon message for missing directional guidance.
+  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE)
+  inject_point(85,60,35);click(lambda t:t=='Follow');reach_text('Pointing east, 6 fists up')
+  click(lambda t:t.startswith('Long March 4B rocket stage'))
+ adb('shell','settings','put','system','user_rotation','1');time.sleep(3)
+ reach_text('Pointing east, 6 fists up');full_dome('Pointing view:');capture('pointing-landscape')
+ center_point_guidance();capture('pointing-landscape-guidance')
+ adb('shell','settings','put','system','user_rotation','0');adb('shell','settings','put','system','font_scale','2.0');time.sleep(3)
+ reach_text('Pointing east, 6 fists up');full_dome('Pointing view:');capture('pointing-large-text')
+ center_point_guidance();capture('pointing-large-guidance')
+ adb('shell','settings','put','system','font_scale','1.0');time.sleep(2)
+ done('Pointing canvas and guidance stay reachable in landscape and 200% Android text')
+ if a.pointing_layout_only:
+  follow_sensors('layout-watching',1);click(lambda t:t=='Follow');follow_sensors('layout-off',0)
+  assert len(receipt['checks'])==receipt['plannedChecks']
+  receipt['complete']=True;save();raise SystemExit(0)
+ click(lambda t:t=='Clear',directions=('down','up'))
  inject('0:0:9.80665','-50:0:-20');reach_text('Facing east · compass')
  click(lambda t:t=='Follow');follow_sensors('off',0);full_dome();capture('follow-off')
- done('Upright pose suspends Follow guidance; explicit off returns north-up and releases native listener')
+ done('Raised phone switches to the pointing view with plain guidance; flat returns the dome; explicit off returns north-up and releases native listener')
  click(lambda t:t=='Follow');reach_text('Facing east · compass')
  tap('Construct menu');follow_sensors('menu',0);tap('Return to module');reach_text('Facing east · compass');follow_sensors('menu-return',1)
  done('Native menu pause releases compass and explicit menu return re-establishes Follow')
@@ -401,7 +467,7 @@ try:
  receipt['complete']=True
 
 except Exception as e:
- receipt['error']=str(e)
+ receipt['error']=str(e);save();print('FAIL:',str(e),flush=True)
  try:(run/'failure-nodes.json').write_text(json.dumps([dict(n.attrib) for n in nodes()],indent=2));capture('failure')
  except Exception:pass
  if a.follow:

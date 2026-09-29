@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.3.7** (source candidate) is a signed HTML/CSS/JavaScript module for
+Space Watch **0.4.1** (source candidate) is a signed HTML/CSS/JavaScript module for
 host **API 0.14**; the published **0.2.14** runs on API 0.9 / alpha26 and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -11,7 +11,51 @@ Aircraft are a 10–100 km map question. Orbiting objects are seen from well ove
 1,000 km away and cross a 100 km circle in about 25 seconds, so they need a sky
 view, not a map.
 
-## Module 0.3.7: follow mode (API 0.14, source candidate)
+## Module 0.4.1: point at the sky (API 0.14, source candidate)
+
+Raise the phone like a camera while **Follow** is on, and the dome gives way to
+a **pointing view**: a drawn viewfinder (no camera image) centred on where the
+back of the phone points, with the horizon, compass points, bright stars, the
+Moon, planets and other satellites. With an object selected, a line under the
+view says how to move the phone ("Move the phone 2 fists up and to the right.",
+"Turn around: it is behind you, 3 fists up.") and an arrow on the rim points
+the same way. Within 4° the ring turns solid: "On target. Look past the top of
+the phone." With nothing selected it names a bright object near the middle
+("In the middle: Saturn."). Module-only; it uses the same `orientation.read`
+grant, stream and lifecycle as Follow. Selecting a future pass while pointing
+keeps the object selected but stays at Now; lower the phone to browse previews.
+
+- **Whole sky.** The host reports the rear-camera bearing while the phone is
+  upright, but switches to `flat` (bearing of the screen's top edge) once the
+  screen is within 45° of horizontal, which includes aiming above about 45°.
+  `ui/space-pointer.js` rebuilds the phone's full attitude from either bearing
+  plus pitch and roll, so pointing works from the horizon to the zenith, in
+  portrait and landscape. The unit suite checks this against a replay of the
+  host's own sample maths (`scripts/space-fixture/orientation-sample.cjs`).
+- **Which view.** A camera axis above about −25° (`pitchDeg` < 25) shows the
+  pointing view; it stays until the axis drops below −35°, so it does not
+  flicker. Flat, screen up, is the dome as before. Upright but aimed at the
+  ground shows neither, with a hint.
+- **Words.** Directions are relative to the screen, so they match the arrow
+  however the phone is rolled. Distances are fists (about 10°).
+- **Accessibility.** The guidance line is not live; the announcement region
+  speaks only when the way changes ("Move the phone to the right.", "On
+  target."), not every few degrees.
+- **Now only.** Raising the phone leaves rewind and pass previews.
+- **Same safeguards as Follow.** True north from WMM2025 (no pointing view where
+  the correction is unavailable), smoothing (35% per reading, on the attitude
+  itself, so there is no wrap-around at north or the zenith), calibration
+  prompts, the 1.5-second silence limit and no storage.
+
+Browser preview of Synthetic Space Watch with simulated host samples (desktop
+Chromium, not Android): guidance with the ISS track, lock-on, and the rim arrow
+for an object outside the view.
+
+![Pointing view: ISS a fist below the reticle](images/space-watch-0.4.0/point-guide.jpg)
+![Pointing view locked on the ISS](images/space-watch-0.4.0/point-lock.jpg)
+![Pointing view with the rim arrow](images/space-watch-0.4.0/point-arrow.jpg)
+
+## Module 0.3.7: follow mode (API 0.14)
 
 **Follow** turns the dome with the phone. Hold the phone flat with its top pointing
 where you face: your heading is at the top of the dome, and a ±28° wedge shows your
@@ -30,8 +74,8 @@ slightly right.", "Turn left about 40°." or "Behind you: turn around."
   relative pointing pauses with an explanation; magnetic and true bearings are never mixed.
 - **Smoothing.** Each reading moves the heading a quarter of the way, along the
   shorter way round.
-- **Poses.** Upright readings do not turn the dome: the status asks you to hold
-  the phone flat. The chart retains its last rotation (including its compass
+- **Poses.** Upright readings do not turn the dome (0.4.0 shows the pointing
+  view instead): the status asks you to hold the phone flat. The chart retains its last rotation (including its compass
   labels); it is not a live facing indicator while upright. Turning Follow off
   explicitly restores north-up. Directional guidance and the view wedge are hidden until a
   fresh flat reading arrives. Missing headings or a 1.5-second sample gap also
@@ -320,8 +364,8 @@ not Android; pre-review wording and stale-train policy):
   taken as 0.
 - **Compass.** Follow is only as good as the phone's compass (often ±10–20°),
   and magnetic surroundings can mislead it.
-- **Not included:** camera AR, a raised "point at the sky" pose, background
-  alerts and notifications. Foreground visible-pass planning covers the next 12 hours.
+- **Not included:** camera-image AR, background alerts and notifications.
+  The raised-phone pointing view is drawn without a camera feed. Foreground visible-pass planning covers the next 12 hours.
 
 ## Third-party code and data
 
@@ -357,10 +401,13 @@ not Android; pre-review wording and stale-train policy):
   DOM double. It covers:
   - start and fix;
   - **no coordinates in any request URL or in storage**;
-  - (0.3.0) Follow: watch request, upright readings ignored, WMM true north
+  - (0.4.0) Follow and pointing: watch request, raised-phone view and flat dome, WMM true north
     for Berlin, smoothing, "Ahead of you" / "Behind you" guidance, calibration
     note, re-watch after a pause, stop and north-up, nothing stored, and the
     denied and no-compass notes;
+  - full-pose pointing through zenith and all four display rotations, large-turn
+    reacquisition, screen-relative guidance/lock, calibration-announcement recovery,
+    rewind exit and stale-aim removal;
   - (0.2.0) the pass list with a Now entry, preview of a train pass, train
     details and Wikipedia, the train cache on reopen, and a failing recent list
     leaving the sky alone;
