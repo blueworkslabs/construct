@@ -188,6 +188,17 @@ def follow_sensors(label,expected):
  receipt.setdefault('followNativeConnections',{})[label]=value
  receipt.setdefault('followListenerWaitSeconds',{})[label]=round(time.monotonic()-started,3);save()
  assert value==expected,('Follow listeners',label,value,expected)
+def follow_focus_lost():
+ from orientation_checks import resumed_unfocused
+ started=time.monotonic();deadline=started+20
+ while True:
+  system=adb('shell','dumpsys','activity','activities')
+  client=adb('shell','dumpsys','activity','dev.construct.runtime/.ModuleActivity')
+  (run/'follow-focus-system.txt').write_text(system);(run/'follow-focus-client.txt').write_text(client)
+  if resumed_unfocused(system,client):break
+  if time.monotonic()>deadline:raise RuntimeError('No resumed-but-unfocused client observation after Quick Settings')
+  time.sleep(.5)
+ receipt['followForegroundObservationSeconds']=round(time.monotonic()-started,3);save()
 def follow_checks():
  # Use the real host sensor/grant path; the fixture does not replace orientation.
  click(lambda t:t=='Follow');reach_text('Allow reading compass and tilt');capture('follow-denied')
@@ -210,7 +221,7 @@ def follow_checks():
  click(lambda t:t=='Follow');reach_text('Facing east · compass')
  tap('Construct menu');follow_sensors('menu',0);tap('Return to module');reach_text('Facing east · compass');follow_sensors('menu-return',1)
  done('Native menu pause releases compass and explicit menu return re-establishes Follow')
- adb('shell','cmd','statusbar','expand-settings');time.sleep(3);follow_sensors('quick-settings',0);capture('follow-quick-settings')
+ adb('shell','cmd','statusbar','expand-settings');time.sleep(4);follow_focus_lost();follow_sensors('quick-settings',0);capture('follow-quick-settings')
  adb('shell','cmd','statusbar','collapse');time.sleep(2)
  reach_text('Follow stopped when Space Watch lost the foreground');capture('follow-ended');follow_sensors('focus-return',0)
  inject('0:0:9.80665','0:50:-20');time.sleep(2);follow_sensors('still-off',0)
