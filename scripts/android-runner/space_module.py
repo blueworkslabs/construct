@@ -11,8 +11,12 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_space_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.space-watch package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.space-watch-fixture package digest')
-p.add_argument('--version',default='0.2.14')
-a=p.parse_args();require_runner();catalog(a.catalog)
+p.add_argument('--version',default='0.3.7')
+p.add_argument('--follow',action='store_true',help='Enable Follow checks for older versions; mandatory automatically for 0.3.0+')
+a=p.parse_args()
+# Follow is mandatory for the feature version, even when the flag is omitted.
+a.follow = a.follow or tuple(map(int, a.version.split('.'))) >= (0, 3, 0)
+require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
 assert subprocess.run(['systemctl','--user','is-active','--quiet',CONFIG.service]).returncode!=0,'Preserve running emulator'
@@ -24,8 +28,9 @@ from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from keyboard_prompt import gboard_contacts_denial
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
+from space_checks import scroll_signature
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'fixtureSha256':a.fixture_sha,'version':a.version,
- 'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{}}
+ 'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{},'plannedChecks':23 if a.follow else 16,'followRequired':a.follow}
 started=False
 def nodes():
  current=ui.nodes();deny=gboard_contacts_denial(current)
@@ -79,14 +84,16 @@ def web():
 def scroll(direction,distance=None):
  dialogs=[n for n in nodes() if n.get('class')=='android.app.AlertDialog' and visible(n)]
  # Scroll in the padding, not across the rewind range or a canvas hit target.
- x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=x1+12;lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
+ x1,y1,x2,y2=bounds(dialogs[-1]) if dialogs else web();x=min(x1+72,x2-24);lo=y1+(y2-y1)*3//10;hi=y1+(y2-y1)*4//5
  if distance is not None:lo=hi-max(24,min(hi-lo,round(distance)))
- adb('shell','input','swipe',str(x),str(hi if direction=='down' else lo),str(x),str(lo if direction=='down' else hi),'300');time.sleep(.35)
-def reveal(match):
+ ui._device.swipe(x,hi if direction=='down' else lo,x,lo if direction=='down' else hi,duration=.15);time.sleep(.8)
+def reveal(match,directions=('up','down')):
  """First visible node whose text satisfies match (a string prefix or predicate), scrolling the module page."""
  test=match if callable(match) else (lambda t:t.startswith(match))
- for direction in ('up','down'):
+ deadline=time.monotonic()+60
+ for direction in directions:
   for _ in range(24):
+   if time.monotonic()>deadline:raise RuntimeError('Module control scroll timed out: '+str(match))
    viewport=web()
    hits=[n for n in nodes() if test(text_of(n)) and visible(n) and n.get('package')=='dev.construct.runtime' and bounds(n)[1]>=viewport[1] and bounds(n)[3]<=viewport[3]]
    if hits:
@@ -95,13 +102,17 @@ def reveal(match):
     settled=[n for n in nodes() if test(text_of(n)) and visible(n) and bounds(n)==before]
     if settled:return settled[0]
    # Detect an actual scroll boundary instead of swiping upward 24 times at
-   # the top of the page. Text+geometry avoids confusing equal-height rows.
-   before=tuple((text_of(n),n.get('bounds')) for n in nodes() if visible(n) and text_of(n))
+   # the top of the page. Named-control geometry ignores live sky text.
+   before=scroll_signature(nodes())
    scroll(direction)
-   after=tuple((text_of(n),n.get('bounds')) for n in nodes() if visible(n) and text_of(n))
-   if before==after:break
+   after=scroll_signature(nodes())
+   if before==after:
+    # Accessibility geometry can lag a completed gesture. A single unchanged
+    # dump is not a boundary: retry the same gesture once and let layout settle.
+    time.sleep(.5);scroll(direction)
+    if before==scroll_signature(nodes()):break
  raise RuntimeError('Module control not reachable: '+str(match))
-def click(match):tap_node(reveal(match))
+def click(match,directions=('up','down')):tap_node(reveal(match,directions))
 def reach_text(fragment):return text_of(reveal(lambda t:fragment in t))
 def wiki_credit():
  contains('Wikipedia loaded',45)
@@ -141,7 +152,9 @@ def switch(label,checked=True):
   if (node.get('checked')=='true')==checked:return
   print('Native grant tap:',label,bounds(node),'attempt',attempt+1,flush=True)
   tap_node(node)
-  if not checked:tap('Turn off')
+  if not checked:
+   time.sleep(.3)
+   if 'Turn off' in labels():tap('Turn off')
   until=time.monotonic()+4
   while time.monotonic()<until:
    if any(n.get('content-desc')==label and n.get('checkable')=='true' and n.get('checked')==('true' if checked else 'false') for n in nodes()):return
@@ -164,6 +177,71 @@ def reopen():tap_node(reach_native('Reopen module'));contains('Space Watch')
 def install(name,digest):
  library();select_after(name+' · '+a.version,('Review & install',));tap('Allow & install');installed_status()
  assert any(e.get('code')=='INSTALLED_TRIAL' and e.get('packageDigest')==digest for e in diagnostics()),'Wrong signed module '+name
+def inject(acc,mag):
+ adb('emu','sensor','set','gyroscope','0:0:0')
+ adb('emu','sensor','set','acceleration',acc)
+ adb('emu','sensor','set','magnetic-field',mag)
+def follow_sensors(label,expected):
+ from orientation_checks import active_connections
+ uid=int(re.search(r'uid:(\d+)',adb('shell','pm','list','packages','-U','dev.construct.runtime')).group(1))
+ started=time.monotonic();deadline=started+3
+ while True:
+  raw=adb('shell','dumpsys','sensorservice');value=active_connections(raw,uid)
+  if value==expected or time.monotonic()>=deadline:break
+  time.sleep(.1)
+ (run/('sensors-'+label+'.txt')).write_text(raw)
+ receipt.setdefault('followNativeConnections',{})[label]=value
+ receipt.setdefault('followListenerWaitSeconds',{})[label]=round(time.monotonic()-started,3);save()
+ assert value==expected,('Follow listeners',label,value,expected)
+def follow_focus_lost():
+ from orientation_checks import resumed_unfocused
+ started=time.monotonic();deadline=started+20
+ while True:
+  system=adb('shell','dumpsys','activity','activities')
+  client=adb('shell','dumpsys','activity','dev.construct.runtime/.ModuleActivity')
+  (run/'follow-focus-system.txt').write_text(system);(run/'follow-focus-client.txt').write_text(client)
+  if resumed_unfocused(system,client):break
+  if time.monotonic()>deadline:raise RuntimeError('No resumed-but-unfocused client observation after Quick Settings')
+  time.sleep(.5)
+ receipt['followForegroundObservationSeconds']=round(time.monotonic()-started,3);save()
+def follow_checks():
+ # Use the real host sensor/grant path; the fixture does not replace orientation.
+ click(lambda t:t=='Follow');reach_text('Allow reading compass and tilt');capture('follow-denied')
+ follow_sensors('denied',0)
+ done('Follow denied without native orientation grant; static sky remains usable')
+ module_access();switch('Allow reading compass and tilt',True);reopen()
+ inject('0:0:9.80665','0:50:-20');click(lambda t:t=='Follow')
+ reach_text('Facing north · compass');full_dome();capture('follow-north');follow_sensors('watching',1)
+ inject('0:0:9.80665','-50:0:-20');reach_text('Facing east · compass');full_dome();capture('follow-east')
+ click(lambda t:t.startswith('Long March 4B rocket stage'))
+ # The fixture satellite moves while native navigation runs. Retain the actual
+ # relative instruction rather than requiring it to remain directly ahead.
+ receipt['followGuidance']=text_of(reveal(lambda t:bool(re.match(r'^(Ahead of you|Turn (left|right) about [0-9]+°|Behind you:)',t))))
+ save();capture('follow-pointing');click(lambda t:t=='Clear')
+ done('Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and relative turn guidance')
+ inject('0:9.80665:0','-50:-20:0');reach_text('Hold the phone flat');capture('follow-upright')
+ inject('0:0:9.80665','-50:0:-20');reach_text('Facing east · compass')
+ click(lambda t:t=='Follow');follow_sensors('off',0);full_dome();capture('follow-off')
+ done('Upright pose suspends Follow guidance; explicit off returns north-up and releases native listener')
+ click(lambda t:t=='Follow');reach_text('Facing east · compass')
+ tap('Construct menu');follow_sensors('menu',0);tap('Return to module');reach_text('Facing east · compass');follow_sensors('menu-return',1)
+ done('Native menu pause releases compass and explicit menu return re-establishes Follow')
+ adb('shell','cmd','statusbar','expand-settings');time.sleep(4);follow_focus_lost();follow_sensors('quick-settings',0);capture('follow-quick-settings')
+ adb('shell','cmd','statusbar','collapse');time.sleep(2)
+ reach_text('Follow stopped when Space Watch lost the foreground');capture('follow-ended');follow_sensors('focus-return',0)
+ inject('0:0:9.80665','0:50:-20');time.sleep(2);follow_sensors('still-off',0)
+ click(lambda t:t=='Follow');reach_text('Facing north · compass');follow_sensors('explicit-restart',1)
+ done('Quick Settings ends Follow, explains focus loss, and requires an explicit tap to restart')
+ adb('shell','settings','put','system','user_rotation','1');time.sleep(3)
+ reach_text('Facing east · compass');full_dome();capture('follow-landscape')
+ adb('shell','settings','put','system','user_rotation','0');adb('shell','settings','put','system','font_scale','2.0');time.sleep(3)
+ reach_text('Facing north · compass');full_dome();capture('follow-large-text')
+ adb('shell','settings','put','system','font_scale','1.0');time.sleep(2)
+ done('Follow remains operable with display rotation and 200% Android text')
+ module_access();switch('Allow reading compass and tilt',False);reopen()
+ click(lambda t:t=='Follow');reach_text('Allow reading compass and tilt');follow_sensors('revoked',0)
+ adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·');follow_sensors('process-restart',0)
+ done('Revoked orientation cannot restart Follow; a fresh process starts with Follow off')
 try:
  print('RESULTS:',run,flush=True);save();(CONFIG.root/'camera-emulated.flag').write_text('emulated\n')
  avd,snapshot,_=CONFIG.profile(True);started=True
@@ -196,11 +274,16 @@ try:
  open_module(FIXTURE);module_access();switch('Allow approved internet sources',True);reopen()
  contains('visible ·');capture('space-dome')
  done('Signed fixture opens its computed dome and equivalent overhead list')
+ if a.follow:
+  follow_checks()
+  # Follow setup/revocation ends in a fresh process with Follow off; reset the
+  # fixture clock so the original pass and pointing assertions remain meaningful.
+  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·')
  reach_text('Visible passes · next 12 h')
  reach_text('Now · ISS (Zarya)');scroll('down',500);capture('space-plan')
  reach_text('highest 1½ fists up in the SW')
  done('Visible-pass list includes the current ISS pass and pointing/max-height words')
- click(lambda t:'Guowang train' in t and ' · ' in t)
+ click(lambda t:'Guowang train' in t and ' · ' in t,directions=('down','up'))
  reach_text('Preview ');reach_text('At ');reach_text('9 satellites in a line');capture('space-train-preview')
  click(lambda t:t=='Details');reach_text('9 of 11 from this launch');reach_text('2026-221');capture('space-train-details')
  click('Read on Wikipedia');wiki_credit();capture('space-train-wikipedia')
@@ -250,7 +333,7 @@ try:
  reach_text('ISS (Zarya)');reach_text('International Space Station · crewed');capture('space-canvas-selected')
  done('Canvas touch selects the ISS, independently of the list')
  # This preview uses the cached train after the genuine process restart.
- click(lambda t:'Guowang train' in t and ' · ' in t);reach_text('Preview ')
+ click(lambda t:'Guowang train' in t and ' · ' in t,directions=('down','up'));reach_text('Preview ')
  adb('shell','settings','put','system','user_rotation','1');time.sleep(3)
  full_dome();capture('space-landscape');click('Details');reach_text('9 of 11 from this launch');reach_text('2026-221');capture('space-landscape-details');click(lambda t:t=='Close')
  done('Landscape train preview/details remain operable and cached batch identity survives restart')
@@ -314,12 +397,18 @@ try:
  receipt['offlineCounts']=text_of(reveal(lambda t:bool(re.fullmatch(r'\d+ visible · \d+ above you',t))))
  capture('space-real-offline-cache')
  done('Real cached sky reopens with Wi-Fi and mobile data disabled')
+ assert len(receipt['checks']) == receipt['plannedChecks'], 'Required acceptance gates missing'
  receipt['complete']=True
 
 except Exception as e:
  receipt['error']=str(e)
  try:(run/'failure-nodes.json').write_text(json.dumps([dict(n.attrib) for n in nodes()],indent=2));capture('failure')
  except Exception:pass
+ if a.follow:
+  try:
+   reveal(lambda t:t in (FIXTURE,REAL));capture('failure-follow-top')
+   (run/'failure-sensors.txt').write_text(adb('shell','dumpsys','sensorservice'))
+  except Exception:pass
  raise
 finally:
  if started:

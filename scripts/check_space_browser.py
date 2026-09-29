@@ -53,6 +53,27 @@ with sync_playwright() as p:
  train.click();assert train.get_attribute('aria-pressed')=='true'
  page.locator('#rewind').fill('-120');assert train.get_attribute('aria-pressed')=='false'
  page.locator('#now').click()
+ # Follow rendering and relative guidance in the actual DOM/canvas.
+ page.locator('#list button[data-id="29507"]').click()
+ page.locator('#follow').click()
+ page.wait_for_function("document.querySelector('#follow').getAttribute('aria-pressed')==='true'")
+ def orient(sample):page.evaluate("s=>dispatchEvent(new CustomEvent('constructorientation',{detail:{timestamp:Date.now(),...s}}))",sample)
+ orient({'pose':'flat','azimuthDeg':85,'accuracyDeg':12,'calibrate':False})
+ assert 'Facing east' in page.locator('#follow-status').inner_text()
+ assert page.locator('#follow-status').get_attribute('aria-live')=='off'
+ assert page.locator('#spot-turn').get_attribute('aria-live')=='off'
+ assert page.locator('#follow-announcement').get_attribute('class')=='sr-only'
+ assert page.locator('#follow-announcement').evaluate("el=>{const s=getComputedStyle(el);return s.position==='absolute' && s.clipPath==='inset(50%)' && s.width==='1px';}")
+ spoken=page.locator('#follow-announcement').inner_text()
+ orient({'pose':'flat','azimuthDeg':95,'accuracyDeg':14,'calibrate':False})
+ assert page.locator('#follow-announcement').inner_text()==spoken
+ assert page.locator('#spot-turn').is_visible()
+ orient({'pose':'flat','calibrate':True})
+ assert 'figure 8' in page.locator('#follow-status').inner_text()
+ assert page.locator('#spot-turn').is_hidden()
+ orient({'watching':False,'reason':'paused'})
+ assert page.locator('#follow').get_attribute('aria-pressed')=='false'
+ assert 'lost the foreground' in page.locator('#follow-status').inner_text()
  # Re-enter the future train for responsive preview/details checks.
  train.click()
  for width,height,scale in [(393,850,1),(850,393,1),(393,850,2)]:

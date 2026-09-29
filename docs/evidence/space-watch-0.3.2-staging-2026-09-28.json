@@ -1,0 +1,53 @@
+{
+  "complete": false,
+  "stopped": false,
+  "checks": [
+    "Signed fixture opens its computed dome and equivalent overhead list",
+    "Follow denied without native orientation grant; static sky remains usable",
+    "Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and ahead-of-you guidance",
+    "Upright pose suspends Follow guidance; explicit off returns north-up and releases native listener",
+    "Native menu pause releases compass and explicit menu return re-establishes Follow",
+    "Quick Settings ends Follow, explains focus loss, and requires an explicit tap to restart"
+  ],
+  "apkSha256": "23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477",
+  "moduleSha256": "52ca8609068cd81270c20e5f003111ab86b22f61599227132e7dd764be8fd199",
+  "fixtureSha256": "0ff39b7243272de166f85d308b4a6d95f58886bf7c7f5dbad63f6a938b9c8956",
+  "version": "0.3.2",
+  "followNativeConnections": {
+    "denied": 0,
+    "watching": 1,
+    "off": 0,
+    "menu": 0,
+    "menu-return": 1,
+    "quick-settings": 0,
+    "focus-return": 0,
+    "still-off": 0,
+    "explicit-restart": 1
+  },
+  "followListenerWaitSeconds": {
+    "denied": 0.048,
+    "watching": 0.044,
+    "off": 0.656,
+    "menu": 0.035,
+    "menu-return": 0.041,
+    "quick-settings": 2.01,
+    "focus-return": 0.04,
+    "still-off": 0.077,
+    "explicit-restart": 0.059
+  },
+  "runId": "20260928T235821Z-space-eaa5d8f9",
+  "plannedChecks": 23,
+  "packageCommit": "b796656d67ad244e46b8b866784b5da417eea06f",
+  "runnerCommit": "b796656d67ad244e46b8b866784b5da417eea06f",
+  "interruption": "Superseded after six completed gates; interrupted before automatic runner teardown",
+  "independentTeardown": {
+    "activeState": "inactive",
+    "mainPid": 0,
+    "result": "success",
+    "exitStatus": 0
+  },
+  "limitations": [
+    "Partial 6/23 evidence; not acceptance",
+    "Raw stopped=false reflects interruption; emulator independently stopped and successful exit verified afterward"
+  ]
+}

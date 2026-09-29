@@ -1,0 +1,31 @@
+{
+  "complete": false,
+  "stopped": false,
+  "checks": [
+    "Signed fixture opens its computed dome and equivalent overhead list",
+    "Follow denied without native orientation grant; static sky remains usable",
+    "Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and ahead-of-you guidance"
+  ],
+  "apkSha256": "23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477",
+  "moduleSha256": "7ec92078b6608a91fc5c31919ff64f48fcc225949e01b5f18dd3e94abcf3f4d5",
+  "fixtureSha256": "b53a17626aff142efb5cf9eac9e3eb95f1ff91381e435e61aa29161ffee59653",
+  "version": "0.3.3",
+  "followNativeConnections": {
+    "denied": 0,
+    "watching": 1
+  },
+  "runId": "20260929T000524Z-space-b5d12385",
+  "plannedChecks": 23,
+  "interruption": "Driver failed to bring Follow header into view; deliberately interrupted after three completed gates",
+  "independentTeardown": {
+    "activeState": "inactive",
+    "mainPid": 0,
+    "result": "success",
+    "exitStatus": 0
+  },
+  "limitations": [
+    "Partial, not acceptance",
+    "Native swipe in left padding did not reach header; diagnostic platform scroll-to-start did",
+    "Follow-up run uses same module/APK bytes and corrected driver"
+  ]
+}

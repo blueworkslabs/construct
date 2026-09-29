@@ -1,7 +1,7 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.2.14** is a signed HTML/CSS/JavaScript module for host **API 0.9 /
-alpha26** and later. It draws a sky dome of CelesTrak's brightest orbiting objects
+Space Watch **0.3.7** (source candidate) is a signed HTML/CSS/JavaScript module for
+host **API 0.14**; the published **0.2.14** runs on API 0.9 / alpha26 and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
 Positions are computed on the phone. **The location never leaves the device.**
@@ -11,6 +11,54 @@ Aircraft are a 10–100 km map question. Orbiting objects are seen from well ove
 1,000 km away and cross a 100 km circle in about 25 seconds, so they need a sky
 view, not a map.
 
+## Module 0.3.7: follow mode (API 0.14, source candidate)
+
+**Follow** turns the dome with the phone. Hold the phone flat with its top pointing
+where you face: your heading is at the top of the dome, and a ±28° wedge shows your
+view. The selected object's spot card then adds a line such as "Ahead of you,
+slightly right.", "Turn left about 40°." or "Behind you: turn around."
+
+- **Where readings come from.** The host's new
+  [`orientation.read`](module-api.md#foreground-compass-and-tilt-orientationread-api-014-source-candidate)
+  capability (#51) streams at 10 Hz while Follow is on. It is optional, and it
+  stays off until "Allow reading compass and tilt" is granted in Module access.
+- **True north.** Headings arrive magnetic. The module converts them with the
+  **WMM2025** declination for the chosen place (`ui/space-magnetic.js`, checked
+  against NOAA's 12 published test values; Berlin is about +5°). Outside the
+  model's use (geographic poles, magnetic caution/blackout zones, or outside
+  decimal years 2025.0–2030.0), the dome stays north-up and
+  relative pointing pauses with an explanation; magnetic and true bearings are never mixed.
+- **Smoothing.** Each reading moves the heading a quarter of the way, along the
+  shorter way round.
+- **Poses.** Upright readings do not turn the dome: the status asks you to hold
+  the phone flat. The chart retains its last rotation (including its compass
+  labels); it is not a live facing indicator while upright. Turning Follow off
+  explicitly restores north-up. Directional guidance and the view wedge are hidden until a
+  fresh flat reading arrives. Missing headings or a 1.5-second sample gap also
+  suspend guidance rather than retaining a stale direction.
+- **Accuracy.** The status line shows the compass accuracy, e.g. "Facing
+  south-west · compass ±12°". When the host flags `calibrate`, it asks for a
+  figure-8 wave. Guidance is always a wedge and words, never a crosshair.
+- **Lifecycle.** A menu pause stops the host stream, and Space Watch asks again on
+  return, retrying a transient `RUN_PAUSED` for at most two seconds while window
+  focus returns. Follow off, another pause or a terminal event cancels this retry.
+  When the host itself ends the stream, it sends `{watching:false,
+  reason}`: that happens for another window in front, Home, Recents, the
+  notification shade or Quick Settings (`paused`), and for access turned off (`revoked`). Follow then turns off and
+  says why, and a tap turns it back on. It never restarts silently. Turning
+  Follow off sends `stop` and puts north back at the top.
+- **Storage.** Nothing about headings is stored, and Follow always starts off.
+- **Fallback.** Without the grant or a compass, a note explains what's missing
+  and the static compass dome keeps working.
+- **Delivery.** 0.3.7 declares `constructApi` 0.14.0 exactly. Publish it only
+  after an API 0.14 host is released. Older hosts keep 0.2.14 from the catalog's
+  version list.
+
+Browser preview of Synthetic Space Watch 0.3.0 with simulated compass readings
+(desktop Chromium, not Android):
+
+![Follow mode facing south-west, ISS ahead](images/space-watch-0.3.0/follow.jpg)
+
 ## Module 0.2.0: visible passes and trains
 
 Both features are module-only, with no host change, no new origin and no new
@@ -19,7 +67,7 @@ the initial 0.2.0 package; 0.2.8 added the grazing-pass refinement below and
 passed 16/16 Android checks. 0.2.12 plans trains from all their members (below),
 keeps invisible gaps out of merged passes, tracks selection per pass and maps
 tappable train beads to the grouped train; it passed 16/16. 0.2.14 makes the
-next-rise lookup grazing-aware too and needs its own acceptance.
+next-rise lookup grazing-aware too and passed its own 16/16 Android acceptance.
 Train details and the below-horizon spot card share a search of every distinct member for the next rise above 10°, yielding
 between scans and discarding stale results after selection, place or lifecycle changes.
 Train spot cards do not show a single representative's fade countdown as though
@@ -135,13 +183,10 @@ not Android; pre-review wording and stale-train policy):
 | Dome rendering, list, pointing words, details, red mode | `storage.kv` (64 KiB quota) |
 | Curated names for famous objects and rocket-stage launchers | Consent, grants, lifecycle, isolation |
 
-- **APIs:** only implemented ones are used: `net.http`, `location.read` and
-  `storage.kv`, all 0.9. There is no new host capability and no APK change.
-- **Future follow mode:** turning the dome with the phone needs a live,
-  foreground-only orientation stream. The Aimé brief already plans a one-shot
-  `orientation.read` with a "later live mode". That would be a separate, shared
-  host contract. The dome renderer has a `rotation` input reserved for it; the
-  module does not claim or emulate it.
+- **APIs:** up to 0.2.14, only implemented 0.9 capabilities are used: `net.http`,
+  `location.read` and `storage.kv`. 0.3.0 adds the optional API 0.14
+  `orientation.read` for Follow. The host side is #51, specified in the
+  [orientation brief](orientation-brief.md).
 
 ## Interaction
 
@@ -250,6 +295,8 @@ not Android; pre-review wording and stale-train policy):
     object or launcher name, and only after **Read on Wikipedia**.
 - **`location.read`** is optional: one foreground fix at opening or on **Use my
   location**. It is held in memory for the session and never stored or sent.
+- **`orientation.read`** (0.3.0) is optional and used only while Follow is on.
+  Readings stay in memory to turn the dome and are never stored or sent.
 - **`storage.kv`** holds only `preferences` (`startWithLocation`, `red`),
   `fetch-state` (attempt times and back-off) and the orbit and catalog cache.
 - The module uses no `fetch`, XHR, geolocation or console. It has no inline
@@ -271,8 +318,10 @@ not Android; pre-review wording and stale-train policy):
 - **Stars and horizon.** Star positions are BSC5 J2000, precessed to the date.
   The horizon uses the phone's location only; the height above sea level is
   taken as 0.
-- **Not included:** compass or orientation, AR, background alerts and
-  notifications. Foreground visible-pass planning covers the next 12 hours.
+- **Compass.** Follow is only as good as the phone's compass (often ±10–20°),
+  and magnetic surroundings can mislead it.
+- **Not included:** camera AR, a raised "point at the sky" pose, background
+  alerts and notifications. Foreground visible-pass planning covers the next 12 hours.
 
 ## Third-party code and data
 
@@ -280,6 +329,7 @@ not Android; pre-review wording and stale-train policy):
 | --- | --- | --- | --- |
 | `ui/vendor/satellite.min.js` | satellite.js 6.0.2 UMD build (`dist/satellite.min.js`, npm) | MIT, `ui/vendor/satellite-js-LICENSE.txt` | `14488fc910920924e6616f07f950ba307586e08fbb837407d8fe04c939b2059f` |
 | `ui/vendor/astronomy.min.js` | Astronomy Engine 2.1.19 (`astronomy.browser.min.js`, npm) | MIT, `ui/vendor/astronomy-engine-LICENSE.txt` | `f41139a87941ea017ab902b954c9389fa27ea72083d7fab4971756d7769d14e6` |
+| `ui/space-magnetic.js` | World Magnetic Model WMM2025 coefficients (`WMM.COF` from NOAA NCEI `WMM2025COF.zip`, epoch 2025.0, valid to 2030.0), with a spherical-harmonic evaluator written for Space Watch | US government work (NOAA NCEI / BGS), public domain | `WMM.COF` `dfa8597825af4e0b87ff4198a5b4fb661b3c49f4cd090cd0164e0259b075582f` |
 | `ui/space-stars.js` | Generated by `scripts/space_watch_stars.py` from the Yale Bright Star Catalog 5th ed. (Hoffleit & Warren 1991), JSON via brettonw/YaleBrightStarCatalog `bsc5-short.json` | Public catalogue data | n/a |
 
 - **Vendored builds.** Both libraries are the unmodified, published builds, and
@@ -288,8 +338,8 @@ not Android; pre-review wording and stale-train policy):
 - **Attribution.** Orbits and the catalogue come from CelesTrak
   (<https://celestrak.org>). Descriptions are Wikipedia text under CC BY-SA 4.0
   (<https://creativecommons.org/licenses/by-sa/4.0/>). The module's Help credits
-  CelesTrak, the Yale Bright Star Catalog, satellite.js, Astronomy Engine and
-  Wikipedia.
+  CelesTrak, the Yale Bright Star Catalog, satellite.js, Astronomy Engine,
+  the World Magnetic Model and Wikipedia.
 
 ## Tests and acceptance
 
@@ -297,6 +347,8 @@ not Android; pre-review wording and stale-train policy):
   - record validation, cache chunking, and the Heavens-Above pass regression;
   - visibility states, pointing words, anchors and the star table;
   - catalogue naming, URL building and Wikipedia parsing;
+  - (0.3.0) WMM2025 declination against NOAA's test values
+    (`scripts/space-fixture/wmm2025-test-values.txt`);
   - (0.2.0) dark ranges and the planner's ISS pass against Heavens-Above, and
     train detection on the captured last-30-days subset;
   - the manifest and package shape (CSP, script order, shared files) and the
@@ -305,6 +357,10 @@ not Android; pre-review wording and stale-train policy):
   DOM double. It covers:
   - start and fix;
   - **no coordinates in any request URL or in storage**;
+  - (0.3.0) Follow: watch request, upright readings ignored, WMM true north
+    for Berlin, smoothing, "Ahead of you" / "Behind you" guidance, calibration
+    note, re-watch after a pause, stop and north-up, nothing stored, and the
+    denied and no-compass notes;
   - (0.2.0) the pass list with a Now entry, preview of a train pass, train
     details and Wikipedia, the train cache on reopen, and a failing recent list
     leaving the sky alone;
@@ -356,3 +412,8 @@ see the staging report above for actual emulator captures.
 ![Details with the same-launch lookup](images/space-watch-0.1.0/details.jpg)
 ![Red mode, rewound two minutes](images/space-watch-0.1.0/red-rewind.jpg)
 ![Landscape](images/space-watch-0.1.0/landscape.jpg)
+
+Follow also rejects missing/future measurement timestamps and samples older than
+1.5 seconds, so queued events cannot refresh a stale heading. WMM correction is
+conservatively unavailable when the horizontal field is below 6000 nT, covering
+NOAA's magnetic caution and blackout zones; the static north-up sky remains usable.

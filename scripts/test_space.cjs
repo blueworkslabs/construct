@@ -9,6 +9,7 @@ const K = require("../" + root + "ui/space-sky.js");
 const C = require("../" + root + "ui/space-catalog.js");
 const Stars = require("../" + root + "ui/space-stars.js");
 const P = require("../" + root + "ui/space-plan.js");
+const M = require("../" + root + "ui/space-magnetic.js");
 let count = 0;
 function test(name, body) {
   body();
@@ -401,13 +402,42 @@ test("planner distinguishes clipped windows and keeps short previews inside visi
   assert(P.previewTime(p, from - 60000) >= p.startMs);
   assert(P.previewTime(p, from - 60000) < p.endMs);
 });
+test("WMM2025 declination matches NOAA's published test values", () => {
+  const rows = fs.readFileSync("scripts/space-fixture/wmm2025-test-values.txt", "utf8").split("\n").filter((l) => l.trim() && !l.startsWith("#"));
+  assert.equal(rows.length, 12);
+  for (const row of rows) {
+    const [year, h, lat, lon, X, Y, Z, , , , D] = row.trim().split(/\s+/).map(Number);
+    const b = M.field(lat, lon, h, year);
+    assert.ok(Math.abs(b.x - X) < 0.2 && Math.abs(b.y - Y) < 0.2 && Math.abs(b.z - Z) < 0.2, row);
+    assert.ok(Math.abs((Math.atan2(b.y, b.x) * 180) / Math.PI - D) < 0.01, row);
+  }
+  // Berlin, autumn 2026: about 5° east.
+  const berlin = M.declination(52.52, 13.405, at("2026-09-28T18:00:00Z"));
+  assert.ok(berlin > 4.5 && berlin < 6, String(berlin));
+  // Outside the model's use: no guess.
+  assert.equal(M.declination(90, 0, at("2026-09-28T18:00:00Z")), null);
+  const blackout = M.field(85,130,0,2026.75);
+  assert(Math.hypot(blackout.x,blackout.y)<2000);
+  assert.equal(M.declination(85,130,at("2026-09-28T18:00:00Z")),null,'magnetic blackout is distinct from geographic pole');
+  assert.equal(M.declination(75,130,at("2026-09-28T18:00:00Z")),null,"caution zone also suspends precise pointing");
+  assert(Number.isFinite(M.declination(70,130,at("2026-09-28T18:00:00Z"))));
+  assert.equal(M.declination(52, 13, at("2033-01-01T00:00:00Z")), null);
+  for (const date of ['2024-12-31T23:59:59.999Z','2030-01-01T00:00:00.001Z'])
+    assert.equal(M.declination(52,13,at(date)),null,'outside documented WMM2025 validity: '+date);
+  for (const date of ['2025-01-01T00:00:00Z','2030-01-01T00:00:00Z'])
+    assert(Number.isFinite(M.declination(52,13,at(date))),'valid model boundary: '+date);
+
+  assert.ok(Math.abs(M.decimalYear(at("2027-07-02T12:00:00Z")) - 2027.5) < 0.002);
+});
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
   assert.equal(m.id, "dev.construct.space-watch");
-  assert.equal(m.version, "0.2.14");
-  assert.deepEqual(m.constructApi, { min: "0.9.0", target: "0.9.0" });
+  assert.equal(m.version, "0.3.7");
+  assert.deepEqual(m.constructApi, { min: "0.14.0", target: "0.14.0" });
   const caps = Object.fromEntries(m.capabilities.map((c) => [c.id, c]));
-  assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "storage.kv"]);
+  assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "orientation.read", "storage.kv"]);
+  assert.equal(caps["orientation.read"].optional, true);
+  assert.match(caps["orientation.read"].reason, /stay on this phone/);
   assert.deepEqual(caps["net.http"].origins, ["https://celestrak.org", "https://en.wikipedia.org"]);
   assert.equal(caps["location.read"].optional, true);
   assert.match(caps["storage.kv"].reason, /not your location/);
@@ -416,7 +446,7 @@ test("package: manifest, capabilities, scripts and no location in any URL", () =
   // Module CSP: no inline script or style.
   assert.doesNotMatch(html, /\sstyle=|<style|<script(?![^>]*\ssrc=)/);
   const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map((x) => x[1]);
-  assert.deepEqual(scripts, ["bridge.js", "vendor/satellite.min.js", "vendor/astronomy.min.js", "space-stars.js", "space-orbit.js", "space-sky.js", "space-catalog.js", "space-plan.js", "space-dome.js", "app.js"]);
+  assert.deepEqual(scripts, ["bridge.js", "vendor/satellite.min.js", "vendor/astronomy.min.js", "space-stars.js", "space-orbit.js", "space-sky.js", "space-catalog.js", "space-plan.js", "space-magnetic.js", "space-dome.js", "app.js"]);
   for (const s of scripts) assert.ok(fs.existsSync(root + "ui/" + s), s);
   assert.doesNotMatch(app, /\bfetch\s*\(|XMLHttpRequest|navigator\.geolocation|console\./);
   // Every URL the module can request is built from fixed strings plus a
@@ -429,7 +459,7 @@ test("package: manifest, capabilities, scripts and no location in any URL", () =
   for (const shared of ["construct-ui.css", "bridge.js"])
     assert.equal(fs.readFileSync(root + "ui/" + shared, "utf8"), fs.readFileSync("examples/sky-watch-module/ui/" + shared, "utf8"), shared);
   const docs = fs.readFileSync("docs/space-watch.md", "utf8");
-  assert.match(docs, /Space Watch \*\*0\.2\.14\*\*/);
+  assert.ok(docs.includes(`Space Watch **${m.version}** (source candidate)`));
   // Vendored libraries are pinned by hash in the doc.
   for (const f of ["satellite.min.js", "astronomy.min.js"]) {
     const sha = crypto.createHash("sha256").update(fs.readFileSync(root + "ui/vendor/" + f)).digest("hex");

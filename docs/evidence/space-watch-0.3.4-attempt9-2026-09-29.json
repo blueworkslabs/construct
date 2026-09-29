@@ -1,0 +1,61 @@
+{
+  "complete": false,
+  "stopped": true,
+  "checks": [
+    "Signed fixture opens its computed dome and equivalent overhead list",
+    "Follow denied without native orientation grant; static sky remains usable",
+    "Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and relative turn guidance",
+    "Upright pose suspends Follow guidance; explicit off returns north-up and releases native listener",
+    "Native menu pause releases compass and explicit menu return re-establishes Follow",
+    "Quick Settings ends Follow, explains focus loss, and requires an explicit tap to restart",
+    "Follow remains operable with display rotation and 200% Android text",
+    "Revoked orientation cannot restart Follow; a fresh process starts with Follow off"
+  ],
+  "error": "Module control scroll timed out: <function reach_text.<locals>.<lambda> at 0x732b73544180>",
+  "apkSha256": "23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477",
+  "moduleSha256": "1ae50cccdbed685744c654bf56e30c4b72d80779e90637df5c0e7f5b89671132",
+  "fixtureSha256": "e57261f177e626228198f8feb705d0fdaba9bc766cca40168e749049f5a2ae77",
+  "version": "0.3.4",
+  "followNativeConnections": {
+    "denied": 0,
+    "watching": 1,
+    "off": 0,
+    "menu": 0,
+    "menu-return": 1,
+    "quick-settings": 0,
+    "focus-return": 0,
+    "still-off": 0,
+    "explicit-restart": 1,
+    "revoked": 0,
+    "process-restart": 0
+  },
+  "followListenerWaitSeconds": {
+    "denied": 0.046,
+    "watching": 0.052,
+    "off": 0.767,
+    "menu": 0.049,
+    "menu-return": 0.098,
+    "quick-settings": 0.028,
+    "focus-return": 0.057,
+    "still-off": 0.061,
+    "explicit-restart": 0.057,
+    "revoked": 0.041,
+    "process-restart": 0.046
+  },
+  "followGuidance": "Turn left about 30\u00b0.",
+  "followForegroundObservationSeconds": 1.411,
+  "runId": "20260929T003813Z-space-3e3f2154",
+  "plannedChecks": 23,
+  "independentTeardown": {
+    "activeState": "inactive",
+    "mainPid": 0,
+    "result": "success",
+    "exitStatus": 0
+  },
+  "limitations": [
+    "Incomplete 8/23; all seven Follow gates passed but original pass-list navigation timed out",
+    "Changing sky text prevented driver top-boundary detection; fixed named-control geometry signature with regressions",
+    "Landscape/200% Follow captures contain a driver-induced text-selection toolbar over rewind",
+    "Superseded by 0.3.5; no physical clearance"
+  ]
+}

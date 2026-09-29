@@ -1,0 +1,47 @@
+{
+  "complete": false,
+  "stopped": true,
+  "checks": [
+    "Signed fixture opens its computed dome and equivalent overhead list",
+    "Follow denied without native orientation grant; static sky remains usable",
+    "Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and relative turn guidance",
+    "Upright pose suspends Follow guidance; explicit off returns north-up and releases native listener",
+    "Native menu pause releases compass and explicit menu return re-establishes Follow"
+  ],
+  "error": "('Follow listeners', 'quick-settings', 1, 0)",
+  "apkSha256": "23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477",
+  "moduleSha256": "1ae50cccdbed685744c654bf56e30c4b72d80779e90637df5c0e7f5b89671132",
+  "fixtureSha256": "e57261f177e626228198f8feb705d0fdaba9bc766cca40168e749049f5a2ae77",
+  "version": "0.3.4",
+  "followNativeConnections": {
+    "denied": 0,
+    "watching": 1,
+    "off": 0,
+    "menu": 0,
+    "menu-return": 1,
+    "quick-settings": 1
+  },
+  "followListenerWaitSeconds": {
+    "denied": 0.044,
+    "watching": 0.093,
+    "off": 0.549,
+    "menu": 0.055,
+    "menu-return": 0.057,
+    "quick-settings": 3.088
+  },
+  "followGuidance": "Ahead of you, slightly left.",
+  "runId": "20260929T003043Z-space-f020283b",
+  "plannedChecks": 23,
+  "independentTeardown": {
+    "activeState": "inactive",
+    "mainPid": 0,
+    "result": "success",
+    "exitStatus": 0
+  },
+  "limitations": [
+    "Incomplete 5/23; native connection remained during Quick Settings check",
+    "SystemUI shade appeared, but no client focus-state receipt was taken before sensor assertion",
+    "Logs show delayed focus processing; result cannot establish a post-callback sensor leak",
+    "Next run observes resumed-but-unfocused client state before sensor assertion, matching host acceptance method"
+  ]
+}

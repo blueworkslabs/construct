@@ -1,8 +1,8 @@
 "use strict";
 // The sky dome: horizon at the edge, straight up in the centre, compass
 // orientation (N up, E right, like holding a compass flat). Canvas only; the
-// list view is the accessible equivalent. `rotation` turns the dome so that a
-// heading points up (reserved for a future follow mode; 0 = north up).
+// list view is the accessible equivalent. In follow mode `turn(heading)` rotates
+// the dome so that heading is at the top (0 = north up).
 class SpaceDome {
   constructor(canvas, onSelect) {
     this.canvas = canvas;
@@ -38,6 +38,11 @@ class SpaceDome {
     this.scene = scene;
     this.draw();
   }
+  // Follow mode: put this heading (degrees true) at the top and redraw.
+  turn(heading) {
+    this.rotation = heading;
+    this.draw();
+  }
   geometry() {
     const rect = this.canvas.getBoundingClientRect(),
       size = Math.max(160, Math.min(rect.width || 320, 560));
@@ -69,6 +74,21 @@ class SpaceDome {
     g.strokeStyle = c.edge;
     g.lineWidth = 1;
     g.stroke();
+    if (s.follow) {
+      // Where you are facing: a wedge of ±28° from the centre to the top edge.
+      const w = (28 * Math.PI) / 180;
+      g.fillStyle = c.track;
+      g.globalAlpha = 0.12;
+      g.beginPath();
+      g.moveTo(cx, cy);
+      g.arc(cx, cy, r, -Math.PI / 2 - w, -Math.PI / 2 + w);
+      g.closePath();
+      g.fill();
+      g.globalAlpha = 0.4;
+      g.strokeStyle = c.track;
+      g.stroke();
+      g.globalAlpha = 1;
+    }
     g.setLineDash([2, 4]);
     g.strokeStyle = c.ring;
     for (const el of [30, 60]) {
