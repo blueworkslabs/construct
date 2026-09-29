@@ -243,6 +243,12 @@ def follow_checks():
  time.sleep(2);full_dome('Pointing view:');capture('pointing-rolled')
  receipt['pointHighGuidance']=text_of(reveal(visible_point_guidance));save()
  done('High 60-degree camera aim stays in pointing through host flat pose; rolled view and screen-relative guidance remain available')
+ # The fixture clock advances with navigation. Reopen it before the layout
+ # sequence so this short-lived satellite is still above the horizon; do not
+ # mistake a correct below-horizon message for missing directional guidance.
+ adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE)
+ inject_point(85,60,35);click(lambda t:t=='Follow');reach_text('Pointing east, 6 fists up')
+ click(lambda t:t.startswith('Long March 4B rocket stage'))
  adb('shell','settings','put','system','user_rotation','1');time.sleep(3)
  reach_text('Pointing east, 6 fists up');full_dome('Pointing view:');capture('pointing-landscape')
  reveal(visible_point_guidance);capture('pointing-landscape-guidance')
