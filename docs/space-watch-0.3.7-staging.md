@@ -1,6 +1,6 @@
-# Space Watch 0.3.5 follow-mode staging
+# Space Watch 0.3.7 follow-mode staging
 
-Status: **Superseded by 0.3.6; not cleared for phone testing.**
+Status: **Android acceptance pending.** Not yet cleared for phone testing.
 No merge, APK release or production-catalog change is included.
 
 ## Ownership and exact artifacts
@@ -11,10 +11,10 @@ pointing UI. The host owns consent, bounded sensor access and lifecycle.
 Optional `orientation.read` adds native opt-in, with no Android permission or
 new network origin. Existing module storage/network privacy boundaries remain.
 
-- Reviewed module source: `e8f286c` (review foundation `b59b222`, author base `4b604ae`).
-- Signed real/fixture packages: `a0d9448bedf10fe84c622da31607bd3778f2338a`.
-- Real module SHA-256: `e8adfd0a526d67b64b667f3a5ad5ac932cd2d56db02ca2e4923bd0526de8fea1`.
-- Fixture SHA-256: `408c6c636dab6d8df64ff410d86ad6c91c9a0b90bbf15b7bb451e4b807fb1e3e`.
+- Reviewed module source: `4f59c2b` (review foundation `b59b222`, author base `4b604ae`).
+- Signed real/fixture packages: `8aaf99611385dafe3b17914f55ca55694f2ab390`.
+- Real module SHA-256: `6c376ca889fa7887c08f70f822508a176f87f5e694b832c044ba60094c22d3c2`.
+- Fixture SHA-256: `dbee0598f0cbfec21add381fb3a20641030267a4367a95ba0eadde54a5563232`.
 - Host alpha37 source: `4e7f534`.
 - Tested x86_64 APK SHA-256: `23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477`.
 
@@ -53,7 +53,7 @@ rotation and suppress live wedge/turn guidance; explicit Follow off restores nor
 
 ## Android acceptance
 
-Attempt 10 (`20260929T005357Z-space-4267d43b`) stopped at **9/23** when the driver could not reach the lower Guowang pass control. All seven Follow gates passed. [Partial receipt](evidence/space-watch-0.3.5-attempt10-2026-09-29.json). Emulator teardown independently returned success, exit 0 and PID 0. A separate run with a settled-scroll correction is in progress; neither substitutes for 0.3.6 acceptance.
+Pending exact-package run, 23 required checks.
 Follow is exercised immediately after signed installation, including native
 compass denial/grant, north/east injection, relative pointing, upright/off,
 menu return, Quick Settings, explicit restart, landscape/200% text, revocation
@@ -106,3 +106,21 @@ run, remain separate. The runner now compares stable named-control positions for
 scroll boundaries rather than rapidly changing compass/sky text. It uses shorter
 swipes to avoid driver-induced text selection. Focus-loss acceptance explicitly
 records system/client state before testing native listener release.
+
+## Cancellable sample expiry
+
+A dedicated cancellable timer expires directional guidance 1.5 seconds after
+measurement time, independently of the slower sky-render timer. Fresh readings
+replace it; lifecycle changes cancel it. Regressions cover silence without frame
+callbacks and an older timer being unable to clear a newer reading. These fail
+before the change and pass afterward. JavaScript event-loop scheduling is not a
+hard real-time guarantee. Earlier [0.3.5 runs](space-watch-0.3.5-staging.md) remain
+separate and cannot establish acceptance for these new bytes.
+
+## Model validity window
+
+Correction is available only for WMM2025’s documented decimal-year interval
+2025.0–2030.0, inclusive. Boundary regressions reject the instants just outside
+it and accept both endpoints; the old extrapolating guard fails this test.
+All twelve NOAA field values remain green. 0.3.6 was signed but superseded
+before Android execution and has no acceptance run.
