@@ -582,6 +582,10 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   point(issNow.az, issNow.el);
   assert.equal(r.el('point-guide').textContent, 'On target. Look past the top of the phone.');
   assert.equal(r.el('point-guide').className, 'locked'); assert.equal(r.el('follow-announcement').textContent, 'On target.');
+  r.orient({...hostSample(issNow.az, issNow.el, 0, {declination: decl}), calibrate: true});
+  assert.match(r.el('follow-announcement').textContent, /figure 8/);
+  point(issNow.az, issNow.el, 0, 1);
+  assert.equal(r.el('follow-announcement').textContent, 'On target.', 'calibration recovery restores unchanged guidance');
   assert(r.el('spot-turn').hidden, 'the viewfinder gives the guidance');
   assert.match(r.el('follow-status').textContent, /^Pointing (north|south|east|west|north-east|north-west|south-east|south-west), .* · compass ±8°$/);
   point(issNow.az - 20, issNow.el);

@@ -4,7 +4,7 @@
 Synthetic wrapper tests UI only; the real package tests authority and providers.
 Screenshots need human review; hardware spotting accuracy is not claimed.
 """
-import argparse,datetime,fcntl,hashlib,json,os,re,subprocess,time,uuid
+import argparse,datetime,fcntl,hashlib,json,math,os,re,subprocess,time,uuid
 from pathlib import Path
 from config import CONFIG,SERIAL,require_runner,catalog
 p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.add_argument('--sha',required=True)
@@ -30,7 +30,7 @@ from host_ui import host_ready,catalog_settings,apply_catalog,library,select_aft
 from catalog_input import replace_text
 from space_checks import scroll_signature
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'fixtureSha256':a.fixture_sha,'version':a.version,
- 'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{},'plannedChecks':23 if a.follow else 16,'followRequired':a.follow}
+ 'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{},'plannedChecks':25 if a.follow else 16,'followRequired':a.follow}
 started=False
 def nodes():
  current=ui.nodes();deny=gboard_contacts_denial(current)
@@ -123,12 +123,12 @@ def wiki_credit():
   adb('shell','input','swipe',str(x),str(y1+(y2-y1)*3//4),str(x),str(y1+(y2-y1)//3),'350')
   time.sleep(.3)
  reach_text('CC BY-SA 4.0')
-def full_dome():
+def full_dome(prefix="Sky dome:"):
  # Start above the canvas: clipped accessibility bounds do not reveal which
  # edge is missing, so blindly scrolling down can move a top-clipped dome out.
  reveal(lambda t:t in (FIXTURE,REAL))
  for _ in range(18):
-  c=next((n for n in nodes() if text_of(n).startswith('Sky dome:') and visible(n)),None)
+  c=next((n for n in nodes() if text_of(n).startswith(prefix) and visible(n)),None)
   if c is not None:
    b=bounds(c);w=web();size=b[2]-b[0]
    if abs(size-(b[3]-b[1]))<=6 and b[1]>=w[1] and b[3]<=w[3]:return c
@@ -181,6 +181,19 @@ def inject(acc,mag):
  adb('emu','sensor','set','gyroscope','0:0:0')
  adb('emu','sensor','set','acceleration',acc)
  adb('emu','sensor','set','magnetic-field',mag)
+def inject_point(az,el,roll=0):
+ # Independent physical ENU basis -> Android device sensor inputs. Portrait
+ # device axes are right, up, and out of the screen; camera looks along -Z.
+ a,e,r=map(math.radians,(az,el,roll))
+ right=(math.cos(a),-math.sin(a),0)
+ up=(-math.sin(e)*math.sin(a),-math.sin(e)*math.cos(a),math.cos(e))
+ z=(-math.cos(e)*math.sin(a),-math.cos(e)*math.cos(a),-math.sin(e))
+ x=tuple(right[i]*math.cos(r)-up[i]*math.sin(r) for i in range(3))
+ y=tuple(right[i]*math.sin(r)+up[i]*math.cos(r) for i in range(3))
+ acc=':'.join(str(9.80665*v[2]) for v in (x,y,z))
+ mag=':'.join(str(50*v[1]-20*v[2]) for v in (x,y,z))
+ inject(acc,mag)
+ receipt.setdefault('pointingInputs',[]).append({'magneticAz':az,'elevation':el,'roll':roll});save()
 def follow_sensors(label,expected):
  from orientation_checks import active_connections
  uid=int(re.search(r'uid:(\d+)',adb('shell','pm','list','packages','-U','dev.construct.runtime')).group(1))
@@ -223,7 +236,21 @@ def follow_checks():
  inject('0:9.80665:0','-50:-20:0');reach_text('Pointing ')
  click(lambda t:t.startswith('Long March 4B rocket stage'))
  receipt['pointGuidance']=text_of(reveal(lambda t:bool(re.match(r'^(On target\.|Move the phone |Turn around: )',t))))
- save();capture('pointing-view');click(lambda t:t=='Clear')
+ save();full_dome('Pointing view:');capture('pointing-view')
+ inject_point(85,60);reach_text('Pointing east, 6 fists up')
+ full_dome('Pointing view:');capture('pointing-high')
+ inject_point(85,60,35);reach_text('Pointing east, 6 fists up')
+ time.sleep(2);full_dome('Pointing view:');capture('pointing-rolled')
+ receipt['pointHighGuidance']=text_of(reveal(lambda t:bool(re.match(r'^(On target\.|Move the phone |Turn around: )',t))));save()
+ done('High 60-degree camera aim stays in pointing through host flat pose; rolled view and screen-relative guidance remain available')
+ adb('shell','settings','put','system','user_rotation','1');time.sleep(3)
+ reach_text('Pointing east, 6 fists up');full_dome('Pointing view:');capture('pointing-landscape')
+ adb('shell','settings','put','system','user_rotation','0');adb('shell','settings','put','system','font_scale','2.0');time.sleep(3)
+ reach_text('Pointing east, 6 fists up');full_dome('Pointing view:');capture('pointing-large-text')
+ reveal(lambda t:bool(re.match(r'^(On target\.|Move the phone |Turn around: )',t)));capture('pointing-large-guidance')
+ adb('shell','settings','put','system','font_scale','1.0');time.sleep(2)
+ done('Pointing canvas and guidance stay reachable in landscape and 200% Android text')
+ click(lambda t:t=='Clear')
  inject('0:0:9.80665','-50:0:-20');reach_text('Facing east · compass')
  click(lambda t:t=='Follow');follow_sensors('off',0);full_dome();capture('follow-off')
  done('Raised phone switches to the pointing view with plain guidance; flat returns the dome; explicit off returns north-up and releases native listener')

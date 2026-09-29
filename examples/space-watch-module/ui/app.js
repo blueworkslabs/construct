@@ -1251,8 +1251,8 @@
     message($("point-guide"), text, g && g.locked ? "locked" : "");
     // Announce only when the kind of guidance changes, not every few degrees.
     const key = g ? g.key : text;
-    if (!pointGuide || pointGuide.key !== key) {
-      pointGuide = { key, text };
+    if (!pointGuide || pointGuide.key !== key || pointGuide.calibrate !== follow.calibrate) {
+      pointGuide = { key, text, calibrate: follow.calibrate };
       if (!follow.calibrate) message($("follow-announcement"), g ? g.short : text, "sr-only");
     }
     pointer.draw({

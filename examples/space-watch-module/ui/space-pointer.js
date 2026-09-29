@@ -52,6 +52,11 @@ const SpacePointer = (() => {
   // zenith, where roll and bearing stop meaning much.
   function smooth(prev, next, k) {
     if (!prev) return next;
+    // A discontinuous reorientation can make opposite vectors cancel (or stay
+    // stuck on the old side for seconds). Reacquire large changes directly;
+    // ordinary sensor jitter still takes the smoothed path. The trace is
+    // 1 + 2*cos(relative rotation), so zero means a 120-degree change.
+    if (dot(prev.E, next.E) + dot(prev.N, next.N) + dot(prev.U, next.U) < 0) return next;
     const U = norm(add(prev.U, scale(add(next.U, scale(prev.U, -1)), k))),
       n0 = add(prev.N, scale(add(next.N, scale(prev.N, -1)), k)),
       N = U && norm(add(n0, scale(U, -dot(n0, U))));

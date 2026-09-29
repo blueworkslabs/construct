@@ -363,8 +363,8 @@ not Android; pre-review wording and stale-train policy):
   taken as 0.
 - **Compass.** Follow is only as good as the phone's compass (often ±10–20°),
   and magnetic surroundings can mislead it.
-- **Not included:** camera AR, a raised "point at the sky" pose, background
-  alerts and notifications. Foreground visible-pass planning covers the next 12 hours.
+- **Not included:** camera-image AR, background alerts and notifications.
+  The raised-phone pointing view is drawn without a camera feed. Foreground visible-pass planning covers the next 12 hours.
 
 ## Third-party code and data
 
@@ -400,10 +400,13 @@ not Android; pre-review wording and stale-train policy):
   DOM double. It covers:
   - start and fix;
   - **no coordinates in any request URL or in storage**;
-  - (0.3.0) Follow: watch request, upright readings ignored, WMM true north
+  - (0.4.0) Follow and pointing: watch request, raised-phone view and flat dome, WMM true north
     for Berlin, smoothing, "Ahead of you" / "Behind you" guidance, calibration
     note, re-watch after a pause, stop and north-up, nothing stored, and the
     denied and no-compass notes;
+  - full-pose pointing through zenith and all four display rotations, large-turn
+    reacquisition, screen-relative guidance/lock, calibration-announcement recovery,
+    rewind exit and stale-aim removal;
   - (0.2.0) the pass list with a Now entry, preview of a train pass, train
     details and Wikipedia, the train cache on reopen, and a failing recent list
     leaving the sky alone;

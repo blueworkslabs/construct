@@ -434,10 +434,10 @@ test("WMM2025 declination matches NOAA's published test values", () => {
 test("pointing: host samples give the camera direction from horizon to zenith", () => {
   const frameOf = (s) => SP.orient({ pitchDeg: s.pitchDeg, rollDeg: s.rollDeg, bearingDeg: s.azimuthDeg, axis: s.pose === "upright" ? "camera" : "top" });
   let flat = 0, upright = 0;
-  for (const rotation of [0, 1])
+  for (const rotation of [0, 1, 2, 3])
     for (const az of [0, 37, 123, 200, 315])
-      for (const el of [-20, 0, 10, 30, 44, 46, 60, 75, 85, 89])
-        for (const roll of [-40, 0, 15, 60]) {
+      for (const el of [-20, 0, 10, 30, 44, 46, 60, 75, 85, 89, 90])
+        for (const roll of [-179, -90, -40, 0, 15, 60, 90, 179]) {
           const s = hostSample(az, el, roll, { rotation });
           assert.ok(Number.isFinite(s.azimuthDeg), `${az}/${el}/${roll}`);
           s.pose === "flat" ? flat++ : upright++;
@@ -461,6 +461,19 @@ test("pointing: host samples give the camera direction from horizon to zenith", 
   for (const v of [z.E, z.N, z.U]) assert.ok(Math.abs(Math.hypot(...v) - 1) < 1e-9);
   assert.equal(SP.orient({ pitchDeg: 10, rollDeg: 0, axis: "camera" }), null, "no bearing, no frame");
 });
+test("pointing: a half-turn reacquires without seconds of stale aim", () => {
+  const frame = (az, roll = 0) => {
+    const s = hostSample(az, 0, roll);
+    return SP.orient({...s, bearingDeg: s.azimuthDeg, axis: "camera"});
+  };
+  for (const target of [frame(180), frame(0, 180)]) {
+    let f = frame(0);
+    for (let i = 0; i < 10; i++) f = SP.smooth(f, target, .35);
+    for (const axis of ["E", "N", "U"])
+      assert(Math.hypot(...f[axis].map((v, i) => v - target[axis][i])) < .1, axis);
+  }
+});
+
 test("pointing: plain words match the screen, the arrow and the lock ring", () => {
   const f = (az, el, roll = 0) => { const s = hostSample(az, el, roll); return SP.orient({ pitchDeg: s.pitchDeg, rollDeg: s.rollDeg, bearingDeg: s.azimuthDeg, axis: s.pose === "upright" ? "camera" : "top" }); };
   const g = (frame, az, el) => SP.guide(frame, { az, el });
