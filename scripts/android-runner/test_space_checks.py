@@ -10,6 +10,16 @@ class ScrollBoundaryTest(unittest.TestCase):
         b['bounds'] = '[24,100][696,145]'
         self.assertNotEqual(scroll_signature([a]), scroll_signature([b]))
 
+    def test_idless_toolbar_ignores_rapid_pointing_words_at_top(self):
+        button = {'package':'dev.construct.runtime','class':'android.widget.Button',
+                  'text':'Follow','bounds':'[188,144][313,212]'}
+        guide = {'package':'dev.construct.runtime','class':'android.widget.TextView',
+                 'text':'Move the phone 2 fists up.','bounds':'[24,1000][696,1080]'}
+        newer = dict(guide,text='Move the phone 2½ fists up.')
+        self.assertEqual(scroll_signature([button,guide]),scroll_signature([button,newer]))
+        moved = dict(button,bounds='[188,90][313,158]')
+        self.assertNotEqual(scroll_signature([button,guide]),scroll_signature([moved,newer]))
+
     def test_unnamed_list_rows_are_not_a_false_boundary(self):
         a = {'class':'android.widget.ToggleButton','bounds':'[24,100][696,200]',
              'text':'ISS · above you'}

@@ -140,7 +140,7 @@ def center_point_guidance():
  # WebView can report clipped text bounds as a complete accessible node. Keep
  # the full visual instruction away from both viewport edges before capture.
  for _ in range(6):
-  n=reveal(visible_point_guidance);b=bounds(n);w=web()
+  n=reveal(visible_point_guidance,directions=('down','up'));b=bounds(n);w=web()
   if b[1]>=w[1]+50 and b[3]<=w[3]-80:return text_of(n)
   scroll('down' if b[3]>w[3]-80 else 'up',260)
  raise RuntimeError('Pointing instruction not centred for visual evidence')
@@ -275,7 +275,7 @@ def follow_checks():
   follow_sensors('layout-watching',1);click(lambda t:t=='Follow');follow_sensors('layout-off',0)
   assert len(receipt['checks'])==receipt['plannedChecks']
   receipt['complete']=True;save();raise SystemExit(0)
- click(lambda t:t=='Clear')
+ click(lambda t:t=='Clear',directions=('down','up'))
  inject('0:0:9.80665','-50:0:-20');reach_text('Facing east · compass')
  click(lambda t:t=='Follow');follow_sensors('off',0);full_dome();capture('follow-off')
  done('Raised phone switches to the pointing view with plain guidance; flat returns the dome; explicit off returns north-up and releases native listener')

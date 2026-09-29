@@ -14,6 +14,13 @@ def scroll_signature(nodes):
     anchors = [(n.get('resource-id'), n.get('bounds')) for n in visible
                if n.get('resource-id') and not n.get('resource-id').startswith('android:')
                and n.get('class') in leaves]
+    if not anchors:
+        # Some WebViews omit DOM resource IDs. Stable module buttons still
+        # locate the top/spot sections without volatile compass/guide text.
+        fixed = {'Follow', 'Red mode', 'Place', 'Details', 'Clear', 'Back to now'}
+        anchors = [(n.get('text') or n.get('content-desc'), n.get('bounds'))
+                   for n in visible if (n.get('text') or n.get('content-desc')) in fixed
+                   and n.get('class') in {'android.widget.Button', 'android.widget.ToggleButton'}]
     if anchors:
         return ('anchors', tuple(anchors))
     # Inside a long list with no named controls, distinguish successive rows.
