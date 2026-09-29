@@ -1,6 +1,6 @@
-# Space Watch 0.4.0 pointing-view staging
+# Space Watch 0.4.1 pointing-view staging
 
-Status: **superseded by [0.4.1](space-watch-0.4.1-staging.md); not cleared for phone testing.**
+Status: **Android acceptance pending. Not cleared for phone handoff yet.**
 No merge, APK release or production-catalog update is included.
 
 ## Ownership and immutable artifacts
@@ -12,10 +12,10 @@ new network origin is added. Position, heading and orientation are not persisted
 or sent to providers.
 
 - Author source: `a291e4ccd56f441e0bfffa7494e1c70ee2f3fca6`.
-- Review fixes: `d221708`.
-- Signed packages: `f4b0ff1eaf3e745d0130be0b733c91e685398f7b`.
-- Real module SHA-256: `f4799b20c88d22d76f7be7dab2791c929eda8c80140386e6d31dc74f639ea98f`.
-- Synthetic fixture SHA-256: `ea3c7d1a1930f89bf13a20aacd319efad2032f7b4fe5fd81e6cb60329c099a56`.
+- Review fixes: `d221708` and `3d9d027`.
+- Signed packages: `301fd638e329a76ef02a5c8b11a880973371eb86`.
+- Real module SHA-256: `10dcb4fc379af3606a32f227cafc68f1f77d98c01ab581724975b2eb7aad9e83`.
+- Synthetic fixture SHA-256: `d130aa79a5d9942cb764eafef3599628b02483e9dcdd35d88b169ce8de6a7b69`.
 - Host source: `4e7f534`, unchanged alpha37.
 - x86_64 APK SHA-256: `23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477`.
 
@@ -31,7 +31,10 @@ permission/live/offline gates remain separate from fixture checks.
   the 35% vector smoothing and orthogonalisation.
 - Calibration recovery restores spoken guidance even when its direction/lock
   state is unchanged. Continuous distance updates are still not announced.
-- Both regressions fail on author source and pass with the fixes.
+- Selecting a future pass while already pointing now keeps the object selected
+  but stays at Now, instead of trapping a preview behind hidden rewind controls.
+  The controller and real-browser regressions fail before and pass after.
+- The turn and calibration regressions also fail before and pass after.
 - Host-formula reconstruction checks all four display rotations, elevations
   through 90° and rolled poses near ±180° (1,760 combinations).
 - 22 unit groups, controller tests, real-browser DOM/canvas checks including
@@ -51,15 +54,8 @@ pointing, landscape and 200% text alongside existing grants, Follow lifecycle,
 pass/train/lookup, real live download and offline-cache gates. Final receipt,
 original captures and teardown result will be added only after completion.
 
-[Phone checklist](space-watch-0.4.0-hardware-check.md).
+[Phone checklist](space-watch-0.4.1-hardware-check.md).
 
-## Retained driver attempt
 
-`20260929T103325Z-space-e29494d6` was stopped after the new layout step.
-The raw receipt recorded five gates, but the fifth matched the hidden spoken
-announcement instead of scrolling the visible large-text instruction into view.
-It is **not accepted layout evidence** and is not combined with a later run.
-The driver now distinguishes full visual guidance from abbreviated announcements,
-with a regression. The module and APK bytes are unchanged. After cancelling the
-runner, the emulator was explicitly stopped; the interrupted receipt is retained
-without rewriting its completion/teardown fields.
+Earlier [0.4.0 driver evidence](space-watch-0.4.0-staging.md) stays separate and
+is not substituted for acceptance of these updated bytes.
