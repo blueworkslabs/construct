@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.space-watch",
+      "name": "Space Watch",
+      "versions": [
+        {
+          "id": "dev.construct.space-watch",
+          "name": "Space Watch",
+          "version": "0.5.0",
+          "artifact": "dev.construct.space-watch-0.5.0.zip",
+          "sha256": "732d30f8a339d3136092c981fe8eba4ed57ac4d863c7a02665f544570b5b7ad0",
+          "signature": "HfTwFMDPA+up6OGxc5BM/czvV0FAXMRjdo93OT/PY0MoevnKftnKqZgHBehMjvigXn4KdUoAISy2u8RKTY/P7sXFfokOFIj1IuuIq2Qq2d0al+WeP8njHuOZ7MBjknBvc6W1xRVGbIPBWnXnNRdCLrwANGK2G3MJpDRif3Q0DjEoW4cW9ClP7W8MWEEaPXQEWZNjukXLfHv4vnInaVXnp+KeirwTtA2P7rs+u17BVyk4YIfQYIX4Q7qh2nHiQSA67ZY7MfB+y9vrEzGe4Z/H/U69iZv9/PkXbVrbe+87UR0OSo4meoC0d0DyPTckGcB1sAXyMhEGHQhS/gQXvkGRww=="
+        },
+        {
+          "id": "dev.construct.space-watch",
+          "name": "Space Watch",
+          "version": "0.4.1",
+          "artifact": "dev.construct.space-watch-0.4.1.zip",
+          "sha256": "10dcb4fc379af3606a32f227cafc68f1f77d98c01ab581724975b2eb7aad9e83",
+          "signature": "IWSz3XC8XkVvcB6YV8tU2byPklrfU86+korGdomqKp2FVQalvZT5Qt0IfbKqPdZZ6C/fMPMJxMsNRxTJUIxgAn9JjVEL5iisOI0pDRw7dGN4INZd22oOO6+V0MsEvr3D+mk7ImCRoYC+tbsJ00qTuzS+fgICjfKu3NUXU3DVR0/NjNxB6WUWfRR8DwRrJ5/bumu1wJeVcaiDfD8nMkh4xBOcOv4w+6RV6xNs3LRi8rBvgo2jpSvwH48m9iITHRe+XPD1wXpLG7yEyoNAGaECLdz+eJVsUt/T1R9ZGk6h9Y2Hg72pTSLr0ROtfitdFnDuxCaq9qhiPM6t55n+ismWug=="
+        }
+      ]
+    },
+    {
+      "id": "dev.construct.space-watch-fixture",
+      "name": "Synthetic Space Watch",
+      "versions": [
+        {
+          "id": "dev.construct.space-watch-fixture",
+          "name": "Synthetic Space Watch",
+          "version": "0.5.0",
+          "artifact": "dev.construct.space-watch-fixture-0.5.0.zip",
+          "sha256": "ebb3d522667b61e01dca4539908f56b4fdb7e1f41cf04db058d54927844a32cd",
+          "signature": "S1qeLgtJJJIYPkOnToz/bD130F9Pfi4qNyXzmFy1rlzKIlbZDAEquZn/uymsth1R3RihGHzG6tEmWZhqDW4fA7Ku1dYHmNvUyxgLtQVxxDQJnMYJysBwRCcCsulSoKp1DSnnV6LyBfC45m1WOehSEjF+VsOW6vpWDjtRtFc0JyBXQTAGCXx7qnkP5HK0NgEjxq3KJhn9czgenwi0m3CZ1dZppLrAvG826CMgOPGGI/0T9z+FYJERUAFf1CO7HOuuph4hdGMAJzhmPKjltI5lG7SqJq5dtesQZIy0lO9DWfqhT8OdOGI5oqswzhopJAVWhJdngKWDiBHFC0fv4V27NQ==",
+          "testFixture": true
+        }
+      ]
+    }
+  ]
+}
