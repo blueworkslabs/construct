@@ -1,6 +1,11 @@
 # Sky Watch 0.4.1 Follow staging
 
-Status: **fresh Android acceptance pending; not yet cleared for hardware.**
+Status: **superseded by 0.4.2; not accepted for hardware.**
+Run `20260930T184052Z-e8b25dd6` completed 24/24 automated gates on
+2026-09-30 18:40–19:07 UTC with independently clean emulator teardown.
+Visual review found truncated source/radius values at 200% portrait text, so
+those automated results do not clear this package.
+[Corrected 0.4.2 report](sky-watch-0.4.2-staging.md).
 No merge, release or production-catalog promotion is included.
 
 ## Exact candidate

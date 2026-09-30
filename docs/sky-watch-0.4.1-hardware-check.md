@@ -1,6 +1,6 @@
 # Sky Watch 0.4.1 phone checklist
 
-Status: **pending Android acceptance; not yet cleared.**
+Status: **superseded, not cleared. See the [0.4.2 checklist](sky-watch-0.4.2-hardware-check.md).**
 Use alpha37 or later with API 0.14. No new APK if alpha37 is installed.
 Production stays on the previously released module until an API 0.14 host release.
 
