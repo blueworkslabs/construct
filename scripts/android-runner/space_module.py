@@ -102,7 +102,7 @@ def scroll(direction,distance=None):
    if b[0]<=x<=b[2] and b[1]-12<=start<=b[3]+12:
     start=max(y1+30,b[1]-30) if direction=='down' else min(y2-30,b[3]+30)
  ui._device.swipe(x,start,x,end,duration=.08);time.sleep(.8)
-def reveal(match,directions=('up','down')):
+def reveal(match,directions=('up','down'),node_match=lambda n:True):
  """First visible node whose text satisfies match (a string prefix or predicate), scrolling the module page."""
  test=match if callable(match) else (lambda t:t.startswith(match))
  deadline=time.monotonic()+60
@@ -110,11 +110,11 @@ def reveal(match,directions=('up','down')):
   for _ in range(24):
    if time.monotonic()>deadline:raise RuntimeError('Module control scroll timed out: '+str(match))
    viewport=web()
-   hits=[n for n in nodes() if test(text_of(n)) and visible(n) and n.get('package')=='dev.construct.runtime' and bounds(n)[1]>=viewport[1] and bounds(n)[3]<=viewport[3]]
+   hits=[n for n in nodes() if node_match(n) and test(text_of(n)) and visible(n) and n.get('package')=='dev.construct.runtime' and bounds(n)[1]>=viewport[1] and bounds(n)[3]<=viewport[3]]
    if hits:
     # WebView's accessibility bounds can lag the end of a scroll/text-size reflow.
     before=bounds(hits[0]);time.sleep(.5)
-    settled=[n for n in nodes() if test(text_of(n)) and visible(n) and bounds(n)==before]
+    settled=[n for n in nodes() if node_match(n) and test(text_of(n)) and visible(n) and bounds(n)==before]
     if settled:return settled[0]
    # Detect an actual scroll boundary instead of swiping upward 24 times at
    # the top of the page. Named-control geometry ignores live sky text.
@@ -319,6 +319,9 @@ def follow_checks():
  click(lambda t:t=='Follow');reach_text('Allow reading compass and tilt');follow_sensors('revoked',0)
  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·');follow_sensors('process-restart',0)
  done('Revoked orientation cannot restart Follow; a fresh process starts with Follow off')
+def open_layers():
+ tap_node(reveal(lambda t:t=='Layers',node_match=lambda n:n.get('resource-id')=='layers' and n.get('class')=='android.widget.Button'))
+ layer_control('Navigation')
 def layer_control(name):
  control_id='layer-'+('gnss' if name=='Navigation' else 'geo')+'-switch'
  # Android's WebView exposes the native input by ID; its label is not
@@ -337,7 +340,7 @@ def layer_switch(name,on):
  tap_node(n)
  contains(name+' '+('on' if on else 'off')+'.')
 def layer_checks():
- click(lambda t:t=='Layers');layer_switch('Navigation',True);layer_switch('Geostationary',True)
+ open_layers();layer_switch('Navigation',True);layer_switch('Geostationary',True)
  capture('space-layers-dialog');click(lambda t:t=='Done')
  reach_text('navigation satellites above you');reach_text('Drawn as small diamonds')
  full_dome();capture('space-layers-dome')
@@ -352,7 +355,7 @@ def layer_checks():
  done('GEO list selects ASTRA 1KR with southern pointing and its own NORAD details')
  for rotation,scale,label in [('1','1.0','landscape'),('0','2.0','large-text')]:
   adb('shell','settings','put','system','user_rotation',rotation);adb('shell','settings','put','system','font_scale',scale);time.sleep(3)
-  click(lambda t:t=='Layers');layer_control('Navigation');time.sleep(.5);capture('space-layers-'+label)
+  open_layers();layer_control('Navigation');time.sleep(.5);capture('space-layers-'+label)
   reveal(lambda t:t=='Done');capture('space-layers-'+label+'-controls');click(lambda t:t=='Done')
   click('Details');reach_text('NORAD 29055');capture('space-layers-'+label+'-details');click(lambda t:t=='Close')
  adb('shell','settings','put','system','font_scale','1.0');time.sleep(2)
@@ -360,9 +363,9 @@ def layer_checks():
  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·')
  reach_text('navigation satellites above you');reach_text('Drawn as small diamonds');capture('space-layers-restored')
  done('Enabled layer preferences survive process restart and reload their data')
- click(lambda t:t=='Layers');layer_switch('Navigation',False);layer_switch('Geostationary',False);click(lambda t:t=='Done')
+ open_layers();layer_switch('Navigation',False);layer_switch('Geostationary',False);click(lambda t:t=='Done')
  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·')
- click(lambda t:t=='Layers')
+ open_layers()
  for name in ['Navigation','Geostationary']:
   # Prove the saved state was off by toggling on, then restore off.
   layer_switch(name,True);layer_switch(name,False)
