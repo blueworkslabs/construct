@@ -320,13 +320,15 @@ def follow_checks():
 def layer_control(name):
  control_id='layer-'+('gnss' if name=='Navigation' else 'geo')+'-switch'
  # Android's WebView exposes the native input by ID; its label is not
- # necessarily a separate text node. Require a named, checkable input.
+ # necessarily a separate text node. Require its native checkbox role and accessible name; this WebView
+ # reports checkable=false even on native HTML checkboxes. State is
+ # verified separately after tapping and across restart.
  end=time.monotonic()+15
  while time.monotonic()<end:
   n=next((n for n in nodes() if n.get('resource-id')==control_id and visible(n)),None)
-  if n and n.get('checkable')=='true' and text_of(n):return n
+  if n and n.get('class')=='android.widget.CheckBox' and text_of(n):return n
   time.sleep(.25)
- raise RuntimeError('Named checkable layer input unavailable: '+control_id)
+ raise RuntimeError('Named layer checkbox unavailable: '+control_id)
 def layer_switch(name,on):
  n=layer_control(name)
  if (n.get('checked')=='true')!=on:tap_node(n)
