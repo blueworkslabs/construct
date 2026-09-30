@@ -57,3 +57,17 @@ Original Android captures require visual inspection. Teardown is checked
 independently from the runner's stopped flag.
 
 [Physical-phone checklist](sky-watch-0.4.2-hardware-check.md).
+
+## Earlier exact-package attempt
+
+Run `20260930T190849Z-b3f3afd7` passed 17/24 checks, including all new
+Follow gates and the corrected toolbar captures. At the granted-location gate,
+OpenSky loaded but ADSB.lol returned “Request unavailable or cancelled”; the
+required live-provider assertion failed. This is incomplete evidence, not
+acceptance. It ran 19:08:49–19:31:21 UTC on 30 September 2026. Independent teardown
+confirmed an inactive emulator, PID 0 and successful exit. The crash buffer
+contains a guest Bluetooth service abort, not a Construct crash.
+
+The host maps network I/O failures and cancellation to that same message; the
+recorded evidence does not establish the underlying cause. A fresh full run uses
+the same signed module and APK, with no weakened gate or automatic test retry.
