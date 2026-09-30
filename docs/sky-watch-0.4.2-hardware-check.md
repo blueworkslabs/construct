@@ -1,9 +1,7 @@
 # Sky Watch 0.4.2 phone checklist
 
-Status: **HELD — Android acceptance incomplete (17/24 and 9/24 separate runs).**
-Repeated ADSB.lol unavailability blocked live-data gates. Do not treat the
-checklist or candidate catalog as phone clearance; a complete exact-package run
-is still required.
+Status: **ready for physical-phone checks — 24/24 Android gates passed in one
+uninterrupted run, with independently verified clean teardown.**
 Use alpha37 or later with API 0.14. No new APK if alpha37 is installed.
 Production stays on the previously released module until an API 0.14 host release.
 

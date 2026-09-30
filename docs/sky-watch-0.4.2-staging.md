@@ -1,7 +1,7 @@
 # Sky Watch 0.4.2 Follow staging
 
-Status: **HELD — review fixes complete, full Android acceptance blocked by repeated
-ADSB.lol unavailability. Not cleared for hardware.**
+Status: **24/24 Android acceptance passed in one uninterrupted exact-package run.
+Ready for physical-phone checks; not a release or physical alignment claim.**
 No merge, release or production-catalog promotion is included.
 
 ## Exact candidate
@@ -48,70 +48,81 @@ The toolbar also wraps its source/radius controls at narrow widths rather than
 truncating selected values at 200% text. A before/after browser text-fit regression
 covers Combined and 100 km.
 
-## Android acceptance — incomplete, separate attempts
+## Android acceptance — 24/24
 
-[Sanitized exact-artifact receipts and original-image hashes](evidence/sky-watch-0.4.2-staging-2026-09-30.json).
+Run **`20260930T195552Z-73aabea2`**, 19:55:52–20:23:20 UTC on
+30 September 2026, completed all 24 gates without interruption or manual rescue.
+The signed 0.4.2 and alpha37 bytes are unchanged from the earlier attempts.
 
-- `20260930T190849Z-b3f3afd7`: **17/24**, 19:08:49–19:31:21 UTC.
-  All seven native Follow gates, signed update/rollback, native Internet consent,
-  live ADSB.lol/OpenSky/Combined, real map pinch, ADSBdb, layouts, menu resume and
-  location denial passed. At granted-location auto-start, OpenSky loaded but
-  ADSB.lol returned “Request unavailable or cancelled”. The live assertion failed;
-  remaining preference/background/offline/revocation checks were not completed.
-- `20260930T193245Z-aa9dedbd`: **9/24**, 19:32:45–19:49:17 UTC.
-  The same seven native Follow gates, signed update/rollback and Internet consent
-  passed. Initial live ADSB.lol loading failed with the same message. The later
-  real-module checks were not reached.
+[Exact-artifact receipt, check names and original-image hashes](evidence/sky-watch-0.4.2-acceptance-2026-09-30.json).
 
-**Do not pool these attempts, or the earlier 0.4.1 24/24 functional receipt, into
-0.4.2 acceptance.** A fresh complete exact-package run remains required before
-phone handoff. No further provider retries were started after the second failure.
-The host maps network I/O failures and cancellation to the same HTTP_UNAVAILABLE
-message, so the recorded evidence does not establish the underlying cause.
+- All seven new native Follow gates: denial; north/east and rotated pinch;
+  raised/high/rolled guidance; landscape and 200% text; Off/menu lifecycle;
+  Quick Settings with explicit restart; revocation and process restart.
+- Signed synthetic update/rollback, on the same checksummed APK.
+- Native Internet denial/grant; manual coordinates; live ADSB.lol, OpenSky and
+  Combined; real two-pointer map pinch; explicit attributed ADSBdb lookup.
+- Map/details layouts and menu resume; separate module/Android location denial;
+  granted-location auto-start with live loading; preference persistence; direct
+  “Use my location”; background exit discarding the previous area; startup choice.
+- Visible offline transport error without a crash; revoked Internet remaining
+  denied after reopen while location auto-start still works.
 
-Both runs were independently confirmed stopped: emulator service inactive,
-main PID 0, result success, exit status 0. Their crash buffers contain guest
-Bluetooth-service aborts, not Construct crashes. There were no attached-WebView
-destroy warnings in either suite receipt.
+The successful post-location live fetch is part of **this run**, not borrowed
+from a previous attempt. Offline coverage verifies the visible failure state,
+not an offline aircraft cache or successful offline downloads.
+
+Independent teardown: emulator service inactive, main PID 0, result success,
+exit status 0; no emulator process remained. The suite recorded zero attached-
+WebView destroy warnings. Its crash buffer contains a guest Bluetooth-service
+abort, not a Construct crash.
 
 ## Inspected native evidence
 
-All **57 original emulator-console PNGs** are retained unchanged, separately by
-run, with SHA-256 hashes in the receipt. They are Android captures, not browser
-previews. Landscape PNGs retain the console's original orientation.
+All **40 original emulator-console PNGs from the accepted run** are retained
+unchanged with SHA-256 hashes in its receipt. These are Android captures, not
+browser previews. Landscape PNGs retain the console's original orientation.
 
-The first run's inspected captures confirm the full high-angle viewfinder,
-landscape/200% guidance, heads-up map, live pinch, attributed ADSBdb record and
-readable Combined/100 km toolbar in both orientations. The ADSBdb response
-contained Airbus A320 214SL, registration D-AIZR, registry owner Eurowings and
-callsign airline Lufthansa; those fields remain explicitly distinguished.
-The rerun's high-angle and landscape/200% guidance captures were separately
-inspected, and its provider-failure capture matches the recorded error.
+Inspected captures show the full high-angle viewfinder and its aircraft label,
+landscape/200% guidance, readable Combined/100 km toolbar, live restored
+preferences, attributed metadata, and the explicit offline error.
 
-- [First run: 200% Combined/100 km toolbar](images/sky-watch-0.4.2-staging/attempt4/android-modular-map-font2.png)
-- [First run: live ADSBdb fields and attribution](images/sky-watch-0.4.2-staging/attempt4/android-modular-metadata-portrait-fields.png)
-- [Rerun: high-angle pointing](images/sky-watch-0.4.2-staging/attempt5/android-sky-point-high.png)
-- [Rerun: 200% pointing instruction](images/sky-watch-0.4.2-staging/attempt5/android-sky-point-large-text-guidance.png)
-- [Rerun: live-provider failure](images/sky-watch-0.4.2-staging/attempt5/android-modular-failure.png)
+ADSBdb returned a record for D-AIJM (Airbus A320-271N), registry owner Lufthansa
+Cityline and callsign airline City Airlines (LHX). The UI correctly displayed
+“Database identity differs from the live feed. Records may be outdated.” These
+fields and the warning are evidence of attributed lookup, not independent
+verification of the aircraft's present owner or operator.
 
-Native listener counts in both attempts were: denial 0; watching 1; Off 0;
-menu pause 0; menu return 1; Quick Settings/focus return/still-off 0; explicit
-restart 1; revoked 0; fresh process 0. Virtual compass uncertainty is not a
-physical heading-accuracy measurement. Sensor and location injection do not
-replace phone alignment or TalkBack testing.
+- [High-angle native pointing](images/sky-watch-0.4.2-staging/attempt6/android-sky-point-high.png)
+- [Landscape pointing instruction](images/sky-watch-0.4.2-staging/attempt6/android-sky-point-landscape-guidance.png)
+- [200% pointing instruction](images/sky-watch-0.4.2-staging/attempt6/android-sky-point-large-text-guidance.png)
+- [200% Combined/100 km toolbar](images/sky-watch-0.4.2-staging/attempt6/android-modular-map-font2.png)
+- [Live ADSBdb fields, mismatch warning and attribution](images/sky-watch-0.4.2-staging/attempt6/android-modular-metadata-portrait-fields.png)
+- [Live data and restored preferences](images/sky-watch-0.4.2-staging/attempt6/android-modular-preferences-restored.png)
+- [Offline error](images/sky-watch-0.4.2-staging/attempt6/android-modular-offline.png)
 
-[Physical-phone checklist — still held](sky-watch-0.4.2-hardware-check.md).
+Native listener counts: denial 0; watching 1; Off 0; menu pause 0; menu return 1;
+Quick Settings/focus return/still-off 0; explicit restart 1; revoked 0;
+fresh process 0. Virtual compass uncertainty is not a physical heading-accuracy
+measurement. Sensor and location injection do not replace phone alignment,
+calibration or TalkBack testing.
 
-## Earlier exact-package attempt
+[Install catalog and physical-phone checklist](sky-watch-0.4.2-hardware-check.md).
 
-Run `20260930T190849Z-b3f3afd7` passed 17/24 checks, including all new
-Follow gates and the corrected toolbar captures. At the granted-location gate,
-OpenSky loaded but ADSB.lol returned “Request unavailable or cancelled”; the
-required live-provider assertion failed. This is incomplete evidence, not
-acceptance. It ran 19:08:49–19:31:21 UTC on 30 September 2026. Independent teardown
-confirmed an inactive emulator, PID 0 and successful exit. The crash buffer
-contains a guest Bluetooth service abort, not a Construct crash.
+## Prior attempts — retained, not pooled
 
-The host maps network I/O failures and cancellation to that same message; the
-recorded evidence does not establish the underlying cause. A fresh full run uses
-the same signed module and APK, with no weakened gate or automatic test retry.
+[Separate incomplete receipts and 57 original-image hashes](evidence/sky-watch-0.4.2-staging-2026-09-30.json)
+remain unchanged:
+
+- `20260930T190849Z-b3f3afd7`: **17/24**, 19:08:49–19:31:21 UTC.
+  At granted-location auto-start, OpenSky loaded but ADSB.lol returned
+  “Request unavailable or cancelled”; later checks were not completed.
+- `20260930T193245Z-aa9dedbd`: **9/24**, 19:32:45–19:49:17 UTC.
+  Initial live ADSB.lol loading failed with the same message. Later real-module
+  checks were not reached.
+
+Both stopped cleanly. Their source/provider failure evidence is not erased by
+the later successful run. The generic host error does not establish whether
+transport failure or cancellation caused either stop; that ambiguity is a
+separate host follow-up. Earlier 0.4.0/0.4.1 attempts also remain separate and do
+not contribute checks to 0.4.2 acceptance.
