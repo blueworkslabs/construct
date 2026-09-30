@@ -57,6 +57,24 @@ const near=(a,b,eps=1e-6)=>Math.abs(a-b)<eps;
   const d=rig();const zd=d.map.zoom;d.fire('pointerdown',150,150);d.fire('pointerup',150,150);d.fire('pointerdown',152,151);d.fire('pointerup',152,151);
   assert.equal(d.map.zoom,zd+1);assert.equal(d.pans.length,1);
   d.map.hits=[{x:60,y:60,key:'icao:abc123'}];d.fire('pointerdown',70,65);d.fire('pointerup',70,65);assert.deepEqual(d.selected,['icao:abc123']);
+  // Follow: the map turns so the heading is up; geometry round-trips under
+  // rotation, drags move the map in the turned frame, markers keep their track.
+  const tm=rig();const home=tm.map.geoAt(150,150);
+  tm.map.turn(90);assert.equal(tm.map.rotation,90);assert.equal(tm.map.follow,true);
+  const east=tm.map.xy({lat:50,lon:8.3});
+  assert.ok(east.y<150-20&&near(east.x,150,1e-6),'facing east, a point to the east appears at the top');
+  const back=tm.map.geoAt(east.x,east.y);assert.ok(near(back.lat,50,1e-6)&&near(back.lon,8.3,1e-6),'xy and geoAt invert under rotation');
+  const still=tm.map.geoAt(150,150);assert.ok(near(still.lat,home.lat,1e-9)&&near(still.lon,home.lon,1e-9),'the centre does not move when turning');
+  tm.fire('pointerdown',150,150);tm.fire('pointermove',150,100);tm.fire('pointerup',150,100);
+  assert.ok(tm.map.center.lon<7.9999&&near(tm.map.center.lat,50,1e-6),'dragging the map up while facing east reveals what is behind you: the centre moves west');
+  tm.map.turn(0,false);assert.equal(tm.map.rotation,0);assert.equal(tm.map.follow,false);
+  tm.map.turn(370);assert.equal(tm.map.rotation,10);
+  const marks=[];tm.map.marker=(x,y,track)=>marks.push(track);tm.map.turn(45);
+  tm.map.update([{key:'icao:aaa111',point:{lat:50.05,lon:8.05},track:90,positionTime:Date.now()/1000,altitudeM:1000,speedMps:100,sources:['adsb'],source:'adsb'},{key:'icao:bbb222',point:{lat:50.02,lon:8.02},track:null,positionTime:Date.now()/1000,altitudeM:null,speedMps:null,sources:['adsb'],source:'adsb'}],null);
+  assert.deepEqual(marks,[45,null],'symbols keep their ground track relative to the turned map');
+  assert.equal(tm.map.hits.length,2);
+  const [hx,hy]=[tm.map.hits[0].x,tm.map.hits[0].y];tm.fire('pointerdown',hx+3,hy-2);tm.fire('pointerup',hx+3,hy-2);
+  assert.deepEqual(tm.selected.at(-1),'icao:aaa111','taps hit turned markers');
   // Drag pans and never selects.
   const g=rig();g.fire('pointerdown',150,150);g.fire('pointermove',190,150);g.fire('pointerup',190,150);
   assert.ok(g.map.center.lon<8);assert.deepEqual(g.selected,[]);assert.equal(g.pans.length,1);

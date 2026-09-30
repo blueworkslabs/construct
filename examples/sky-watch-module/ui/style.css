@@ -77,6 +77,58 @@ select:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
+.toolbar #follow {
+  flex: none;
+}
+#follow[aria-pressed="true"] {
+  border-color: var(--jade);
+  color: var(--jade);
+}
+#follow-status {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+#follow-status.attention {
+  color: var(--amber);
+}
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
+/* While pointing, the viewfinder owns the frame: no map controls or tile credit. */
+#map-wrap.pointing .map-controls,
+#map-wrap.pointing .attribution,
+#map-wrap.pointing .north,
+#map-wrap.pointing #search-here {
+  visibility: hidden;
+}
+#pointer-wrap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  background: #0d1a14;
+}
+#pointer {
+  width: 100%;
+  height: 100%;
+  touch-action: manipulation;
+}
+#point-guide {
+  margin: 0;
+  padding: 8px 12px 10px;
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  background: #102a1fe8;
+}
+#point-guide.locked {
+  color: var(--jade);
+}
+.selected-turn {
+  color: var(--text);
+  font-weight: 600;
+  margin: 4px 0;
+}
 .toolbar #refresh {
   font-size: 1.5rem;
   min-width: 48px;

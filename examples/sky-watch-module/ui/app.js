@@ -35,6 +35,7 @@
     infoBusy = false;
   const metadata = new Map(),
     queue = [];
+  let turnLine = null;
   let inFlight = 0;
   const message = (el, text, tone = "") => {
     el.textContent = text;
@@ -629,6 +630,9 @@
           "Sources disagree; inspect source-labelled details.",
         );
       card.append(dl);
+      turnLine = element("p", "", "selected-turn");
+      turnLine.hidden = true;
+      card.append(turnLine);
       const actions = element("div", null, "selected-actions"),
         more = element("button", "More aircraft info"),
         show = element("button", "Show on map"),
@@ -648,6 +652,8 @@
     }
     map.update(rows, selected);
     tickStatus();
+    renderTurn();
+    renderPoint();
   }
   function tickStatus() {
     if (lastUpdated)
@@ -849,10 +855,252 @@
       }
     }
   };
+  // ---- Follow and pointing (orientation.read, API 0.14) ----
+  // Flat: the map turns so your heading is up. Raised like a camera: a drawn
+  // viewfinder of the sky with the nearby aircraft (SpacePointer, shared with
+  // Space Watch). Headings arrive magnetic; WMM2025 makes them true. Nothing
+  // about headings is stored.
+  const wrap360 = (x) => ((x % 360) + 360) % 360,
+    wrap180 = (x) => ((((x + 180) % 360) + 360) % 360) - 180;
+  const follow = { on: false, want: false, heading: null, accuracy: null, calibrate: false, pose: null, unavailable: false, lastSample: 0, request: 0, expiry: null, pointing: false, attitude: null };
+  let pointGuide = null;
+  const POINT_PALETTE = { sky0: "#0d1a14", ring: "#2E4638", edge: "#2E4638", text: "#9DB3A6", faint: "#6F8C7C", star: "#E6F0EA", moon: "#F3EBD2", planet: "#8CF0C4", sat: "#5FD3A0", satMajor: "#5FD3A0", selected: "#8CF0C4", dim: "#6F8C7C", track: "#5FD3A0" };
+  const pointer = new SpacePointer.View($("pointer"));
+  function clearHeading(reset = true) {
+    if (follow.expiry !== null) clearTimeout(follow.expiry);
+    follow.expiry = null;
+    follow.heading = null;
+    follow.accuracy = null;
+    follow.pose = null;
+    follow.calibrate = false;
+    follow.unavailable = false;
+    follow.lastSample = 0;
+    follow.attitude = null;
+    if (reset) {
+      follow.pointing = false;
+      map.turn(0, false);
+    }
+  }
+  async function startFollow(retryUntil = 0) {
+    if (!active || !area) return;
+    clearHeading();
+    const request = ++follow.request;
+    follow.want = true;
+    try {
+      await call("orientation.read", { op: "watch", rateHz: 10 });
+      if (request !== follow.request || !active || !follow.want) return;
+      follow.on = true;
+      message($("follow-status"), "Hold the phone flat for the map, or raise it like a camera to point.");
+    } catch (e) {
+      if (request !== follow.request) return;
+      // Menu visibility can arrive before window focus; retry briefly.
+      if (e.code === "RUN_PAUSED" && active && follow.want && Date.now() < retryUntil) {
+        message($("follow-status"), "Waiting for the module to regain focus…");
+        applyFollow(true);
+        setTimeout(() => {
+          if (request === follow.request && active && follow.want) startFollow(retryUntil);
+        }, 100);
+        return;
+      }
+      follow.on = follow.want = false;
+      message(
+        $("follow-status"),
+        e.code === "CAPABILITY_DENIED"
+          ? "Allow reading compass and tilt for Sky Watch in Construct’s Module access, then tap Follow again."
+          : e.code === "ORIENTATION_UNAVAILABLE"
+            ? "This phone has no compass Sky Watch can use."
+            : describe(e),
+        "attention",
+      );
+    }
+    applyFollow(true);
+  }
+  function stopFollow() {
+    follow.request++;
+    follow.on = follow.want = false;
+    clearHeading();
+    call("orientation.read", { op: "stop" }).catch(() => {});
+    applyFollow();
+  }
+  function applyFollow(keepStatus = false) {
+    $("follow").setAttribute("aria-pressed", String(follow.on));
+    $("follow-status").hidden = !follow.on && !keepStatus;
+    if (!follow.on) map.turn(0, false);
+    applyPointing();
+    message($("follow-announcement"), keepStatus ? $("follow-status").textContent : "Follow off.", "sr-only");
+    renderTurn();
+    renderPoint();
+  }
+  function applyPointing() {
+    const on = follow.on && follow.pointing && !follow.unavailable;
+    $("pointer-wrap").hidden = !on;
+    $("map-wrap").className = on ? "pointing" : "";
+    if (!on) pointGuide = null;
+    // The north badge turns with the map (CSSOM, not an inline style attribute).
+    const north = $("north");
+    if (north && north.style) north.style.transform = follow.on && follow.heading !== null ? `rotate(${-follow.heading}deg)` : "";
+  }
+  function renderFollow() {
+    applyPointing();
+    if (!follow.on) return;
+    let text, tone = "";
+    if (follow.unavailable)
+      text = "True-north correction unavailable for this place or date. The map stays north-up; Follow guidance is paused.";
+    else if (follow.pointing && follow.attitude) {
+      const a = SpacePointer.aim(follow.attitude);
+      text = `Pointing ${D.compass(a.az)}, ${a.el < 0 ? "below the horizon" : SpacePointer.height(a.el)}${follow.accuracy !== null ? ` · compass ±${Math.round(follow.accuracy)}°` : ""}`;
+    } else if (follow.heading === null)
+      text = follow.pointing || follow.pose !== "upright"
+        ? "Waiting for the compass…"
+        : "Raise the phone like a camera to point, or hold it flat for the map.";
+    else text = `Facing ${D.compass(follow.heading)}${follow.accuracy !== null ? ` · compass ±${Math.round(follow.accuracy)}°` : ""}`;
+    if (follow.calibrate) {
+      text += ". Wave the phone in a figure 8 to calibrate the compass.";
+      tone = "attention";
+    }
+    message($("follow-status"), text, tone);
+    if (follow.calibrate) message($("follow-announcement"), "Wave the phone in a figure 8 to calibrate the compass.", "sr-only");
+    else if (!follow.pointing)
+      message($("follow-announcement"), follow.heading !== null ? "Follow active. Compass direction and turn guidance are available on the aircraft card." : text, "sr-only");
+  }
+  // "Ahead of you", or which way to turn, for the selected aircraft (flat map).
+  function renderTurn() {
+    if (!turnLine) return;
+    const a = rows.find((x) => x.key === selected);
+    if (!a || !follow.on || follow.pointing || follow.heading === null) {
+      turnLine.hidden = true;
+      return;
+    }
+    const d = wrap180(D.look(area, a, Date.now() / 1000).az - follow.heading),
+      abs = Math.abs(d),
+      text = abs <= 28
+        ? `Ahead of you${abs > 8 ? `, slightly ${d > 0 ? "right" : "left"}` : ""}.`
+        : abs >= 150
+          ? "Behind you: turn around."
+          : `Turn ${d > 0 ? "right" : "left"} about ${Math.round(abs / 10) * 10}°.`;
+    turnLine.hidden = false;
+    if (turnLine.textContent !== text) turnLine.textContent = text;
+  }
+  const PLANE_DOT = "plane"; // any SpacePointer body key other than "moon"
+  // Feet like the cards; rounded to 100 ft, which is what barometric reports resolve.
+  const altitudeShort = (a) => (a.altitudeM === null ? "altitude unknown" : `${(Math.round(a.altitudeM / 0.3048 / 100) * 100).toLocaleString()} ft`);
+  const pointLabel = (a) => [D.label(a), a.type ? D.name(a.type) : null, altitudeShort(a)].filter(Boolean).join(" · ");
+  // The viewfinder: every nearby aircraft as a dot, guidance to the selected one.
+  function renderPoint() {
+    if (!follow.on || !follow.pointing || follow.unavailable || !area || !active) return;
+    const f = follow.attitude,
+      now = Date.now() / 1000,
+      looks = rows.map((a) => ({ a, l: D.look(area, a, now) })),
+      target = looks.find((x) => x.a.key === selected) || null,
+      g = f && target ? SpacePointer.guide(f, target.l) : null;
+    let text;
+    if (!f) text = "Waiting for the compass…";
+    else if (g) text = g.text;
+    else {
+      const aim = SpacePointer.aim(f),
+        near = looks
+          .map((x) => ({ x, sep: SpacePointer.separation(aim, x.l) }))
+          .filter((y) => y.sep <= 6)
+          .sort((p, q) => p.sep - q.sep)[0];
+      text = near
+        ? `In the middle: ${pointLabel(near.x.a)}.`
+        : rows.length
+          ? "Tap an aircraft in the list to be guided to it."
+          : "No aircraft reported nearby right now.";
+    }
+    message($("point-guide"), text, g && g.locked ? "locked" : "");
+    const key = g ? g.key : text;
+    if (!pointGuide || pointGuide.key !== key) {
+      pointGuide = { key, text };
+      if (!follow.calibrate) message($("follow-announcement"), g ? g.short : text, "sr-only");
+    }
+    pointer.draw({
+      frame: f,
+      target: target ? { az: target.l.az, el: target.l.el, label: pointLabel(target.a) } : null,
+      guide: g,
+      bodies: looks.filter((x) => x !== target && x.l.el > -2).map((x) => ({ key: PLANE_DOT, az: x.l.az, el: x.l.el, label: pointLabel(x.a) })),
+      palette: POINT_PALETTE,
+      dark: false,
+    });
+  }
+  window.addEventListener("constructorientation", (event) => {
+    const s = event.detail || {};
+    if (s.watching === false && follow.want) {
+      follow.request++;
+      follow.on = follow.want = false;
+      clearHeading();
+      message(
+        $("follow-status"),
+        s.reason === "revoked"
+          ? "Compass access was turned off in Module access. Follow is off."
+          : "Follow stopped when Sky Watch lost the foreground (notifications, Quick Settings or another app). Tap Follow to turn it back on.",
+        "attention",
+      );
+      applyFollow(true);
+      return;
+    }
+    if (!follow.on || !active || !area) return;
+    const sampleAge = Date.now() - s.timestamp;
+    if (!Number.isFinite(s.timestamp) || sampleAge < 0 || sampleAge > 1500) {
+      clearHeading();
+      renderFollow();
+      renderTurn();
+      return;
+    }
+    const fresh = Date.now() - follow.lastSample <= 1500,
+      previous = fresh ? follow.heading : null,
+      previousAttitude = fresh ? follow.attitude : null,
+      wasPointing = follow.pointing;
+    clearHeading(false);
+    follow.pose = s.pose === "flat" ? "flat" : "upright";
+    follow.calibrate = s.calibrate === true;
+    follow.accuracy = Number.isFinite(s.accuracyDeg) ? s.accuracyDeg : null;
+    // Camera axis above about −25° (pitch < 25) means the phone is raised to
+    // point; a margin keeps the view from flickering at the threshold.
+    follow.pointing = Number.isFinite(s.pitchDeg) && s.pitchDeg < (wasPointing ? 35 : 25);
+    // The viewfinder covers the map; it waits north-up underneath.
+    if (follow.pointing && !wasPointing) map.turn(0, false);
+    if ((follow.pose === "flat" || follow.pointing) && Number.isFinite(s.azimuthDeg)) {
+      const dec = SpaceMagnetic.declination(area.lat, area.lon, Date.now());
+      follow.unavailable = dec === null;
+      if (dec === null) {
+        map.turn(0, false);
+        renderFollow();
+        renderTurn();
+        return;
+      }
+      const heading = wrap360(s.azimuthDeg + dec);
+      if (follow.pointing) {
+        const next = SpacePointer.orient({ pitchDeg: s.pitchDeg, rollDeg: s.rollDeg, bearingDeg: heading, axis: follow.pose === "upright" ? "camera" : "top" });
+        follow.attitude = next && SpacePointer.smooth(previousAttitude, next, 0.35);
+      } else {
+        // A quarter of the way toward each reading, along the shorter way round.
+        follow.heading = previous === null ? heading : wrap360(previous + 0.25 * wrap180(heading - previous));
+      }
+      follow.lastSample = s.timestamp;
+      const measuredAt = s.timestamp;
+      follow.expiry = setTimeout(() => {
+        if (!follow.on || follow.lastSample !== measuredAt) return;
+        clearHeading();
+        renderFollow();
+        renderTurn();
+      }, Math.max(1, 1501 - sampleAge));
+      if (follow.heading !== null) map.turn(follow.heading, true);
+    }
+    if (follow.heading === null && !follow.pointing) map.turn(0, false);
+    renderFollow();
+    renderTurn();
+    renderPoint();
+  });
+  $("follow").onclick = () => (follow.want ? stopFollow() : startFollow());
   window.addEventListener("constructvisibilitychange", (event) => {
     active = event.detail?.visible !== false;
     epoch++;
     if (!active) {
+      follow.request++;
+      follow.on = false;
+      clearHeading();
+      $("follow").setAttribute("aria-pressed", "false");
       discardLocation();
       while (queue.length) queue.shift().reject(new Error("Request paused."));
       setBusy(false);
@@ -870,6 +1118,11 @@
       message($("status"), lastStatus.text, lastStatus.tone);
       render();
       pump();
+      // The host ends the compass stream on pause; ask again on return.
+      if (follow.want) {
+        follow.on = false;
+        startFollow(Date.now() + 2000);
+      }
     }
   });
   setInterval(() => {
@@ -889,6 +1142,8 @@
           if (a) el.textContent = liveLine(a);
         }
         map.update(rows, selected);
+        renderTurn();
+        renderPoint();
       }
     }
   }, 1000);

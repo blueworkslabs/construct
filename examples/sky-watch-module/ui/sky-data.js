@@ -314,6 +314,30 @@ const SkyData = (() => {
       ? "unknown"
       : reported || known || "unknown";
   }
+  // Where an aircraft is now, moved along its ground track for the seconds
+  // since its position report (at most 60 s; beyond that, or without track
+  // and speed, the reported point stands).
+  function extrapolate(a, now) {
+    const age = Math.max(0, Math.min(60, now - a.positionTime));
+    if (a.track === null || a.speedMps === null || !(age > 0)) return a.point;
+    const d = (a.speedMps * age) / 1000 / R,
+      b = rad(a.track),
+      la = rad(a.point.lat),
+      lat = Math.asin(Math.sin(la) * Math.cos(d) + Math.cos(la) * Math.sin(d) * Math.cos(b)),
+      lon = rad(a.point.lon) + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(la), Math.cos(d) - Math.sin(la) * Math.sin(lat));
+    return point(deg(lat), ((deg(lon) + 540) % 360) - 180) || a.point;
+  }
+  // Direction to an aircraft from an observer at sea level: true azimuth and
+  // elevation (degrees), ground distance (km) and the line-of-sight range.
+  // Earth's curvature lowers far aircraft; the aircraft's altitude is
+  // barometric above sea level, so the observer's own height is not counted.
+  function look(center, a, now) {
+    const p = extrapolate(a, now),
+      km = distance(center, p),
+      up = (a.altitudeM === null ? 0 : a.altitudeM) / 1000 - (km * km) / (2 * R),
+      el = deg(Math.atan2(up, km));
+    return { az: bearing(center, p), el, km, rangeKm: Math.hypot(km, up), point: p, altitudeKnown: a.altitudeM !== null };
+  }
   const projection = {
     x: (lon) => (lon + 180) / 360,
     y: (lat) => {
@@ -409,6 +433,8 @@ const SkyData = (() => {
     kind,
     projection,
     lookup,
+    extrapolate,
+    look,
     aircraftInfo,
     airlineInfo,
   };

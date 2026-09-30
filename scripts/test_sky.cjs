@@ -298,7 +298,10 @@ test("ambiguous airline record stays unknown", () => {
 test("actual module has no native Sky launcher or direct network/geolocation", () => {
   const root = "examples/sky-watch-module/";
   const m = JSON.parse(fs.readFileSync(root + "manifest.json"));
-  assert.equal(m.constructApi.min, "0.9.0");
+  assert.deepEqual(m.constructApi, { min: "0.14.0", target: "0.14.0" });
+  const orientation = m.capabilities.find((c) => c.id === "orientation.read");
+  assert.equal(orientation.optional, true);
+  assert.match(orientation.reason, /stay on this phone/);
   assert.ok(!m.capabilities.some((c) => c.id === "sky.watch"));
   const app = fs.readFileSync(root + "ui/app.js", "utf8");
   assert.ok(
@@ -329,6 +332,31 @@ test("scale bar picks a round length that fits", () => {
   assert.equal(D.scaleBar(0, 140), null);
   assert.equal(D.scaleBar(10, NaN), null);
 });
+test("look angles: extrapolation along track, curvature, azimuth", () => {
+  const here = { lat: 50.0379, lon: 8.5622 };
+  // 18 km north at 10,000 m: about 29° up; a stale report is moved along its track.
+  const a = { point: { lat: 50.2, lon: 8.56 }, altitudeM: 10000, speedMps: 250, track: 90, positionTime: 1000 };
+  const l = D.look(here, a, 1000);
+  assert.ok(Math.abs(l.az - 359.5) < 0.2 && Math.abs(l.el - 29) < 0.3 && Math.abs(l.km - 18.0) < 0.2, JSON.stringify(l));
+  const moved = D.extrapolate(a, 1020);
+  assert.ok(Math.abs(moved.lon - 8.63) < 0.002 && Math.abs(moved.lat - 50.2) < 0.001, "5 km east after 20 s at 250 m/s");
+  assert.equal(D.extrapolate(a, 1200).lon, D.extrapolate(a, 1060).lon, "at most 60 s of dead reckoning");
+  assert.deepEqual(D.extrapolate({ ...a, track: null }, 1020), a.point, "no track, no guess");
+  assert.deepEqual(D.extrapolate(a, 990), a.point, "reports from the future are not moved");
+  // Far and low: curvature lowers it below the geometric line.
+  const far = { point: { lat: 50.0379, lon: 9.95 }, altitudeM: 1000, speedMps: null, track: null, positionTime: 1000 };
+  const f = D.look(here, far, 1000);
+  assert.ok(f.km > 98 && f.km < 100 && f.el < 0.2 && f.el > -0.2, JSON.stringify(f));
+  assert.equal(D.look(here, { ...far, altitudeM: null }, 1000).altitudeKnown, false);
+});
+test("compass files are shared byte-for-byte with Space Watch", () => {
+  for (const f of ["space-pointer.js", "space-magnetic.js", "bridge.js", "construct-ui.css"])
+    assert.ok(fs.readFileSync("examples/sky-watch-module/ui/" + f).equals(fs.readFileSync("examples/space-watch-module/ui/" + f)), f);
+  const html = fs.readFileSync("examples/sky-watch-module/ui/index.html", "utf8"),
+    scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map((x) => x[1]);
+  assert.deepEqual(scripts, ["bridge.js", "models.js", "sky-data.js", "sky-map.js", "space-magnetic.js", "space-pointer.js", "app.js"]);
+  assert.doesNotMatch(html, /\sstyle=|<style|<script(?![^>]*\ssrc=)/);
+});
 test("module start flow, storage keys and shared stylesheet", () => {
   const root = "examples/sky-watch-module/";
   const app = fs.readFileSync(root + "ui/app.js", "utf8"),
@@ -352,10 +380,10 @@ test("module start flow, storage keys and shared stylesheet", () => {
     "What’s flying nearby?",
   ])
     assert.ok(html.includes(label), label);
-  assert.equal(m.version, "0.3.4");
+  assert.equal(m.version, "0.4.0");
   assert.match(m.capabilities.find((c) => c.id === "storage.kv").reason, /not your location/);
   assert.equal(m.capabilities.find((c) => c.id === "location.read").optional, true);
-  assert.match(fs.readFileSync("docs/sky-watch.md", "utf8"), /Sky Watch \*\*0\.3\.4\*\*/);
+  assert.ok(fs.readFileSync("docs/sky-watch.md", "utf8").includes(`Sky Watch **${m.version}**`));
 });
 test("malformed categories and identity fields remain unknown", () => {
   for (const value of ["constructor", "__proto__", ["A7"], {}, 7, null]) assert.equal(D.category(value), null);
