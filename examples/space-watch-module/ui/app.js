@@ -452,7 +452,7 @@
       L.at = t;
       L.note = "";
       layerSky[name] = null;
-      for (const o of L.objects) layerDescribed.delete(o.id);
+      for (const o of L.objects) layerDescribed.delete(name + ":" + o.id);
       frame();
     } catch (e) {
       if (e.code === "RUN_PAUSED") L.tried = previous;
@@ -551,10 +551,10 @@
     return highest ? highest.o : train.centre;
   }
   function layerInfo(o, name, t) {
-    let d = layerDescribed.get(o.id);
+    let d = layerDescribed.get(name + ":" + o.id);
     if (!d) {
       d = C.describeLayer(o, layers[name].satcat.get(o.id), name, name === "geo" ? O.subLon(o, t) : null);
-      layerDescribed.set(o.id, d);
+      layerDescribed.set(name + ":" + o.id, d);
     }
     return d;
   }
@@ -576,8 +576,10 @@
   }
   // Layer objects above the horizon. Navigation satellites move slowly and
   // are recomputed every 5 s; geostationary ones hardly move (every 60 s).
+  // An object in two groups (a BeiDou IGSO is navigation and geosynchronous)
+  // appears once, in the first layer that is on; find() agrees.
   function layerSnapshot(t) {
-    const items = [];
+    const items = [], seen = new Set();
     for (const name of ["gnss", "geo"]) {
       if (!prefs.layers[name]) continue;
       const L = layers[name];
@@ -585,6 +587,7 @@
       if (!c || c.place !== place || c.n !== L.objects.length || Math.abs(t - c.t) > (name === "geo" ? 60000 : 5000)) {
         c = { t, place, n: L.objects.length, items: [] };
         for (const o of L.objects) {
+          if (name !== "gnss" && prefs.layers.gnss && layers.gnss.byId.has(o.id)) continue;
           const l = O.look(o, place.ob, t);
           if (l && l.el >= 0) c.items.push({ id: o.id, o, l, layer: name, state: "faint", d: layerInfo(o, name, t) });
         }
@@ -648,7 +651,7 @@
       red: prefs.red,
       follow: follow.on && follow.heading !== null,
       selected,
-      layers: s.layers.map((x) => ({ id: x.id, az: x.l.az, el: x.l.el, kind: x.layer, label: x.id === selected ? x.o.name : null })),
+      layers: s.layers.map((x) => ({ id: x.id, az: x.l.az, el: x.l.el, kind: x.layer, parked: x.d.geo === "parked", label: x.id === selected ? x.o.name : null })),
       belt: prefs.layers.geo && belt ? belt.points : null,
       objects: s.items.map((x) => ({
         id: x.id,
@@ -847,8 +850,10 @@
       return `${items.length} navigation satellites above you${parts.length ? ": " + parts.join(", ") : ""}. Drawn as small squares.`;
     }
     const top = belt && belt.points.length ? belt.points.reduce((a, b) => (b.el > a.el ? b : a)) : null,
-      where = top ? `, strung along the dotted belt ${K.height(top.el)} in the ${K.dir8(top.az).toLowerCase()}` : "";
-    return `${items.length} geostationary satellites above you${where}. Drawn as small diamonds.${L.note ? " " + L.note : ""}`;
+      where = top ? `, strung along the dotted belt ${K.height(top.el)} in the ${K.dir8(top.az).toLowerCase()}` : "",
+      parked = items.filter((x) => x.d.geo === "parked").length,
+      other = items.length - parked;
+    return `${parked} geostationary satellites above you${where}. Drawn as small diamonds${other ? `, plus ${other} inclined or drifting geosynchronous ones as hollow diamonds that swing north and south daily` : ""}.${L.note ? " " + L.note : ""}`;
   }
   function renderLayers(s) {
     const any = prefs.layers.gnss || prefs.layers.geo;
@@ -894,6 +899,7 @@
     prefs.layers[name] = on;
     savePrefs();
     layerKeys[name] = "";
+    layerSky.geo = null;
     if (on && place && active && !layers[name].at) {
       layers[name].note = "";
       fetchLayer(name, now()).catch(() => {});
@@ -935,7 +941,7 @@
         $("spot-anchor").textContent = "Working out the next member above you…";
         nextTrainPass(train, s.t, () => selected === train.id && request === spotPassRequest,
           p => { $("spot-anchor").textContent = trainRiseText(p); });
-      } else if (layer === "geo") {
+      } else if (d.geo === "parked") {
         $("spot-anchor").textContent = "Geostationary satellites stay put in the sky: this one never rises here.";
       } else {
         const p = nextPass(o, s.t);
@@ -958,15 +964,19 @@
     spotAz = offset === 0 ? l.az : null;
     renderTurn();
     $("spot-anchor").textContent = an ? an.text : "";
-    $("spot-motion").textContent = layer === "geo"
-      ? "It stays at this spot: it circles Earth once a day, exactly as fast as Earth turns."
+    $("spot-motion").textContent = d.geo === "parked"
+      ? d.inclination >= 1
+        ? `It stays near this spot, wobbling about ${Math.round(d.inclination)}° north and south over each day.`
+        : "It stays at this spot: it circles Earth once a day, exactly as fast as Earth turns."
       : K.motion(l, O.look(o, place.ob, s.t + MINUTE), O.look(o, place.ob, s.t + 4 * MINUTE));
     const end = !train && st === "visible" && offset === 0 ? passEnd(o, s.t) : null;
     const line = train
       ? `A line of ${train.members.length} satellites; early orbits are rough, so look along the track ahead and behind`
-      : layer === "geo"
+      : d.geo === "parked"
         ? "Satellite dishes aimed at it point exactly this way"
-        : layer === "gnss"
+        : layer === "geo"
+          ? "Geosynchronous but not parked: it swings north and south of the dotted belt every day"
+          : layer === "gnss"
           ? "Your phone’s location fix can use signals from satellites like this one"
           : "";
     $("spot-state").textContent = [K.STATE[st], K.ending(end), line].filter(Boolean).join(". ");
@@ -1053,7 +1063,7 @@
       c = train ? null : catalogOf(o.id, found.layer),
       t = now(),
       l = O.look(o, place.ob, t),
-      p = train || found.layer === "geo" ? null : nextPass(o, t);
+      p = train || found.d.geo === "parked" ? null : nextPass(o, t);
     $("info-title").textContent = d.title;
     $("info-kind").textContent = d.kind;
     const body = $("info-body");
@@ -1102,7 +1112,7 @@
       facts("Orbit", [
         ["Circles Earth every", c && c.period ? C.period(c.period) : null],
         ["Height range", c && c.perigee != null && c.apogee != null ? `${c.perigee}–${c.apogee} km` : null],
-        found.layer === "geo"
+        found.d.geo === "parked"
           ? ["Parked above", C.lonText(O.subLon(o, t)) ? `${C.lonText(O.subLon(o, t))} on the equator` : null]
           : [
               "Next time above you",

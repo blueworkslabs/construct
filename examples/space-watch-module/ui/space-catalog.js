@@ -305,6 +305,16 @@ const SpaceCatalog = (() => {
   }
   const lonText = (lon) =>
     Number.isFinite(lon) ? `${Math.abs(lon).toFixed(1)}°${lon >= 0 ? "E" : "W"}` : null;
+  // CelesTrak's GEO group is geosynchronous, not all geostationary. Only an
+  // object with inclination ≤ 5° and a mean motion within 2 % of one
+  // revolution per day sits still in the sky ("parked"). Inclined ones trace
+  // a daily figure-8 north and south of the belt; drifting ones move along it.
+  function geoClass(o) {
+    const inc = o.row ? o.row[6] : null, mm = o.row ? o.row[4] : null;
+    if (!Number.isFinite(inc) || !Number.isFinite(mm)) return "inclined";
+    if (Math.abs(mm - 1) > 0.02) return "drifting";
+    return inc > 5 ? "inclined" : "parked";
+  }
   // Objects of the optional layers: never visible to the eye, so the kind
   // line says what they are for instead.
   function describeLayer(o, c, layer, lon) {
@@ -319,14 +329,23 @@ const SpaceCatalog = (() => {
         layer,
       };
     }
-    const who = c && owner(c.owner);
+    const who = c && owner(c.owner),
+      geo = geoClass(o),
+      inc = o.row ? Math.round(o.row[6]) : null;
+    const kind = geo === "parked"
+      ? `Geostationary satellite${lonText(lon) ? " · parked above " + lonText(lon) : ""}`
+      : geo === "inclined"
+        ? `Geosynchronous satellite · inclined ${inc}° · traces a daily figure-8, not parked`
+        : "Geosynchronous satellite · drifting along the belt, not parked";
     return {
       title: o.name,
-      kind: `Geostationary satellite${lonText(lon) ? " · parked above " + lonText(lon) : ""}${who ? " · " + who : ""}`,
+      kind: `${kind}${who ? " · " + who : ""}`,
       search: o.name,
       wiki: null,
       major: false,
       layer,
+      geo,
+      inclination: o.row ? o.row[6] : null,
     };
   }
   // Wikipedia: intro text only, plain text, redirects resolved server-side
@@ -369,6 +388,7 @@ const SpaceCatalog = (() => {
     navFamily,
     lonText,
     describeLayer,
+    geoClass,
     RECENT_URL,
     RECENT_SATCAT_URL,
     compact,

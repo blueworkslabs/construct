@@ -145,8 +145,10 @@
           Layers adds satellites that are far too faint to see: navigation
           satellites (GPS, Galileo, GLONASS, BeiDou) as small squares and
           geostationary satellites as small diamonds, with a dotted line for the
-          geostationary belt. Satellite dishes point at that belt. Select one to
-          see what it is, or point at it with Follow.
+          geostationary belt. Satellite dishes point at that belt. Hollow
+          diamonds are geosynchronous satellites on inclined orbits: they swing
+          north and south of the belt every day and are not parked. Select one
+          to see what it is, or point at it with Follow.
         </p>
         <p>
           The list covers CelesTrak’s ~150 brightest objects, not every
@@ -164,7 +166,10 @@
         <p>
           Orbits and catalog: CelesTrak (celestrak.org), through the Space Watch
           data mirror (space-data.pages.dev, refreshed every 4 hours) with
-          CelesTrak itself as the fallback. Stars: Yale Bright
+          CelesTrak itself as the fallback. Construct asks once to approve the
+          mirror’s address; declining turns off all downloads (mirror and
+          CelesTrak) until Internet access is allowed in Module access, while
+          saved orbits keep working. Stars: Yale Bright
           Star Catalog. Positions: satellite.js and Astronomy Engine (MIT).
           Magnetic declination: World Magnetic Model WMM2025 (NOAA/BGS).
           Descriptions: Wikipedia, CC BY-SA 4.0.

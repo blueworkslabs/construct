@@ -760,7 +760,8 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   r.el('layers').click(); r.el('layer-geo-switch').checked = true; r.el('layer-geo-switch').onchange(); await flush(6);
   const snap = r.dome();
   assert(snap.belt && snap.belt.length > 20, 'the belt is drawn');
-  assert.match(r.el('layer-geo-summary').textContent, /^\d+ geostationary satellites above you, strung along the dotted belt 3 fists up in the south\. Drawn as small diamonds\.$/);
+  assert.match(r.el('layer-geo-summary').textContent, /^\d+ geostationary satellites above you, strung along the dotted belt 3 fists up in the south\. Drawn as small diamonds, plus \d+ inclined or drifting geosynchronous ones as hollow diamonds that swing north and south daily\.$/);
+  assert(snap.layers.some(x => x.kind === 'geo' && x.parked) && snap.layers.some(x => x.kind === 'geo' && !x.parked), 'both diamond kinds are drawn');
   r.select(29055);
   assert.equal(r.el('spot-title').textContent, 'ASTRA 1KR');
   assert.match(r.el('spot-kind').textContent, /^Geostationary satellite · parked above 19\.\d°E/);
@@ -770,6 +771,26 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   r.el('details').click(); await flush(4);
   assert.match(r.el('info-body').text, /Parked above 19\.\d°E on the equator/);
   r.el('close-info').click();
+  // GEO-group membership is not "parked": BeiDou IGSO-6 is inclined 60° and
+  // swings north and south daily. It is below Berlin's horizon at the clock.
+  // It is also a navigation satellite: with that layer on it is drawn once,
+  // as navigation; with it off, as geosynchronous.
+  assert.equal(r.dome().layers.filter(x => x.id === 41434).length, r.dome().layers.some(x => x.id === 41434) ? 1 : 0);
+  r.select(41434);
+  assert.match(r.el('spot-kind').textContent, /^BeiDou navigation satellite · China$/);
+  r.el('layer-gnss-switch').checked = false; r.el('layer-gnss-switch').onchange();
+  r.select(41434);
+  assert.match(r.el('spot-title').textContent, /^BEIDOU-2 IGSO-6/);
+  assert.match(r.el('spot-kind').textContent, /^Geosynchronous satellite · inclined 60° · traces a daily figure-8, not parked · China$/);
+  assert.equal(r.el('spot-head').textContent, 'Below your horizon');
+  assert.match(r.el('spot-anchor').textContent, /^(Next time above you: .*, up to .*\.|Not above you in the next 36 hours\.)$/);
+  assert.doesNotMatch(r.el('spot-anchor').textContent, /never rises|visible/);
+  r.el('details').click(); await flush(4);
+  assert.doesNotMatch(r.el('info-body').text, /Parked above/);
+  assert.match(r.el('info-body').text, /Next time above you/);
+  r.el('close-info').click();
+  r.el('layer-gnss-switch').checked = true; r.el('layer-gnss-switch').onchange(); await flush(4);
+  r.select(29055);
   // Turning a layer off drops its selection and its objects.
   r.el('layer-geo-switch').checked = false; r.el('layer-geo-switch').onchange();
   assert(r.el('spot').hidden, 'a switched-off layer’s object is deselected');
@@ -800,5 +821,5 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   r.finishHttp(); await flush(); r.finishHttp(); await flush(6);
   assert(r.dome().layers.length > 10, 'retried layer completes');
 
-  console.log('Space Watch app checks passed: start, privacy (no coordinates in URLs or storage), list selection, spot words, details, Wikipedia on request, rewind, red mode, visible passes and preview, trains (plan, details, cache, optional failure), cache reuse/expiry/torn cache, CelesTrak back-off, location fallbacks, paused downloads and follow mode (true north, smoothing, guidance, calibration, pause, denial), pointing (camera aim to the zenith, words, lock, announcements, rewind exit), the space-data mirror (fresh, stale, bad row, rest) and layers (navigation, geostationary belt, selection, details, persistence, mirror down).');
+  console.log('Space Watch app checks passed: start, privacy (no coordinates in URLs or storage), list selection, spot words, details, Wikipedia on request, rewind, red mode, visible passes and preview, trains (plan, details, cache, optional failure), cache reuse/expiry/torn cache, CelesTrak back-off, location fallbacks, paused downloads and follow mode (true north, smoothing, guidance, calibration, pause, denial), pointing (camera aim to the zenith, words, lock, announcements, rewind exit), the space-data mirror (fresh, stale, bad row, rest) and layers (navigation, geostationary belt, parked vs inclined geosynchronous, selection, details, persistence, mirror down).');
 })().catch(error => { console.error(error); process.exitCode = 1; });

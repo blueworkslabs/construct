@@ -26,8 +26,12 @@ view, not a map.
     module asks CelesTrak directly, exactly as 0.4.x did. The back-off rules
     for CelesTrak are unchanged.
   - **Consent.** `net.http` gains the origin `https://space-data.pages.dev`, so
-    updating asks to approve it. Same-launch lookups stay on CelesTrak and
-    Wikipedia stays on request.
+    updating asks to approve the widened scope. On alpha37 there is one switch
+    for the capability: **declining disables all downloads, mirror and
+    CelesTrak alike** (`CAPABILITY_DENIED`), until Internet access is allowed in
+    Module access; saved orbits and the sky keep working. The CelesTrak
+    fallback covers an unreachable or malformed mirror, not a declined origin.
+    Same-launch lookups stay on CelesTrak and Wikipedia stays on request.
   - **Privacy.** Unchanged: whole lists only, nothing about the place.
 - **Layers** (toolbar **Layers**, both off by default, remembered with the
   other preferences). They add objects that are far too faint to see:
@@ -36,10 +40,19 @@ view, not a map.
     the constellation and operator. Wikipedia opens the constellation's article.
   - **Geostationary:** communication, TV and weather satellites 35,786 km
     above the equator, drawn as small diamonds. The **geostationary belt** is a
-    dotted line: seen from Berlin it arcs across the south, highest about 30°
-    up. The spot card says which longitude a satellite is parked above (e.g.
-    Astra at 19.2°E) and that dishes aimed at it point that way. It also says
-    that it stays put.
+    dotted reference line: seen from Berlin it arcs across the south, highest
+    about 30° up. CelesTrak's `geo` group is *geosynchronous*, so each object
+    is classified (`C.geoClass`): **parked** when inclination ≤ 5° and the mean
+    motion is within 2 % of one revolution per day (filled diamond; the spot
+    card says which longitude it is parked above, e.g. Astra at 19.2°E, that
+    dishes aimed at it point that way, and that it stays put, wobbling by its
+    inclination when that is ≥ 1°); **inclined** (> 5°, e.g. BeiDou IGSO at
+    60°) or **drifting** (mean motion off by more than 2 %) are drawn as hollow
+    diamonds, described as geosynchronous and not parked, get ordinary motion
+    words and rise predictions, and no dish or "never rises" claims. In the
+    captured fixture: 163 parked, 27 inclined, 0 drifting.
+    An object in both groups (BeiDou IGSO is navigation and geosynchronous)
+    is drawn and described once, by the first layer that is on.
   - Layer objects are selectable on the dome (naked-eye objects win ties) and
     from **List them** under each layer's summary, e.g. "31 navigation
     satellites above you: 12 BeiDou, 9 Galileo, 6 GPS, 4 GLONASS". Pointing

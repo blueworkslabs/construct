@@ -186,12 +186,17 @@ class SpaceDome {
       g.globalAlpha = o.id === s.selected ? 1 : 0.75;
       g.beginPath();
       if (o.kind === "geo") {
-        g.moveTo(x, y - 2.8);
-        g.lineTo(x + 2.8, y);
-        g.lineTo(x, y + 2.8);
-        g.lineTo(x - 2.8, y);
+        g.moveTo(x, y - 3);
+        g.lineTo(x + 3, y);
+        g.lineTo(x, y + 3);
+        g.lineTo(x - 3, y);
+        g.closePath();
       } else g.rect(x - 2, y - 2, 4, 4);
-      g.fill();
+      // A hollow diamond: geosynchronous but not parked (inclined or drifting).
+      if (o.kind === "geo" && !o.parked) {
+        g.strokeStyle = c.layer;
+        g.stroke();
+      } else g.fill();
       g.globalAlpha = 1;
       if (o.id === s.selected) {
         if (o.label) labels.push([o.label, x, y - 12, c.layer, true, true]);

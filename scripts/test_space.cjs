@@ -553,6 +553,22 @@ test("layers: navigation families, geostationary belt and longitudes", () => {
   const near = belt.reduce((a, b) => (Math.hypot(b.az - l.az, b.el - l.el) < Math.hypot(a.az - l.az, a.el - l.el) ? b : a));
   assert.ok(Math.hypot(near.az - l.az, near.el - l.el) < 1.5, JSON.stringify([near, l.az, l.el]));
   assert.match(C.describeLayer(astra, null, "geo", lon).kind, /^Geostationary satellite · parked above 19\.\dE?°?/);
+  // Only ≤5° inclination and one revolution a day is "parked"; the GEO group
+  // also holds inclined geosynchronous objects that swing north and south.
+  const geoObjects = O.build(O.rows(geo, O.compact, 1000)),
+    classes = geoObjects.map((o) => C.geoClass(o));
+  assert.deepEqual([classes.filter((x) => x === "parked").length, classes.filter((x) => x === "inclined").length, classes.filter((x) => x === "drifting").length], [163, 27, 0]);
+  const igso = geoObjects.find((o) => o.id === 41434);
+  assert.equal(C.geoClass(igso), "inclined");
+  const di = C.describeLayer(igso, null, "geo", O.subLon(igso, t));
+  assert.equal(di.geo, "inclined");
+  assert.match(di.kind, /^Geosynchronous satellite · inclined 60° · traces a daily figure-8, not parked$/);
+  assert.equal(C.geoClass({ row: [1, "x", null, 0, 1.03, 0, 0.5, 0, 0, 0, 0, 0, 0] }), "drifting");
+  assert.equal(C.geoClass({ row: [1, "x", null, 0, 1.0, 0, 5.0, 0, 0, 0, 0, 0, 0] }), "parked");
+  assert.equal(C.geoClass({ row: [1, "x", null, 0, 1.0, 0, 5.1, 0, 0, 0, 0, 0, 0] }), "inclined");
+  // Over twelve hours the inclined object moves through tens of degrees; Astra does not.
+  const ob = O.observer(52.517834, 13.388761, 0), move = (o) => Math.abs(O.look(o, ob, t + 6 * 3600000).el - O.look(o, ob, t).el);
+  assert.ok(move(igso) > 30 && move(astra) < 1, `${move(igso)} ${move(astra)}`);
   assert.equal(C.lonText(-8.04), "8.0°W");
   // From the southern hemisphere the belt is in the north.
   const south = K.geoBelt(-33.9, 18.4).reduce((a, b) => (b.el > a.el ? b : a));
