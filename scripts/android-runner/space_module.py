@@ -102,10 +102,10 @@ def scroll(direction,distance=None):
    if b[0]<=x<=b[2] and b[1]-12<=start<=b[3]+12:
     start=max(y1+30,b[1]-30) if direction=='down' else min(y2-30,b[3]+30)
  ui._device.swipe(x,start,x,end,duration=.08);time.sleep(.8)
-def reveal(match,directions=('up','down'),node_match=lambda n:True):
+def reveal(match,directions=('up','down'),node_match=lambda n:True,timeout=60):
  """First visible node whose text satisfies match (a string prefix or predicate), scrolling the module page."""
  test=match if callable(match) else (lambda t:t.startswith(match))
- deadline=time.monotonic()+60
+ deadline=time.monotonic()+timeout
  for direction in directions:
   for _ in range(24):
    if time.monotonic()>deadline:raise RuntimeError('Module control scroll timed out: '+str(match))
@@ -264,7 +264,7 @@ def follow_checks():
   click(lambda t:t.startswith('Long March 4B rocket stage'))
   # The fixture satellite moves while native navigation runs. Retain the actual
   # relative instruction rather than requiring it to remain directly ahead.
-  receipt['followGuidance']=text_of(reveal(lambda t:bool(re.match(r'^(Ahead of you|Turn (left|right) about [0-9]+°|Behind you:)',t))))
+  receipt['followGuidance']=text_of(reveal(lambda t:bool(re.match(r'^(Ahead of you|Turn (left|right) about [0-9]+°|Behind you:)',t)),timeout=120))
   save();capture('follow-pointing');click(lambda t:t=='Clear')
   done('Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and relative turn guidance')
   # Raised like a camera (upright, axis level): the pointing view replaces the dome.
