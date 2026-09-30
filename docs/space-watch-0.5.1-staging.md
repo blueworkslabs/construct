@@ -1,6 +1,9 @@
 # Space Watch 0.5.1 mirror and layers staging
 
-Status: **Android acceptance pending. Not yet cleared for phone handoff.**
+Status: **31/31 functional Android gates passed; ready for physical-phone checks.**
+**Teardown caveat:** the emulator aborted during requested shutdown after all
+checks completed. It is stopped, with no emulator process remaining; this is
+not a clean-exit receipt.
 No merge, APK release or production-catalog promotion is included.
 
 ## Ownership and exact artifacts
@@ -40,7 +43,7 @@ host. Real-module consent, loading and offline gates are separate.
 - Cached layer composition deduplicates after asynchronous downloads, so an
   object in both lists appears once even when navigation completes later.
 - 24 orbit/model groups, controller regressions, real-browser UI/layout checks,
-  19 package/publisher tests, 98 Android-runner helper tests and architecture
+  19 package/publisher tests, 99 Android-runner helper tests and architecture
   checks pass. The new drift regression fails on the prior classifier.
 
 Review and fixes assisted by Codex. Emulator checks cannot establish physical
@@ -56,11 +59,63 @@ controller; it is not evidence of selective native source approval.
 
 ## Android run
 
-A fresh 31-gate run is pending, with the new layers checked before the existing
-Follow and baseline suite. The 0.5.0 run passed 21 baseline gates but failed at
-the unnamed/non-checkable ARIA switch; it is not used as acceptance of 0.5.1.
-The corrected HTML uses named native checkboxes, with browser accessibility-role
-assertions. The driver requires named/checkable Android inputs, checks their
-actual state, and keeps layer tests early. See [prior attempt](space-watch-0.5.0-staging.md).
+- Run: `20260930T072500Z-space-179a761b`, 2026-09-30 07:25–07:55 UTC.
+- Runner: `02a0b00dc3a1d3f40912f3264541728ea2baecec`.
+- **31/31 functional gates passed in this run**, with the exact signed bytes above.
+- [Sanitized receipt and original-capture hashes](evidence/space-watch-0.5.1-staging-2026-09-30.json).
+- [All 50 original Android captures](images/space-watch-0.5.1-staging/).
 
-[Phone checklist](space-watch-0.5.1-hardware-check.md).
+Coverage includes both layers loading from the fixture mirror, ASTRA selection,
+landscape and 200% text, on/off persistence, native Follow/pointing/lifecycle,
+pass/train preview, explicit live lookups, restart, the **real 0.4.1→0.5.1
+scope upgrade**, denial, regrant without Refresh, and offline reopen with Wi-Fi
+and mobile data disabled. Native sensor listeners were one while watching and
+zero on denial, Off, menu pause, focus loss, revocation and process restart.
+
+The live data status was `Orbit data 15 h old · CelesTrak`; live and offline
+views both showed `0 visible · 8 above you` at Now. This is the orbital-element
+age, not proof that a mirror index was stale. The native result confirms live
+loading, not which upstream path supplied it; mirror fallback is independently
+covered by controller fixtures.
+
+### Shutdown and environment caveats
+
+The runner recorded `complete=true`, `stopped=true`, but independent systemd
+inspection found `Result=core-dump`, `ExecMainStatus=6`, `MainPID=0`,
+`ActiveState=failed`. The journal places SIGABRT at **07:55:00 during requested
+emulator shutdown**, after the final checks, not during module operation. A
+process check found no remaining emulator. No clean teardown is claimed.
+The guest crash buffer separately contains the emulator's system Bluetooth
+abort at startup, not a Construct application exception.
+
+Earlier attempts remain incomplete, not pooled into the 31/31 result:
+0.5.0 stopped at 21/31; initial 0.5.1 attempts stopped at 1, 1, 1, 5, 7 and 3
+gates. Fixes were a named native checkbox, XML-leaf lookup regression, unique
+Layers toolbar targeting, dialog-ready capture waits and a bounded guidance
+scroll. One interrupted attempt relaunched/stopped the module when rotation
+and text size changed together; the final driver settles rotation before the
+separate text-size change. The earlier [0.5.0 report](space-watch-0.5.0-staging.md)
+remains separate.
+
+This WebView exposes named `android.widget.CheckBox` nodes but reports
+`checkable=false` and `checked=false` even for visibly checked controls.
+The driver verifies visible on/off announcements, drawn layers and persistence
+instead. Browser accessibility-role checks pass; **real TalkBack checkbox-state
+announcements remain a phone check**, not an emulator claim.
+
+### Inspected native captures
+
+![Navigation/GEO dome](images/space-watch-0.5.1-staging/android-space-layers-dome.png)
+![Layers in landscape](images/space-watch-0.5.1-staging/android-space-layers-landscape.png)
+![Layers at 200% text](images/space-watch-0.5.1-staging/android-space-layers-large-text.png)
+![Expanded native consent defaults off](images/space-watch-0.5.1-staging/android-space-expanded-consent-off.png)
+
+The final-run layer controls, ASTRA details, pointing guidance, train attribution,
+consent and live/offline captures were inspected. Screenshots are original
+emulator-console PNGs, not browser previews. Fixture details may show an element
+epoch as “tomorrow” because saved GEO rows are newer than the running fixture
+clock; they are not presented as fresh real-world alignment measurements.
+
+[Phone checklist](space-watch-0.5.1-hardware-check.md). PR remains open;
+production and the host APK are unchanged. Broader Android CI was still running
+at handoff; this is not a release or merge clearance.

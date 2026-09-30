@@ -500,7 +500,10 @@ not Android; pre-review wording and stale-train policy):
 - **Android acceptance:** the standalone runner is
   `scripts/android-runner/space_module.py`. The exact signed candidate, native
   grant checks, live/offline results and original Android screenshots are tracked
-  in the [0.2.14 staging report](space-watch-0.2.14-staging.md).
+  in the [0.5.1 staging report](space-watch-0.5.1-staging.md) (31 functional gates,
+  with an abnormal emulator shutdown documented separately).
+  The [0.5.1 phone checklist](space-watch-0.5.1-hardware-check.md) is ready;
+  physical-device acceptance remains pending.
   The [0.2.14 phone check](space-watch-0.2.14-hardware-check.md) passed on real
   hardware on 2026-09-28; the same signed 0.2.14 bytes are the latest Space Watch
   in the production catalog. The earlier [0.1.6 acceptance](space-watch-0.1.6-staging.md)
