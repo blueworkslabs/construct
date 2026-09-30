@@ -1,7 +1,8 @@
 # Sky Watch 0.4.2 phone checklist
 
-Status: **ready for physical-phone checks — 24/24 Android gates passed in one
-uninterrupted run, with independently verified clean teardown.**
+Status: **passed on hardware** (2026-09-30, pilot tester: "works as expected")
+after 24/24 Android gates in one uninterrupted run with independently verified
+clean teardown.
 Use alpha37 or later with API 0.14. No new APK if alpha37 is installed.
 Production stays on the previously released module until an API 0.14 host release.
 
