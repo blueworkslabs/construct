@@ -155,6 +155,10 @@ function rig({saved = {}, pendingLocation = false, pendingHttp = false, pendingS
   for (let i = 0; i < 25; i++) r.orient(sample(20, 29));
   assert.equal(r.el('point-guide').textContent, 'Move the phone 2 fists to the left.');
   assert.equal(r.el('follow-announcement').textContent, 'Move the phone to the left.');
+  r.orient({...sample(20, 29), calibrate: true});
+  assert.match(r.el('follow-announcement').textContent, /calibrate/);
+  r.orient({...sample(20, 29), calibrate: false});
+  assert.equal(r.el('follow-announcement').textContent, 'Move the phone to the left.', 'calibration recovery restores unchanged pointing guidance');
   // Nothing selected: name what sits in the middle.
   r.card().children.at(-1).children.find(c => c.textContent === 'Dismiss details').click(); await flush();
   for (let i = 0; i < 25; i++) r.orient(sample(0, 29));
@@ -172,6 +176,13 @@ function rig({saved = {}, pendingLocation = false, pendingHttp = false, pendingS
   assert.equal(r.calls.filter(c => c.method === 'orientation.read' && c.params.op === 'watch').length, 3);
   r.orient({watching: false, reason: 'paused'});
   assert.equal(r.el('follow').attributes['aria-pressed'], 'false'); assert.match(r.el('follow-status').textContent, /lost the foreground/);
+  r = rig({aircraft: [{...PLANE, alt_baro: null}]}); await flush(); await flush();
+  await r.el('follow').onclick(); await flush();
+  for (let i = 0; i < 25; i++) r.orient(sample(0, 0));
+  assert.doesNotMatch(r.el('point-guide').textContent, /In the middle|On target/);
+  r.el('aircraft-list').children[0].click(); await flush();
+  assert.match(r.el('point-guide').textContent, /altitude unavailable/i);
+  assert.notEqual(r.el('point-guide').className, 'locked');
   // Denied or no compass: a clear note; the map keeps working.
   r = rig({aircraft: [PLANE], orientError: 'CAPABILITY_DENIED'}); await flush(); await flush();
   await r.el('follow').onclick(); await flush();

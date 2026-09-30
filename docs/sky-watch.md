@@ -32,8 +32,12 @@ off until "Allow reading compass and tilt" is granted in Module access.
   (at most 60 s, `SkyData.extrapolate`); azimuth is the great-circle bearing
   from the area centre; elevation uses the barometric altitude above sea level
   minus Earth's curvature drop (d²/2R). The observer's own height is not known
-  and not counted, so an aircraft low over high ground can sit a degree or two
-  off; the help text says so.
+  and not counted. The chosen area centre is the assumed observer location,
+  not necessarily the phone location. Elevation error can be substantial nearby
+  or over high ground (500 m of observer height at 1 km is about 27°); there is
+  no one-or-two-degree bound. Help explains these limits. Missing aircraft
+  altitude is never treated as a horizon target: bearing remains available on
+  the flat map, but viewfinder placement, identification and lock are withheld.
 - **Same safeguards as Space Watch:** WMM2025 true north (`space-magnetic.js`,
   shared; no guidance where the correction is unavailable), a quarter-step
   heading smoother on the flat map and a 35 % attitude smoother when pointing,

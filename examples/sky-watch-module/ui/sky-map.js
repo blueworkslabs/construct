@@ -181,10 +181,11 @@ class SkyMap {
       const anchor = this.geoAt(x, y),
         p = SkyData.projection;
       this.zoom = next;
-      const s = this.scale();
+      const s = this.scale(),
+        [ux, uy] = this.unrotate(x - this.width / 2, y - this.height / 2);
       this.center = p.point(
-        p.x(anchor.lon) - (x - this.width / 2) / s,
-        p.y(anchor.lat) - (y - this.height / 2) / s,
+        p.x(anchor.lon) - ux / s,
+        p.y(anchor.lat) - uy / s,
       );
     } else this.zoom = next;
     this.draw();

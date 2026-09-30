@@ -44,6 +44,13 @@ const near=(a,b,eps=1e-6)=>Math.abs(a-b)<eps;
   const before=z.map.geoAt(250,90);z.map.zoomTo(10.3,250,90);const after=z.map.geoAt(250,90);
   assert.ok(near(before.lat,after.lat,1e-9)&&near(before.lon,after.lon,1e-9),'anchor stays under the finger');
   assert.ok(!near(z.map.center.lat,50,1e-6)||!near(z.map.center.lon,8,1e-6),'centre moved to keep the anchor');
+  for (const heading of [45, 90, 270]) {
+    const rotated = rig(); rotated.map.turn(heading);
+    const before = rotated.map.geoAt(245, 80);
+    rotated.map.zoomTo(rotated.map.zoom + 1, 245, 80);
+    const after = rotated.map.geoAt(245, 80);
+    assert.ok(near(before.lat, after.lat, 1e-9) && near(before.lon, after.lon, 1e-9), 'turned anchored zoom preserves geography');
+  }
   // Pinch: two pointers spread ×1.5 → +log2(1.5) zoom, no selection, tap state cleared.
   const p=rig();const z0=p.map.zoom, pinchAnchor=p.map.geoAt(150,150);
   p.fire('pointerdown',100,150,1);p.fire('pointerdown',200,150,2);assert.equal(p.map.drag,null);assert.ok(p.map.pinch);

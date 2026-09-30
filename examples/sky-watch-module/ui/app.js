@@ -991,16 +991,18 @@
     const f = follow.attitude,
       now = Date.now() / 1000,
       looks = rows.map((a) => ({ a, l: D.look(area, a, now) })),
-      target = looks.find((x) => x.a.key === selected) || null,
+      selectedLook = looks.find((x) => x.a.key === selected) || null,
+      target = selectedLook?.l.altitudeKnown ? selectedLook : null,
       g = f && target ? SpacePointer.guide(f, target.l) : null;
     let text;
     if (!f) text = "Waiting for the compass…";
+    else if (selectedLook && !target) text = "Aircraft altitude unavailable. Use the flat map for its bearing.";
     else if (g) text = g.text;
     else {
       const aim = SpacePointer.aim(f),
         near = looks
           .map((x) => ({ x, sep: SpacePointer.separation(aim, x.l) }))
-          .filter((y) => y.sep <= 6)
+          .filter((y) => y.x.l.altitudeKnown && y.sep <= 6)
           .sort((p, q) => p.sep - q.sep)[0];
       text = near
         ? `In the middle: ${pointLabel(near.x.a)}.`
@@ -1010,15 +1012,15 @@
     }
     message($("point-guide"), text, g && g.locked ? "locked" : "");
     const key = g ? g.key : text;
-    if (!pointGuide || pointGuide.key !== key) {
-      pointGuide = { key, text };
+    if (!pointGuide || pointGuide.key !== key || pointGuide.calibrate !== follow.calibrate) {
+      pointGuide = { key, text, calibrate: follow.calibrate };
       if (!follow.calibrate) message($("follow-announcement"), g ? g.short : text, "sr-only");
     }
     pointer.draw({
       frame: f,
       target: target ? { az: target.l.az, el: target.l.el, label: pointLabel(target.a) } : null,
       guide: g,
-      bodies: looks.filter((x) => x !== target && x.l.el > -2).map((x) => ({ key: PLANE_DOT, az: x.l.az, el: x.l.el, label: pointLabel(x.a) })),
+      bodies: looks.filter((x) => x !== target && x.l.altitudeKnown && x.l.el > -2).map((x) => ({ key: PLANE_DOT, az: x.l.az, el: x.l.el, label: pointLabel(x.a) })),
       palette: POINT_PALETTE,
       dark: false,
     });

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.sky-watch",
+      "name": "Sky Watch",
+      "versions": [
+        {
+          "id": "dev.construct.sky-watch",
+          "name": "Sky Watch",
+          "version": "0.4.0",
+          "artifact": "dev.construct.sky-watch-0.4.0.zip",
+          "sha256": "a367a7d7f5771ae20b6703e596a8f896f63c8955cbbc7a8bf20531d0fabdc600",
+          "signature": "Rcy3RtpKSaFEb1l5sxXOjBMSWKRG+oFYx0KfG4Zj48vpK8bFNgqM3AsxEK7vhmh57XlL8S24ASihc/p2aFtwZ9f29cXUaBFDOseny0hqhxBXEL30VXcuRJakU716uBCY7mbDp1d5y8hOvTbnN7zi1aVDelH0PaBCbPWFi3XV64w496UK0rYf+VKXlUAT1XWChD2de4vPYZXLl6OqpWSZBI67ECZPENbYvtpHibRHlDP8IM1m5yOcrlAlWDoDxuhtCS/aNDMx/POtGVe0XqjiQpYytH0cM0ULSrqiNsfIS31kEqeT/OnHO+JsXurSMcagsG50vPV3iPAOfuEd5t+/mw=="
+        }
+      ],
+      "latest": "0.4.0"
+    }
+  ]
+}
