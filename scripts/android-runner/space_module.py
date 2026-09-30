@@ -318,9 +318,15 @@ def follow_checks():
  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·');follow_sensors('process-restart',0)
  done('Revoked orientation cannot restart Follow; a fresh process starts with Follow off')
 def layer_control(name):
- reveal(lambda t:t.startswith(name+':'))
- return next(n for n in nodes() if n.get('checkable')=='true' and visible(n) and
-             (n.get('resource-id')=='layer-'+('gnss' if name=='Navigation' else 'geo')+'-switch' or text_of(n).startswith(name+':')))
+ control_id='layer-'+('gnss' if name=='Navigation' else 'geo')+'-switch'
+ # Android's WebView exposes the native input by ID; its label is not
+ # necessarily a separate text node. Require a named, checkable input.
+ end=time.monotonic()+15
+ while time.monotonic()<end:
+  n=next((n for n in nodes() if n.get('resource-id')==control_id and visible(n)),None)
+  if n and n.get('checkable')=='true' and text_of(n):return n
+  time.sleep(.25)
+ raise RuntimeError('Named checkable layer input unavailable: '+control_id)
 def layer_switch(name,on):
  n=layer_control(name)
  if (n.get('checked')=='true')!=on:tap_node(n)
@@ -389,6 +395,9 @@ try:
  open_module(FIXTURE);module_access();switch('Allow approved internet sources',True);reopen()
  contains('visible ·');capture('space-dome')
  done('Signed fixture opens its computed dome and equivalent overhead list')
+ if a.layers:
+  layer_checks()
+  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·')
  if a.follow:
   follow_checks()
   # Follow setup/revocation ends in a fresh process with Follow off; reset the
@@ -459,7 +468,6 @@ try:
  # Native menu pause/resume on retained data, then real module gates.
  tap('Construct menu');tap('Return to module');contains('visible ·')
  done('Native menu pause/resume restores the sky')
- if a.layers:layer_checks()
  tap('Construct menu');find('Mark working');tap('Mark working')
  if a.layers:
   install(REAL,a.previous_module_sha,version='0.4.1');open_module(REAL,version='0.4.1')

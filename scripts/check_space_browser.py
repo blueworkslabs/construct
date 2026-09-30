@@ -116,6 +116,8 @@ with sync_playwright() as p:
  page.evaluate('document.documentElement.style.fontSize="16px"')
  page.locator('#now').click()
  page.locator('#layers').click()
+ assert page.get_by_role('checkbox',name='Navigation satellites',exact=True).count()==1
+ assert page.get_by_role('checkbox',name='Geostationary and geosynchronous satellites',exact=True).count()==1
  page.locator('#layer-gnss-switch').check()
  page.locator('#layer-geo-switch').check()
  page.wait_for_function("document.querySelector('#layer-geo-list button[data-id=\"29055\"]')")
