@@ -40,7 +40,10 @@ def run(context, version):
         h.leave_access();h.open_module('Synthetic Sky',version['version']);h.area()
     h.click('Follow');text('Allow reading compass and tilt');sensors('denied',0)
     h.capture('sky-follow-denied');h.done('Follow denied without native compass grant; ordinary aircraft list remains usable')
-    h.access();h.switch('Allow reading compass and tilt');h.native_status('Allow reading compass and tilt: on.');reopen()
+    h.access();h.switch('Allow reading compass and tilt');h.native_status('Allow reading compass and tilt: on.')
+    h.switch('Allow approved internet sources');h.native_status('Allow approved internet sources: on.');reopen()
+    # Keep reports fresh throughout the long native pose/layout sequence.
+    h.tap_node(h.auto_switch());h.contains('next in')
     inject('0:0:9.80665','0:50:-20');h.click('Follow');text('Facing N · compass');sensors('watching',1);h.capture('sky-follow-north')
     inject('0:0:9.80665','-50:0:-20');text('Facing E · compass');h.capture('sky-follow-east')
     label='Aircraft map. Select aircraft in the nearby list for accessible details.'
@@ -54,7 +57,7 @@ def run(context, version):
         if rows:h.tap_node(rows[0]);break
         h.scroll()
     else:raise RuntimeError('Synthetic aircraft list row unavailable')
-    text('Turn left');h.capture('sky-follow-relative')
+    text('left');h.capture('sky-follow-relative')
     for elevation,roll,label in [(30,0,'raised'),(60,0,'high'),(30,35,'rolled')]:
         point(0,elevation,roll);text('Pointing ');text('Move the phone');h.capture('sky-point-'+label)
     h.done('Selected aircraft has relative bearing and raised/high/rolled native viewfinder guidance')
