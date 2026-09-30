@@ -1,6 +1,10 @@
 # Sky Watch 0.4.0 Follow staging
 
-Status: **Android acceptance in progress; not cleared for hardware yet.**
+Status: **superseded by 0.4.1; not accepted for hardware.**
+The second attempt recorded five automated gates but visual inspection found
+clipped pointing guidance. It then stopped at a premature Quick Settings client
+focus observation. Both 0.4.0 attempts shut down cleanly. Their partial results
+are not combined into acceptance. See [0.4.1](sky-watch-0.4.1-staging.md).
 No merge, release or production-catalog promotion is included.
 
 ## Exact candidate

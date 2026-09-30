@@ -6,7 +6,7 @@ the optional compass; the published **0.3.4** runs on API 0.9 / alpha26 and late
 The package does not call `sky.watch`. Camera/AR remains deferred; the pointing
 view is drawn, not a camera image.
 
-## Module 0.4.0: Follow and point at the sky (API 0.14, source candidate)
+## Module 0.4.1: Follow and point at the sky (API 0.14, source candidate)
 
 Space Watch's compass features, for aircraft. **Follow** (toolbar) turns the
 `orientation.read` stream on (10 Hz) while it is pressed; it is optional and

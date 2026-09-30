@@ -59,13 +59,13 @@ def run(context, version):
     else:raise RuntimeError('Synthetic aircraft list row unavailable')
     text('left');h.capture('sky-follow-relative')
     for elevation,roll,label in [(30,0,'raised'),(60,0,'high'),(30,35,'rolled')]:
-        point(0,elevation,roll);text('Pointing ');text('Move the phone');h.capture('sky-point-'+label)
+        point(0,elevation,roll);text('Pointing N,');text('Move the phone');h.capture('sky-point-'+label)
     h.done('Selected aircraft has relative bearing and raised/high/rolled native viewfinder guidance')
     for rotation,scale,label in [('1','1.0','landscape'),('0','2.0','large-text')]:
         adb('shell','settings','put','system','accelerometer_rotation','0')
         adb('shell','settings','put','system','user_rotation',rotation);time.sleep(3)
         adb('shell','settings','put','system','font_scale',scale);time.sleep(3)
-        text('Pointing ');h.capture('sky-point-'+label)
+        text('Pointing N,');h.capture('sky-point-'+label)
         text('Move the phone');h.capture('sky-point-'+label+'-guidance')
     adb('shell','settings','put','system','user_rotation','0');time.sleep(3)
     adb('shell','settings','put','system','font_scale','1.0');time.sleep(2)
@@ -76,9 +76,13 @@ def run(context, version):
     h.tap('Construct menu');sensors('menu',0);h.tap('Return to module');text('Facing E · compass');sensors('menu-return',1)
     h.done('Flat return, explicit Off and native-menu pause release the compass; menu return resumes')
     adb('shell','cmd','statusbar','expand-settings');time.sleep(3)
-    system=adb('shell','dumpsys','activity','activities');client=adb('shell','dumpsys','activity','dev.construct.runtime/.ModuleActivity')
-    (h.RESULTS/'sky-focus-system.txt').write_text(system);(h.RESULTS/'sky-focus-client.txt').write_text(client)
-    assert resumed_unfocused(system,client),'Expected resumed-but-unfocused module under Quick Settings'
+    deadline=time.monotonic()+20
+    while True:
+        system=adb('shell','dumpsys','activity','activities');client=adb('shell','dumpsys','activity','dev.construct.runtime/.ModuleActivity')
+        (h.RESULTS/'sky-focus-system.txt').write_text(system);(h.RESULTS/'sky-focus-client.txt').write_text(client)
+        if resumed_unfocused(system,client):break
+        if time.monotonic()>deadline:raise RuntimeError('Expected resumed-but-unfocused module under Quick Settings')
+        time.sleep(.5)
     sensors('quick-settings',0);h.capture('sky-follow-quick-settings')
     adb('shell','cmd','statusbar','collapse');time.sleep(2)
     text('lost the foreground');sensors('focus-return',0)

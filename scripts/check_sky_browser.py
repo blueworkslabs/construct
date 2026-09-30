@@ -7,7 +7,7 @@ from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 with sync_playwright() as p:
     browser=p.chromium.launch(headless=True,args=['--no-sandbox'])
-    page=browser.new_page(viewport={'width':393,'height':850},has_touch=True)
+    page=browser.new_page(viewport={'width':393,'height':850},has_touch=True,device_scale_factor=2)
     errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
     def route(r):
         path=r.request.url.split('http://sky.test/',1)[-1]
@@ -28,7 +28,9 @@ with sync_playwright() as p:
         sample['calibrate']=calibrate
         for _ in range(25):orient(sample)
     point(20,29)
+    page.wait_for_timeout(500)
     assert page.locator('#pointer-wrap').is_visible()
+    assert page.locator('#map').get_attribute('aria-hidden')=='true'
     assert page.locator('#pointer').evaluate("c=>c.width>0&&c.getContext('2d').getImageData(0,0,c.width,c.height).data.some(v=>v!==0)")
     point(20,29,calibrate=True);assert 'figure 8' in page.locator('#follow-announcement').inner_text()
     point(20,29);assert 'figure 8' not in page.locator('#follow-announcement').inner_text()
@@ -36,8 +38,12 @@ with sync_playwright() as p:
         page.set_viewport_size({'width':width,'height':height})
         page.evaluate('(scale)=>document.documentElement.style.fontSize=(16*scale)+"px"',scale)
         point(20,60,35)
+        page.wait_for_timeout(500)
+        assert page.evaluate("()=>{const w=document.querySelector('#pointer-wrap');return w.scrollHeight<=w.clientHeight+1;}"),'pointing grid must not overflow or hide guidance'
+        assert page.locator('#pointer').evaluate('c=>{const r=c.getBoundingClientRect();return r.width>0&&Math.abs(r.width-r.height)<1;}'),'pointer stays square without distorted aiming geometry'
         page.locator('#point-guide').scroll_into_view_if_needed()
         assert page.locator('#point-guide').is_visible()
+        assert page.evaluate("()=>{const w=document.querySelector('#map-wrap').getBoundingClientRect(),g=document.querySelector('#point-guide').getBoundingClientRect();return g.top>=w.top&&g.bottom<=w.bottom+1;}"),'visible guidance must stay inside the unclipped frame'
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'horizontal overflow'
     page.wait_for_timeout(1600);assert page.locator('#pointer-wrap').is_hidden()
     assert not errors,errors

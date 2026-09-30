@@ -104,12 +104,22 @@ select:focus-visible {
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   background: #0d1a14;
 }
+#pointer-frame {
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+  container-type: size;
+}
 #pointer {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   touch-action: manipulation;
 }
 #point-guide {

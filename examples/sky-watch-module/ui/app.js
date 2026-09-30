@@ -934,6 +934,7 @@
   function applyPointing() {
     const on = follow.on && follow.pointing && !follow.unavailable;
     $("pointer-wrap").hidden = !on;
+    $("map").setAttribute("aria-hidden", String(on));
     $("map-wrap").className = on ? "pointing" : "";
     if (!on) pointGuide = null;
     // The north badge turns with the map (CSSOM, not an inline style attribute).
