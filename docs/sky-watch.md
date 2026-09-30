@@ -46,7 +46,7 @@ off until "Allow reading compass and tilt" is granted in Module access.
   pause stops the stream and Follow asks again on return), and nothing stored.
 - **Accessibility:** `follow-status` is not live; a sr-only status announces
   Follow on/off, calibration, and pointing guidance only when the way changes.
-- **Manifest:** 0.4.0, `constructApi` 0.14.0, new optional `orientation.read`.
+- **Manifest:** 0.4.2, `constructApi` 0.14.0, new optional `orientation.read`.
   Publish it only after an API 0.14 host is released; older hosts keep 0.3.4.
 
 Browser preview with synthetic aircraft (desktop Chromium, not Android):
