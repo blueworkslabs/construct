@@ -6,7 +6,7 @@ import re
 import time
 from config import require_runner
 import ui
-from ui import adb,nodes,labels,find,tap,tap_node,capture,RESULTS
+from ui import adb,nodes,labels,find,tap,tap_node,capture as adb_capture,RESULTS
 from host_ui import restart,diagnostics,select_after,installed_status,catalog_settings,apply_catalog,library,reveal_host_control,scroll_top
 from catalog_input import replace_text
 
@@ -14,6 +14,12 @@ require_runner()
 C=json.loads(os.environ['CONSTRUCT_SKY_MODULE_CANDIDATES'])
 result={'complete':False,'checks':[],'scope':'Actual Sky module live data/UI/grants plus separate synthetic glossary update/rollback; not physical GPS or full host baseline'}
 font=adb('shell','settings','get','system','font_scale').strip()
+
+def capture(name):
+    adb_capture(name)
+    target=RESULTS/(name+'-display');target.mkdir()
+    adb('emu','screenrecord','screenshot',str(target))
+    assert len(list(target.glob('*.png')))==1,'Missing original console capture'
 
 def done(name):
     result['checks'].append(name)
@@ -240,6 +246,25 @@ def screenshot_layouts(prefix,expected):
     adb('shell','settings','put','system','font_scale',font);time.sleep(2)
 
 try:
+    # Separate fixtures: same actual Sky parser/UI with synthetic feed and only glossary/version differences.
+    restart();use_catalog(C['updateCatalog']);v1,v2=C['updates']
+    path=adb('shell','pm','path','dev.construct.runtime').strip().removeprefix('package:')
+    apk=adb('shell','sha256sum',path).split()[0]
+    exact_install('Synthetic Sky',v1['version'],v1['sha256'],from_versions=True)
+    open_module('Synthetic Sky',v1['version']);area();contains('Beechcraft King Air');capture('module-update-before')
+    if any('Beechcraft King Air 300' in x for x in labels()):raise RuntimeError('Old glossary already contains changed name')
+    tap('Construct menu');tap('Mark working');library();use_catalog(C['updateCatalog'])
+    exact_install('Synthetic Sky',v2['version'],v2['sha256'])
+    open_module('Synthetic Sky',v2['version']);area();contains('Beechcraft King Air 300');capture('module-update-after')
+    if adb('shell','sha256sum',path).split()[0]!=apk:raise RuntimeError('Host APK changed during module-only update')
+    from sky_follow_checks import run as follow_checks
+    follow_checks(globals(),v2)
+    close_module();select_after('Synthetic Sky · '+v2['version'],('Roll back','Restore '+v1['version'],'Restore previous'))
+    tap('Restore');library();open_module('Synthetic Sky',v1['version']);area();contains('Beechcraft King Air')
+    if any('Beechcraft King Air 300' in x for x in labels()):raise RuntimeError('Rollback failed to restore glossary')
+    capture('module-update-rollback');close_module()
+    result['moduleUpdate']={'before':v1,'after':v2,'apkSha256Before':apk,'apkSha256After':adb('shell','sha256sum',path).split()[0]}
+    done('Two signed synthetic module versions change real glossary behavior and rollback on the same checksummed APK')
     restart();use_catalog(C['catalog']);exact_install('Sky Watch',C['sky']['version'],C['sky']['sha256'])
     path=adb('shell','pm','path','dev.construct.runtime').strip().removeprefix('package:')
     apk=adb('shell','sha256sum',path).split()[0];result['environment']={'apkSha256':apk}
@@ -314,26 +339,12 @@ try:
     if 'Turn off' in labels():tap('Turn off')
     native_status('Allow approved internet sources: off.');leave_access();open_module(expect='map');contains('Enable the requested capability');close_module()
     done('Revoked internet grant remains denied after reopen while location auto-start still works')
-    # Separate fixtures: same actual Sky parser/UI with synthetic feed and only glossary/version differences.
-    use_catalog(C['updateCatalog']);v1,v2=C['updates']
-    exact_install('Synthetic Sky',v1['version'],v1['sha256'],from_versions=True)
-    open_module('Synthetic Sky',v1['version']);area();contains('Beechcraft King Air');capture('module-update-before')
-    if any('Beechcraft King Air 300' in x for x in labels()):raise RuntimeError('Old glossary already contains changed name')
-    tap('Construct menu');tap('Mark working');library();use_catalog(C['updateCatalog'])
-    exact_install('Synthetic Sky',v2['version'],v2['sha256'])
-    open_module('Synthetic Sky',v2['version']);area();contains('Beechcraft King Air 300');capture('module-update-after')
-    if adb('shell','sha256sum',path).split()[0]!=apk:raise RuntimeError('Host APK changed during module-only update')
-    close_module();select_after('Synthetic Sky · '+v2['version'],('Roll back','Restore '+v1['version'],'Restore previous'))
-    tap('Restore');library();open_module('Synthetic Sky',v1['version']);area();contains('Beechcraft King Air')
-    if any('Beechcraft King Air 300' in x for x in labels()):raise RuntimeError('Rollback failed to restore glossary')
-    capture('module-update-rollback');close_module()
-    result['moduleUpdate']={'before':v1,'after':v2,'apkSha256Before':apk,'apkSha256After':adb('shell','sha256sum',path).split()[0]}
-    done('Two signed synthetic module versions change real glossary behavior and rollback on the same checksummed APK')
     result['complete']=True
 except Exception as e:
     result['error']=str(e)
     try:
         capture('modular-failure')
+        (RESULTS/'modular-failure-nodes.json').write_text(json.dumps([n.attrib for n in nodes()],indent=2))
         (RESULTS/'modular-failure-nodes.json').write_text(json.dumps([n.attrib for n in nodes()],indent=2))
     except Exception:pass
     raise

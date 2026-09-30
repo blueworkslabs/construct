@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "id": "dev.construct.sky-watch",
   "name": "Sky Watch",
-  "version": "0.3.4",
-  "description": "A module-owned aircraft map with ADSB.lol, OpenSky and selected-aircraft details. Opens on your location when allowed. Requires Construct alpha26 or later.",
+  "version": "0.4.2",
+  "description": "A module-owned aircraft map with ADSB.lol, OpenSky and selected-aircraft details, plus Follow (the map turns with your phone) and a pointing view that names the aircraft you aim the phone at. Opens on your location when allowed. Requires Construct API 0.14.",
   "constructApi": {
-    "min": "0.9.0",
-    "target": "0.9.0"
+    "min": "0.14.0",
+    "target": "0.14.0"
   },
   "runtime": {
     "kind": "webview-js"
@@ -26,6 +26,11 @@
     {
       "id": "location.read",
       "reason": "Optionally take one foreground location fix when the module opens or when you tap Use my location, to choose the search area. The module can send that area to its approved internet sources.",
+      "optional": true
+    },
+    {
+      "id": "orientation.read",
+      "reason": "Optionally read the phone's compass and tilt while Follow is on, to turn the map to where you face or guide the raised phone to an aircraft. Readings stay on this phone.",
       "optional": true
     },
     {

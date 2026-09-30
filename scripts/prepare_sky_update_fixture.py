@@ -27,7 +27,7 @@ call = function(method, params) {
 };
 """
 
-def prepare(output):
+def prepare(output, versions=('0.1.0', '0.2.0')):
     key=signing_key()
     with tempfile.TemporaryDirectory() as temp:
         source=Path(temp)/'sky'
@@ -38,14 +38,15 @@ def prepare(output):
         html=(source/'ui/index.html').read_text().replace('<h1>Sky Watch</h1>','<h1>Synthetic Sky</h1>').replace('<script src="app.js"></script>','<script src="update-fixture.js"></script><script src="app.js"></script>')
         (source/'ui/index.html').write_text(html)
         models=(source/'ui/models.js').read_text()
-        for version in ('0.1.0','0.2.0'):
+        for i, version in enumerate(versions):
             manifest['version']=version
             (source/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
-            (source/'ui/models.js').write_text(models.replace('Beechcraft King Air 300','Beechcraft King Air') if version=='0.1.0' else models)
+            (source/'ui/models.js').write_text(models.replace('Beechcraft King Air 300','Beechcraft King Air') if i == 0 else models)
             publish(output,*build(source,key),fixture=True)
     print('Prepared two synthetic signed module versions; only version and glossary differ.')
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output',type=Path,required=True)
-    prepare(p.parse_args().output.resolve())
+    p.add_argument('--versions',nargs=2,default=['0.1.0','0.2.0'])
+    a=p.parse_args();prepare(a.output.resolve(),a.versions)

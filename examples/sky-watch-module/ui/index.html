@@ -45,8 +45,11 @@
               <option value="50" selected>50 km</option>
               <option value="100">100 km</option>
             </select></label
+          ><button id="follow" aria-pressed="false">Follow</button
           ><button id="refresh" aria-label="Refresh aircraft">↻</button>
         </div>
+        <p id="follow-status" aria-live="off" hidden></p>
+        <p id="follow-announcement" class="sr-only" role="status"></p>
         <progress
           id="progress"
           aria-label="Refreshing aircraft"
@@ -59,7 +62,17 @@
               aria-label="Aircraft map. Select aircraft in the nearby list for accessible details."
               role="img"
             ></canvas
-            ><span class="north">N ↑</span>
+            ><span id="north" class="north">N ↑</span>
+            <div id="pointer-wrap" hidden>
+              <div id="pointer-frame">
+              <canvas
+                id="pointer"
+                role="img"
+                aria-label="Pointing view: the sky where the back of the phone points, with nearby aircraft. The guidance below says where to move."
+              ></canvas>
+              </div>
+              <p id="point-guide" aria-live="off"></p>
+            </div>
             <div class="map-controls">
               <button id="zoom-in" aria-label="Zoom in">+</button
               ><button id="zoom-out" aria-label="Zoom out">−</button
@@ -100,8 +113,25 @@
           Radius: 10–100 km. Combined merges matching aircraft using the newest
           complete position report and retains known identity from active feeds.
           Amber means stale data. Pinch or double-tap to zoom. The map is
-          north-up; symbols follow ground track, not necessarily the aircraft’s
-          nose direction.
+          north-up unless Follow is on; symbols follow ground track, not
+          necessarily the aircraft’s nose direction.
+        </p>
+        <p>
+          Follow turns the map with your phone: hold it flat, top pointing where
+          you face, and the green wedge shows your view; the selected aircraft’s
+          card says which way to turn. Raise the phone like a camera and the map
+          becomes a pointing view: the back of the phone is the aim, nearby
+          aircraft appear as dots with callsign, type and altitude, and the words
+          and arrow guide you to the selected one. There is no camera image; the
+          view is drawn. It needs “Allow reading compass and tilt” in Construct’s
+          Module access. Headings are corrected to true north with the World
+          Magnetic Model. Positions are a few seconds old and are moved along the
+          aircraft’s track; altitude is barometric above sea level, so an aircraft
+          may appear substantially too high, especially nearby or over high ground.
+          Pointing assumes you are at the chosen area centre at sea level; use
+          your current location or enter where you are. Aircraft without altitude
+          stay on the map but cannot be positioned in the viewfinder. Compass readings are
+          used only while Follow is on and are never stored or sent.
         </p>
         <p>
           Altitude is barometric, not height above you or terrain. Public feeds
@@ -178,6 +208,8 @@
     <script src="models.js"></script>
     <script src="sky-data.js"></script>
     <script src="sky-map.js"></script>
+    <script src="space-magnetic.js"></script>
+    <script src="space-pointer.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

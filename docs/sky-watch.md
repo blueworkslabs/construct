@@ -1,8 +1,64 @@
 # Sky Watch — module-owned map
 
-Sky Watch **0.3.4** runs its aircraft logic and UI in the signed HTML/CSS/JavaScript
-module, using host **API 0.9 / alpha26**. The new package does not call `sky.watch`.
-Camera/AR remains deferred.
+Sky Watch **0.4.2** (source candidate) runs its aircraft logic and UI in the signed
+HTML/CSS/JavaScript module. 0.4.0 needs host **API 0.14** (alpha37 or later) for
+the optional compass; the published **0.3.4** runs on API 0.9 / alpha26 and later.
+The package does not call `sky.watch`. Camera/AR remains deferred; the pointing
+view is drawn, not a camera image.
+
+## Module 0.4.2: Follow and point at the sky (API 0.14, source candidate)
+
+Space Watch's compass features, for aircraft. **Follow** (toolbar) turns the
+`orientation.read` stream on (10 Hz) while it is pressed; it is optional and
+off until "Allow reading compass and tilt" is granted in Module access.
+
+- **Flat phone: heads-up map.** `SkyMap.turn(heading)` rotates the whole map,
+  tiles and markers, so your true heading is up; the north badge turns with it
+  and a ±28° wedge from the area centre shows your view. Pan, pinch and taps
+  work in the turned frame (`rotate`/`unrotate`). Aircraft symbols keep their
+  ground track relative to the turned map. The selected aircraft's card gains
+  "Ahead of you, slightly right." / "Turn left about 40°." / "Behind you: turn
+  around." from the current look direction.
+- **Raised phone: pointing view.** Above about −25° camera pitch the map gives
+  way to a drawn viewfinder (`space-pointer.js`, shared byte-for-byte with Space
+  Watch): horizon, compass points, and every nearby aircraft as a dot labelled
+  "callsign · type · altitude (ft)". With one selected, the words and rim arrow
+  guide the phone ("Move the phone 1 fist up and to the right."), locking
+  within 4°. With nothing selected: "In the middle: DLH123 · Airbus A320 ·
+  36,000 ft", the direct answer to "what plane is that?". Altitudes are in
+  feet, like the cards, rounded to 100 ft.
+- **Look angles** (`SkyData.look`): the position is first moved along the
+  reported ground track and speed for the seconds since the position report
+  (at most 60 s, `SkyData.extrapolate`); azimuth is the great-circle bearing
+  from the area centre; elevation uses the barometric altitude above sea level
+  minus Earth's curvature drop (d²/2R). The observer's own height is not known
+  and not counted. The chosen area centre is the assumed observer location,
+  not necessarily the phone location. Elevation error can be substantial nearby
+  or over high ground (500 m of observer height at 1 km is about 27°); there is
+  no one-or-two-degree bound. Help explains these limits. Missing aircraft
+  altitude is never treated as a horizon target: bearing remains available on
+  the flat map, but viewfinder placement, identification and lock are withheld.
+- **Same safeguards as Space Watch:** WMM2025 true north (`space-magnetic.js`,
+  shared; no guidance where the correction is unavailable), a quarter-step
+  heading smoother on the flat map and a 35 % attitude smoother when pointing,
+  the 1.5 s silence expiry, calibration prompts, the pause/terminal-event
+  lifecycle (`{watching:false, reason}` turns Follow off and says why; a menu
+  pause stops the stream and Follow asks again on return), and nothing stored.
+- **Accessibility:** `follow-status` is not live; a sr-only status announces
+  Follow on/off, calibration, and pointing guidance only when the way changes.
+- **Manifest:** 0.4.2, `constructApi` 0.14.0, new optional `orientation.read`.
+  Publish it only after an API 0.14 host is released; older hosts keep 0.3.4.
+
+Browser preview with synthetic aircraft (desktop Chromium, not Android):
+
+![Follow: heads-up map facing east, view wedge, DLH123 selected](images/sky-watch-0.4.0/sky-follow.png)
+![Pointing view guiding to DLH123](images/sky-watch-0.4.0/sky-point.png)
+![Pointing view naming the aircraft in the middle](images/sky-watch-0.4.0/sky-middle.png)
+
+Space Watch's `space-pointer.js` became self-contained for this (its own
+`fists`/`height`, identical to `SpaceSky`'s), and the unit tests require the two
+modules' copies of `space-pointer.js` and `space-magnetic.js` to be identical.
+
 
 ## Module 0.3.4: opening straight onto the map
 

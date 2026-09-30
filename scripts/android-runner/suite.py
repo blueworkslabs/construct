@@ -278,7 +278,7 @@ try:
     if a.http_consent_candidates: children=[('http_consent.py','http-consent-result.json')]
     for script, result in children:
         # HTTP and location run separately to bound emulator memory growth.
-        timeout = 1800 if script in ('http_consent.py','ux.py','sky_module.py') else 900
+        timeout = 3600 if script == 'sky_module.py' else 1800 if script in ('http_consent.py','ux.py') else 900
         with (run/(script+'.log')).open('w') as log:
             subprocess.run([str(BASE/'venv/bin/python'), str(BASE/script)], check=True,
                            stdout=log, stderr=subprocess.STDOUT, timeout=timeout)

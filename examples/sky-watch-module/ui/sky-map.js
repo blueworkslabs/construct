@@ -18,6 +18,10 @@ class SkyMap {
     this.pending = new Set();
     this.wanted = new Set();
     this.hits = [];
+    // Follow: the map is turned so this true heading (degrees) is up, and a
+    // wedge shows the view from the area centre.
+    this.rotation = 0;
+    this.follow = false;
     this.visible = true;
     this.drag = null;
     this.pinch = null;
@@ -62,11 +66,9 @@ class SkyMap {
         this.zoom = SkyMap.clampZoom(
           this.pinch.zoom + Math.log2(d / this.pinch.distance), this.zoom,
         );
-        const p = SkyData.projection, s = this.scale();
-        this.center = p.point(
-          p.x(this.pinch.anchor.lon) - ((a.x + b.x) / 2 - r.left - this.width / 2) / s,
-          p.y(this.pinch.anchor.lat) - ((a.y + b.y) / 2 - r.top - this.height / 2) / s,
-        );
+        const p = SkyData.projection, s = this.scale(),
+          [ux, uy] = this.unrotate((a.x + b.x) / 2 - r.left - this.width / 2, (a.y + b.y) / 2 - r.top - this.height / 2);
+        this.center = p.point(p.x(this.pinch.anchor.lon) - ux / s, p.y(this.pinch.anchor.lat) - uy / s);
         this.draw();
         this.onPan();
         return;
@@ -78,10 +80,11 @@ class SkyMap {
       if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 7) d.moved = true;
       if (d.moved) {
         const p = SkyData.projection,
-          s = this.scale();
+          s = this.scale(),
+          [ux, uy] = this.unrotate(dx, dy);
         this.center = p.point(
-          p.x(this.center.lon) - dx / s,
-          p.y(this.center.lat) - dy / s,
+          p.x(this.center.lon) - ux / s,
+          p.y(this.center.lat) - uy / s,
         );
         this.draw();
         this.onPan();
@@ -143,14 +146,27 @@ class SkyMap {
   static clampZoom(z, fallback = 8) {
     return Math.max(2, Math.min(13, Number.isFinite(z) ? z : fallback));
   }
+  // Screen offsets from the centre ↔ north-up map offsets, under rotation.
+  rotate(ux, uy) {
+    const t = (-this.rotation * Math.PI) / 180, c = Math.cos(t), s = Math.sin(t);
+    return [ux * c - uy * s, ux * s + uy * c];
+  }
+  unrotate(x, y) {
+    const t = (this.rotation * Math.PI) / 180, c = Math.cos(t), s = Math.sin(t);
+    return [x * c - y * s, x * s + y * c];
+  }
+  // Follow mode: put this true heading at the top (0 = north-up) and redraw.
+  turn(heading, follow = heading !== 0) {
+    this.rotation = ((heading % 360) + 360) % 360;
+    this.follow = follow;
+    this.draw();
+  }
   // Geographic point under a canvas pixel.
   geoAt(x, y) {
     const p = SkyData.projection,
-      s = this.scale();
-    return p.point(
-      p.x(this.center.lon) + (x - this.width / 2) / s,
-      p.y(this.center.lat) + (y - this.height / 2) / s,
-    );
+      s = this.scale(),
+      [ux, uy] = this.unrotate(x - this.width / 2, y - this.height / 2);
+    return p.point(p.x(this.center.lon) + ux / s, p.y(this.center.lat) + uy / s);
   }
   // Change zoom while keeping the geography under (x, y) fixed on screen.
   zoomTo(zoom, x, y) {
@@ -165,10 +181,11 @@ class SkyMap {
       const anchor = this.geoAt(x, y),
         p = SkyData.projection;
       this.zoom = next;
-      const s = this.scale();
+      const s = this.scale(),
+        [ux, uy] = this.unrotate(x - this.width / 2, y - this.height / 2);
       this.center = p.point(
-        p.x(anchor.lon) - (x - this.width / 2) / s,
-        p.y(anchor.lat) - (y - this.height / 2) / s,
+        p.x(anchor.lon) - ux / s,
+        p.y(anchor.lat) - uy / s,
       );
     } else this.zoom = next;
     this.draw();
@@ -220,11 +237,9 @@ class SkyMap {
   }
   xy(p) {
     const m = SkyData.projection,
-      s = this.scale();
-    return {
-      x: this.width / 2 + m.dx(m.x(p.lon), m.x(this.center.lon)) * s,
-      y: this.height / 2 + (m.y(p.lat) - m.y(this.center.lat)) * s,
-    };
+      s = this.scale(),
+      [x, y] = this.rotate(m.dx(m.x(p.lon), m.x(this.center.lon)) * s, (m.y(p.lat) - m.y(this.center.lat)) * s);
+    return { x: this.width / 2 + x, y: this.height / 2 + y };
   }
   draw() {
     if (!this.visible) return;
@@ -254,17 +269,23 @@ class SkyMap {
       s = this.scale(),
       cx = p.x(this.center.lon) * s,
       cy = p.y(this.center.lat) * s,
+      // A turned map shows the corners of a larger north-up square.
+      margin = this.rotation ? (Math.hypot(r.width, r.height) - Math.min(r.width, r.height)) / 2 : 0,
       left = cx - r.width / 2,
       top = cy - r.height / 2;
+    ctx.save();
+    ctx.translate(r.width / 2, r.height / 2);
+    ctx.rotate((-this.rotation * Math.PI) / 180);
+    ctx.translate(-r.width / 2, -r.height / 2);
     this.wanted = new Set();
     for (
-      let y = Math.floor(top / tile);
-      y <= Math.floor((top + r.height) / tile);
+      let y = Math.floor((top - margin) / tile);
+      y <= Math.floor((top + r.height + margin) / tile);
       y++
     )
       for (
-        let x = Math.floor(left / tile);
-        x <= Math.floor((left + r.width) / tile);
+        let x = Math.floor((left - margin) / tile);
+        x <= Math.floor((left + r.width + margin) / tile);
         x++
       ) {
         if (y < 0 || y >= n) continue;
@@ -281,6 +302,7 @@ class SkyMap {
             tile + 0.5,
           );
       }
+    ctx.restore();
     const center = this.xy(this.area),
       mPerPx = (40075016 * Math.cos((this.area.lat * Math.PI) / 180)) / s;
     ctx.beginPath();
@@ -288,6 +310,22 @@ class SkyMap {
     ctx.strokeStyle = "#739780aa";
     ctx.lineWidth = 2;
     ctx.stroke();
+    if (this.follow) {
+      // Where you are facing: a wedge of ±28° from your spot toward the top.
+      const w = (28 * Math.PI) / 180, reach = Math.hypot(r.width, r.height);
+      ctx.fillStyle = "#5fd3a0";
+      ctx.globalAlpha = 0.14;
+      ctx.beginPath();
+      ctx.moveTo(center.x, center.y);
+      ctx.arc(center.x, center.y, reach, -Math.PI / 2 - w, -Math.PI / 2 + w);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = "#5fd3a0";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     this.hits = [];
     for (const a of this.aircraft) {
       const q = this.xy(a.point);
@@ -296,7 +334,7 @@ class SkyMap {
       this.hits.push({ ...q, key: a.key });
       const selected = a.key === this.selected,
         stale = Date.now() / 1000 - a.positionTime > 30;
-      this.marker(q.x, q.y, a.track, SkyData.kind(a), selected, stale);
+      this.marker(q.x, q.y, a.track === null ? null : a.track - this.rotation, SkyData.kind(a), selected, stale);
       if (
         selected &&
         q.x >= 0 &&

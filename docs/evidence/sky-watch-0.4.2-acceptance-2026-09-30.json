@@ -1,0 +1,320 @@
+{
+  "date": "2026-09-30",
+  "version": "0.4.2",
+  "run": "20260930T195552Z-73aabea2",
+  "started": "2026-09-30T19:55:52.129663+00:00",
+  "finished": "2026-09-30T20:23:20.574219+00:00",
+  "complete": true,
+  "plannedChecks": 24,
+  "passedChecks": 24,
+  "checks": [
+    "Follow denied without native compass grant; ordinary aircraft list remains usable",
+    "Native north/east Follow and rotated-map pinch work; original map captures retained",
+    "Selected aircraft has relative bearing and raised/high/rolled native viewfinder guidance",
+    "Pointing UI remains usable in landscape and 200% text; captures require visual review",
+    "Flat return, explicit Off and native-menu pause release the compass; menu return resumes",
+    "Quick Settings ends Follow with explanation and no silent restart; explicit tap restores it",
+    "Revocation denies new Follow watches and process restart starts with zero compass listeners",
+    "Two signed synthetic module versions change real glossary behavior and rollback on the same checksummed APK",
+    "Exact signed module; net.http denied by default and explicitly granted in native access",
+    "Module-owned parser/map loads live ADSB.lol after manual coordinate validation without location permission",
+    "Real two-pointer WebView pinch exposes Search here; before/after map captures retained for zoom review",
+    "Module-owned OpenSky adapter loads live data",
+    "Combined receives both live feeds; deterministic identity/merge rules tested separately",
+    "Selected-aircraft metadata requires explicit lookup and returns attributed results; layout screenshots retained",
+    "Map, radius and controls survive both orientations and Android 2x text",
+    "Native menu returns to module state without a stale pause notice",
+    "Location module grant and Android denial remain separate; module cannot launch OS prompt",
+    "Granted location.read opens straight onto the map from one synthetic foreground fix; no confirmation step",
+    "Source, radius and Auto preferences persist across close/reopen",
+    "Use my location shows aircraft directly without Show aircraft",
+    "Real background exit discards the module area; reopening takes a fresh fix, not the old coordinates",
+    "Start-with-location preference persists across close/reopen and restores auto-start when re-enabled",
+    "Offline transport failure is visible without crashing module",
+    "Revoked internet grant remains denied after reopen while location auto-start still works"
+  ],
+  "scope": "Actual Sky module live data/UI/grants plus separate synthetic glossary update/rollback; not physical GPS or full host baseline",
+  "apkSha256": "23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477",
+  "artifactCommit": "f2845cdd5739929a4926774c1928812f8f9001d3",
+  "runnerCommit": "77d178a9bf13e70d131943ffa067d49ead297458",
+  "realModule": {
+    "version": "0.4.2",
+    "sha256": "ed066d96a8148e661ae859928ecb6ad683608cc17f86f409b6d8ed5180e8c0c2"
+  },
+  "fixtures": [
+    {
+      "version": "0.4.4",
+      "sha256": "881aa1cca7b4f68ce2b878d762835120e30969028795e60d4a48a67f4d73b894"
+    },
+    {
+      "version": "0.4.5",
+      "sha256": "f21aad09ff31aab4a65343436be4927b1d15d150120db05431b3cc046dd18c83"
+    }
+  ],
+  "nativeCompassConnections": {
+    "denied": 0,
+    "watching": 1,
+    "off": 0,
+    "menu": 0,
+    "menu-return": 1,
+    "quick-settings": 0,
+    "focus-return": 0,
+    "still-off": 0,
+    "explicit-restart": 1,
+    "revoked": 0,
+    "restart": 0
+  },
+  "teardown": {
+    "MainPID": "0",
+    "Result": "success",
+    "ExecMainStatus": "0",
+    "ActiveState": "inactive"
+  },
+  "captures": [
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-adsb-map.png",
+      "sha256": "643a6487fc5a3d1b2633878a9c0566965d7048df72159b0f87f3668d23bc9873",
+      "bytes": 905001,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-combined-map.png",
+      "sha256": "6580f8fd31d381b65efc3d04aa8213d45a1adcd43b4a9413cf7a2ac113d308c3",
+      "bytes": 905789,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-default-denied.png",
+      "sha256": "0d76a3f673d5502f4e1ac37efb7e6f1c037fb3b988739d6abacaae56bd2a7513",
+      "bytes": 120016,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-map-font2.png",
+      "sha256": "50e3eb4f9760e9d3a0b9eef3b0fdac284ab20a14fe1397345390fe27a5fa69f8",
+      "bytes": 832923,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-map-font2-landscape.png",
+      "sha256": "5e3c4abdd47c45a22a494b36d64db9e68586a602f518057104d3523124f6fe60",
+      "bytes": 642378,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-map-landscape.png",
+      "sha256": "6f5d1e2af92cd210554c162d7ecf7db4daebdd536de96477c5d2f8be74d1a482",
+      "bytes": 736651,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-map-portrait.png",
+      "sha256": "a44b095d05927d0f223c8a8f76607941cdc6c228992b9756f1d1bcc2b2e7966a",
+      "bytes": 861760,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-menu-resume.png",
+      "sha256": "632d9dac86a8ece7917d1c5c7e91b198a71056228fc9cd1a17e9fa6b7a064067",
+      "bytes": 858717,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-metadata-font2.png",
+      "sha256": "0515a053b57d2b0f82f4a2d405b069a7d4517549889d68f9055b94f8aa66c96b",
+      "bytes": 149564,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-metadata-font2-fields.png",
+      "sha256": "5c71e6fe643298fb3fff2190f60f19608a95e6cf5845f6a43277f96181f12f8e",
+      "bytes": 149180,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-metadata-font2-landscape.png",
+      "sha256": "c67aa2f3b52b9fc62f8ee9b0a716086e2f774e21485be47540ee8467108ede19",
+      "bytes": 248056,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-metadata-font2-landscape-fields.png",
+      "sha256": "c469813660bb4b1a42bbb0e07ef9eaba128a906c89ec09973376d0a1e363bc45",
+      "bytes": 220286,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-metadata-landscape.png",
+      "sha256": "4e348a73c8263d14ad825e6d81910d99efdd26b47276d7a5226ae7f70112a1a1",
+      "bytes": 211441,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-metadata-landscape-fields.png",
+      "sha256": "c2ba4894c555e82c481a03afd9c0cebd43518bf48e938df8d27f3ddede3734c9",
+      "bytes": 228062,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-metadata-optin.png",
+      "sha256": "9de175bc2079d1aa8c3ca1370a30e1d0c6e90e926704b923ca35dd6a56d0af6f",
+      "bytes": 296653,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-metadata-portrait.png",
+      "sha256": "9223683c4a9187c93eb7e85d506ec9ddca9e24dad7b972bd04beb4ca3565878a",
+      "bytes": 143626,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-metadata-portrait-fields.png",
+      "sha256": "9223683c4a9187c93eb7e85d506ec9ddca9e24dad7b972bd04beb4ca3565878a",
+      "bytes": 143626,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-offline.png",
+      "sha256": "5b3d84b5e48555d3eadd795c774aaffc1ff4fbd57d9127552b3d302b96b2b90a",
+      "bytes": 891920,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-opensky-map.png",
+      "sha256": "81e0f9e7468cc529c6937103e39601a38a55fc2ae260304ef77f4dea84ee4f4f",
+      "bytes": 904353,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-pinch-after.png",
+      "sha256": "ee3a3ad96f2cb82643fc34f22d3c0d92538d930d3cc93c3af8bd054230e62141",
+      "bytes": 907585,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-preferences-restored.png",
+      "sha256": "24ef5bc9f715a1953e6ed0ab370cde91158b141a55d962d5d7913e8ea95cea0f",
+      "bytes": 872261,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-start-picker.png",
+      "sha256": "7c2828e2792d0fd155696130cce6ba471c9d0347d33feae93d84842863706cab",
+      "bytes": 73286,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-modular-synthetic-location.png",
+      "sha256": "dd3c20a575c61d0960adaa0d4db5dc0d9d303bbfb8f2f53544d7819e8ba7e159",
+      "bytes": 116913,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-module-update-after.png",
+      "sha256": "f20d12b94535786096db485482d4850b32a7131e3325f67cd15bf64bad0cc0f2",
+      "bytes": 104732,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-module-update-before.png",
+      "sha256": "a2f58c75010511428defc17eaedb2117c6df51772d39bd829d06713154b99ac1",
+      "bytes": 103832,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-module-update-rollback.png",
+      "sha256": "6b514a332521c3466ded5042d75729e139ec0b24f227e871a9ad551649cc1bab",
+      "bytes": 914555,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-sky-follow-denied.png",
+      "sha256": "02a0384551e12c3584d1bd8294aad0a59cffa8f4860444b4a922512a7777ad77",
+      "bytes": 112530,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-sky-follow-east.png",
+      "sha256": "88ae22ccbd13cb299daf05ff82aa49099447a6ef09fa60d1603364b5e1a1f1a6",
+      "bytes": 903828,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-sky-follow-north.png",
+      "sha256": "5744ae4a05560957d3a7e094f4380c340fa46965fc7198de5e283e5949c05c3e",
+      "bytes": 906212,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-sky-follow-off.png",
+      "sha256": "a989f05b87a7a042d90011ed08392700cfa7f6add06c5dc465c18d5e9477001c",
+      "bytes": 949197,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-sky-follow-pinch.png",
+      "sha256": "a59dc8e4c736d36f30196e6267e898facf605b926fe83503bce86e72fe5d9eb2",
+      "bytes": 117519,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-sky-follow-quick-settings.png",
+      "sha256": "fc658f905de915b49acf7e8b048bfcab05da6e3e6e6fd95a2fc046165f506df5",
+      "bytes": 232795,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-sky-follow-relative.png",
+      "sha256": "1078e74e287b14948cf74b7d3afa211b2cc1204cc58a09e2ba5a07a8732c8c00",
+      "bytes": 264395,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-sky-point-high.png",
+      "sha256": "4fe53caff740645c8aef512dcd18a5167bde1d2fda98d56b090382d727007851",
+      "bytes": 100100,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-sky-point-landscape.png",
+      "sha256": "c7c371b3155f823b1d5fb85608710a5aa2a3ea592dac5bfd1831f5e50ef2abd4",
+      "bytes": 122312,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-sky-point-landscape-guidance.png",
+      "sha256": "b1a8a386b13b31205311c538e9626f4064d0fd38f8d764ea7d8470452b7b6be6",
+      "bytes": 121566,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-sky-point-large-text.png",
+      "sha256": "621e45bf8be789561bf68b46b4d433cc1b040bdfed7ba4fd228515b80b39b90d",
+      "bytes": 118185,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-sky-point-large-text-guidance.png",
+      "sha256": "7d7f39fbc5f459ee1b6130272fcdf6cdd139bfb8c19fd54a376470c32a34bd1d",
+      "bytes": 117508,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-sky-point-raised.png",
+      "sha256": "a21398cd5ba232c25b052f623529c6c3c6f7d5cf7b7f16383ea893b1d310e7d2",
+      "bytes": 101606,
+      "original": true
+    },
+    {
+      "file": "docs/images/sky-watch-0.4.2-staging/attempt6/android-sky-point-rolled.png",
+      "sha256": "ce4216080f20c73275cf07259250ab5f2721218b5c853ce42900e15d2796d6ed",
+      "bytes": 94987,
+      "original": true
+    }
+  ],
+  "limitations": [
+    "Emulator compass input and location are synthetic; physical sky alignment and TalkBack remain phone checks.",
+    "Earlier 0.4.0/0.4.1 runs and the two incomplete 0.4.2 runs remain separate; none contribute checks to this acceptance receipt.",
+    "Guest Bluetooth service aborted; no Construct crash appears in the crash buffer, and emulator shutdown succeeded."
+  ]
+}
