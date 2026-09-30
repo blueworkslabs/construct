@@ -1,6 +1,6 @@
-# Space Watch 0.5.0 mirror and layers staging
+# Space Watch 0.5.1 mirror and layers staging
 
-Status: **Incomplete: 21/31 passed, stopped at the first layer control. Superseded by 0.5.1.**
+Status: **Android acceptance pending. Not yet cleared for phone handoff.**
 No merge, APK release or production-catalog promotion is included.
 
 ## Ownership and exact artifacts
@@ -11,9 +11,9 @@ orientation lifecycle and bounded storage. The new `space-data.pages.dev` origin
 widens `net.http` scope; no host code or APK change is required.
 
 - Author correction: `8f7bf65`; reviewed refinements: `b0c112d`.
-- Signed artifact commit: `875e0bb0fa6e472fc14f846d51fe1397312e12ad`.
-- Real 0.5.0 SHA-256: `732d30f8a339d3136092c981fe8eba4ed57ac4d863c7a02665f544570b5b7ad0`.
-- Fixture SHA-256: `ebb3d522667b61e01dca4539908f56b4fdb7e1f41cf04db058d54927844a32cd`.
+- Signed artifact commit: `03a2490`.
+- Real 0.5.1 SHA-256: `bb5f783b5398a72b5eb9751366f7ec86def7d1bb6b52b3a7d356492ee85939ea`.
+- Fixture SHA-256: `b99cce2aa7c8424a01df427fbe2cae2da2a97d09524a76e94c6d95b7712dd619`.
 - Unchanged 0.4.1 upgrade baseline: `10dcb4fc379af3606a32f227cafc68f1f77d98c01ab581724975b2eb7aad9e83`.
 - Unchanged alpha37 x86_64 APK: `23cd4b27f95fbc0124fbb6cf69af4d80a6cc8534c58e2235b95e24f4526b5477`.
 
@@ -56,10 +56,11 @@ controller; it is not evidence of selective native source approval.
 
 ## Android run
 
-`20260930T062141Z-space-24255f9c` passed 21/31 and stopped at the first layer control. Android exposed the ARIA switches without names or checked state; the visible dialog looked correct. Native checkbox semantics and explicit labels are corrected in 0.5.1. The emulator stopped with Result=success, ExecMainStatus=0, MainPID=0.
-No partial results are acceptance. Required coverage includes native Follow and
-pointing, baseline trains/lookups/layout, new layer switches and persistence,
-0.4.1→0.5.0 consent upgrade, real denied grants, automatic live loading and
-offline reopen. Captures and independent teardown will be reviewed afterward.
+A fresh 31-gate run is pending, with the new layers checked before the existing
+Follow and baseline suite. The 0.5.0 run passed 21 baseline gates but failed at
+the unnamed/non-checkable ARIA switch; it is not used as acceptance of 0.5.1.
+The corrected HTML uses named native checkboxes, with browser accessibility-role
+assertions. The driver requires named/checkable Android inputs, checks their
+actual state, and keeps layer tests early. See [prior attempt](space-watch-0.5.0-staging.md).
 
-[Phone checklist](space-watch-0.5.0-hardware-check.md).
+[Phone checklist](space-watch-0.5.1-hardware-check.md).
