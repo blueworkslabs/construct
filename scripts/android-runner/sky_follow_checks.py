@@ -53,7 +53,7 @@ def run(context, version):
     h.done('Native north/east Follow and rotated-map pinch work; original map captures retained')
     # Select the named synthetic aircraft using the actual accessible list row.
     for _ in range(12):
-        rows=[n for n in h.nodes() if n.get('class')=='android.widget.Button' and 'SYNTHETIC' in (n.get('text','')+' '+n.get('content-desc','')) and h.visible(n)]
+        rows=[n for n in h.nodes() if 'SYNTHETIC' in (n.get('text','')+' '+n.get('content-desc','')) and ' km · ' in (n.get('text','')+' '+n.get('content-desc','')) and h.visible(n)]
         if rows:h.tap_node(rows[0]);break
         h.scroll()
     else:raise RuntimeError('Synthetic aircraft list row unavailable')

@@ -345,6 +345,7 @@ except Exception as e:
     try:
         capture('modular-failure')
         (RESULTS/'modular-failure-nodes.json').write_text(json.dumps([n.attrib for n in nodes()],indent=2))
+        (RESULTS/'modular-failure-nodes.json').write_text(json.dumps([n.attrib for n in nodes()],indent=2))
     except Exception:pass
     raise
 finally:
