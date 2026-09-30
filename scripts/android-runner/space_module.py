@@ -354,7 +354,9 @@ def layer_checks():
  click('Details');reach_text('NORAD 29055');capture('space-layers-astra-details');click(lambda t:t=='Close')
  done('GEO list selects ASTRA 1KR with southern pointing and its own NORAD details')
  for rotation,scale,label in [('1','1.0','landscape'),('0','2.0','large-text')]:
-  adb('shell','settings','put','system','user_rotation',rotation);adb('shell','settings','put','system','font_scale',scale);time.sleep(3)
+  adb('shell','settings','put','system','user_rotation',rotation);time.sleep(3)
+  # Let rotation settle before the separate text-size configuration change.
+  adb('shell','settings','put','system','font_scale',scale);time.sleep(3)
   open_layers();layer_control('Navigation');time.sleep(.5);capture('space-layers-'+label)
   reveal(lambda t:t=='Done');capture('space-layers-'+label+'-controls');click(lambda t:t=='Done')
   click('Details');reach_text('NORAD 29055');capture('space-layers-'+label+'-details');click(lambda t:t=='Close')
