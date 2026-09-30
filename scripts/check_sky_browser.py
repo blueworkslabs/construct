@@ -37,7 +37,9 @@ with sync_playwright() as p:
     for width,height,scale in [(393,850,1),(850,393,1),(393,850,2)]:
         page.set_viewport_size({'width':width,'height':height})
         page.evaluate('(scale)=>document.documentElement.style.fontSize=(16*scale)+"px"',scale)
+        page.evaluate("()=>{document.querySelector('#source').value='combined';document.querySelector('#radius').value='100';}")
         point(20,60,35)
+        assert page.evaluate("()=>['source','radius'].every(id=>{const e=document.getElementById(id),s=getComputedStyle(e),c=document.createElement('canvas').getContext('2d');c.font=s.font;return e.clientWidth>=c.measureText(e.selectedOptions[0].text).width+parseFloat(s.paddingLeft)+parseFloat(s.paddingRight)+24;})"),'toolbar must fit selected source and radius values'
         page.wait_for_timeout(500)
         assert page.evaluate("()=>{const w=document.querySelector('#pointer-wrap');return w.scrollHeight<=w.clientHeight+1;}"),'pointing grid must not overflow or hide guidance'
         assert page.locator('#pointer').evaluate('c=>{const r=c.getBoundingClientRect();return r.width>0&&Math.abs(r.width-r.height)<1;}'),'pointer stays square without distorted aiming geometry'

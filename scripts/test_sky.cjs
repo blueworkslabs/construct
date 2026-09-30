@@ -380,7 +380,7 @@ test("module start flow, storage keys and shared stylesheet", () => {
     "What’s flying nearby?",
   ])
     assert.ok(html.includes(label), label);
-  assert.equal(m.version, "0.4.1");
+  assert.equal(m.version, "0.4.2");
   assert.match(m.capabilities.find((c) => c.id === "storage.kv").reason, /not your location/);
   assert.equal(m.capabilities.find((c) => c.id === "location.read").optional, true);
   assert.ok(fs.readFileSync("docs/sky-watch.md", "utf8").includes(`Sky Watch **${m.version}**`));

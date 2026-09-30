@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.sky-fixture",
+      "name": "Synthetic Sky",
+      "versions": [
+        {
+          "id": "dev.construct.sky-fixture",
+          "name": "Synthetic Sky",
+          "version": "0.4.4",
+          "artifact": "dev.construct.sky-fixture-0.4.4.zip",
+          "sha256": "881aa1cca7b4f68ce2b878d762835120e30969028795e60d4a48a67f4d73b894",
+          "signature": "b5fYF0MI+gvIIZ4VI5JGT2gcJNohZgOcU3B5vhrlJlr4dsE5dJ1Eq77no83d7VACM6+wNvvytn7mIq4UpJE1ssQYlQMeHIcWan9rud+LVXECaJcS/1i8Sf43bjs/fZTQHYLKctZpriZ4LJI5EPoJ7JFgakY9X49M4FSkFIS5yORi07Mov+Zf4xVXKwZmxB7PBbqjR9brU/NBEm+UoN+fUh5utbDxYqhprv5wxl/Js/ZzxwQSu4QzITrxK81HKa7y+NgPe/OhF61nYYkbNhYUKyHmEuVyBthHmQM+I7dzh61h814ca2hrYmSU8ucTuISGIX+RBwhVhyoucjRqM62zYg==",
+          "testFixture": true
+        },
+        {
+          "id": "dev.construct.sky-fixture",
+          "name": "Synthetic Sky",
+          "version": "0.4.5",
+          "artifact": "dev.construct.sky-fixture-0.4.5.zip",
+          "sha256": "f21aad09ff31aab4a65343436be4927b1d15d150120db05431b3cc046dd18c83",
+          "signature": "aoynsReu8hhK8GJkGQqFQLoTk5WLxj2nNVuBGuNjpvhgP1YzeA5Jl+2p/fD9BsrS9HPPQFnf79gm0w5xfoT9HG/G2NtF9pascn2F5LQurm6sCD0VpXZeZCLI5RCUYduFAwxDqtoxLn8WWW6oF1ZtbDhCWWOwhvUGvBInLXLOlxLJjS/UD2nVXYgsM5wkgYwrW+O4UFf0BbRVcj/LI0E2dVCTUefesIO2ZlhiRjsWMITXoULIbKVZaXJOxVW17Ak5JAuk7uV7L09GyqG5wQwhtVCng1TzNp+dbtlvmlUazZp0jsYvdaR5ZER421LaZfCNDgFNNEmYHPHxS6LIJVS1MQ==",
+          "testFixture": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,12 +1,12 @@
 # Sky Watch — module-owned map
 
-Sky Watch **0.4.1** (source candidate) runs its aircraft logic and UI in the signed
+Sky Watch **0.4.2** (source candidate) runs its aircraft logic and UI in the signed
 HTML/CSS/JavaScript module. 0.4.0 needs host **API 0.14** (alpha37 or later) for
 the optional compass; the published **0.3.4** runs on API 0.9 / alpha26 and later.
 The package does not call `sky.watch`. Camera/AR remains deferred; the pointing
 view is drawn, not a camera image.
 
-## Module 0.4.1: Follow and point at the sky (API 0.14, source candidate)
+## Module 0.4.2: Follow and point at the sky (API 0.14, source candidate)
 
 Space Watch's compass features, for aircraft. **Follow** (toolbar) turns the
 `orientation.read` stream on (10 Hz) while it is pressed; it is optional and
