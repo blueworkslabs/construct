@@ -1,6 +1,6 @@
 # Sky Watch — module-owned map
 
-Sky Watch **0.4.0** (source candidate) runs its aircraft logic and UI in the signed
+Sky Watch **0.4.1** (source candidate) runs its aircraft logic and UI in the signed
 HTML/CSS/JavaScript module. 0.4.0 needs host **API 0.14** (alpha37 or later) for
 the optional compass; the published **0.3.4** runs on API 0.9 / alpha26 and later.
 The package does not call `sky.watch`. Camera/AR remains deferred; the pointing
