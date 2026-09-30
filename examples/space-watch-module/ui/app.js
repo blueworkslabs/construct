@@ -30,7 +30,7 @@
     planKey = "",
     meta = { elements: 0, satcat: 0, recent: 0 },
     fetchState = { last: 0, until: 0, satcatLast: 0, satcatUntil: 0, recentLast: 0, recentUntil: 0 },
-    prefs = { startWithLocation: true, red: false },
+    prefs = { startWithLocation: true, red: false, layers: { gnss: false, geo: false } },
     selected = null,
     selectedPass = null,
     offset = 0,
@@ -49,6 +49,19 @@
     infoBusy = false,
     wikiDone = false,
     wikiSection = null;
+  // The space-data mirror (C.MIRROR): index cached for 30 minutes; after a
+  // failure it rests for 30 minutes and CelesTrak is used directly.
+  const mirror = { index: null, at: 0, until: 0 };
+  // Optional layers, loaded from the mirror only while switched on. Too large
+  // for storage.kv, so they are downloaded again on each open.
+  const LAYER_NAMES = { gnss: "Navigation", geo: "Geostationary" };
+  const layers = {
+    gnss: { objects: [], byId: new Map(), satcat: new Map(), at: 0, tried: 0, note: "" },
+    geo: { objects: [], byId: new Map(), satcat: new Map(), at: 0, tried: 0, note: "" },
+  };
+  const layerSky = { gnss: null, geo: null },
+    layerDescribed = new Map();
+  let belt = null;
   const described = new Map(),
     passes = new Map(),
     ends = new Map(),
@@ -165,6 +178,8 @@
       if (typeof p.startWithLocation === "boolean")
         prefs.startWithLocation = p.startWithLocation;
       if (typeof p.red === "boolean") prefs.red = p.red;
+      if (p.layers && typeof p.layers === "object")
+        for (const k of ["gnss", "geo"]) if (typeof p.layers[k] === "boolean") prefs.layers[k] = p.layers[k];
     }
     const f = await kvGet("fetch-state");
     if (f && typeof f === "object")
@@ -213,6 +228,54 @@
     if (e !== epoch || !active) throw interrupted();
     return r;
   }
+  const MIRROR_RETRY = 30 * MINUTE;
+  async function mirrorIndex(t) {
+    if (mirror.index && t - mirror.at < 30 * MINUTE && t - mirror.index.built < 12 * HOUR) return mirror.index;
+    mirror.index = null;
+    if (t < mirror.until) return null;
+    try {
+      const r = await getJson(C.MIRROR_INDEX),
+        idx = r.status === 200 ? C.parseMirrorIndex(r.text, now()) : null;
+      if (!idx) {
+        mirror.until = t + MIRROR_RETRY;
+        return null;
+      }
+      mirror.index = idx;
+      mirror.at = t;
+      return idx;
+    } catch (e) {
+      if (e.code === "RUN_PAUSED") throw e;
+      mirror.until = t + MIRROR_RETRY;
+      return null;
+    }
+  }
+  // Every row of every file of one group/kind, each checked like cached rows;
+  // null (and a rest for the mirror) when anything is missing or off.
+  async function mirrorRows(t, group, kind, check, max) {
+    const idx = await mirrorIndex(t),
+      files = idx && idx.groups[group] && idx.groups[group][kind];
+    if (!files) return null;
+    const out = [], seen = new Set();
+    try {
+      for (const url of files) {
+        const r = await getJson(url),
+          list = r.status === 200 ? C.parseMirrorFile(r.text, kind) : null;
+        if (!list || !list.length) throw new Error("mirror file");
+        for (const x of list) {
+          const v = check(x);
+          if (!v || seen.has(v[0]) || out.length >= max) throw new Error("mirror row");
+          seen.add(v[0]);
+          out.push(v);
+        }
+      }
+    } catch (e) {
+      if (e.code === "RUN_PAUSED") throw e;
+      mirror.index = null;
+      mirror.until = t + MIRROR_RETRY;
+      return null;
+    }
+    return out;
+  }
   const dataStatus = (text, tone = "") => {
     dataMessage = { text, tone };
     renderDataStatus();
@@ -231,12 +294,16 @@
     const previous = fetchState.last;
     fetchState.last = t;
     try {
-      const r = await getJson(C.ELEMENTS_URL);
-      if (r.status !== 200) {
-        fetchState.until = t + (r.status === 403 || r.status === 429 ? BACKOFF : RETRY);
-        throw new Error(`CelesTrak orbit data unavailable (HTTP ${r.status}).`);
+      let rows = await mirrorRows(t, "visual", "elements", O.validRow, 5000);
+      rows = rows && rows.length >= 10 ? rows.slice(0, O.MAX_OBJECTS) : null;
+      if (!rows) {
+        const r = await getJson(C.ELEMENTS_URL);
+        if (r.status !== 200) {
+          fetchState.until = t + (r.status === 403 || r.status === 429 ? BACKOFF : RETRY);
+          throw new Error(`CelesTrak orbit data unavailable (HTTP ${r.status}).`);
+        }
+        rows = O.parseElements(r.text);
       }
-      const rows = O.parseElements(r.text);
       if (rows.length < 10) {
         fetchState.until = t + BACKOFF;
         throw new Error("CelesTrak sent no usable orbit data.");
@@ -271,10 +338,14 @@
     const previous = fetchState.satcatLast;
     fetchState.satcatLast = t;
     try {
-      const r = await getJson(C.SATCAT_URL);
-      if (r.status === 403 || r.status === 429) fetchState.satcatUntil = t + BACKOFF;
-      if (r.status !== 200) return;
-      const rows = C.parseSatcat(r.text);
+      let rows = await mirrorRows(t, "visual", "satcat", C.validRow, 5000);
+      rows = rows && rows.length >= 10 ? rows.slice(0, 400) : null;
+      if (!rows) {
+        const r = await getJson(C.SATCAT_URL);
+        if (r.status === 403 || r.status === 429) fetchState.satcatUntil = t + BACKOFF;
+        if (r.status !== 200) return;
+        rows = C.parseSatcat(r.text);
+      }
       if (rows.length < 10) {
         fetchState.satcatUntil = t + BACKOFF;
         return;
@@ -302,21 +373,29 @@
     const previous = fetchState.recentLast;
     fetchState.recentLast = t;
     try {
-      const r = await getJson(C.RECENT_URL);
-      if (r.status === 403 || r.status === 429) fetchState.recentUntil = t + BACKOFF;
-      if (r.status !== 200) return;
-      let raw = null;
-      try { raw = JSON.parse(r.text); } catch (_) { /* Checked below. */ }
-      // The generic orbit parser permits unknown launch IDs. Grouping cannot:
-      // incomplete provider records must not become a successful empty snapshot.
-      if (!Array.isArray(raw) || raw.some(o => !O.compact(o)?.[2]))
-        throw Object.assign(new Error("Invalid recent orbit data"), { code: "HTTP_DATA" });
-      // The ordinary visual parser caps at 400. Recent feeds must be grouped
-      // in full (the host bounds response bytes), not truncated mid-batch.
-      const parsed = [...new Map(raw.map(o => { const r = O.compact(o); return [r[0], r]; })).values()];
+      // Mirror rows are already compact and checked; the same launch-ID rule
+      // applies. Any doubt falls back to CelesTrak's own answer.
+      let parsed = await mirrorRows(t, "last-30-days", "elements", O.validRow, 20000);
+      const fromMirror = !!parsed && !parsed.some((x) => !x[2]);
+      if (!fromMirror) {
+        const r = await getJson(C.RECENT_URL);
+        if (r.status === 403 || r.status === 429) fetchState.recentUntil = t + BACKOFF;
+        if (r.status !== 200) return;
+        let raw = null;
+        try { raw = JSON.parse(r.text); } catch (_) { /* Checked below. */ }
+        // The generic orbit parser permits unknown launch IDs. Grouping cannot:
+        // incomplete provider records must not become a successful empty snapshot.
+        if (!Array.isArray(raw) || raw.some(o => !O.compact(o)?.[2]))
+          throw Object.assign(new Error("Invalid recent orbit data"), { code: "HTTP_DATA" });
+        // The ordinary visual parser caps at 400. Recent feeds must be grouped
+        // in full (the host bounds response bytes), not truncated mid-batch.
+        parsed = [...new Map(raw.map(o => { const r = O.compact(o); return [r[0], r]; })).values()];
+      }
       const rows = P.trainRows(parsed);
       let dates = new Map();
-      if (rows.length) {
+      const catalog = rows.length && fromMirror ? await mirrorRows(t, "last-30-days", "satcat", C.validRow, 20000) : null;
+      if (catalog && catalog.length && !catalog.some((x) => !x[9])) dates = P.launchDates(catalog);
+      else if (rows.length) {
         const q = await getJson(C.RECENT_SATCAT_URL);
         if (q.status === 403 || q.status === 429) fetchState.recentUntil = t + BACKOFF;
         if (q.status !== 200) return;
@@ -351,6 +430,38 @@
       await saveFetchState();
     }
   }
+  // One optional layer from the mirror. No CelesTrak fallback: the layers
+  // are extras, and CelesTrak's big lists are what the mirror is for.
+  async function fetchLayer(name, t) {
+    const L = layers[name];
+    if (L.loading) return;
+    const previous = L.tried;
+    L.loading = true;
+    try {
+      L.tried = t;
+      const rows = await mirrorRows(t, name, "elements", O.validRow, 5000);
+      if (!rows || !rows.length) {
+        L.note = `${LAYER_NAMES[name]} satellites come from the Space Watch data mirror, which is not reachable right now. Retrying in a while.`;
+        renderLayers();
+        return;
+      }
+      const cat = await mirrorRows(t, name, "satcat", C.validRow, 5000);
+      L.objects = O.build(rows);
+      L.byId = new Map(L.objects.map((o) => [o.id, o]));
+      L.satcat = cat ? C.index(cat) : new Map();
+      L.at = t;
+      L.note = "";
+      layerSky[name] = null;
+      for (const o of L.objects) layerDescribed.delete(name + ":" + o.id);
+      frame();
+    } catch (e) {
+      if (e.code === "RUN_PAUSED") L.tried = previous;
+      throw e;
+    } finally {
+      L.loading = false;
+    }
+  }
+
   async function refreshData(manual = false) {
     if (fetching || !active) return;
     const t = now(),
@@ -388,6 +499,9 @@
         t - fetchState.recentLast > RETRY
       )
         await fetchRecent(t);
+      for (const name of ["gnss", "geo"])
+        if (prefs.layers[name] && (!layers[name].at || t - layers[name].at > ELEMENTS_TTL) && t - layers[name].tried > RETRY)
+          await fetchLayer(name, t);
     } catch (_) {
       /* Paused: the next visible tick retries. */
     } finally {
@@ -436,14 +550,54 @@
     }
     return highest ? highest.o : train.centre;
   }
-  // An id is a NORAD number, or "train:YYYY-NNN" for a train.
+  function layerInfo(o, name, t) {
+    let d = layerDescribed.get(name + ":" + o.id);
+    if (!d) {
+      d = C.describeLayer(o, layers[name].satcat.get(o.id), name, name === "geo" ? O.subLon(o, t) : null);
+      layerDescribed.set(name + ":" + o.id, d);
+    }
+    return d;
+  }
+  const catalogOf = (id, layer) => (layer ? layers[layer].satcat.get(id) : satcat.get(id));
+  // An id is a NORAD number, or "train:YYYY-NNN" for a train. Objects of a
+  // layer are found only while that layer is on.
   function find(id, t = now()) {
     if (typeof id === "string") {
       const train = trainList.find((x) => x.id === id);
       return train ? { id, o: trainRepresentative(train, t), train, d: trainInfo(train) } : null;
     }
     const o = objects.find((x) => x.id === id);
-    return o ? { id, o, train: null, d: info(o) } : null;
+    if (o) return { id, o, train: null, d: info(o) };
+    for (const name of ["gnss", "geo"]) {
+      const lo = prefs.layers[name] && layers[name].byId.get(id);
+      if (lo) return { id, o: lo, train: null, d: layerInfo(lo, name, t), layer: name };
+    }
+    return null;
+  }
+  // Layer objects above the horizon. Navigation satellites move slowly and
+  // are recomputed every 5 s; geostationary ones hardly move (every 60 s).
+  // An object in two groups (a BeiDou IGSO is navigation and geosynchronous)
+  // appears once, in the first layer that is on; find() agrees.
+  function layerSnapshot(t) {
+    const items = [], seen = new Set();
+    for (const name of ["gnss", "geo"]) {
+      if (!prefs.layers[name]) continue;
+      const L = layers[name];
+      let c = layerSky[name];
+      if (!c || c.place !== place || c.n !== L.objects.length || Math.abs(t - c.t) > (name === "geo" ? 60000 : 5000)) {
+        c = { t, place, n: L.objects.length, items: [] };
+        for (const o of L.objects) {
+          const l = O.look(o, place.ob, t);
+          if (l && l.el >= 0) c.items.push({ id: o.id, o, l, layer: name, state: "faint", d: layerInfo(o, name, t) });
+        }
+        c.items.sort((a, b) => b.l.el - a.l.el);
+        layerSky[name] = c;
+      }
+      for (const item of c.items) {
+        if (!seen.has(item.id)) { seen.add(item.id); items.push(item); }
+      }
+    }
+    return items;
   }
   const shortLabel = (o, d) =>
     d.title.endsWith(" train") ? d.title : o.id === 25544 ? "ISS" : o.id === 48274 ? "Tiangong" : o.id === 20580 ? "Hubble" : d.major ? d.title : o.name;
@@ -487,7 +641,9 @@
     context(t);
     const s = snapshot(t),
       visible = s.items.filter((x) => x.state === "visible").length;
+    s.layers = layerSnapshot(t);
     lastSky = s;
+    if (prefs.layers.geo && (!belt || belt.place !== place)) belt = { place, points: K.geoBelt(place.lat, place.lon) };
     dome.set({
       stars: sky.stars,
       asterisms: K.asterisms,
@@ -496,6 +652,8 @@
       red: prefs.red,
       follow: follow.on && follow.heading !== null,
       selected,
+      layers: s.layers.map((x) => ({ id: x.id, az: x.l.az, el: x.l.el, kind: x.layer, parked: x.d.geo === "parked", label: x.id === selected ? x.o.name : null })),
+      belt: prefs.layers.geo && belt ? belt.points : null,
       objects: s.items.map((x) => ({
         id: x.id,
         az: x.l.az,
@@ -536,6 +694,7 @@
     }
     $("sky-note").textContent = note;
     renderList(s);
+    renderLayers(s);
     renderSpot(s);
     $("rewind-label").textContent = offset > 0 ? `Preview ${time(t)}` : K.ago(offset);
     $("now").hidden = offset === 0;
@@ -675,6 +834,84 @@
       }
     }
   }
+  // The layers section: a summary per switched-on layer and, behind "List
+  // them", one button per object above the horizon (the dome is an image).
+  const layerKeys = { gnss: "", geo: "" };
+  function layerSummary(name, items) {
+    const L = layers[name];
+    if (L.note && !L.at) return L.note;
+    if (!L.at) return `Loading ${LAYER_NAMES[name].toLowerCase()} satellites…`;
+    if (name === "gnss") {
+      const by = new Map();
+      for (const x of items) {
+        const f = x.d.family === "augmentation (SBAS)" ? "augmentation" : x.d.family;
+        by.set(f, (by.get(f) || 0) + 1);
+      }
+      const parts = [...by].sort((a, b) => b[1] - a[1]).map(([f, n]) => `${n} ${f}`);
+      return `${items.length} navigation satellites above you${parts.length ? ": " + parts.join(", ") : ""}. Drawn as small squares.`;
+    }
+    const top = belt && belt.points.length ? belt.points.reduce((a, b) => (b.el > a.el ? b : a)) : null,
+      where = top ? `, strung along the dotted belt ${K.height(top.el)} in the ${K.dir8(top.az).toLowerCase()}` : "",
+      parked = items.filter((x) => x.d.geo === "parked").length,
+      other = items.length - parked;
+    return `${parked} geostationary satellites above you${where}. Drawn as small diamonds${other ? `, plus ${other} inclined or drifting geosynchronous ones as hollow diamonds whose positions change over time` : ""}.${L.note ? " " + L.note : ""}`;
+  }
+  function renderLayers(s) {
+    const any = prefs.layers.gnss || prefs.layers.geo;
+    $("layer-section").hidden = !any;
+    for (const name of ["gnss", "geo"]) {
+      const block = $(`layer-${name}`), on = prefs.layers[name];
+      block.hidden = !on;
+      if (!on) {
+        layerKeys[name] = "";
+        continue;
+      }
+      const items = (s ? s.layers : []).filter((x) => x.layer === name);
+      message($(`layer-${name}-summary`), layerSummary(name, items));
+      const key = items.map((x) => x.id).join() + "|" + selected;
+      if (key !== layerKeys[name]) {
+        layerKeys[name] = key;
+        $(`layer-${name}-list`).replaceChildren(
+          ...items.map((x) => {
+            const b = element("button", null, "object");
+            b.dataset.id = String(x.id);
+            b.setAttribute("aria-pressed", String(x.id === selected));
+            b.append(element("strong", x.d.title), element("span", `${K.dir16(x.l.az)} · ${K.height(x.l.el)}`));
+            b.onclick = () => select(x.id, true);
+            return b;
+          }),
+        );
+      } else {
+        const byId = new Map(items.map((x) => [String(x.id), x]));
+        for (const b of $(`layer-${name}-list`).children) {
+          const x = byId.get(b.dataset.id);
+          if (x && b.children[1]) b.children[1].textContent = `${K.dir16(x.l.az)} · ${K.height(x.l.el)}`;
+        }
+      }
+    }
+  }
+  function showLayers() {
+    $("layer-gnss-switch").checked = prefs.layers.gnss;
+    $("layer-geo-switch").checked = prefs.layers.geo;
+    $("layers-status").textContent = "";
+    $("layers-dialog").showModal();
+  }
+  function setLayer(name, on) {
+    prefs.layers[name] = on;
+    savePrefs();
+    layerKeys[name] = "";
+    layerSky.geo = null;
+    if (on && place && active && !layers[name].at) {
+      layers[name].note = "";
+      fetchLayer(name, now()).catch(() => {});
+    }
+    frame();
+    $("layers-status").textContent = `${LAYER_NAMES[name]} ${on ? "on" : "off"}.`;
+  }
+  $("layers").onclick = showLayers;
+  $("layer-gnss-switch").onchange = () => setLayer("gnss", $("layer-gnss-switch").checked);
+  $("layer-geo-switch").onchange = () => setLayer("geo", $("layer-geo-switch").checked);
+  $("close-layers").onclick = () => $("layers-dialog").close();
   let spotPassRequest = 0;
   function renderSpot(s) {
     const request = ++spotPassRequest;
@@ -689,9 +926,9 @@
       $("spot").hidden = true;
       return;
     }
-    const { o, d, train } = found,
+    const { o, d, train, layer } = found,
       l = O.look(o, place.ob, s.t),
-      st = O.state(l, s.sunAlt);
+      st = layer ? (l && l.el >= 0 ? "faint" : "below") : O.state(l, s.sunAlt);
     $("spot").hidden = false;
     $("spot-title").textContent = d.title;
     $("spot-kind").textContent = d.kind;
@@ -705,10 +942,12 @@
         $("spot-anchor").textContent = "Working out the next member above you…";
         nextTrainPass(train, s.t, () => selected === train.id && request === spotPassRequest,
           p => { $("spot-anchor").textContent = trainRiseText(p); });
+      } else if (d.geo === "parked") {
+        $("spot-anchor").textContent = "Below your horizon now. Even near-geostationary satellites move slightly; horizon visibility can change.";
       } else {
         const p = nextPass(o, s.t);
         $("spot-anchor").textContent = p
-          ? `Next time above you: ${day(p.riseMs)}, up to ${K.height(p.maxEl)}${p.visible ? ", visible" : ", not visible (shadow or daylight)"}.`
+          ? `Next time above you: ${day(p.riseMs)}, up to ${K.height(p.maxEl)}${layer ? "" : p.visible ? ", visible" : ", not visible (shadow or daylight)"}.`
           : "Not above you in the next 36 hours.";
       }
       $("spot-motion").textContent = "";
@@ -726,15 +965,21 @@
     spotAz = offset === 0 ? l.az : null;
     renderTurn();
     $("spot-anchor").textContent = an ? an.text : "";
-    $("spot-motion").textContent = K.motion(
-      l,
-      O.look(o, place.ob, s.t + MINUTE),
-      O.look(o, place.ob, s.t + 4 * MINUTE),
-    );
+    $("spot-motion").textContent = d.geo === "parked"
+      ? d.inclination >= 1
+        ? `It stays near this spot, wobbling about ${Math.round(d.inclination)}° north and south over each day.`
+        : "It stays near this spot: its orbit nearly matches Earth’s rotation. Small daily motion remains."
+      : K.motion(l, O.look(o, place.ob, s.t + MINUTE), O.look(o, place.ob, s.t + 4 * MINUTE));
     const end = !train && st === "visible" && offset === 0 ? passEnd(o, s.t) : null;
     const line = train
       ? `A line of ${train.members.length} satellites; early orbits are rough, so look along the track ahead and behind`
-      : "";
+      : d.geo === "parked"
+        ? "Satellite dishes aimed at it point approximately this way"
+        : layer === "geo"
+          ? "Geosynchronous but not parked: its position changes relative to the dotted belt"
+          : layer === "gnss"
+          ? "Your phone’s location fix can use signals from satellites like this one"
+          : "";
     $("spot-state").textContent = [K.STATE[st], K.ending(end), line].filter(Boolean).join(". ");
     $("stat-alt").textContent = km(l.altKm);
     $("stat-speed").textContent = `${l.speedKms.toFixed(1)} km/s`;
@@ -816,10 +1061,10 @@
     wikiDone = false;
     const d = found.d,
       train = found.train,
-      c = train ? null : satcat.get(o.id),
+      c = train ? null : catalogOf(o.id, found.layer),
       t = now(),
       l = O.look(o, place.ob, t),
-      p = train ? null : nextPass(o, t);
+      p = train || found.d.geo === "parked" ? null : nextPass(o, t);
     $("info-title").textContent = d.title;
     $("info-kind").textContent = d.kind;
     const body = $("info-body");
@@ -868,10 +1113,12 @@
       facts("Orbit", [
         ["Circles Earth every", c && c.period ? C.period(c.period) : null],
         ["Height range", c && c.perigee != null && c.apogee != null ? `${c.perigee}–${c.apogee} km` : null],
-        [
-          "Next time above you",
-          p ? `${day(p.riseMs)} · up to ${K.height(p.maxEl)} · ${p.visible ? "visible" : "not visible"}` : "Not in the next 36 hours",
-        ],
+        found.d.geo === "parked"
+          ? ["Parked above", C.lonText(O.subLon(o, t)) ? `${C.lonText(O.subLon(o, t))} near the equator` : null]
+          : [
+              "Next time above you",
+              p ? `${day(p.riseMs)} · up to ${K.height(p.maxEl)}${found.layer ? "" : ` · ${p.visible ? "visible" : "not visible"}`}` : "Not in the next 36 hours",
+            ],
         ["Orbit data from", day(o.epoch)],
       ]),
     );
@@ -1264,7 +1511,9 @@
       guide: g,
       stars: sky.stars,
       bodies: sky.bodies,
-      objects: lastSky ? lastSky.items.filter((x) => x.id !== selected).map((x) => ({ az: x.l.az, el: x.l.el, state: x.state })) : [],
+      objects: lastSky
+        ? [...lastSky.items, ...(lastSky.layers || [])].filter((x) => x.id !== selected).map((x) => ({ az: x.l.az, el: x.l.el, state: x.state }))
+        : [],
       palette: SpaceDome.palette(prefs.red),
       dark: lastSky ? lastSky.sunAlt < O.DARK_SUN : true,
     });

@@ -17,7 +17,7 @@ def scroll_signature(nodes):
     if not anchors:
         # Some WebViews omit DOM resource IDs. Stable module buttons still
         # locate the top/spot sections without volatile compass/guide text.
-        fixed = {'Follow', 'Red mode', 'Place', 'Details', 'Clear', 'Back to now'}
+        fixed = {'Follow', 'Red mode', 'Place', 'Layers', 'Details', 'Clear', 'Back to now'}
         anchors = [(n.get('text') or n.get('content-desc'), n.get('bounds'))
                    for n in visible if (n.get('text') or n.get('content-desc')) in fixed
                    and n.get('class') in {'android.widget.Button', 'android.widget.ToggleButton'}]
@@ -31,3 +31,9 @@ def scroll_signature(nodes):
 def visible_point_guidance(text):
     """Match the full visual instruction, not the abbreviated live-region text."""
     return bool(re.match(r'^(On target\. Look|Move the phone [0-9½]|Turn around: it is behind you,)', text))
+
+
+def named_layer_checkbox(node):
+    """WebView leaf nodes are falsey ElementTree objects, not missing nodes."""
+    return (node is not None and node.get('class') == 'android.widget.CheckBox'
+            and bool(node.get('text') or node.get('content-desc')))

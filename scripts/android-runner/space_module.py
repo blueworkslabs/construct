@@ -4,19 +4,24 @@
 Synthetic wrapper tests UI only; the real package tests authority and providers.
 Screenshots need human review; hardware spotting accuracy is not claimed.
 """
-import argparse,datetime,fcntl,hashlib,json,math,os,re,subprocess,time,uuid
+import argparse,datetime,fcntl,hashlib,json,math,os,re,subprocess,sys,time,uuid
 from pathlib import Path
 from config import CONFIG,SERIAL,require_runner,catalog
 p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.add_argument('--sha',required=True)
 p.add_argument('--catalog',required=True,help='HTTPS index with both packages from prepare_space_fixture.py')
 p.add_argument('--module-sha',required=True,help='dev.construct.space-watch package digest')
 p.add_argument('--fixture-sha',required=True,help='dev.construct.space-watch-fixture package digest')
-p.add_argument('--version',default='0.4.1')
+p.add_argument('--version',default='0.5.0')
+p.add_argument('--previous-module-sha',help='Exact 0.4.1 real package in the same catalog, required for 0.5+ update-consent coverage')
 p.add_argument('--follow',action='store_true',help='Enable Follow checks for older versions; mandatory automatically for 0.3.0+')
 p.add_argument('--pointing-layout-only',action='store_true',help='Focused same-package visual evidence only; not full acceptance')
+p.add_argument('--layers-only',action='store_true',help='Focused layer interaction/capture evidence; not full acceptance')
 a=p.parse_args()
 # Follow is mandatory for the feature version, even when the flag is omitted.
 a.follow = a.pointing_layout_only or a.follow or tuple(map(int, a.version.split('.'))) >= (0, 3, 0)
+a.layers = tuple(map(int, a.version.split('.'))) >= (0, 5, 0)
+if a.layers and not a.pointing_layout_only:
+ assert a.previous_module_sha and re.fullmatch(r'[a-f0-9]{64}',a.previous_module_sha),'0.5+ needs the previous exact module for update consent'
 require_runner();catalog(a.catalog)
 assert hashlib.sha256(a.apk.read_bytes()).hexdigest()==a.sha,'APK checksum mismatch'
 lock=(CONFIG.root/'suite.lock').open('a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -29,10 +34,11 @@ from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from keyboard_prompt import gboard_contacts_denial
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
-from space_checks import scroll_signature,visible_point_guidance
+from space_checks import scroll_signature,visible_point_guidance,named_layer_checkbox
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'fixtureSha256':a.fixture_sha,'version':a.version,
- 'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{},'plannedChecks':3 if a.pointing_layout_only else (25 if a.follow else 16),'followRequired':a.follow,'pointingLayoutOnly':a.pointing_layout_only}
+ 'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{},'plannedChecks':6 if a.layers_only else 3 if a.pointing_layout_only else ((31 if a.layers else 25) if a.follow else 16),'followRequired':a.follow,'pointingLayoutOnly':a.pointing_layout_only,'previousModuleSha256':a.previous_module_sha}
 if a.pointing_layout_only:receipt['scope']='Focused pointing layout and native grant checks only; not full module acceptance'
+if a.layers_only:receipt['scope']='Focused same-package layer interactions and captures; not full module acceptance'
 started=False
 def nodes():
  current=ui.nodes();deny=gboard_contacts_denial(current)
@@ -96,19 +102,19 @@ def scroll(direction,distance=None):
    if b[0]<=x<=b[2] and b[1]-12<=start<=b[3]+12:
     start=max(y1+30,b[1]-30) if direction=='down' else min(y2-30,b[3]+30)
  ui._device.swipe(x,start,x,end,duration=.08);time.sleep(.8)
-def reveal(match,directions=('up','down')):
+def reveal(match,directions=('up','down'),node_match=lambda n:True,timeout=60):
  """First visible node whose text satisfies match (a string prefix or predicate), scrolling the module page."""
  test=match if callable(match) else (lambda t:t.startswith(match))
- deadline=time.monotonic()+60
+ deadline=time.monotonic()+timeout
  for direction in directions:
   for _ in range(24):
    if time.monotonic()>deadline:raise RuntimeError('Module control scroll timed out: '+str(match))
    viewport=web()
-   hits=[n for n in nodes() if test(text_of(n)) and visible(n) and n.get('package')=='dev.construct.runtime' and bounds(n)[1]>=viewport[1] and bounds(n)[3]<=viewport[3]]
+   hits=[n for n in nodes() if node_match(n) and test(text_of(n)) and visible(n) and n.get('package')=='dev.construct.runtime' and bounds(n)[1]>=viewport[1] and bounds(n)[3]<=viewport[3]]
    if hits:
     # WebView's accessibility bounds can lag the end of a scroll/text-size reflow.
     before=bounds(hits[0]);time.sleep(.5)
-    settled=[n for n in nodes() if test(text_of(n)) and visible(n) and bounds(n)==before]
+    settled=[n for n in nodes() if node_match(n) and test(text_of(n)) and visible(n) and bounds(n)==before]
     if settled:return settled[0]
    # Detect an actual scroll boundary instead of swiping upward 24 times at
    # the top of the page. Named-control geometry ignores live sky text.
@@ -188,14 +194,19 @@ def permission(button):
   time.sleep(.3)
  raise RuntimeError('Android permission choices missing for '+button)
 def launch():adb('shell','am','start','-n','dev.construct.runtime/.MainActivity');host_ready()
-def open_module(name):
+def open_module(name,version=None):
  global heading
- heading=name+' · '+a.version
+ heading=name+' · '+(version or a.version)
  launch();library();select_after(heading,('Open',));contains('Space Watch')
 def module_access():tap('Construct menu');tap('Module access');find('Module access')
 def reopen():tap_node(reach_native('Reopen module'));contains('Space Watch')
-def install(name,digest):
- library();select_after(name+' · '+a.version,('Review & install',));tap('Allow & install');installed_status()
+def install(name,digest,version=None,expanded=False):
+ library();select_after(name+' · '+(version or a.version),('Review & install',))
+ if expanded:
+  n=reach_native('Allow approved internet sources',checkable=True)
+  assert n.get('checked')=='false','Expanded origins must require fresh approval'
+  capture('space-expanded-consent-off')
+ tap('Allow & install');installed_status()
  assert any(e.get('code')=='INSTALLED_TRIAL' and e.get('packageDigest')==digest for e in diagnostics()),'Wrong signed module '+name
 def inject(acc,mag):
  adb('emu','sensor','set','gyroscope','0:0:0')
@@ -253,7 +264,7 @@ def follow_checks():
   click(lambda t:t.startswith('Long March 4B rocket stage'))
   # The fixture satellite moves while native navigation runs. Retain the actual
   # relative instruction rather than requiring it to remain directly ahead.
-  receipt['followGuidance']=text_of(reveal(lambda t:bool(re.match(r'^(Ahead of you|Turn (left|right) about [0-9]+°|Behind you:)',t))))
+  receipt['followGuidance']=text_of(reveal(lambda t:bool(re.match(r'^(Ahead of you|Turn (left|right) about [0-9]+°|Behind you:)',t)),timeout=120))
   save();capture('follow-pointing');click(lambda t:t=='Clear')
   done('Granted real rotation-vector readings drive true-north-corrected north/east Follow dome and relative turn guidance')
   # Raised like a camera (upright, axis level): the pointing view replaces the dome.
@@ -308,6 +319,61 @@ def follow_checks():
  click(lambda t:t=='Follow');reach_text('Allow reading compass and tilt');follow_sensors('revoked',0)
  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·');follow_sensors('process-restart',0)
  done('Revoked orientation cannot restart Follow; a fresh process starts with Follow off')
+def open_layers():
+ tap_node(reveal(lambda t:t=='Layers',node_match=lambda n:n.get('resource-id')=='layers' and n.get('class')=='android.widget.Button'))
+ layer_control('Navigation')
+def layer_control(name):
+ control_id='layer-'+('gnss' if name=='Navigation' else 'geo')+'-switch'
+ # Android's WebView exposes the native input by ID; its label is not
+ # necessarily a separate text node. Require its native checkbox role and accessible name; this WebView
+ # reports checkable=false even on native HTML checkboxes. State is
+ # verified separately after tapping and across restart.
+ end=time.monotonic()+15
+ while time.monotonic()<end:
+  n=next((n for n in nodes() if n.get('resource-id')==control_id and visible(n)),None)
+  if named_layer_checkbox(n):return n
+  time.sleep(.25)
+ raise RuntimeError('Named layer checkbox unavailable: '+control_id)
+def layer_switch(name,on):
+ n=layer_control(name)
+ # Calls deliberately toggle a known state; visible onchange text verifies it.
+ tap_node(n)
+ contains(name+' '+('on' if on else 'off')+'.')
+def layer_checks():
+ open_layers();layer_switch('Navigation',True);layer_switch('Geostationary',True)
+ capture('space-layers-dialog');click(lambda t:t=='Done')
+ reach_text('navigation satellites above you');reach_text('Drawn as small diamonds')
+ full_dome();capture('space-layers-dome')
+ done('Navigation and GEO layers load through the fixture mirror; switches and full dome are operable')
+ # Open only the GEO list: select its summary's following details control.
+ reach_text('Drawn as small diamonds')
+ rows=list(nodes());summary=next(i for i,n in enumerate(rows) if 'Drawn as small diamonds' in text_of(n))
+ button=next(n for n in rows[summary+1:] if text_of(n)=='List them' and visible(n));tap_node(button)
+ click(lambda t:t.startswith('ASTRA 1KR'))
+ reach_text('SOUTH · 3 fists up');capture('space-layers-astra')
+ click('Details');reach_text('NORAD 29055');capture('space-layers-astra-details');click(lambda t:t=='Close')
+ done('GEO list selects ASTRA 1KR with southern pointing and its own NORAD details')
+ for rotation,scale,label in [('1','1.0','landscape'),('0','2.0','large-text')]:
+  adb('shell','settings','put','system','user_rotation',rotation);time.sleep(3)
+  # Let rotation settle before the separate text-size configuration change.
+  adb('shell','settings','put','system','font_scale',scale);time.sleep(3)
+  open_layers();layer_control('Navigation');time.sleep(.5);capture('space-layers-'+label)
+  reveal(lambda t:t=='Done');capture('space-layers-'+label+'-controls');click(lambda t:t=='Done')
+  click('Details');reach_text('NORAD 29055');capture('space-layers-'+label+'-details');click(lambda t:t=='Close')
+ adb('shell','settings','put','system','font_scale','1.0');time.sleep(2)
+ done('Layer switches and selected-object details work in landscape and 200% Android text')
+ adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·')
+ reach_text('navigation satellites above you');reach_text('Drawn as small diamonds');capture('space-layers-restored')
+ done('Enabled layer preferences survive process restart and reload their data')
+ open_layers();layer_switch('Navigation',False);layer_switch('Geostationary',False);click(lambda t:t=='Done')
+ adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·')
+ open_layers()
+ for name in ['Navigation','Geostationary']:
+  # Prove the saved state was off by toggling on, then restore off.
+  layer_switch(name,True);layer_switch(name,False)
+ capture('space-layers-off');click(lambda t:t=='Done')
+ done('Turning both layers off is persisted without changing the baseline sky')
+
 try:
  print('RESULTS:',run,flush=True);save();(CONFIG.root/'camera-emulated.flag').write_text('emulated\n')
  avd,snapshot,_=CONFIG.profile(True);started=True
@@ -340,6 +406,12 @@ try:
  open_module(FIXTURE);module_access();switch('Allow approved internet sources',True);reopen()
  contains('visible ·');capture('space-dome')
  done('Signed fixture opens its computed dome and equivalent overhead list')
+ if a.layers:
+  layer_checks()
+  if a.layers_only:
+   assert len(receipt['checks'])==6
+   receipt['complete']=True;sys.exit(0)
+  adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·')
  if a.follow:
   follow_checks()
   # Follow setup/revocation ends in a fresh process with Follow off; reset the
@@ -410,7 +482,18 @@ try:
  # Native menu pause/resume on retained data, then real module gates.
  tap('Construct menu');tap('Return to module');contains('visible ·')
  done('Native menu pause/resume restores the sky')
- tap('Construct menu');find('Mark working');tap('Mark working');install(REAL,a.module_sha);open_module(REAL)
+ tap('Construct menu');find('Mark working');tap('Mark working')
+ if a.layers:
+  install(REAL,a.previous_module_sha,version='0.4.1');open_module(REAL,version='0.4.1')
+  contains('Phone location isn’t enabled');module_access();switch('Allow approved internet sources',True);reopen()
+  tap('Construct menu');tap('Mark working')
+  install(REAL,a.module_sha,expanded=True);open_module(REAL)
+  module_access();n=reach_native('Allow approved internet sources',checkable=True)
+  assert n.get('checked')=='false','Declined expanded consent must leave all HTTP disabled'
+  capture('space-expanded-consent-denied');reopen()
+  done('Real 0.4.1 update: expanded origin consent defaults off and cannot reuse the previous HTTP grant')
+ else:
+  install(REAL,a.module_sha);open_module(REAL)
  contains('Phone location isn’t enabled');capture('space-real-location-denied')
  done('Real module refuses ungranted phone location and offers manual place')
  click('Choose place')

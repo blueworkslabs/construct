@@ -492,16 +492,102 @@ test("pointing: plain words match the screen, the arrow and the lock ring", () =
   assert.equal(SP.guide(null, { az: 0, el: 0 }), null);
   assert.equal(SP.guide(f(90, 20), null), null);
 });
+test("mirror: index and files follow the space-data contract, fail closed otherwise", () => {
+  const T = Date.parse("2026-09-29T21:00:00Z");
+  const index = (over = {}) => JSON.stringify({
+    schema: 1, dataset: "20260929T2053Z", built: "2026-09-29T20:53:36Z", path: "20260929T2053Z/",
+    groups: {
+      visual: { elements: [{ file: "visual/elements-1.json" }], satcat: [{ file: "visual/satcat-1.json" }] },
+      starlink: { elements: [{ file: "starlink/elements-1.json" }, { file: "starlink/elements-2.json" }] },
+    },
+    ...over,
+  });
+  const idx = C.parseMirrorIndex(index(), T);
+  assert.equal(idx.dataset, "20260929T2053Z");
+  assert.deepEqual(idx.groups.visual.elements, ["https://space-data.pages.dev/v1/20260929T2053Z/visual/elements-1.json"]);
+  assert.equal(idx.groups.starlink.elements.length, 2);
+  assert.equal(idx.groups.starlink.satcat, undefined);
+  // Stale, future, malformed or path-escaping indexes are not used.
+  assert.equal(C.parseMirrorIndex(index(), T + 13 * 3600000), null, "older than 12 h");
+  assert.equal(C.parseMirrorIndex(index({ built: "2026-09-29T23:30:00Z" }), T), null, "from the future");
+  assert.equal(C.parseMirrorIndex(index({ schema: 2 }), T), null);
+  assert.equal(C.parseMirrorIndex(index({ path: "../x/" }), T), null);
+  for (const file of ["visual/elements-2.json", "../visual/elements-1.json", "geo/elements-1.json", "visual/elements-1.json?x", "https://evil.example/x.json"])
+    assert.equal(C.parseMirrorIndex(index({ groups: { visual: { elements: [{ file }] } } }), T), null, file);
+  assert.equal(C.parseMirrorIndex("<html>", T), null);
+  assert.deepEqual(C.parseMirrorFile(JSON.stringify({ schema: 1, kind: "elements", rows: [[1]] }), "elements"), [[1]]);
+  assert.equal(C.parseMirrorFile(JSON.stringify({ schema: 1, kind: "satcat", rows: [] }), "elements"), null);
+  assert.equal(C.parseMirrorFile("nope", "elements"), null);
+  // Rows from the mirror pass the same checks as cached rows.
+  const row = O.compact(elements.find((x) => x.NORAD_CAT_ID === 25544));
+  assert.deepEqual(O.validRow(JSON.parse(JSON.stringify(row))), row);
+  assert.equal(O.rows(elements, O.compact, 5).length, 5);
+});
+test("layers: navigation families, geostationary belt and longitudes", () => {
+  const gnss = JSON.parse(fs.readFileSync("scripts/space-fixture/gnss.json", "utf8")),
+    geo = JSON.parse(fs.readFileSync("scripts/space-fixture/geo.json", "utf8"));
+  const fam = (name) => C.navFamily(name).family;
+  assert.equal(fam("GPS BIIF-1  (PRN 25)"), "GPS");
+  assert.equal(fam("GSAT0202 (GALILEO 6)"), "Galileo");
+  assert.equal(fam("COSMOS 2485 (747)"), "GLONASS");
+  assert.equal(fam("BEIDOU-3 M2 (C20)"), "BeiDou");
+  assert.equal(fam("QZS-6 (QZSS/PRN 200)"), "QZSS");
+  assert.equal(fam("IRNSS-1B"), "NavIC");
+  assert.equal(fam("SES-15 (WAAS/PRN 133)"), "augmentation (SBAS)");
+  const unknown = gnss.filter((o) => fam(o.OBJECT_NAME) === "navigation").map((o) => o.OBJECT_NAME);
+  assert.ok(unknown.length <= 3, "nearly every fixture navigation satellite has a family: " + unknown);
+  const d = C.describeLayer({ name: "GPS BIII-1  (PRN 04)" }, null, "gnss");
+  assert.equal(d.kind, "GPS navigation satellite · United States");
+  assert.equal(d.wiki, "Global Positioning System");
+  // The belt from Berlin: highest in the south, about 30° up; Astra 19.2°E
+  // (SGP4, captured elements) sits on it within a degree.
+  const belt = K.geoBelt(52.52, 13.405),
+    top = belt.reduce((a, b) => (b.el > a.el ? b : a));
+  assert.ok(Math.abs(top.az - 180) < 3 && top.el > 29 && top.el < 31, JSON.stringify(top));
+  assert.ok(belt.every((p) => p.el >= -1));
+  const astra = O.build(O.rows(geo.filter((o) => o.OBJECT_NAME === "ASTRA 1KR")))[0],
+    t = Date.parse("2026-09-28T17:50:40Z"),
+    l = O.look(astra, O.observer(52.52, 13.405, 0), t),
+    lon = O.subLon(astra, t);
+  assert.ok(Math.abs(lon - 19.2) < 0.5, String(lon));
+  const near = belt.reduce((a, b) => (Math.hypot(b.az - l.az, b.el - l.el) < Math.hypot(a.az - l.az, a.el - l.el) ? b : a));
+  assert.ok(Math.hypot(near.az - l.az, near.el - l.el) < 1.5, JSON.stringify([near, l.az, l.el]));
+  assert.match(C.describeLayer(astra, null, "geo", lon).kind, /^Geostationary satellite · parked above 19\.\dE?°?/);
+  // Only near-sidereal, low-inclination, low-eccentricity orbits are "parked"; the GEO group
+  // also holds inclined geosynchronous objects that swing north and south.
+  const geoObjects = O.build(O.rows(geo, O.compact, 1000)),
+    classes = geoObjects.map((o) => C.geoClass(o));
+  assert.deepEqual([classes.filter((x) => x === "parked").length, classes.filter((x) => x === "inclined").length, classes.filter((x) => x === "drifting").length], [119,63,8]);
+  const igso = geoObjects.find((o) => o.id === 41434);
+  assert.equal(C.geoClass(igso), "inclined");
+  assert.equal(C.geoClass(geoObjects.find(o => o.id === 44903)), "drifting", "ELEKTRO-L 3 drifts over 3 degrees/day");
+  assert.equal(C.geoClass(geoObjects.find(o => o.id === 56372)), "inclined", "GS-1 crosses the horizon despite inclination below 5 degrees");
+  assert.notEqual(C.geoClass({row: [1, "x", null, 0, 1.0027379, 0.1, 0.1]}), "parked", "eccentric synchronous orbit is not stationary");
+  const di = C.describeLayer(igso, null, "geo", O.subLon(igso, t));
+  assert.equal(di.geo, "inclined");
+  assert.match(di.kind, /^Geosynchronous satellite · inclined 60° · traces a daily figure-8, not parked$/);
+  assert.equal(C.geoClass({ row: [1, "x", null, 0, 1.03, 0, 0.5, 0, 0, 0, 0, 0, 0] }), "drifting");
+  assert.equal(C.geoClass({ row: [1, "x", null, 0, 1.0027379, 0, 1.0, 0, 0, 0, 0, 0, 0] }), "parked");
+  assert.equal(C.geoClass({ row: [1, "x", null, 0, 1.0027379, 0, 1.1, 0, 0, 0, 0, 0, 0] }), "inclined");
+  // Over six hours the inclined object moves through tens of degrees; Astra does not.
+  const ob = O.observer(52.517834, 13.388761, 0), move = (o) => Math.abs(O.look(o, ob, t + 6 * 3600000).el - O.look(o, ob, t).el);
+  assert.ok(move(igso) > 30 && move(astra) < 1, `${move(igso)} ${move(astra)}`);
+  assert.equal(C.lonText(-8.04), "8.0°W");
+  // From the southern hemisphere the belt is in the north.
+  const south = K.geoBelt(-33.9, 18.4).reduce((a, b) => (b.el > a.el ? b : a));
+  assert.ok(south.az < 3 || south.az > 357, JSON.stringify(south));
+});
 test("package: manifest, capabilities, scripts and no location in any URL", () => {
   const m = JSON.parse(fs.readFileSync(root + "manifest.json", "utf8"));
   assert.equal(m.id, "dev.construct.space-watch");
-  assert.equal(m.version, "0.4.1");
+  assert.equal(m.version, "0.5.1");
   assert.deepEqual(m.constructApi, { min: "0.14.0", target: "0.14.0" });
   const caps = Object.fromEntries(m.capabilities.map((c) => [c.id, c]));
   assert.deepEqual(Object.keys(caps).sort(), ["location.read", "net.http", "orientation.read", "storage.kv"]);
   assert.equal(caps["orientation.read"].optional, true);
   assert.match(caps["orientation.read"].reason, /stay on this phone/);
-  assert.deepEqual(caps["net.http"].origins, ["https://celestrak.org", "https://en.wikipedia.org"]);
+  assert.deepEqual(caps["net.http"].origins, ["https://space-data.pages.dev", "https://celestrak.org", "https://en.wikipedia.org"]);
+  assert.match(caps["net.http"].reason, /mirror.*CelesTrak directly/); assert.ok(caps["net.http"].reason.length <= 240);
   assert.equal(caps["location.read"].optional, true);
   assert.match(caps["storage.kv"].reason, /not your location/);
   const html = fs.readFileSync(root + "ui/index.html", "utf8"),
@@ -514,8 +600,9 @@ test("package: manifest, capabilities, scripts and no location in any URL", () =
   assert.doesNotMatch(app, /\bfetch\s*\(|XMLHttpRequest|navigator\.geolocation|console\./);
   // Every URL the module can request is built from fixed strings plus a
   // catalogue designator or an object name; coordinates never enter one.
-  const urls = [C.ELEMENTS_URL, C.SATCAT_URL, C.RECENT_URL, C.RECENT_SATCAT_URL, C.launchUrl("1998-067A"), C.wikiUrl({ wiki: "International Space Station" }), C.wikiUrl({ search: "COSMOS 2428" }, true)];
-  for (const u of urls) assert.match(u, /^https:\/\/(celestrak\.org|en\.wikipedia\.org)\//);
+  const urls = [C.MIRROR_INDEX, C.ELEMENTS_URL, C.SATCAT_URL, C.RECENT_URL, C.RECENT_SATCAT_URL, C.launchUrl("1998-067A"), C.wikiUrl({ wiki: "International Space Station" }), C.wikiUrl({ search: "COSMOS 2428" }, true)];
+  for (const u of urls) assert.match(u, /^https:\/\/(space-data\.pages\.dev|celestrak\.org|en\.wikipedia\.org)\//);
+  assert.doesNotMatch(app, /MIRROR[^;]*(lat|lon)/, "mirror URLs never carry the place");
   const keys = [...app.matchAll(/kvSet\("([^"]+)"/g)].map((x) => x[1]);
   assert.deepEqual([...new Set(keys)].sort(), ["fetch-state", "preferences", "recent-launches"]);
   assert.doesNotMatch(app, /kvSet\(`?(place|location|coordinates|lat)/);

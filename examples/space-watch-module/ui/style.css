@@ -62,6 +62,20 @@ input[type="text"] {
   border-color: #2f6b52;
   color: var(--jade);
 }
+.layer-block summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--jade);
+}
+.layer-list {
+  display: grid;
+  gap: 6px;
+}
+#layer-section p {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
 #follow[aria-pressed="true"] {
   border-color: var(--jade);
   color: var(--jade);

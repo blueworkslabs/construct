@@ -10,7 +10,12 @@ const SpaceCatalog = (() => {
       "https://celestrak.org/NORAD/elements/gp.php?GROUP=last-30-days&FORMAT=json",
     RECENT_SATCAT_URL =
       "https://celestrak.org/satcat/records.php?GROUP=last-30-days&FORMAT=json",
-    WIKI = "https://en.wikipedia.org/w/api.php";
+    WIKI = "https://en.wikipedia.org/w/api.php",
+    // Our cache of CelesTrak's lists (github.com/blueworkslabs/space-data),
+    // refreshed every 4 hours; CelesTrak directly is the fallback.
+    MIRROR = "https://space-data.pages.dev",
+    MIRROR_INDEX = MIRROR + "/v1/index.json",
+    MIRROR_STALE_MS = 12 * 3600000;
   const TYPES = new Set(["PAY", "R/B", "DEB", "UNK"]),
     DATE = /^\d{4}-\d\d-\d\d$/,
     INTDES = /^\d{4}-\d{3}[A-Z]{1,3}$/,
@@ -239,6 +244,111 @@ const SpaceCatalog = (() => {
       stages: others.filter((x) => x.type === "R/B").length,
     };
   }
+  // The mirror's index (data contract schema 1). Returns the file names per
+  // group and kind, or null when anything is off or it is older than 12 hours.
+  const DATASET = /^\d{8}T\d{4}Z$/,
+    GROUP = /^[a-z0-9-]{1,20}$/,
+    FILE = /^([a-z0-9-]{1,20})\/(elements|satcat)-(\d{1,2})\.json$/;
+  function parseMirrorIndex(body, ms) {
+    let j;
+    try {
+      j = JSON.parse(body);
+    } catch (_) {
+      return null;
+    }
+    if (!j || j.schema !== 1 || typeof j.dataset !== "string" || !DATASET.test(j.dataset) || j.path !== j.dataset + "/")
+      return null;
+    const built = typeof j.built === "string" ? Date.parse(j.built) : NaN;
+    if (!Number.isFinite(built) || built > ms + 3600000 || ms - built > MIRROR_STALE_MS) return null;
+    if (!j.groups || typeof j.groups !== "object") return null;
+    const groups = {};
+    for (const [name, g] of Object.entries(j.groups)) {
+      if (!GROUP.test(name) || !g || typeof g !== "object") return null;
+      const entry = {};
+      for (const kind of ["elements", "satcat"]) {
+        if (g[kind] === undefined) continue;
+        if (!Array.isArray(g[kind]) || !g[kind].length || g[kind].length > 20) return null;
+        const files = [];
+        for (const [i, f] of g[kind].entries()) {
+          const m = f && typeof f.file === "string" ? FILE.exec(f.file) : null;
+          if (!m || m[1] !== name || m[2] !== kind || Number(m[3]) !== i + 1) return null;
+          files.push(`${MIRROR}/v1/${j.path}${f.file}`);
+        }
+        entry[kind] = files;
+      }
+      groups[name] = entry;
+    }
+    return { dataset: j.dataset, built, groups };
+  }
+  // One mirror file: {"schema":1,"kind":…,"rows":[…]}; rows are checked by the caller.
+  function parseMirrorFile(body, kind) {
+    try {
+      const j = JSON.parse(body);
+      return j && j.schema === 1 && j.kind === kind && Array.isArray(j.rows) ? j.rows : null;
+    } catch (_) {
+      return null;
+    }
+  }
+  // Navigation satellites by constellation, from the catalogue name.
+  const NAV = [
+    [/^GPS /, "GPS", "United States", "Global Positioning System"],
+    [/^GSAT0\d{3}|GALILEO/, "Galileo", "European Union", "Galileo (satellite navigation)"],
+    [/^COSMOS \d+ \(\d{3}[A-Z]?\)$/, "GLONASS", "Russia", "GLONASS"],
+    [/^BEIDOU/, "BeiDou", "China", "BeiDou"],
+    [/^QZS/, "QZSS", "Japan", "Quasi-Zenith Satellite System"],
+    [/^(IRNSS|NVS)/, "NavIC", "India", "Indian Regional Navigation Satellite System"],
+    [/WAAS|EGNOS|SDCM|GAGAN|MSAS|BDSBAS|KASS|SBAS/, "augmentation (SBAS)", null, "GNSS augmentation"],
+  ];
+  function navFamily(name) {
+    const n = NAV.find(([re]) => re.test(name || ""));
+    return n ? { family: n[1], who: n[2], wiki: n[3] } : { family: "navigation", who: null, wiki: "Satellite navigation" };
+  }
+  const lonText = (lon) =>
+    Number.isFinite(lon) ? `${Math.abs(lon).toFixed(1)}°${lon >= 0 ? "E" : "W"}` : null;
+  // Conservative near-geostationary display heuristic, not proof of station keeping.
+  // Mean motion is in revolutions per solar day; Earth turns once per SIDEREAL day.
+  // Bound drift (~0.18 degrees/day), latitude wobble, and eccentric longitude motion.
+  function geoClass(o) {
+    const inc = o.row ? o.row[6] : null, mm = o.row ? o.row[4] : null,
+      eccentricity = o.row ? o.row[5] : null;
+    if (![inc, mm, eccentricity].every(Number.isFinite)) return "drifting";
+    if (Math.abs(mm - 1.0027379) > 0.0005) return "drifting";
+    if (inc > 1) return "inclined";
+    return eccentricity > 0.001 ? "drifting" : "parked";
+  }
+  // Objects of the optional layers: never visible to the eye, so the kind
+  // line says what they are for instead.
+  function describeLayer(o, c, layer, lon) {
+    if (layer === "gnss") {
+      const f = navFamily(o.name);
+      return {
+        title: o.name,
+        kind: `${f.family === "augmentation (SBAS)" ? "Navigation augmentation" : f.family + " navigation"} satellite${f.who ? " · " + f.who : ""}`,
+        family: f.family,
+        wiki: f.wiki,
+        major: false,
+        layer,
+      };
+    }
+    const who = c && owner(c.owner),
+      geo = geoClass(o),
+      inc = o.row ? Math.round(o.row[6]) : null;
+    const kind = geo === "parked"
+      ? `Geostationary satellite${lonText(lon) ? " · parked above " + lonText(lon) : ""}`
+      : geo === "inclined"
+        ? `Geosynchronous satellite · inclined ${inc}° · traces a daily figure-8, not parked`
+        : "Geosynchronous satellite · drifting or eccentric orbit, not parked";
+    return {
+      title: o.name,
+      kind: `${kind}${who ? " · " + who : ""}`,
+      search: o.name,
+      wiki: null,
+      major: false,
+      layer,
+      geo,
+      inclination: o.row ? o.row[6] : null,
+    };
+  }
   // Wikipedia: intro text only, plain text, redirects resolved server-side
   // (Construct does not follow HTTP redirects).
   // A curated or derived title first; a one-result search as the fallback.
@@ -272,6 +382,14 @@ const SpaceCatalog = (() => {
   return {
     ELEMENTS_URL,
     SATCAT_URL,
+    MIRROR,
+    MIRROR_INDEX,
+    parseMirrorIndex,
+    parseMirrorFile,
+    navFamily,
+    lonText,
+    describeLayer,
+    geoClass,
     RECENT_URL,
     RECENT_SATCAT_URL,
     compact,

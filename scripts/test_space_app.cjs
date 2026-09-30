@@ -19,8 +19,29 @@ const LAUNCH = JSON.stringify([
   {NORAD_CAT_ID: 29505, OBJECT_TYPE: 'PAY', OBJECT_NAME: 'SHIJIAN-6 02A (SJ-6 02A)', OBJECT_ID: '2006-046A'},
   {NORAD_CAT_ID: 29507, OBJECT_TYPE: 'R/B', OBJECT_NAME: 'CZ-4B R/B', OBJECT_ID: '2006-046C'},
 ]);
+// A space-data mirror built from the same fixtures (data contract schema 1),
+// plus navigation and geostationary layers.
+const MIRROR = 'https://space-data.pages.dev/v1/';
+const MirrorOrbit = require('../' + root + 'space-orbit.js'), MirrorCatalog = require('../' + root + 'space-catalog.js');
+function mirrorFiles({built = '2026-09-28T17:00:00Z', dataset = '20260928T1700Z', tamper = null} = {}) {
+  const read = (f) => JSON.parse(fs.readFileSync('scripts/space-fixture/' + f, 'utf8'));
+  const files = {}, groups = {};
+  for (const [group, el, sc] of [['visual', 'elements.json', 'satcat.json'], ['last-30-days', 'recent.json', 'recent-satcat.json'],
+    ['gnss', 'gnss.json', 'gnss-satcat.json'], ['geo', 'geo.json', 'geo-satcat.json']]) {
+    groups[group] = {};
+    for (const [kind, f, compact] of [['elements', el, MirrorOrbit.compact], ['satcat', sc, MirrorCatalog.compact]]) {
+      const rows = [...new Map(read(f).map(compact).filter(Boolean).map((r) => [r[0], r])).values()],
+        file = `${group}/${kind}-1.json`;
+      files[`${MIRROR}${dataset}/${file}`] = {schema: 1, kind, rows};
+      groups[group][kind] = [{file, rows: rows.length}];
+    }
+  }
+  files[MIRROR + 'index.json'] = {schema: 1, dataset, built, path: dataset + '/', groups};
+  if (tamper) tamper(files, dataset);
+  return files;
+}
 const WIKI = JSON.stringify({query: {pages: [{title: 'Long March 4B', extract: 'The Long March 4B is a Chinese launch vehicle.', fullurl: 'https://en.wikipedia.org/wiki/Long_March_4B'}]}});
-function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, recentBody = RECENT, recentSatcatBody = RECENT_SATCAT, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false, planScenario = false, orientError = null, pendingOrientation = false, orientationErrors = []} = {}) {
+function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, recentStatus = 200, recentBody = RECENT, recentSatcatBody = RECENT_SATCAT, netError = null, pendingHttp = false, clock = START, launchBody = LAUNCH, elementsBody = ELEMENTS, pendingLocation = false, planScenario = false, orientError = null, pendingOrientation = false, orientationErrors = [], mirror = null, mirrorError = null} = {}) {
   const elements = new Map(), events = {}, timers = [], calls = [], held = [], heldLocation = [], heldOrientation = [], followRetries = [], expiryTimers = new Set();
   const storage = structuredClone(saved);
   let now = clock;
@@ -70,6 +91,12 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
       if (method === 'net.http') {
         const u = params.url;
         if (netError) throw Object.assign(new Error(netError), {code: netError});
+        if (u.startsWith(MIRROR)) {
+          if (mirrorError) throw Object.assign(new Error(mirrorError), {code: mirrorError});
+          const body = mirror && mirror[u], result = body ? {status: 200, text: JSON.stringify(body)} : {status: 404};
+          if (typeof pendingHttp === 'function' && pendingHttp(u)) return new Promise(resolve => held.push(() => resolve(result)));
+          return result;
+        }
         const result = u === GP ? (gpStatus === 200 ? {status: 200, text: elementsBody} : {status: gpStatus})
           : u === SC ? (satcatStatus === 200 ? {status: 200, text: SATCAT} : {status: satcatStatus})
           : u === RGP ? (recentStatus === 200 ? {status: 200, text: recentBody} : {status: recentStatus})
@@ -90,8 +117,10 @@ function rig({saved = {}, error = null, gpStatus = 200, satcatStatus = 200, rece
     if (f === 'space-plan.js' && planScenario) vm.runInContext(`SpacePlan.darkRanges = (from,to)=>[[from,to]]; SpacePlan.passes = (o,ob,ranges)=> { const t=${clock} + 12.25*3600000; return o.id===25544 && ranges.some(([a,b])=>a<=t&&t<=b) ? [{startMs:t,endMs:t+120000,maxMs:t+60000,startAz:90,endAz:180,maxAz:135,startEl:10,endEl:10,maxEl:20,startReason:'rises',endReason:'sets'}] : []; };`,context);
     if (f === 'space-plan.js' && planScenario === 'repeated') vm.runInContext(`SpacePlan.passes = (o)=>o.id===25544 ? [60000,600000].map(dt=>({startMs:${clock}+dt,endMs:${clock}+dt+120000,maxMs:${clock}+dt+60000,startAz:90,endAz:180,maxAz:135,startEl:10,endEl:10,maxEl:20,startReason:'rises',endReason:'sets'})) : [];`,context);
   }
-  const http = () => calls.filter(c => c.method === 'net.http').map(c => c.params.url);
-  return {el, calls, storage, classes, http, dome: () => sandbox.domeSnapshot, select: id => sandbox.selectObject(id),
+  // CelesTrak and Wikipedia requests; the mirror is counted separately.
+  const http = () => calls.filter(c => c.method === 'net.http' && !c.params.url.startsWith(MIRROR)).map(c => c.params.url);
+  const mirrorHttp = () => calls.filter(c => c.method === 'net.http' && c.params.url.startsWith(MIRROR)).map(c => c.params.url.slice(MIRROR.length));
+  return {el, calls, storage, classes, http, mirrorHttp, dome: () => sandbox.domeSnapshot, select: id => sandbox.selectObject(id),
     retryFollow: () => { now += 100; followRetries.splice(0).forEach(f => f()); },
     finishOrientation: () => heldOrientation.splice(0).forEach(f => f()),
     finishLocation: () => heldLocation.splice(0).forEach(f => f()),
@@ -147,7 +176,7 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   // Red mode is remembered with the start choice only.
   r.el('red').click(); await flush();
   assert(r.classes.has('red')); assert.equal(r.el('red').attributes['aria-pressed'], 'true');
-  assert.deepEqual(r.storage.preferences, {startWithLocation: true, red: true});
+  assert.deepEqual(r.storage.preferences, {startWithLocation: true, red: true, layers: {gnss: false, geo: false}});
 
   // Reopen within hours: cached orbits and catalog, no download.
   const saved = r.storage;
@@ -655,5 +684,167 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   for(let i=0;i<25;i++){r.retryFollow();await flush();}
   assert.equal(r.el('follow').attributes['aria-pressed'],'false');
   const attempts=r.calls.length;r.retryFollow();await flush();assert.equal(r.calls.length,attempts,'bounded retry stops');
-  console.log('Space Watch app checks passed: start, privacy (no coordinates in URLs or storage), list selection, spot words, details, Wikipedia on request, rewind, red mode, visible passes and preview, trains (plan, details, cache, optional failure), cache reuse/expiry/torn cache, CelesTrak back-off, location fallbacks, paused downloads and follow mode (true north, smoothing, guidance, calibration, pause, denial) and pointing (camera aim to the zenith, words, lock, announcements, rewind exit).');
+  // ---- 0.5.0: the space-data mirror first, CelesTrak as the fallback ----
+  const baseline = rig(); await flush(8);
+  const baseCounts = baseline.el('counts').textContent;
+  r = rig({mirror: mirrorFiles()}); await flush(8);
+  assert.deepEqual(r.http(), [], 'a fresh mirror serves everything; CelesTrak is not asked');
+  assert.deepEqual(r.mirrorHttp(), ['index.json', '20260928T1700Z/visual/elements-1.json', '20260928T1700Z/visual/satcat-1.json',
+    '20260928T1700Z/last-30-days/elements-1.json', '20260928T1700Z/last-30-days/satcat-1.json']);
+  assert.equal(r.el('counts').textContent, baseCounts, 'same sky as the CelesTrak path');
+  assert.match(r.el('data-status').textContent, /^Orbit data \d+ h old · CelesTrak$/);
+  r.el('list').children.find(b => b.dataset.id === '29507').click();
+  assert.equal(r.el('spot-head').textContent, 'EAST · 1½ fists up');
+  assert(r.storage['elements.meta'], 'mirror rows are cached like CelesTrak rows');
+  assert(!/52\.517|13\.388/.test(r.mirrorHttp().join()), 'no place in mirror URLs');
+  // Stale (built 13 h before the clock): CelesTrak directly, as in 0.4.
+  r = rig({mirror: mirrorFiles({built: '2026-09-28T04:50:00Z', dataset: '20260928T0450Z'})}); await flush(8);
+  assert.deepEqual(r.mirrorHttp(), ['index.json']);
+  assert.deepEqual(r.http(), [GP, SC, RGP, RSC]);
+  assert.equal(r.el('counts').textContent, baseCounts);
+  // One bad row anywhere: that list comes from CelesTrak, and the mirror rests.
+  r = rig({mirror: mirrorFiles({tamper: (f, d) => { f[`${MIRROR}${d}/visual/elements-1.json`].rows[3][5] = 1.5; }})}); await flush(8);
+  assert.deepEqual(r.http(), [GP, SC, RGP, RSC], 'after a bad file the mirror rests; everything falls back');
+  assert.deepEqual(r.mirrorHttp(), ['index.json', '20260928T1700Z/visual/elements-1.json']);
+  assert.equal(r.el('counts').textContent, baseCounts);
+  r.advance(20 * 60000); await r.el('refresh').onclick(); await flush(4);
+  assert.equal(r.mirrorHttp().length, 2, 'no mirror request during its 30-minute rest');
+  // A recent list with any row lacking its launch ID is not trusted from the mirror.
+  r = rig({mirror: mirrorFiles({tamper: (f, d) => { f[`${MIRROR}${d}/last-30-days/elements-1.json`].rows[0][2] = null; }})}); await flush(8);
+  assert.deepEqual(r.http(), [RGP, RSC]);
+
+  // Native origin denial must fall back without treating it as a pause.
+  r = rig({mirror: mirrorFiles(), mirrorError: 'HTTP_SOURCE'}); await flush(8);
+  assert.deepEqual(r.http(), [GP, SC, RGP, RSC]);
+  assert.equal(r.el('counts').textContent, baseCounts);
+  // Empty and duplicate-row mirror snapshots cannot erase or duplicate the sky.
+  for (const kind of ['empty-recent', 'duplicate-visual']) {
+    r = rig({mirror: mirrorFiles({tamper: (f, d) => {
+      const key = kind === 'empty-recent' ? 'last-30-days' : 'visual';
+      const rows = f[`${MIRROR}${d}/${key}/elements-1.json`].rows;
+      if (kind === 'empty-recent') rows.length = 0; else rows[1] = rows[0];
+    }})}); await flush(8);
+    assert(r.http().includes(kind === 'empty-recent' ? RGP : GP), kind + ' falls back');
+    assert.equal(r.el('counts').textContent, baseCounts);
+  }
+
+  // ---- 0.5.0: layers ----
+  r = rig({mirror: mirrorFiles()}); await flush(8);
+  assert(r.el('layer-section').hidden, 'layers are off by default');
+  assert.equal(r.dome().layers.length, 0);
+  r.el('layers').click();
+  assert(r.el('layers-dialog').open);
+  r.el('layer-gnss-switch').checked = true; r.el('layer-gnss-switch').onchange(); await flush(6);
+  assert.deepEqual(r.mirrorHttp().slice(-2), ['20260928T1700Z/gnss/elements-1.json', '20260928T1700Z/gnss/satcat-1.json']);
+  assert.equal(r.el('layers-status').textContent, 'Navigation on.');
+  assert.deepEqual(r.storage.preferences.layers, {gnss: true, geo: false});
+  r.el('close-layers').click();
+  assert(!r.el('layer-section').hidden); assert(!r.el('layer-gnss').hidden); assert(r.el('layer-geo').hidden);
+  assert.match(r.el('layer-gnss-summary').textContent, /^\d+ navigation satellites above you: .*\b\d+ GPS\b.*\. Drawn as small squares\.$/);
+  const gnssItems = r.dome().layers;
+  assert(gnssItems.length > 10 && gnssItems.every(x => x.kind === 'gnss' && x.el >= 0));
+  assert.equal(r.el('counts').textContent, baseCounts, 'layers never count as visible objects');
+  const navButton = r.el('layer-gnss-list').children.find(b => /^GPS /.test(b.children[0].textContent));
+  assert(navButton, 'a GPS satellite is listed');
+  navButton.click();
+  assert.match(r.el('spot-kind').textContent, /^GPS navigation satellite · United States$/);
+  assert.match(r.el('spot-state').textContent, /^Far too faint to see without a telescope\. Your phone’s location fix can use signals/);
+  assert.equal(r.dome().selected, Number(navButton.dataset.id));
+  r.el('details').click(); await flush(4);
+  assert.match(r.el('info-body').text, /Next time above you|Height/);
+  assert.doesNotMatch(r.el('info-body').text, /· (visible|not visible)/, 'no visibility promise for a layer object');
+  await r.el('wiki').onclick(); await flush();
+  assert.match(r.http().at(-1), /titles=Global%20Positioning%20System$/);
+  r.el('close-info').click();
+  // Geostationary: the belt, a parked satellite, and what dishes point at.
+  r.el('layers').click(); r.el('layer-geo-switch').checked = true; r.el('layer-geo-switch').onchange(); await flush(6);
+  const snap = r.dome();
+  assert(snap.belt && snap.belt.length > 20, 'the belt is drawn');
+  assert.match(r.el('layer-geo-summary').textContent, /^\d+ geostationary satellites above you, strung along the dotted belt 3 fists up in the south\. Drawn as small diamonds, plus \d+ inclined or drifting geosynchronous ones as hollow diamonds whose positions change over time\.$/);
+  assert(snap.layers.some(x => x.kind === 'geo' && x.parked) && snap.layers.some(x => x.kind === 'geo' && !x.parked), 'both diamond kinds are drawn');
+  r.select(29055);
+  assert.equal(r.el('spot-title').textContent, 'ASTRA 1KR');
+  assert.match(r.el('spot-kind').textContent, /^Geostationary satellite · parked above 19\.\d°E/);
+  assert.equal(r.el('spot-head').textContent, 'SOUTH · 3 fists up');
+  assert.equal(r.el('spot-motion').textContent, 'It stays near this spot: its orbit nearly matches Earth’s rotation. Small daily motion remains.');
+  assert.match(r.el('spot-state').textContent, /Satellite dishes aimed at it point approximately this way$/);
+  r.el('details').click(); await flush(4);
+  assert.match(r.el('info-body').text, /Parked above 19\.\d°E near the equator/);
+  r.el('close-info').click();
+  // GEO-group membership is not "parked": BeiDou IGSO-6 is inclined 60° and
+  // swings north and south daily. It is below Berlin's horizon at the clock.
+  // It is also a navigation satellite: with that layer on it is drawn once,
+  // as navigation; with it off, as geosynchronous.
+  assert.equal(r.dome().layers.filter(x => x.id === 41434).length, r.dome().layers.some(x => x.id === 41434) ? 1 : 0);
+  r.select(41434);
+  assert.match(r.el('spot-kind').textContent, /^BeiDou navigation satellite · China$/);
+  r.el('layer-gnss-switch').checked = false; r.el('layer-gnss-switch').onchange();
+  r.select(41434);
+  assert.match(r.el('spot-title').textContent, /^BEIDOU-2 IGSO-6/);
+  assert.match(r.el('spot-kind').textContent, /^Geosynchronous satellite · inclined 60° · traces a daily figure-8, not parked · China$/);
+  assert.equal(r.el('spot-head').textContent, 'Below your horizon');
+  assert.match(r.el('spot-anchor').textContent, /^(Next time above you: .*, up to .*\.|Not above you in the next 36 hours\.)$/);
+  assert.doesNotMatch(r.el('spot-anchor').textContent, /never rises|visible/);
+  r.el('details').click(); await flush(4);
+  assert.doesNotMatch(r.el('info-body').text, /Parked above/);
+  assert.match(r.el('info-body').text, /Next time above you/);
+  r.el('close-info').click();
+  r.el('layer-gnss-switch').checked = true; r.el('layer-gnss-switch').onchange(); await flush(4);
+  r.select(29055);
+  // Turning a layer off drops its selection and its objects.
+  r.el('layer-geo-switch').checked = false; r.el('layer-geo-switch').onchange();
+  assert(r.el('spot').hidden, 'a switched-off layer’s object is deselected');
+  assert(r.dome().layers.every(x => x.kind === 'gnss')); assert.equal(r.dome().belt, null);
+  // Preferences carry the layers into the next open; the data is downloaded again.
+  const layerPrefs = structuredClone(r.storage);
+  r = rig({mirror: mirrorFiles(), saved: layerPrefs}); await flush(10);
+  assert(!r.el('layer-gnss').hidden);
+  assert(r.mirrorHttp().includes('20260928T1700Z/gnss/elements-1.json'));
+  assert(!Object.keys(r.storage).some(k => /gnss|geo|layer/.test(k)), 'layer data is not stored');
+  for (const key of Object.keys(r.storage)) assert(allowedKeys(key), key);
+  // Without the mirror a layer explains itself; the rest of the sky works.
+  r = rig(); await flush(8);
+  r.el('layers').click(); r.el('layer-geo-switch').checked = true; r.el('layer-geo-switch').onchange(); await flush(4);
+  assert.match(r.el('layer-geo-summary').textContent, /come from the Space Watch data mirror, which is not reachable right now/);
+  assert.equal(r.el('counts').textContent, baseCounts);
+
+  // Repeated toggles share a pending layer request, and a pause does not
+  // impose the network-failure retry delay on an uncompleted download.
+  r = rig({mirror: mirrorFiles(), pendingHttp: u => u.includes('/gnss/')}); await flush(8);
+  r.el('layer-gnss-switch').checked = true; r.el('layer-gnss-switch').onchange(); await flush();
+  r.el('layer-gnss-switch').checked = false; r.el('layer-gnss-switch').onchange();
+  r.el('layer-gnss-switch').checked = true; r.el('layer-gnss-switch').onchange(); await flush();
+  assert.equal(r.mirrorHttp().filter(u => u.endsWith('gnss/elements-1.json')).length, 1, 'only one layer request in flight');
+  r.visibility(false); r.finishHttp(); await flush();
+  r.visibility(true); await flush();
+  assert.equal(r.mirrorHttp().filter(u => u.endsWith('gnss/elements-1.json')).length, 2, 'pause retries on return, not after 15 minutes');
+  r.finishHttp(); await flush(); r.finishHttp(); await flush(6);
+  assert(r.dome().layers.length > 10, 'retried layer completes');
+
+  // A near-geostationary object can cross the geometric horizon. Never claim
+  // permanent invisibility solely from a near-stationary element threshold.
+  r = rig({mirror: mirrorFiles()}); await flush(6);
+  r.el('layer-geo-switch').checked = true; r.el('layer-geo-switch').onchange(); await flush(6);
+  let foundBelow = false;
+  for (let h = 0; h < 25; h++) {
+    r.select(63157);
+    if (r.el('spot-head').textContent === 'Below your horizon') {
+      assert.doesNotMatch(r.el('spot-anchor').textContent, /never rises/);
+      assert.match(r.el('spot-anchor').textContent, /visibility can change/);
+      foundBelow = true; break;
+    }
+    r.tick(1, HOUR);
+  }
+  assert(foundBelow, 'TJS-15 horizon crossing exercised');
+  // GNSS can finish after GEO has already cached its view. Deduplicate at
+  // composition time, not only when building that older GEO cache.
+  r = rig({clock: START + 6 * HOUR, mirror: mirrorFiles(), pendingHttp: u => u.includes('/gnss/')}); await flush(6);
+  r.el('layer-geo-switch').checked = true; r.el('layer-geo-switch').onchange(); await flush(6);
+  assert(r.dome().layers.some(x => x.id === 41434));
+  r.el('layer-gnss-switch').checked = true; r.el('layer-gnss-switch').onchange(); await flush(6);
+  r.finishHttp(); await flush(6); r.finishHttp(); await flush(6);
+  assert.equal(r.dome().layers.filter(x => x.id === 41434).length, 1);
+  assert.equal(r.dome().layers.find(x => x.id === 41434).kind, 'gnss');
+
+  console.log('Space Watch app checks passed: start, privacy (no coordinates in URLs or storage), list selection, spot words, details, Wikipedia on request, rewind, red mode, visible passes and preview, trains (plan, details, cache, optional failure), cache reuse/expiry/torn cache, CelesTrak back-off, location fallbacks, paused downloads and follow mode (true north, smoothing, guidance, calibration, pause, denial), pointing (camera aim to the zenith, words, lock, announcements, rewind exit), the space-data mirror (fresh, stale, bad row, rest) and layers (navigation, geostationary belt, parked vs inclined geosynchronous, selection, details, persistence, mirror down).');
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -17,14 +17,16 @@ class SpacePackageTest(unittest.TestCase):
         manifest = json.loads(z.read('manifest.json'))
         self.assertEqual(manifest['constructApi'], {'min': '0.14.0', 'target': '0.14.0'})
         net = next(c for c in manifest['capabilities'] if c['id'] == 'net.http')
-        self.assertEqual(net['origins'], ['https://celestrak.org', 'https://en.wikipedia.org'])
+        self.assertEqual(net['origins'], ['https://space-data.pages.dev', 'https://celestrak.org', 'https://en.wikipedia.org'])
         self.assertIn('Space Watch · '+json.loads(z.read('manifest.json'))['version'], z.read('ui/index.html').decode())
         synthetic = zipfile.ZipFile(io.BytesIO(fixture))
         html = synthetic.read('ui/index.html').decode()
         self.assertLess(html.index('synthetic-space.js'), html.index('app.js'))
         self.assertIn('<h1>Synthetic Space Watch</h1>', html)
         stub = synthetic.read('ui/synthetic-space.js').decode()
-        self.assertNotIn('/*ELEMENTS*/', stub)
+        for marker in ('/*ELEMENTS*/', '/*GNSS*/', '/*GEO_SATCAT*/'):
+            self.assertNotIn(marker, stub)
+        self.assertIn('"OBJECT_NAME":"ASTRA 1KR"', stub)
         self.assertIn('"NORAD_CAT_ID":25544', stub)
         with tempfile.TemporaryDirectory() as out:
             prepare_space_fixture.prepare(Path(out), key)

@@ -25,13 +25,13 @@ class SpaceDome {
           sky0: "#0a0000", sky1: "#140202", edge: "#3a0b0b", ring: "#3a0b0b",
           text: "#b33a3a", faint: "#6e1d1d", star: "#c24848", line: "#5a1717",
           moon: "#d65a5a", planet: "#e06a4a", sat: "#ff5a4a", satMajor: "#ff7a66",
-          selected: "#ff9a8a", dim: "#6e1d1d", track: "#ff5a4a",
+          selected: "#ff9a8a", dim: "#6e1d1d", track: "#ff5a4a", layer: "#a33a3a",
         }
       : {
           sky0: "#0d1a14", sky1: "#1c3a2a", edge: "#2E4638", ring: "#2E4638",
           text: "#9DB3A6", faint: "#6F8C7C", star: "#E6F0EA", line: "#5b7568",
           moon: "#F3EBD2", planet: "#E9C46A", sat: "#5FD3A0", satMajor: "#8CF0C4",
-          selected: "#8CF0C4", dim: "#6F8C7C", track: "#5FD3A0",
+          selected: "#8CF0C4", dim: "#6F8C7C", track: "#5FD3A0", layer: "#7FB2C8",
         };
   }
   set(scene) {
@@ -163,8 +163,52 @@ class SpaceDome {
       g.fill();
       labels.push([b.label, x, y + (b.key === "moon" ? 16 : 12), b.key === "moon" ? c.text : c.planet, true]);
     }
-    // Satellites: faint hollow ticks unless visible; visible ones get a track.
     this.points = [];
+    // Optional layers, beneath the naked-eye objects: the geostationary belt
+    // as a guide line, geostationary satellites as small diamonds and
+    // navigation satellites as small squares. Never visible to the eye.
+    if (s.belt && s.belt.length > 1) {
+      g.strokeStyle = c.layer;
+      g.globalAlpha = 0.45;
+      g.setLineDash([1, 4]);
+      g.lineWidth = 1.5;
+      g.beginPath();
+      s.belt.forEach((p, i) => (i ? g.lineTo(...P(p.az, p.el)) : g.moveTo(...P(p.az, p.el))));
+      g.stroke();
+      g.setLineDash([]);
+      g.lineWidth = 1;
+      g.globalAlpha = 1;
+    }
+    for (const o of s.layers || []) {
+      const [x, y] = P(o.az, o.el);
+      this.points.push({ id: o.id, x, y, on: false, layer: true });
+      g.fillStyle = c.layer;
+      g.globalAlpha = o.id === s.selected ? 1 : 0.75;
+      g.beginPath();
+      if (o.kind === "geo") {
+        g.moveTo(x, y - 3);
+        g.lineTo(x + 3, y);
+        g.lineTo(x, y + 3);
+        g.lineTo(x - 3, y);
+        g.closePath();
+      } else g.rect(x - 2, y - 2, 4, 4);
+      // A hollow diamond: geosynchronous but not parked (inclined or drifting).
+      if (o.kind === "geo" && !o.parked) {
+        g.strokeStyle = c.layer;
+        g.stroke();
+      } else g.fill();
+      g.globalAlpha = 1;
+      if (o.id === s.selected) {
+        if (o.label) labels.push([o.label, x, y - 12, c.layer, true, true]);
+        g.strokeStyle = c.selected;
+        g.lineWidth = 2;
+        g.beginPath();
+        g.arc(x, y, 11, 0, 2 * Math.PI);
+        g.stroke();
+        g.lineWidth = 1;
+      }
+    }
+    // Satellites: faint hollow ticks unless visible; visible ones get a track.
     const order = [...s.objects].sort((a, b) => (a.state === "visible") - (b.state === "visible"));
     for (const o of order) {
       const [x, y] = P(o.az, o.el),
@@ -245,7 +289,8 @@ class SpaceDome {
   hit(x, y) {
     let best = null;
     for (const p of this.points) {
-      const d = Math.hypot(p.x - x, p.y - y) - (p.on ? 6 : 0);
+      // Layer objects are dense and faint: they lose ties to the others.
+      const d = Math.hypot(p.x - x, p.y - y) - (p.on ? 6 : 0) + (p.layer ? 4 : 0);
       if (d < 26 && (!best || d < best.d)) best = { id: p.id, d };
     }
     return best ? best.id : null;

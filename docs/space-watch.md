@@ -1,6 +1,6 @@
 # Space Watch — what's passing overhead
 
-Space Watch **0.4.1** (source candidate) is a signed HTML/CSS/JavaScript module for
+Space Watch **0.5.1** (source candidate) is a signed HTML/CSS/JavaScript module for
 host **API 0.14**; the published **0.2.14** runs on API 0.9 / alpha26 and later. It draws a sky dome of CelesTrak's brightest orbiting objects
 (the ISS, Tiangong, Hubble, rocket stages and other satellites that sunlight makes
 visible). It tells you where to look in plain words and shows what each object is.
@@ -11,7 +11,71 @@ Aircraft are a 10–100 km map question. Orbiting objects are seen from well ove
 1,000 km away and cross a 100 km circle in about 25 seconds, so they need a sky
 view, not a map.
 
-## Module 0.4.1: point at the sky (API 0.14, source candidate)
+## Module 0.5.0: data mirror and layers (API 0.14, source candidate)
+
+- **Data mirror.** Orbit lists and catalogues now come from
+  [space-data](https://github.com/blueworkslabs/space-data) at
+  `https://space-data.pages.dev`. That repository fetches CelesTrak's lists
+  once per 4 hours and serves them as the module's own compact rows. It follows
+  CelesTrak's usage policy, which asks services with many devices to cache.
+  - **Checks.** The module reads `v1/index.json` (data contract schema 1) and
+    rejects an index that is malformed, from the future or **older than 12
+    hours**. File names must match `<group>/<kind>-<n>.json` for their own group.
+    Every row passes the same checks as cached rows (`validRow`).
+  - **Fallback.** Any doubt makes the mirror rest for 30 minutes, and the
+    module asks CelesTrak directly, exactly as 0.4.x did. The back-off rules
+    for CelesTrak are unchanged.
+  - **Consent.** `net.http` gains the origin `https://space-data.pages.dev`, so
+    updating asks to approve the widened scope. On alpha37 there is one switch
+    for the capability: **declining disables all downloads, mirror and
+    CelesTrak alike** (`CAPABILITY_DENIED`), until Internet access is allowed in
+    Module access; saved orbits and the sky keep working. The CelesTrak
+    fallback covers an unreachable or malformed mirror, not a declined origin.
+    Same-launch lookups stay on CelesTrak and Wikipedia stays on request.
+  - **Privacy.** Unchanged: whole lists only, nothing about the place.
+- **Layers** (toolbar **Layers**, both off by default, remembered with the
+  other preferences). They add objects that are far too faint to see:
+  - **Navigation:** GPS, Galileo, GLONASS, BeiDou, QZSS, NavIC and augmentation
+    satellites, about 20,000 km up, drawn as small squares. The spot card names
+    the constellation and operator. Wikipedia opens the constellation's article.
+  - **Geostationary:** communication, TV and weather satellites 35,786 km
+    above the equator, drawn as small diamonds. The **geostationary belt** is a
+    dotted reference line: seen from Berlin it arcs across the south, highest
+    about 30° up. CelesTrak's `geo` group is *geosynchronous*, so each object
+    is classified (`C.geoClass`) with a conservative display heuristic, not a
+    claim of active station keeping: **parked** requires inclination ≤ 1°,
+    eccentricity ≤ 0.001 and mean motion within 0.0005 rev/day of 1.0027379
+    (one revolution per sidereal day, not solar day). These bounds limit
+    longitudinal drift to roughly 0.18°/day and daily wobble. Filled diamonds
+    stay **near** their spot; the dish direction is approximate and horizon
+    visibility can still change. Other objects use hollow diamonds, ordinary
+    motion words and rise predictions: **inclined**, or **drifting/eccentric**.
+    No class promises "never rises". The saved fixture has 119 parked,
+    63 inclined and 8 drifting/eccentric objects. ELEKTRO-L 3 drifts about
+    3.1° in longitude/day; GS-1 crosses Berlin's horizon despite inclination
+    below 5°. Both are regression cases, alongside BeiDou IGSO-6.
+    An object in both groups (BeiDou IGSO is navigation and geosynchronous)
+    is drawn and described once, by the first layer that is on.
+  - Layer objects are selectable on the dome (naked-eye objects win ties) and
+    from **List them** under each layer's summary, e.g. "31 navigation
+    satellites above you: 12 BeiDou, 9 Galileo, 6 GPS, 4 GLONASS". Pointing
+    mode guides to them and shows them in the viewfinder.
+  - They never count as "visible". Their state reads "Far too faint to see
+    without a telescope", and passes are not planned for them.
+  - Layers load only from the mirror (no CelesTrak fallback) while switched
+    on. They are too large for `storage.kv`, so each open downloads them
+    again: about 40 KB (navigation) and 120 KB (geostationary).
+- **Synthetic Space Watch** serves a synthetic mirror (dataset
+  `20260928T1700Z`) with the captured lists plus 172 navigation and 190
+  geostationary satellites. `?mirror=off` shows the CelesTrak fallback, and
+  `?celestrak=503` still shows the error path.
+
+Browser preview of Synthetic Space Watch with both layers (desktop Chromium, not Android):
+
+![Both layers: navigation squares, the geostationary belt in the south](images/space-watch-0.5.0/layers-dome.jpg)
+![Astra 1KR selected: parked above 19°E, where dishes point](images/space-watch-0.5.0/layers-astra.jpg)
+
+## Module 0.4.1: point at the sky (API 0.14)
 
 Raise the phone like a camera while **Follow** is on, and the dome gives way to
 a **pointing view**: a drawn viewfinder (no camera image) centred on where the
@@ -436,7 +500,10 @@ not Android; pre-review wording and stale-train policy):
 - **Android acceptance:** the standalone runner is
   `scripts/android-runner/space_module.py`. The exact signed candidate, native
   grant checks, live/offline results and original Android screenshots are tracked
-  in the [0.2.14 staging report](space-watch-0.2.14-staging.md).
+  in the [0.5.1 staging report](space-watch-0.5.1-staging.md) (31 functional gates,
+  with an abnormal emulator shutdown documented separately).
+  The [0.5.1 phone checklist](space-watch-0.5.1-hardware-check.md) is ready;
+  physical-device acceptance remains pending.
   The [0.2.14 phone check](space-watch-0.2.14-hardware-check.md) passed on real
   hardware on 2026-09-28; the same signed 0.2.14 bytes are the latest Space Watch
   in the production catalog. The earlier [0.1.6 acceptance](space-watch-0.1.6-staging.md)
