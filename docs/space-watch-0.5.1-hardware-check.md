@@ -1,6 +1,8 @@
 # Space Watch 0.5.1 phone checklist
 
-Status: **ready for physical-phone checks: 31/31 functional Android gates pass.**
+Status: **passed on hardware** (2026-09-30, pilot tester: "works as expected") after
+31/31 functional Android gates. **Production-catalog promotion still waits for a
+released API 0.14 (alpha37-or-later) host.**
 The emulator aborted during requested shutdown after the checks; it is stopped
 with no process remaining. See the report for the exact teardown caveat.
 Use an installed alpha37-or-later API 0.14 host. No new APK if alpha37 is installed.
