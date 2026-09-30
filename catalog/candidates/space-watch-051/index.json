@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "dev.construct.space-watch",
+      "name": "Space Watch",
+      "versions": [
+        {
+          "id": "dev.construct.space-watch",
+          "name": "Space Watch",
+          "version": "0.5.1",
+          "artifact": "dev.construct.space-watch-0.5.1.zip",
+          "sha256": "bb5f783b5398a72b5eb9751366f7ec86def7d1bb6b52b3a7d356492ee85939ea",
+          "signature": "KqZKhJ5+LDnbI9rQA8eff810rNwWmSkrXdkFSx8PgZAd2iy01pWl3R1VR/8f4qPY4EkBiNZVCzXQ/FszAHw8ML9hES/54p+JUP7/yrUu5doX+WiAn1Bf4wsGmT6pbWDYIduV39pN+niEOhBhA+aoC2+G3ljdlKL5N5nJvuRtd8v9QnGCrVbIQClLZIoDBk9XbpkFxICtqpKPVOFulLZ85odIPCS+frDr4YAbzHSvzB5LnD8uvAOGmPSzmglZhrTgR860P9cW322qBDC56sTdE+6ay4uBIbCUeyJ3hPSGjvBWTYYV9YUnyQlelfglGEU+yYlxISxB5Nh0DAbRGnGY6g=="
+        },
+        {
+          "id": "dev.construct.space-watch",
+          "name": "Space Watch",
+          "version": "0.4.1",
+          "artifact": "dev.construct.space-watch-0.4.1.zip",
+          "sha256": "10dcb4fc379af3606a32f227cafc68f1f77d98c01ab581724975b2eb7aad9e83",
+          "signature": "IWSz3XC8XkVvcB6YV8tU2byPklrfU86+korGdomqKp2FVQalvZT5Qt0IfbKqPdZZ6C/fMPMJxMsNRxTJUIxgAn9JjVEL5iisOI0pDRw7dGN4INZd22oOO6+V0MsEvr3D+mk7ImCRoYC+tbsJ00qTuzS+fgICjfKu3NUXU3DVR0/NjNxB6WUWfRR8DwRrJ5/bumu1wJeVcaiDfD8nMkh4xBOcOv4w+6RV6xNs3LRi8rBvgo2jpSvwH48m9iITHRe+XPD1wXpLG7yEyoNAGaECLdz+eJVsUt/T1R9ZGk6h9Y2Hg72pTSLr0ROtfitdFnDuxCaq9qhiPM6t55n+ismWug=="
+        }
+      ]
+    },
+    {
+      "id": "dev.construct.space-watch-fixture",
+      "name": "Synthetic Space Watch",
+      "versions": [
+        {
+          "id": "dev.construct.space-watch-fixture",
+          "name": "Synthetic Space Watch",
+          "version": "0.5.1",
+          "artifact": "dev.construct.space-watch-fixture-0.5.1.zip",
+          "sha256": "b99cce2aa7c8424a01df427fbe2cae2da2a97d09524a76e94c6d95b7712dd619",
+          "signature": "jmYuUQEHBapnNFt5Dtr2sHI1nJG2PS9pRXJpQzwy9hqOxeSOt5aUGfDPJEteFDUaOYpWxBaeub8TtfZB0YdKrzsqq3FHp8I2Db0q5DD7Z4jx7bIIPBNQ+xPfrFV1PY9+WjF1NIfPV8JpZEEpJZ/tWMRCI3yVr2VzkmmUmcjsoQRI/wGtX/KV8J1e8bQcfub9JfbaDdGGK+jmn/7bmPZ8c4oMFfgvbO5jy2PzF2wlEibm0+XofK7dUQGigZ9XKHRNCY559OCNAKbtwEpkFG/3Cq4MdRQXe31WWHPZ89H5vDJkUdFsj/WlsdVAzQusiddMpTpvbq2lxKuBbjvVaJ9UTA==",
+          "testFixture": true
+        }
+      ]
+    }
+  ]
+}
