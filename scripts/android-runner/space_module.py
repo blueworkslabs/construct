@@ -33,7 +33,7 @@ from ui import adb,nodes,labels,tap,tap_node,find,capture as adb_capture
 from keyboard_prompt import gboard_contacts_denial
 from host_ui import host_ready,catalog_settings,apply_catalog,library,select_after,installed_status,diagnostics
 from catalog_input import replace_text
-from space_checks import scroll_signature,visible_point_guidance
+from space_checks import scroll_signature,visible_point_guidance,named_layer_checkbox
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'fixtureSha256':a.fixture_sha,'version':a.version,
  'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{},'plannedChecks':3 if a.pointing_layout_only else ((31 if a.layers else 25) if a.follow else 16),'followRequired':a.follow,'pointingLayoutOnly':a.pointing_layout_only,'previousModuleSha256':a.previous_module_sha}
 if a.pointing_layout_only:receipt['scope']='Focused pointing layout and native grant checks only; not full module acceptance'
@@ -326,7 +326,7 @@ def layer_control(name):
  end=time.monotonic()+15
  while time.monotonic()<end:
   n=next((n for n in nodes() if n.get('resource-id')==control_id and visible(n)),None)
-  if n and n.get('class')=='android.widget.CheckBox' and text_of(n):return n
+  if named_layer_checkbox(n):return n
   time.sleep(.25)
  raise RuntimeError('Named layer checkbox unavailable: '+control_id)
 def layer_switch(name,on):

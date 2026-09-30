@@ -46,3 +46,14 @@ class PointingGuidanceTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class LayerCheckboxTest(unittest.TestCase):
+    def test_named_webview_leaf_is_not_missing(self):
+        from xml.etree.ElementTree import Element
+        from space_checks import named_layer_checkbox
+        node = Element('node', {'class':'android.widget.CheckBox',
+            'content-desc':'Navigation satellites', 'checkable':'false', 'checked':'false'})
+        self.assertTrue(named_layer_checkbox(node))
+        self.assertFalse(named_layer_checkbox(None))
+        node.set('content-desc', '')
+        self.assertFalse(named_layer_checkbox(node))
