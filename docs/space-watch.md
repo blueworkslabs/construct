@@ -42,15 +42,18 @@ view, not a map.
     above the equator, drawn as small diamonds. The **geostationary belt** is a
     dotted reference line: seen from Berlin it arcs across the south, highest
     about 30° up. CelesTrak's `geo` group is *geosynchronous*, so each object
-    is classified (`C.geoClass`): **parked** when inclination ≤ 5° and the mean
-    motion is within 2 % of one revolution per day (filled diamond; the spot
-    card says which longitude it is parked above, e.g. Astra at 19.2°E, that
-    dishes aimed at it point that way, and that it stays put, wobbling by its
-    inclination when that is ≥ 1°); **inclined** (> 5°, e.g. BeiDou IGSO at
-    60°) or **drifting** (mean motion off by more than 2 %) are drawn as hollow
-    diamonds, described as geosynchronous and not parked, get ordinary motion
-    words and rise predictions, and no dish or "never rises" claims. In the
-    captured fixture: 163 parked, 27 inclined, 0 drifting.
+    is classified (`C.geoClass`) with a conservative display heuristic, not a
+    claim of active station keeping: **parked** requires inclination ≤ 1°,
+    eccentricity ≤ 0.001 and mean motion within 0.0005 rev/day of 1.0027379
+    (one revolution per sidereal day, not solar day). These bounds limit
+    longitudinal drift to roughly 0.18°/day and daily wobble. Filled diamonds
+    stay **near** their spot; the dish direction is approximate and horizon
+    visibility can still change. Other objects use hollow diamonds, ordinary
+    motion words and rise predictions: **inclined**, or **drifting/eccentric**.
+    No class promises "never rises". The saved fixture has 119 parked,
+    63 inclined and 8 drifting/eccentric objects. ELEKTRO-L 3 drifts about
+    3.1° in longitude/day; GS-1 crosses Berlin's horizon despite inclination
+    below 5°. Both are regression cases, alongside BeiDou IGSO-6.
     An object in both groups (BeiDou IGSO is navigation and geosynchronous)
     is drawn and described once, by the first layer that is on.
   - Layer objects are selectable on the dome (naked-eye objects win ties) and

@@ -587,14 +587,15 @@
       if (!c || c.place !== place || c.n !== L.objects.length || Math.abs(t - c.t) > (name === "geo" ? 60000 : 5000)) {
         c = { t, place, n: L.objects.length, items: [] };
         for (const o of L.objects) {
-          if (name !== "gnss" && prefs.layers.gnss && layers.gnss.byId.has(o.id)) continue;
           const l = O.look(o, place.ob, t);
           if (l && l.el >= 0) c.items.push({ id: o.id, o, l, layer: name, state: "faint", d: layerInfo(o, name, t) });
         }
         c.items.sort((a, b) => b.l.el - a.l.el);
         layerSky[name] = c;
       }
-      items.push(...c.items);
+      for (const item of c.items) {
+        if (!seen.has(item.id)) { seen.add(item.id); items.push(item); }
+      }
     }
     return items;
   }
@@ -853,7 +854,7 @@
       where = top ? `, strung along the dotted belt ${K.height(top.el)} in the ${K.dir8(top.az).toLowerCase()}` : "",
       parked = items.filter((x) => x.d.geo === "parked").length,
       other = items.length - parked;
-    return `${parked} geostationary satellites above you${where}. Drawn as small diamonds${other ? `, plus ${other} inclined or drifting geosynchronous ones as hollow diamonds that swing north and south daily` : ""}.${L.note ? " " + L.note : ""}`;
+    return `${parked} geostationary satellites above you${where}. Drawn as small diamonds${other ? `, plus ${other} inclined or drifting geosynchronous ones as hollow diamonds whose positions change over time` : ""}.${L.note ? " " + L.note : ""}`;
   }
   function renderLayers(s) {
     const any = prefs.layers.gnss || prefs.layers.geo;
@@ -942,7 +943,7 @@
         nextTrainPass(train, s.t, () => selected === train.id && request === spotPassRequest,
           p => { $("spot-anchor").textContent = trainRiseText(p); });
       } else if (d.geo === "parked") {
-        $("spot-anchor").textContent = "Geostationary satellites stay put in the sky: this one never rises here.";
+        $("spot-anchor").textContent = "Below your horizon now. Even near-geostationary satellites move slightly; horizon visibility can change.";
       } else {
         const p = nextPass(o, s.t);
         $("spot-anchor").textContent = p
@@ -967,15 +968,15 @@
     $("spot-motion").textContent = d.geo === "parked"
       ? d.inclination >= 1
         ? `It stays near this spot, wobbling about ${Math.round(d.inclination)}° north and south over each day.`
-        : "It stays at this spot: it circles Earth once a day, exactly as fast as Earth turns."
+        : "It stays near this spot: its orbit nearly matches Earth’s rotation. Small daily motion remains."
       : K.motion(l, O.look(o, place.ob, s.t + MINUTE), O.look(o, place.ob, s.t + 4 * MINUTE));
     const end = !train && st === "visible" && offset === 0 ? passEnd(o, s.t) : null;
     const line = train
       ? `A line of ${train.members.length} satellites; early orbits are rough, so look along the track ahead and behind`
       : d.geo === "parked"
-        ? "Satellite dishes aimed at it point exactly this way"
+        ? "Satellite dishes aimed at it point approximately this way"
         : layer === "geo"
-          ? "Geosynchronous but not parked: it swings north and south of the dotted belt every day"
+          ? "Geosynchronous but not parked: its position changes relative to the dotted belt"
           : layer === "gnss"
           ? "Your phone’s location fix can use signals from satellites like this one"
           : "";
@@ -1113,7 +1114,7 @@
         ["Circles Earth every", c && c.period ? C.period(c.period) : null],
         ["Height range", c && c.perigee != null && c.apogee != null ? `${c.perigee}–${c.apogee} km` : null],
         found.d.geo === "parked"
-          ? ["Parked above", C.lonText(O.subLon(o, t)) ? `${C.lonText(O.subLon(o, t))} on the equator` : null]
+          ? ["Parked above", C.lonText(O.subLon(o, t)) ? `${C.lonText(O.subLon(o, t))} near the equator` : null]
           : [
               "Next time above you",
               p ? `${day(p.riseMs)} · up to ${K.height(p.maxEl)}${found.layer ? "" : ` · ${p.visible ? "visible" : "not visible"}`}` : "Not in the next 36 hours",

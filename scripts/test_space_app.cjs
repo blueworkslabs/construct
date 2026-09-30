@@ -760,16 +760,16 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   r.el('layers').click(); r.el('layer-geo-switch').checked = true; r.el('layer-geo-switch').onchange(); await flush(6);
   const snap = r.dome();
   assert(snap.belt && snap.belt.length > 20, 'the belt is drawn');
-  assert.match(r.el('layer-geo-summary').textContent, /^\d+ geostationary satellites above you, strung along the dotted belt 3 fists up in the south\. Drawn as small diamonds, plus \d+ inclined or drifting geosynchronous ones as hollow diamonds that swing north and south daily\.$/);
+  assert.match(r.el('layer-geo-summary').textContent, /^\d+ geostationary satellites above you, strung along the dotted belt 3 fists up in the south\. Drawn as small diamonds, plus \d+ inclined or drifting geosynchronous ones as hollow diamonds whose positions change over time\.$/);
   assert(snap.layers.some(x => x.kind === 'geo' && x.parked) && snap.layers.some(x => x.kind === 'geo' && !x.parked), 'both diamond kinds are drawn');
   r.select(29055);
   assert.equal(r.el('spot-title').textContent, 'ASTRA 1KR');
   assert.match(r.el('spot-kind').textContent, /^Geostationary satellite · parked above 19\.\d°E/);
   assert.equal(r.el('spot-head').textContent, 'SOUTH · 3 fists up');
-  assert.equal(r.el('spot-motion').textContent, 'It stays at this spot: it circles Earth once a day, exactly as fast as Earth turns.');
-  assert.match(r.el('spot-state').textContent, /Satellite dishes aimed at it point exactly this way$/);
+  assert.equal(r.el('spot-motion').textContent, 'It stays near this spot: its orbit nearly matches Earth’s rotation. Small daily motion remains.');
+  assert.match(r.el('spot-state').textContent, /Satellite dishes aimed at it point approximately this way$/);
   r.el('details').click(); await flush(4);
-  assert.match(r.el('info-body').text, /Parked above 19\.\d°E on the equator/);
+  assert.match(r.el('info-body').text, /Parked above 19\.\d°E near the equator/);
   r.el('close-info').click();
   // GEO-group membership is not "parked": BeiDou IGSO-6 is inclined 60° and
   // swings north and south daily. It is below Berlin's horizon at the clock.
@@ -820,6 +820,31 @@ const allowedKeys = key => /^(preferences|fetch-state|recent-launches|elements\.
   assert.equal(r.mirrorHttp().filter(u => u.endsWith('gnss/elements-1.json')).length, 2, 'pause retries on return, not after 15 minutes');
   r.finishHttp(); await flush(); r.finishHttp(); await flush(6);
   assert(r.dome().layers.length > 10, 'retried layer completes');
+
+  // A near-geostationary object can cross the geometric horizon. Never claim
+  // permanent invisibility solely from a near-stationary element threshold.
+  r = rig({mirror: mirrorFiles()}); await flush(6);
+  r.el('layer-geo-switch').checked = true; r.el('layer-geo-switch').onchange(); await flush(6);
+  let foundBelow = false;
+  for (let h = 0; h < 25; h++) {
+    r.select(63157);
+    if (r.el('spot-head').textContent === 'Below your horizon') {
+      assert.doesNotMatch(r.el('spot-anchor').textContent, /never rises/);
+      assert.match(r.el('spot-anchor').textContent, /visibility can change/);
+      foundBelow = true; break;
+    }
+    r.tick(1, HOUR);
+  }
+  assert(foundBelow, 'TJS-15 horizon crossing exercised');
+  // GNSS can finish after GEO has already cached its view. Deduplicate at
+  // composition time, not only when building that older GEO cache.
+  r = rig({clock: START + 6 * HOUR, mirror: mirrorFiles(), pendingHttp: u => u.includes('/gnss/')}); await flush(6);
+  r.el('layer-geo-switch').checked = true; r.el('layer-geo-switch').onchange(); await flush(6);
+  assert(r.dome().layers.some(x => x.id === 41434));
+  r.el('layer-gnss-switch').checked = true; r.el('layer-gnss-switch').onchange(); await flush(6);
+  r.finishHttp(); await flush(6); r.finishHttp(); await flush(6);
+  assert.equal(r.dome().layers.filter(x => x.id === 41434).length, 1);
+  assert.equal(r.dome().layers.find(x => x.id === 41434).kind, 'gnss');
 
   console.log('Space Watch app checks passed: start, privacy (no coordinates in URLs or storage), list selection, spot words, details, Wikipedia on request, rewind, red mode, visible passes and preview, trains (plan, details, cache, optional failure), cache reuse/expiry/torn cache, CelesTrak back-off, location fallbacks, paused downloads and follow mode (true north, smoothing, guidance, calibration, pause, denial), pointing (camera aim to the zenith, words, lock, announcements, rewind exit), the space-data mirror (fresh, stale, bad row, rest) and layers (navigation, geostationary belt, parked vs inclined geosynchronous, selection, details, persistence, mirror down).');
 })().catch(error => { console.error(error); process.exitCode = 1; });
