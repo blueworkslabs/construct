@@ -4,7 +4,7 @@
 Synthetic wrapper tests UI only; the real package tests authority and providers.
 Screenshots need human review; hardware spotting accuracy is not claimed.
 """
-import argparse,datetime,fcntl,hashlib,json,math,os,re,subprocess,time,uuid
+import argparse,datetime,fcntl,hashlib,json,math,os,re,subprocess,sys,time,uuid
 from pathlib import Path
 from config import CONFIG,SERIAL,require_runner,catalog
 p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.add_argument('--sha',required=True)
@@ -15,6 +15,7 @@ p.add_argument('--version',default='0.5.0')
 p.add_argument('--previous-module-sha',help='Exact 0.4.1 real package in the same catalog, required for 0.5+ update-consent coverage')
 p.add_argument('--follow',action='store_true',help='Enable Follow checks for older versions; mandatory automatically for 0.3.0+')
 p.add_argument('--pointing-layout-only',action='store_true',help='Focused same-package visual evidence only; not full acceptance')
+p.add_argument('--layers-only',action='store_true',help='Focused layer interaction/capture evidence; not full acceptance')
 a=p.parse_args()
 # Follow is mandatory for the feature version, even when the flag is omitted.
 a.follow = a.pointing_layout_only or a.follow or tuple(map(int, a.version.split('.'))) >= (0, 3, 0)
@@ -35,8 +36,9 @@ from host_ui import host_ready,catalog_settings,apply_catalog,library,select_aft
 from catalog_input import replace_text
 from space_checks import scroll_signature,visible_point_guidance,named_layer_checkbox
 receipt={'complete':False,'stopped':False,'apkSha256':a.sha,'moduleSha256':a.module_sha,'fixtureSha256':a.fixture_sha,'version':a.version,
- 'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{},'plannedChecks':3 if a.pointing_layout_only else ((31 if a.layers else 25) if a.follow else 16),'followRequired':a.follow,'pointingLayoutOnly':a.pointing_layout_only,'previousModuleSha256':a.previous_module_sha}
+ 'scope':'Synthetic Space Watch UI plus real-module native grants and live providers; not physical-phone spotting accuracy','checks':[],'candidates':{},'plannedChecks':6 if a.layers_only else 3 if a.pointing_layout_only else ((31 if a.layers else 25) if a.follow else 16),'followRequired':a.follow,'pointingLayoutOnly':a.pointing_layout_only,'previousModuleSha256':a.previous_module_sha}
 if a.pointing_layout_only:receipt['scope']='Focused pointing layout and native grant checks only; not full module acceptance'
+if a.layers_only:receipt['scope']='Focused same-package layer interactions and captures; not full module acceptance'
 started=False
 def nodes():
  current=ui.nodes();deny=gboard_contacts_denial(current)
@@ -350,7 +352,8 @@ def layer_checks():
  done('GEO list selects ASTRA 1KR with southern pointing and its own NORAD details')
  for rotation,scale,label in [('1','1.0','landscape'),('0','2.0','large-text')]:
   adb('shell','settings','put','system','user_rotation',rotation);adb('shell','settings','put','system','font_scale',scale);time.sleep(3)
-  click(lambda t:t=='Layers');capture('space-layers-'+label);click(lambda t:t=='Done')
+  click(lambda t:t=='Layers');layer_control('Navigation');time.sleep(.5);capture('space-layers-'+label)
+  reveal(lambda t:t=='Done');capture('space-layers-'+label+'-controls');click(lambda t:t=='Done')
   click('Details');reach_text('NORAD 29055');capture('space-layers-'+label+'-details');click(lambda t:t=='Close')
  adb('shell','settings','put','system','font_scale','1.0');time.sleep(2)
  done('Layer switches and selected-object details work in landscape and 200% Android text')
@@ -400,6 +403,9 @@ try:
  done('Signed fixture opens its computed dome and equivalent overhead list')
  if a.layers:
   layer_checks()
+  if a.layers_only:
+   assert len(receipt['checks'])==6
+   receipt['complete']=True;sys.exit(0)
   adb('shell','am','force-stop','dev.construct.runtime');open_module(FIXTURE);contains('visible ·')
  if a.follow:
   follow_checks()
