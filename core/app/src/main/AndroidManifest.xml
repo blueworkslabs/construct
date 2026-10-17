@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <application android:theme="@android:style/Theme.Material.Light.NoActionBar"
-        android:label="Construct" android:allowBackup="false" android:fullBackupContent="false"
+        android:label="${appLabel}" android:allowBackup="false" android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:networkSecurityConfig="@xml/network_security_config"
         android:icon="@mipmap/ic_launcher"

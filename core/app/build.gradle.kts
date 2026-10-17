@@ -13,6 +13,7 @@ android {
         targetSdk = 35
         versionCode = 37
         versionName = "0.1.0-alpha37"
+        manifestPlaceholders["appLabel"] = "Construct"
         externalNativeBuild { cmake {
             abiFilters += listOf("arm64-v8a", "x86_64")
             arguments += listOf("-DANDROID_STL=c++_static", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
@@ -35,8 +36,17 @@ android {
         version = "3.22.1"
     } }
     buildTypes {
+        // A debug build installs beside an installed release or pilot build, with its own WebView
+        // data and module storage, and shows as a second launcher entry.
+        getByName("debug") {
+            applicationIdSuffix = ".dev"
+            manifestPlaceholders["appLabel"] = "Construct (dev)"
+        }
         create("pilot") {
             initWith(getByName("debug"))
+            // pilot keeps the release package name, which the android-runner scripts address
+            applicationIdSuffix = null
+            manifestPlaceholders["appLabel"] = "Construct"
             isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
