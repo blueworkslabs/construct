@@ -27,6 +27,11 @@ The production catalog URL is `https://construct-20x.pages.dev/index.json`, not
 origins, credentials, query strings, and fragments in its catalog URL. Do not put
 an authentication challenge in front of these public static files.
 
+[Encrypted packages](encrypted-packages.md) is a separate **design proposal** for
+opaque catalog entries with privately supplied unlock keys. The current host and
+publication tools do not implement it; this proposal does not change today's
+publication or installation procedure.
+
 The index revalidates on every request; versioned ZIPs are immutable and can be
 cached long-term. A real `404.html` prevents Pages' default SPA fallback from
 returning the landing page for nonexistent ZIPs. Cache rules on a custom domain
