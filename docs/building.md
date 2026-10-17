@@ -60,6 +60,10 @@ operator's APK. Debug and pilot builds are development-signed, not public releas
 signing. `assemblePilot` creates the optimized, non-debuggable pilot variant.
 A separately signed APK with the same application ID cannot update an existing
 installation signed by someone else; use a disposable emulator for reproduction.
+The debug variant's application ID is `dev.construct.runtime.dev`, labelled
+"Construct (dev)": it installs beside a pilot or release build with its own WebView
+data and module storage, and uninstalls without touching it. Pilot and release keep
+`dev.construct.runtime`, the ID the android-runner scripts address.
 
 ### Architecture-specific APKs and measurement engine
 
