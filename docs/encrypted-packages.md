@@ -312,8 +312,8 @@ encrypted bytes signed by a publisher. “Wrong key” is the normal recovery UX
 not proof of the cause; never report an unauthenticated JSON/ZIP parse error.
 
 Public/staging receipts use synthetic IDs, error codes, artifact hashes, counts
-and timings. Copy diagnostics must not include keys, QR contents, plaintext game
-or application text, decrypted names or payloads. Review the existing host and
+and timings. Copy diagnostics must not include keys, QR contents, plaintext
+application text, decrypted names or payloads. Review the existing host and
 module-log paths: encrypted modules' free-form logs are excluded from exported
 diagnostics by default. Module code never receives the content key, but can log
 its own private data, so native crypto-log redaction alone is insufficient.
