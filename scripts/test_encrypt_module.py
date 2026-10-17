@@ -291,7 +291,7 @@ class Publisher(unittest.TestCase):
         self.assertEqual(index['modules'], [])
         [module] = index['encryptedModules']
         self.assertEqual((module['id'], module['name'], module['latest']), (self.opaque, 'Locked module', '1.0.0'))
-        self.assertEqual(set(module['versions'][0]), {'id', 'version', 'format', 'artifact', 'sha256', 'signature'})
+        self.assertEqual(set(module['versions'][0]), {'version', 'format', 'artifact', 'sha256', 'signature'})
         artifact = self.output / entry['artifact']
         self.assertEqual(artifact.read_bytes(), envelope)
         record = em.load_record(self.keys, self.key_id)
@@ -347,6 +347,91 @@ class Publisher(unittest.TestCase):
         os.chmod(path, 0o644)
         with self.assertRaisesRegex(ValueError, '0600'):
             em.load_record(self.keys, self.key_id)
+
+
+class PublicVerifier(unittest.TestCase):
+    """verify_public_catalog without content keys: encrypted entries checked and counted separately."""
+    @classmethod
+    def setUpClass(cls):
+        cls.signer = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        cls.other = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    def setUp(self):
+        import publish_module
+        import verify_public_catalog as vpc
+        self.vpc = vpc
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        root = Path(temp.name)
+        self.catalog = root / 'catalog'
+        plain = root / 'plain'
+        plain.mkdir()
+        (plain / 'manifest.json').write_text(json.dumps(dict(schemaVersion=1, id='dev.test.plain', name='Plain', version='0.1.0',
+            constructApi=dict(min='0.1.0', target='0.1.0'), runtime=dict(kind='webview-js'), entry='index.html', capabilities=[])))
+        (plain / 'index.html').write_text('<h1>plain</h1>')
+        blob, meta = publish_module.build(plain, self.signer)
+        publish_module.publish(self.catalog, blob, meta, latest=True)
+        keys = em.key_dir(root / 'keys')
+        self.opaque = em.new_opaque_id()
+        key_id = em.new_key(keys, self.opaque)
+        sealed = root / 'sealed'
+        sealed.mkdir()
+        (sealed / 'manifest.json').write_text(json.dumps(dict(schemaVersion=1, id=self.opaque, name=MARKER, version='1.0.0',
+            constructApi=dict(min='0.1.0', target='0.1.0'), runtime=dict(kind='webview-js'), entry='index.html', capabilities=[])))
+        (sealed / 'index.html').write_text(MARKER)
+        envelope, self.entry = em.build_sealed(sealed, self.signer, keys, key_id)
+        em.publish_encrypted(self.catalog, envelope, self.entry, latest=True)
+        der = self.signer.public_key().public_bytes(em.serialization.Encoding.DER, em.serialization.PublicFormat.SubjectPublicKeyInfo)
+        (self.catalog / 'publisher-public.der').write_bytes(der)
+        patcher = patch.object(vpc, 'PUBLISHER_SHA256', hashlib.sha256(der).hexdigest())
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def edit(self, change):
+        index = json.loads((self.catalog / 'index.json').read_text())
+        change(index)
+        (self.catalog / 'index.json').write_text(json.dumps(index))
+
+    def test_mixed_catalog_verifies_and_counts_separately(self):
+        out = io.StringIO()
+        with patch('sys.stdout', out):
+            self.vpc.verify(self.catalog)
+        self.assertIn('Verified 1 modules / 1 signed versions; 1 encrypted modules / 1 signed envelopes (not decrypted)', out.getvalue())
+
+    def test_refusals(self):
+        artifact = self.catalog / self.entry['artifact']
+        good = artifact.read_bytes()
+        cases = [
+            ('descriptive name', lambda i: i['encryptedModules'][0].update(name=MARKER), 'neutral label'),
+            ('extra field', lambda i: i['encryptedModules'][0].update(description='x'), 'neutral label'),
+            ('readable ID', lambda i: i['encryptedModules'][0].update(id='dev.readable.name'), 'opaque ID'),
+            ('ID in both arrays', lambda i: i['modules'][0].update(id=self.opaque), 'Duplicate module ID'),
+            ('latest not listed', lambda i: i['encryptedModules'][0].update(latest='9.9.9'), 'version list'),
+            ('other format', lambda i: i['encryptedModules'][0]['versions'][0].update(format='construct-encrypted-v2'), 'Unsupported'),
+            ('other path', lambda i: i['encryptedModules'][0]['versions'][0].update(artifact='sealed/x.cenc'), 'artifact path'),
+            ('other signer', lambda i: i['encryptedModules'][0]['versions'][0].update(
+                signature=base64.b64encode(em.sign(good, self.other)).decode()), None),
+        ]
+        original = (self.catalog / 'index.json').read_text()
+        for name, change, message in cases:
+            with self.subTest(name):
+                (self.catalog / 'index.json').write_text(original)
+                self.edit(change)
+                with self.assertRaises(Exception) as caught, patch('sys.stdout', io.StringIO()):
+                    self.vpc.verify(self.catalog)
+                if message:
+                    self.assertIn(message, str(caught.exception))
+        (self.catalog / 'index.json').write_text(original)
+        artifact.write_bytes(flip(good, len(good) - 1))
+        with self.assertRaisesRegex(ValueError, 'Hash mismatch'), patch('sys.stdout', io.StringIO()):
+            self.vpc.verify(self.catalog)
+
+    def test_ordinary_publisher_refuses_an_encrypted_id(self):
+        import publish_module
+        index = json.loads((self.catalog / 'index.json').read_text())
+        with self.assertRaisesRegex(ValueError, 'encrypted module'):
+            publish_module.publish(self.catalog, b'x', dict(id=self.opaque, name='x', version='1.0.0', artifact='x.zip', sha256='', signature=''))
+        self.assertEqual(json.loads((self.catalog / 'index.json').read_text()), index)
 
 
 if __name__ == '__main__':

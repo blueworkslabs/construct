@@ -282,6 +282,8 @@ def artifact_path(opaque_id, version):
 
 
 def publish_encrypted(output, envelope, entry, latest=False):
+    """`entry` carries the opaque ID; the catalog stores it on the module, not on each version."""
+    published = entry
     output = Path(output)
     require(not output.is_symlink(), 'Registry cannot be a symlink')
     output.mkdir(parents=True, exist_ok=True)
@@ -297,6 +299,7 @@ def publish_encrypted(output, envelope, entry, latest=False):
         if module is None:
             module = {'id': entry['id'], 'name': LABEL, 'versions': []}
             sealed.append(module)
+        entry = {k: v for k, v in entry.items() if k != 'id'}
         old = next((v for v in module['versions'] if v['version'] == entry['version']), None)
         require(old is None or old == entry, 'Published version is immutable; increment version')
         target = output / entry['artifact']
@@ -314,7 +317,7 @@ def publish_encrypted(output, envelope, entry, latest=False):
             target.parent.mkdir(parents=True, exist_ok=True)
             atomic_write(target, envelope)
         atomic_write(index_path, encoded)
-    return entry
+    return published
 
 
 def build_sealed(source, signing_key, keys, key_id, version=None):

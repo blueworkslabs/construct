@@ -13,6 +13,7 @@ import zipfile
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
+from encrypt_module import FORMAT as ENCRYPTED_FORMAT, LABEL as LOCKED_LABEL, MAX_ENVELOPE, OPAQUE_ID, artifact_path, parse_envelope
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLISHER_SHA256 = '6d82e01afd38130c7634aec030f0c2b7da10bbac1104002727529dee19374a0f'
@@ -58,8 +59,13 @@ def verify(directory, url=None):
         return data
 
     index = json.loads(read('index.json', 512 * 1024))
-    if index.get('schemaVersion') != 1 or not 1 <= len(index['modules']) <= 100:
+    sealed_modules = index.get('encryptedModules', [])
+    if (index.get('schemaVersion') != 1 or not isinstance(sealed_modules, list)
+            or not 1 <= len(index['modules']) + len(sealed_modules) <= 100):
         raise ValueError('Unexpected catalog schema')
+    ids = [m['id'] for m in index['modules']] + [m['id'] for m in sealed_modules]
+    if len(ids) != len(set(ids)):
+        raise ValueError('Duplicate module ID across catalog arrays')
     seen = set()
     count = 0
     for module in index['modules']:
@@ -84,7 +90,36 @@ def verify(directory, url=None):
                 if (manifest['id'], manifest['version']) != identity:
                     raise ValueError('Signed identity differs from catalog')
             count += 1
+    sealed_count = 0
+    for module in sealed_modules:
+        # Encrypted entries: framing, opaque identity, bounds, hashes and publisher signatures,
+        # checked without any content key. The plaintext is the private verifier's job.
+        if set(module) != {'id', 'name', 'latest', 'versions'} or module['name'] != LOCKED_LABEL:
+            raise ValueError('Encrypted entry must carry only the neutral label')
+        if not OPAQUE_ID.fullmatch(module['id']):
+            raise ValueError('Encrypted entry needs an opaque ID')
+        versions = module['versions']
+        if not 1 <= len(versions) <= 50 or module['latest'] not in {v['version'] for v in versions}:
+            raise ValueError('Invalid version list')
+        for version in versions:
+            if set(version) != {'version', 'format', 'artifact', 'sha256', 'signature'} or version['format'] != ENCRYPTED_FORMAT:
+                raise ValueError('Unsupported encrypted entry')
+            identity = (module['id'], version['version'])
+            name = version['artifact']
+            if identity in seen or name != artifact_path(*identity):
+                raise ValueError('Duplicate identity or unexpected encrypted artifact path')
+            seen.add(identity)
+            envelope = read(name, MAX_ENVELOPE)
+            if hashlib.sha256(envelope).hexdigest() != version['sha256']:
+                raise ValueError('Hash mismatch: ' + name)
+            key.verify(base64.b64decode(version['signature'], validate=True), envelope,
+                       padding.PKCS1v15(), hashes.SHA256())
+            header = parse_envelope(envelope)[0]
+            if (header['id'], header['version']) != identity:
+                raise ValueError('Signed identity differs from catalog')
+            sealed_count += 1
     print(f'Verified {len(index["modules"])} modules / {count} signed versions'
+          + (f'; {len(sealed_modules)} encrypted modules / {sealed_count} signed envelopes (not decrypted)' if sealed_modules else '')
           + ('; direct HTTPS and exact checkout bytes' if url else '; local artifacts'))
 
 
