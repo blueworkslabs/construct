@@ -9,7 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 # Existing debt may shrink, not silently grow. See docs/shell-retirement.md.
 NATIVE_WORKSPACES = {}
 # PhotoCaptureActivity is a generic foreground acquisition surface, not an album/workflow.
-ACTIVITIES = {'.MainActivity', '.ModuleActivity', '.PhotoCaptureActivity'}
+# ModuleKeysActivity is host-owned key entry (docs/encrypted-packages.md): its own window, so
+# FLAG_SECURE and the autofill exclusion cover exactly that screen.
+ACTIVITIES = {'.MainActivity', '.ModuleActivity', '.PhotoCaptureActivity', '.ModuleKeysActivity'}
 
 def check(root=ROOT):
     errors = []
