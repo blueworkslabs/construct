@@ -141,7 +141,8 @@ object EncryptedPackages {
  * A deliberately small JSON reader for the envelope header: one flat object whose values are
  * strings or non-negative integers. Duplicate keys, nesting, booleans, null, fractions,
  * exponents, leading zeros and trailing data are all rejected (org.json keeps the last of
- * duplicate keys, which the format forbids).
+ * duplicate keys, which the format forbids). Digits and \u escapes are ASCII only, exactly as
+ * the JSON grammar and the publisher's parser have them: no other Unicode digits, no signs.
  */
 private class StrictHeaderJson(private val s: String) {
     private var i = 0
@@ -182,7 +183,12 @@ private class StrictHeaderJson(private val s: String) {
                         'n' -> b.append('\n')
                         'r' -> b.append('\r')
                         't' -> b.append('\t')
-                        'u' -> { if (i + 4 > s.length) fail(); b.append(s.substring(i, i + 4).toIntOrNull(16)?.toChar() ?: fail()); i += 4 }
+                        'u' -> {
+                            if (i + 4 > s.length) fail()
+                            val hex = s.substring(i, i + 4)
+                            if (!hex.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) fail()
+                            b.append(hex.toInt(16).toChar()); i += 4
+                        }
                         else -> fail()
                     }
                 }
@@ -193,7 +199,7 @@ private class StrictHeaderJson(private val s: String) {
     }
     private fun number(): Long {
         val start = i
-        while (i < s.length && s[i].isDigit()) i++
+        while (i < s.length && s[i] in '0'..'9') i++
         val text = s.substring(start, i)
         if (text.isEmpty() || text.length > 10 || (text.length > 1 && text[0] == '0')) fail()
         return text.toLong()

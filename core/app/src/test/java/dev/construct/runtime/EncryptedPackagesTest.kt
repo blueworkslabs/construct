@@ -58,7 +58,7 @@ class EncryptedPackagesTest {
 
     @Test fun everyNegativeVectorFailsWithItsRecordedCategory() {
         val negative = vectors.getJSONArray("negative")
-        assertEquals(20, negative.length())
+        assertEquals(22, negative.length())
         for (i in 0 until negative.length()) {
             val v = negative.getJSONObject(i)
             assertEquals(v.getString("name"), v.getString("expect"), code { EncryptedPackages.open(hex(v.getString("envelope")), hex(v.getString("key"))) })

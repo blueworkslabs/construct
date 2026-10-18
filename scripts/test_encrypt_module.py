@@ -10,6 +10,7 @@ import base64
 import hashlib
 import io
 import json
+import re
 import os
 from pathlib import Path
 import sys
@@ -105,6 +106,9 @@ def vectors():
     add('duplicate header field', frame(dup, nonce, sealed), expect='PACKAGE_INVALID')
     add('unknown header field', frame(hb[:-1] + b',"x":1}', nonce, sealed), expect='PACKAGE_INVALID')
     add('invalid UTF-8 header', frame(hb.replace(b'"format"', b'"form\xffat"'), nonce, sealed), expect='PACKAGE_INVALID')
+    # JSON digits and \u escapes are ASCII: the Android reader once took other Unicode digits and signed hex.
+    add('non-ASCII digit in zipBytes', frame(re.sub(rb'"zipBytes":[0-9]+', '"zipBytes":\u0661'.encode(), hb), nonce, sealed), expect='PACKAGE_INVALID')
+    add('signed hex in a \\u escape', frame(hb.replace(b'"format":"c', b'"format":"\\u+063'), nonce, sealed), expect='PACKAGE_INVALID')
     add('zipBytes as string', reseal(em.encode_header(header_of(blob, manifest, zipBytes=str(len(blob)))), SALT + blob), expect='PACKAGE_INVALID')
     add('unsupported format', reseal(em.encode_header(header_of(blob, manifest, format='construct-encrypted-v2')), SALT + blob), expect='PACKAGE_FORMAT_UNSUPPORTED')
     add('commitment mismatch', reseal(em.encode_header(header_of(blob, manifest, manifestCommitment='0' * 64)), SALT + blob), expect='PACKAGE_INVALID')
