@@ -38,6 +38,7 @@ def prepare(output):
     prepare_photo_identity(output, key)
     prepare_capture_metadata(output, key)
     prepare_orientation(output, key)
+    prepare_audio(output, key)
     print('Prepared complete JVM fixtures plus home/test catalogs under the selected output.')
 
 def prepare_sensitive(output, key):
@@ -90,6 +91,11 @@ def prepare_capture_metadata(output, key):
 def prepare_orientation(output, key):
     # API 0.14 orientation.read probe: one reading, a rate-capped stream and stop.
     publish(output/'orientation-registry',*build(ROOT/'examples/fixtures/orientation-probe',key),fixture=True)
+
+def prepare_audio(output, key):
+    # API 0.15 audio.play probes: a declared module and one without audio.play.
+    for probe in ('audio-probe', 'audio-undeclared-probe'):
+        publish(output/'audio-registry',*build(ROOT/'examples/fixtures'/probe,key),fixture=True)
 
 def prepare_transport(output, key):
     # Signed scopes exercise expansion, removal/reintroduction and rollback.

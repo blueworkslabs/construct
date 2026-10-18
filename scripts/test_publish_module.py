@@ -20,6 +20,15 @@ class PublisherTest(unittest.TestCase):
         (self.source/'manifest.json').write_text(json.dumps(self.manifest))
         (self.source/'index.html').write_text('<h1>__VERSION__</h1>')
         self.output = self.root/'registry'
+    def test_audio_play_requires_api015(self):
+        self.manifest['capabilities']=[dict(id='audio.play',reason='Game sounds')]
+        for api,ok in (('0.14.0',False),('0.15.0',True)):
+            self.manifest['constructApi']=dict(min=api,target=api)
+            (self.source/'manifest.json').write_text(json.dumps(self.manifest))
+            if ok: build(self.source,self.key)
+            else:
+                with self.assertRaises(ValueError): build(self.source,self.key)
+
     def test_sky_watch_requires_api08(self):
         self.manifest['capabilities']=[dict(id='sky.watch',reason='Native foreground aircraft map')]
         self.manifest['constructApi']=dict(min='0.7.0',target='0.7.0')
@@ -38,7 +47,7 @@ class PublisherTest(unittest.TestCase):
         attempt(dict(min='0.13.0',target='0.13.0'))
         attempt(dict(min='0.12.0',target='0.12.0'))
         attempt(dict(min='0.14.0',target='0.14.0'))
-        for bad in [dict(min='0.12.0',target='0.13.0'), dict(min='0.15.0',target='0.15.0')]:
+        for bad in [dict(min='0.12.0',target='0.13.0'), dict(min='0.16.0',target='0.16.0')]:
             with self.assertRaises(ValueError): attempt(bad)
 
     def test_orientation_requires_api014(self):

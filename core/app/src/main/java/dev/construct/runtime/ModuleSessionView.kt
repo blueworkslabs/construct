@@ -61,6 +61,16 @@ internal open class ModuleSessionView(context: Context) : WebView(context) {
         super.destroy()
     }
     val gate = ModuleSessionGate()
+    /** Real user input in the page (touch or key release); synthetic DOM events never arrive here. */
+    var onUserInput: () -> Unit = {}
+    override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean {
+        if (event.actionMasked == android.view.MotionEvent.ACTION_UP && !released) onUserInput()
+        return super.dispatchTouchEvent(event)
+    }
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.action == android.view.KeyEvent.ACTION_UP && !released) onUserInput()
+        return super.dispatchKeyEvent(event)
+    }
     var stopEffects: () -> Unit = {}
     /** True while the hosting activity is paused (another window in front, Home, Recents). */
     val activityPaused = AtomicBoolean(false)

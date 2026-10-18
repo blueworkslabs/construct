@@ -55,8 +55,9 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
     var orientation: ModuleOrientation? = null
     var images: ModuleImageSession? = null
     var library: ModulePhotoLibrary? = null
+    lateinit var audio: ModuleAudio
     val view = object : ModuleSessionView(context) {
-        override fun releaseSession() { active.set(false); contacts.close(); tone.close(); http?.close(); location?.close(); orientation?.close(); images?.close(); library?.close() }
+        override fun releaseSession() { active.set(false); contacts.close(); tone.close(); audio.close(); http?.close(); location?.close(); orientation?.close(); images?.close(); library?.close() }
     }
     contacts = ContactsReader(context) {
         view.gate.authorize("contacts.read")
@@ -67,6 +68,15 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
         if (capability == "orientation.read") view.authorizeOrientation()
         view.gate.authorize(capability); store.withCapability(installed, capability) { }
     }
+    audio = ModuleAudio(WebViewAudioPlatform(context, view, origin), module.capabilities.any { it.id == "audio.play" }, {
+        checkRule(!view.activityPaused.get(), "RUN_PAUSED", "Return to the module before opening audio")
+        authorizeCapability("audio.play")
+    }, { detail ->
+        if (active.get()) view.evaluateJavascript("window.dispatchEvent(new CustomEvent('constructaudio',{detail:$detail}));", null)
+    }, event = { code -> store.log("audio", code, module, "Web Audio output under host policy; not proof of audibility") })
+    audio.install()
+    view.onUserInput = { audio.userGesture() }
+    view.stopForeground = { audio.suspend("background") }
     if (module.capabilities.any { it.id == "net.http" }) http = ModuleHttp(context, module) { authorizeCapability("net.http") }
     if (module.capabilities.any { it.id == "location.read" }) location = ModuleLocation(context) { authorizeCapability("location.read") }
     if (module.capabilities.any { it.id == "orientation.read" }) {
@@ -79,15 +89,15 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             // Pushed like constructvisibilitychange; the sample is host-built JSON only.
             if (active.get() && !view.gate.paused.get() && !view.activityPaused.get()) push(sample)
         }) { reason -> if (active.get()) push(JSONObject().put("watching", false).put("reason", reason)) }
-        view.stopForeground = { orientation?.cancel("paused") }
+        view.stopForeground = { orientation?.cancel("paused"); audio.suspend("background") }
     }
     if (module.capabilities.any { it.id == "image.read" }) images = ModuleImageSession(context, origin, ::authorizeCapability, pickImage)
     if (module.capabilities.any { it.id == "photos.library" }) library = ModulePhotoLibrary(context, module.id, images!!, ::authorizeCapability,
         { action -> store.withCapability(installed, "photos.library") {
             authorizeCapability("image.read"); view.gate.authorize("photos.library"); action()
-        } }, confirmPhoto, stableIds = module.api in setOf("0.12.0", "0.13.0", "0.14.0"))
+        } }, confirmPhoto, stableIds = module.api in setOf("0.12.0", "0.13.0", "0.14.0", "0.15.0"))
     view.stopImageEffects = { images?.cancel(); library?.cancel() }
-    view.stopEffects = { tone.pause(); http?.cancel(); location?.cancel(); orientation?.cancel() }
+    view.stopEffects = { tone.pause(); audio.suspend("pause"); http?.cancel(); location?.cancel(); orientation?.cancel() }
     val reportedBlocks = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     var calls = 0
     var window = android.os.SystemClock.elapsedRealtime()
@@ -99,14 +109,14 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
         // Persist failure before posting the UI transition, so a queued Mark working
         // action cannot confirm a failed run even if the view has not closed yet.
         runCatching { store.runtimeFailed(installed, code) }
-        view.post { contacts.close(); tone.close(); http?.close(); location?.close(); orientation?.close(); images?.close(); library?.close(); onFailure(view, code) }
+        view.post { contacts.close(); tone.close(); audio.close(); http?.close(); location?.close(); orientation?.close(); images?.close(); library?.close(); onFailure(view, code) }
     }
     fun auditBlock(code: String, category: String = "policy") {
         if (active.get() && reportedBlocks.add("$code:$category"))
             store.log("runtime", code, module, "Blocked category=$category; URL/payload omitted")
     }
     with(view.settings) {
-        if (module.api in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0")) textZoom = (context.resources.configuration.fontScale * 100).toInt().coerceIn(50, 300)
+        if (module.api in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0")) textZoom = (context.resources.configuration.fontScale * 100).toInt().coerceIn(50, 300)
         javaScriptEnabled = true
         domStorageEnabled = false
         allowFileAccess = false
@@ -137,7 +147,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             // Android intercepts data: resources too. Keep this local raster path
             // bounded; returning null here would bypass our byte/format policy.
             if (request.url.scheme == "data") {
-                if (module.api !in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0") || request.isForMainFrame || request.method != "GET") return reject("inline-image-context")
+                if (module.api !in setOf("0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0") || request.isForMainFrame || request.method != "GET") return reject("inline-image-context")
                 val raster = runCatching { ModuleImages.dataUrl(request.url.toString()) }.getOrNull()
                     ?: return reject("inline-image-format")
                 return WebResourceResponse(raster.first, null, 200, "OK",
@@ -163,7 +173,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                     "X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-store"), stream)
             }
             if (!Packages.safePath(path)) return reject("path")
-            if (module.api in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0") && path == "construct-host.css") {
+            if (module.api in setOf("0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0") && path == "construct-host.css") {
                 return WebResourceResponse("text/css", "UTF-8", 200, "OK",
                     mapOf("X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-store"),
                     ByteArrayInputStream(ModuleLayout.css.toByteArray()))
@@ -325,6 +335,7 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                 }
                 "storage.kv" -> store.storage(module.id, params)
                 "device.tone" -> tone.play(params)
+                "audio.play" -> audio.request(params)
                 else -> throw ConstructError("CAPABILITY_DENIED", "Unsupported capability")
             }
             }
