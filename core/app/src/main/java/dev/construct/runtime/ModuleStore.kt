@@ -189,21 +189,24 @@ class ModuleStore(private val context: Context, publisherKey: ByteArray? = null,
      * verified again from its signed bytes. Grants stay as they were; nothing opens by itself.
      * A key that fails to restore any of its installed versions is not kept: the whole forget runs
      * again, so versions it already restored in this call are locked again and a corrected retry
-     * starts from a clean slate instead of `KEY_EXISTS`.
+     * starts from a clean slate instead of `KEY_EXISTS`. Every failure after the key is stored,
+     * including an unreadable module record, takes that path.
      */
     @Synchronized fun addKey(id: String, keyId: String, key: ByteArray, label: String) {
         retryCleanup()
         checkRule(!cleanupPending(id, keyId), "KEY_CLEANUP_PENDING", "Removing the code this key unlocked earlier is still pending; try again")
         keys.add(id, keyId, key, label)
         log("keys", "KEY_ADDED", message = "Module key added")
-        val record = readState().optJSONObject(id) ?: return
-        val sealed = record.optJSONObject("sealed") ?: return
-        for (digest in sealed.keys().asSequence().toList()) {
-            val binding = sealed.getJSONObject(digest)
-            // Every installed version under this key is checked against the new key, also when its
-            // code is still on disk (a Keystore loss keeps it): a wrong key never unlocks kept code.
-            if (binding.getString("keyId") != keyId) continue
-            try {
+        var version: String? = null
+        try {
+            val record = readState().optJSONObject(id) ?: return
+            val sealed = record.optJSONObject("sealed") ?: return
+            for (digest in sealed.keys().asSequence().toList()) {
+                val binding = sealed.getJSONObject(digest)
+                // Every installed version under this key is checked against the new key, also when its
+                // code is still on disk (a Keystore loss keeps it): a wrong key never unlocks kept code.
+                if (binding.getString("keyId") != keyId) continue
+                version = binding.getString("version")
                 val kept = File(sealedRoot, "$digest.cenc")
                 checkRule(kept.isFile, "PACKAGE_CORRUPT", "The kept encrypted package is missing; remove and reinstall")
                 val envelope = kept.inputStream().use { it.readBytesBounded(EncryptedPackages.MAX_ENVELOPE) }
@@ -214,13 +217,13 @@ class ModuleStore(private val context: Context, publisherKey: ByteArray? = null,
                 }
                 stage(verified)
                 verifiedInstalled(id, digest)
-                log("keys", "MODULE_UNLOCKED", message = "Installed version ${binding.getString("version")} unlocked")
-            } catch (error: Exception) {
-                val code = (error as? ConstructError)?.code ?: "INSTALL_IO"
-                rejectKey(id, keyId)
-                log("keys", code, message = "Installed version ${binding.getString("version")} stays locked")
-                throw if (error is ConstructError) error else ConstructError(code, "Could not restore the unlocked module; it stays locked")
+                log("keys", "MODULE_UNLOCKED", message = "Installed version $version unlocked")
             }
+        } catch (error: Exception) {
+            val code = (error as? ConstructError)?.code ?: "INSTALL_IO"
+            rejectKey(id, keyId)
+            log("keys", code, message = version?.let { "Installed version $it stays locked" } ?: "The module record could not be read; the key was not kept")
+            throw if (error is ConstructError) error else ConstructError(code, "Could not restore the unlocked module; it stays locked")
         }
     }
 
@@ -228,7 +231,9 @@ class ModuleStore(private val context: Context, publisherKey: ByteArray? = null,
      * Drops a key whose re-import failed. The journaled forget comes first; a pending cleanup is
      * retried by the next addKey, which refuses until it is done. If the forget stops before the
      * key is removed (the journal cannot be read or written), the key and the code unlocked under
-     * it are removed here directly, so neither a usable key nor a partial restore stays behind.
+     * it are removed here directly, so neither a usable key nor a partial restore stays behind. A
+     * deletion that fails here is found again by [sweepUnkeyed]: the binding without its key is the
+     * retry intent.
      */
     private fun rejectKey(id: String, keyId: String) {
         if (runCatching { forgetKey(id, keyId) }.isSuccess) return
@@ -274,7 +279,8 @@ class ModuleStore(private val context: Context, publisherKey: ByteArray? = null,
     /** Journaled and idempotent; true once no forgotten binding has unlocked code or staging left. */
     @Synchronized private fun retryCleanup(): Boolean {
         val pending = runCatching { readCleanup() }.getOrNull() ?: return false
-        if (pending.length() == 0) return true
+        val swept = sweepUnkeyed()
+        if (pending.length() == 0) return swept
         val state = runCatching { readState() }.getOrNull() ?: return false
         val remaining = org.json.JSONArray()
         for (i in 0 until pending.length()) {
@@ -295,8 +301,29 @@ class ModuleStore(private val context: Context, publisherKey: ByteArray? = null,
         runCatching { syncDirectory(root) }
         if (remaining.length() != pending.length()) writeAtomic(cleanupFile, remaining.toString())
         if (remaining.length() == 0) log("keys", "KEY_CLEANUP_DONE", message = "Unlocked code of forgotten keys removed")
-        return remaining.length() == 0
+        return remaining.length() == 0 && swept
     }
+
+    /**
+     * Removes the unlocked code of every sealed binding whose key is no longer stored, so a cleanup
+     * that failed without a journal entry is retried at the next inventory, import or restart. A
+     * key that is stored but cannot be unwrapped (Keystore loss) keeps its code. True when clean.
+     */
+    private fun sweepUnkeyed(): Boolean = runCatching {
+        val stored = keys.list().map { it.id to it.keyId }.toSet()
+        val state = readState()
+        var clean = true
+        for (id in state.keys()) {
+            val sealed = state.optJSONObject(id)?.optJSONObject("sealed") ?: continue
+            for (digest in sealed.keys()) {
+                val keyId = sealed.optJSONObject(digest)?.optString("keyId") ?: continue
+                if ((id to keyId) in stored) continue
+                val dir = directory(digest)
+                if (dir.exists() && !dir.deleteRecursively()) clean = false
+            }
+        }
+        clean
+    }.getOrDefault(false)
 
     private fun readState(): JSONObject = if (stateFile.baseFile.exists() || File(stateFile.baseFile.path + ".bak").exists())
         JSONObject(stateFile.openRead().use { it.readBytesBounded(512 * 1024).toString(Charsets.UTF_8) }) else JSONObject()
