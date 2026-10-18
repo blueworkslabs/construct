@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "dev.construct.audio-probe",
+  "name": "Audio probe",
+  "version": "0.1.1",
+  "description": "Synthetic acceptance fixture for API 0.15 audio.play: constructor availability, open, state, close and suspension events, with a continuous test tone.",
+  "constructApi": {
+    "min": "0.15.0",
+    "target": "0.15.0"
+  },
+  "runtime": {
+    "kind": "webview-js"
+  },
+  "entry": "ui/index.html",
+  "capabilities": [
+    {
+      "id": "audio.play",
+      "reason": "Play a synthetic test tone while this probe is open."
+    }
+  ]
+}

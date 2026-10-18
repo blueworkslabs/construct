@@ -278,6 +278,7 @@ class MainActivity : ComponentActivity() {
                                 store.beginRun(module);
                                 { accessModuleId = null; moduleLauncher.launch(ModuleActivity.intent(this@MainActivity, module)); status = "Testing ${module.manifest.name} ${module.manifest.version}." }
                             } }) { Text("Reopen module") }
+                            if (module.manifest.capabilities.any { it.id == "audio.play" }) Text("Sound starts only after you tap in the module, follows media volume, silent mode and Do Not Disturb, and stops when you leave the module. It does not access the microphone.")
                             if (module.manifest.capabilities.any { it.id == "device.tone" }) Text("Tones are short, use media volume and stop when you leave the module. The tone capability does not access the microphone or internet.")
                         }
                     }

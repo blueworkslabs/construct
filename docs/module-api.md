@@ -75,6 +75,9 @@ a granted module can retain data it has read; revocation is not retroactive eras
   Fixed bounded patterns, two-second rate limit; native playback stops when the
   session loses authority. Silent/vibrate/DND policy can return `AUDIO_MUTED`.
   This capability does not grant arbitrary audio streaming or microphone access.
+- **`audio.play` (0.15):** Web Audio under host policy, [below](#sound-audioplay-api-015).
+  From 0.15 every module page starts natively muted, and modules that do not declare it
+  cannot construct an `AudioContext`.
 - **`contacts.read` (0.3+):** bounded native provider search/details, below.
 - **`camera.photo`, `photos.library`, `image.analyze` (0.11):** bounded acquisition,
   private-photo access and reusable inference; [contracts](module-photos.md).
@@ -382,6 +385,33 @@ Fine-grained motion data can reveal activity patterns. The foreground-only
 limit, the rate cap, the rounding and the separate consent line are the bounds;
 granted storage or internet access can still retain or send what the module
 receives. The contract was proposed in the [orientation brief](orientation-brief.md).
+
+## Sound (`audio.play`, API 0.15)
+
+For modules that play their own sound: game effects, music, a metronome. Declare
+`audio.play` with a reason and `constructApi` 0.15.0. It can be `optional` and is off until
+granted in **Module access** ("Play sounds while this module is open"). No Android runtime
+permission is involved. The module keeps Web Audio as its engine; the host decides whether
+it is heard. See the [audio brief](audio-brief.md).
+
+- Every module page starts with its WebView natively muted. Modules that do not declare
+  `audio.play` also get `AudioContext`, `webkitAudioContext` and `OfflineAudioContext`
+  constructors that throw `NotAllowedError`.
+- **`{op:'open'}`** checks the grant, the foreground, media volume, ringer and Do Not
+  Disturb (`AUDIO_MUTED`), and requests audio focus (`AUDIO_UNAVAILABLE`). It returns
+  `{open:true, waitingForGesture}`. Output stays muted until a real tap or key in the module;
+  a tap up to 5 s before the open counts, so open from a click handler.
+- **`{op:'state'}`** returns the same shape; **`{op:'close'}`** returns `{open:false}`.
+- Focus loss, menu pause, losing the foreground or closing mutes again and dispatches
+  `window.dispatchEvent(new CustomEvent('constructaudio', {detail: {state:'suspended',
+  reason}}))` with reason `focus`, `pause`, `background`, `module` or `policy` (the phone went
+  silent, vibrate, Do Not Disturb or media volume 0 while open, or a tap came after that or after
+  the grant was withdrawn: the rules are checked again before output is heard). Nothing resumes
+  by itself; ask `open` again after the next tap.
+- On a WebView without native mute, no module opens (`WEBVIEW_UNSUPPORTED`): the host could not
+  keep them quiet.
+- `{open:true}` is native submission, not audibility. There is no background audio, network
+  streaming, microphone, system volume or media-session control. `device.tone` is unchanged.
 
 **Composition matters:** unlike the legacy Sky launcher, these capabilities return
 data to module JavaScript. If internet access is also granted, the module may send
