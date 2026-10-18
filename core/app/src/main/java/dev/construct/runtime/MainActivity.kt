@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
     private val worker = Executors.newSingleThreadExecutor()
     private lateinit var store: ModuleStore
     private var keysOpened = false
-    private val foreground = ForegroundGeneration()
+    private val preparation = PreparationGate()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -137,7 +137,7 @@ class MainActivity : ComponentActivity() {
         DisposableEffect(lifecycle) {
             val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
                 // An unlocked candidate, shown or still unlocking, does not survive leaving Construct before consent.
-                if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) { foreground.invalidate(); if (candidate?.sealed != null) candidate = null }
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) { preparation.leave(); if (candidate?.sealed != null) candidate = null }
                 if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                     androidContacts = ContactsReader.hasPermission(this@MainActivity)
                     androidCamera = PhotoCaptureActivity.hasPermission(this@MainActivity)
@@ -149,6 +149,9 @@ class MainActivity : ComponentActivity() {
             lifecycle.addObserver(observer)
             onDispose { lifecycle.removeObserver(observer) }
         }
+        // Leaving Browse (Back, Library, Settings, About, Diagnostics, Module access) drops an unlock still running.
+        val onPreparation = page == "browse" && !showLogs && accessModuleId == null
+        LaunchedEffect(onPreparation) { if (!onPreparation) preparation.leave() }
         // Launch is local-only. Catalog IO is an explicit Browse/Settings action.
         LaunchedEffect(Unit) { work { { } } }
         BackHandler(showLogs || accessModuleId != null || page !in listOf("library")) {
@@ -350,11 +353,11 @@ class MainActivity : ComponentActivity() {
                                         secondary = listOf(WorkshopAction(WorkshopActionId.MODULE_KEYS, "Module keys", !busy))),
                                         onAction = { action -> if (action == WorkshopActionId.MODULE_KEYS) openKeys() else {
                                             val selectedSource = catalogSource
-                                            val token = foreground.token()
+                                            val token = preparation.begin()
                                             work { val verified = store.prepareEncrypted(selectedSource, version)
                                                 CapabilityLifecycle.requireRunnable(verified.manifest);
-                                                { if (foreground.current(token)) { candidate = verified; status = "Unlocked and verified. Review access before installing." }
-                                                  else status = "Unlock discarded because Construct left the screen. Unlock again to review." } }
+                                                { if (preparation.deliverable(token, page == "browse" && !showLogs && accessModuleId == null)) { candidate = verified; status = "Unlocked and verified. Review access before installing." }
+                                                  else status = "Unlock discarded because you left Browse or Construct before reviewing. Unlock again to review." } }
                                         } })
                                 }
                             }

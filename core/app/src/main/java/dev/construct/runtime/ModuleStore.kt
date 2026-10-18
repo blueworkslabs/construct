@@ -116,6 +116,8 @@ class ModuleStore(private val context: Context, publisherKey: ByteArray? = null,
         // The 15-second local deadline: a late result is discarded, even though the crypto call itself could not be stopped.
         checkRule(System.nanoTime() - started <= UNLOCK_DEADLINE_NANOS, "PREPARE_TIMEOUT", "Unlocking took too long; try again")
         checkRule(epoch == keyEpoch, "INSTALL_STALE", "Keys changed; review the module again")
+        // For the phone check's latency figure; opaque ID and sizes only, nothing decrypted.
+        log("install", "PACKAGE_UNLOCKED", message = "Verified and unlocked in ${(System.nanoTime() - started) / 1_000_000} ms, ${envelope.size / 1024} KiB")
         return verified.copy(sealed = SealedSource(version, envelope, keyId, epoch))
     }
 
@@ -200,7 +202,9 @@ class ModuleStore(private val context: Context, publisherKey: ByteArray? = null,
             // code is still on disk (a Keystore loss keeps it): a wrong key never unlocks kept code.
             if (binding.getString("keyId") != keyId) continue
             try {
-                val envelope = File(sealedRoot, "$digest.cenc").inputStream().use { it.readBytesBounded(EncryptedPackages.MAX_ENVELOPE) }
+                val kept = File(sealedRoot, "$digest.cenc")
+                checkRule(kept.isFile, "PACKAGE_CORRUPT", "The kept encrypted package is missing; remove and reinstall")
+                val envelope = kept.inputStream().use { it.readBytesBounded(EncryptedPackages.MAX_ENVELOPE) }
                 val verified = EncryptedPackages.verify(envelope, EncryptedCatalogVersion(id, binding.getString("version"),
                     binding.getString("artifact"), digest, binding.getString("signature")), publicKey) { header ->
                     checkRule(header.keyId == keyId, "STATE_INVALID", "Encrypted module record is inconsistent; remove and reinstall")
