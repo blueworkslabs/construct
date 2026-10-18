@@ -1,8 +1,11 @@
 # Audio brief — `audio.play`
 
-Status: **implemented for review** (2026-10-17) as API 0.15.0, in the advisory's private fork.
-Codex review, the staging report and the physical-phone check are pending. The note, the fix
-and the advisory publish together.
+Status: **implemented** as API 0.15.0 (Construct 0.1.0-alpha38). Review, emulator staging and
+the physical-phone listening check are complete; see the
+[staging report](audio-play-staging.md) and the [review](reviews/audio-0.15-codex.md), including
+their evidence limits (the emulator runs without audio output; audibility rests on a person's
+observation of the phone; the host log records event codes, not suspension reasons). The note,
+the fix and the advisory publish together.
 
 ## Why
 
@@ -28,7 +31,7 @@ and the advisory publish together.
 The module keeps Web Audio as its engine (it is the only engine that runs under the current
 CSP, which has no `media-src`, and it is standard). The host does not proxy sample data or mix.
 
-## Proposed contract
+## Implemented contract
 
 Capability `audio.play` is declared with a reason and may be `optional`. Consent text: "Play
 sounds while this module is open." No Android runtime permission. Off until granted in Module
@@ -42,7 +45,8 @@ access, like `device.tone`.
    and `OfflineAudioContext` with non-configurable constructors that throw `NotAllowedError`
    before any module script runs. `<audio>`/`<video>` stay blocked by the CSP. This applies to
    every module from the API version that ships it: older modules lose an unintended path, not
-   a contract. On a WebView without native mute, declared modules lose the constructors too.
+   a contract. Without native mute, module execution is refused (`WEBVIEW_UNSUPPORTED`),
+   declared or not.
 3. **Declared and granted: a bridge-gated sink.** The module keeps the real constructor, so it
    can decode and schedule ahead; the native mute is the gate. It requests `{op:'open'}` on
    `audio.play`. The host checks grant, foreground, ringer mode, stream mute and the
@@ -102,7 +106,7 @@ media-session controls.
 - Focus is requested with `USAGE_MEDIA`, the same attribute as the tone player, so one
   attribute means one policy. A `USAGE_GAME` option is added only if a real device is
   measured to duck media badly.
-- A second layer that mutes the WebView audio sink for undeclared modules is added only if a
-  public WebView API exists for it. Otherwise the layer is the document-start replacement plus a
-  staging test: an undeclared module that calls `AudioContext` must leave no AudioFlinger
-  track. Codex review decides whether the single layer is enough.
+- Native mute (`MUTE_AUDIO`) is mandatory: a WebView without it opens no module. The
+  document-start constructor replacement is defence in depth for undeclared modules, not a
+  release fallback; removing the constructors alone is not evidence that every audio route is
+  silent.
