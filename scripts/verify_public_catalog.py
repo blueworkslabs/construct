@@ -94,12 +94,13 @@ def verify(directory, url=None):
     for module in sealed_modules:
         # Encrypted entries: framing, opaque identity, bounds, hashes and publisher signatures,
         # checked without any content key. The plaintext is the private verifier's job.
-        if set(module) != {'id', 'name', 'latest', 'versions'} or module['name'] != LOCKED_LABEL:
+        # `latest` is optional, as in the Android parser and `encrypt_module.py seal` without --latest.
+        if set(module) - {'latest'} != {'id', 'name', 'versions'} or module['name'] != LOCKED_LABEL:
             raise ValueError('Encrypted entry must carry only the neutral label')
         if not OPAQUE_ID.fullmatch(module['id']):
             raise ValueError('Encrypted entry needs an opaque ID')
         versions = module['versions']
-        if not 1 <= len(versions) <= 50 or module['latest'] not in {v['version'] for v in versions}:
+        if not 1 <= len(versions) <= 50 or ('latest' in module and module['latest'] not in {v['version'] for v in versions}):
             raise ValueError('Invalid version list')
         for version in versions:
             if set(version) != {'version', 'format', 'artifact', 'sha256', 'signature'} or version['format'] != ENCRYPTED_FORMAT:

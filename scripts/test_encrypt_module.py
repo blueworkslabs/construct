@@ -411,6 +411,12 @@ class PublicVerifier(unittest.TestCase):
             self.vpc.verify(self.catalog)
         self.assertIn('Verified 1 modules / 1 signed versions; 1 encrypted modules / 1 signed envelopes (not decrypted)', out.getvalue())
 
+    def test_first_publication_without_latest_verifies(self):
+        # `encrypt_module.py seal` without --latest writes no `latest`; the Android parser accepts that too.
+        self.edit(lambda i: i['encryptedModules'][0].pop('latest'))
+        with patch('sys.stdout', io.StringIO()):
+            self.vpc.verify(self.catalog)
+
     def test_refusals(self):
         artifact = self.catalog / self.entry['artifact']
         good = artifact.read_bytes()

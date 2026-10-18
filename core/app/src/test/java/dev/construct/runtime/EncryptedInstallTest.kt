@@ -208,6 +208,26 @@ class EncryptedInstallTest {
         File(app.filesDir, "module-state.json").writeText(state.toString())
         assertEquals("STATE_INVALID", code { store.addKey(id, other, key(), "") })
         assertTrue(store.inventory().modules.isEmpty())
+        assertTrue(store.keys.list().isEmpty())
+    }
+
+    @Test fun aReimportThatCannotRestoreItsVersionIsNotKeptAndACorrectedRetryWorks() {
+        installed()
+        store.forgetKey(id, keyId)
+        val kept = File(app.filesDir, "sealed/$digest.cenc")
+        val good = kept.readBytes()
+        kept.writeBytes(good.copyOf().also { it[it.size - 1] = (it[it.size - 1] + 1).toByte() })
+        assertEquals("CHECKSUM_FAILED", code { store.addKey(id, keyId, key(), "") })
+        assertTrue(store.keys.list().isEmpty())
+        assertEquals("[]", File(app.filesDir, "key-cleanup.json").readText())
+        kept.delete()
+        assertEquals("PACKAGE_CORRUPT", code { store.addKey(id, keyId, key(), "") })
+        assertTrue(store.keys.list().isEmpty())
+        // The retry after the repair is not refused as KEY_EXISTS, and restores the version.
+        kept.writeBytes(good)
+        store.addKey(id, keyId, key(), "")
+        assertEquals(digest, store.inventory().modules.single().digest)
+        assertEquals(1, store.keys.list().size)
     }
 
     @Test fun anEncryptedRecordWithoutItsBindingNeverRunsAsPlain() {

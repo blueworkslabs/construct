@@ -131,4 +131,13 @@ class EncryptedPackagesTest {
         assertEquals("CATALOG_SCHEMA", code { Packages.encryptedCatalog(catalog(clash, sameId)) })
         assertEquals("CATALOG_SCHEMA", code { Packages.encryptedCatalog(catalog(JSONArray().put(sealedEntry()).put(sealedEntry()))) })
     }
+    @Test fun theModuleLimitCountsEveryObjectNotDistinctOrdinaryIds() {
+        // One ordinary ID repeated across objects with distinct versions, which Packages.catalog accepts.
+        fun repeated(n: Int) = JSONArray().apply { repeat(n) { i -> put(JSONObject(ordinary.getJSONObject(0).toString())
+            .put("versions", JSONArray().put(JSONObject(ordinary.getJSONObject(0).getJSONArray("versions").getJSONObject(0).toString()).put("version", "0.1.$i")))) } }
+        assertEquals(100, Packages.catalog(catalog(JSONArray(), repeated(100))).size)
+        assertEquals("CATALOG_SIZE", code { Packages.encryptedCatalog(catalog(JSONArray().put(sealedEntry()), repeated(100))) })
+        // Control: one object fewer fits the combined bound and parses.
+        assertEquals(1, Packages.encryptedCatalog(catalog(JSONArray().put(sealedEntry()), repeated(99))).versions.size)
+    }
 }

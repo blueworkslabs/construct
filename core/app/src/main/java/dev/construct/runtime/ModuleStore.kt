@@ -187,7 +187,9 @@ class ModuleStore(private val context: Context, publisherKey: ByteArray? = null,
     /**
      * Stores a key, then restores the code of installed versions that need it: each envelope is
      * verified again from its signed bytes. Grants stay as they were; nothing opens by itself.
-     * A key that fails to unlock its own installed version is not kept.
+     * A key that fails to restore any of its installed versions is not kept: the whole forget runs
+     * again, so versions it already restored in this call are locked again and a corrected retry
+     * starts from a clean slate instead of `KEY_EXISTS`.
      */
     @Synchronized fun addKey(id: String, keyId: String, key: ByteArray, label: String) {
         retryCleanup()
@@ -215,7 +217,8 @@ class ModuleStore(private val context: Context, publisherKey: ByteArray? = null,
                 log("keys", "MODULE_UNLOCKED", message = "Installed version ${binding.getString("version")} unlocked")
             } catch (error: Exception) {
                 val code = (error as? ConstructError)?.code ?: "INSTALL_IO"
-                if (code == "PACKAGE_WRONG_KEY") { keys.forget(id, keyId); unwrapped.remove(id to keyId) }
+                // A pending cleanup is retried by the next addKey, which refuses until it is done.
+                runCatching { forgetKey(id, keyId) }
                 log("keys", code, message = "Installed version ${binding.getString("version")} stays locked")
                 throw if (error is ConstructError) error else ConstructError(code, "Could not restore the unlocked module; it stays locked")
             }

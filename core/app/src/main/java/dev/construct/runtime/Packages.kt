@@ -205,7 +205,8 @@ object Packages {
         checkRule(root.get("schemaVersion") == 1, "CATALOG_SCHEMA", "Unsupported catalog schema")
         val sealed = root.optJSONArray("encryptedModules") ?: return EncryptedCatalog(emptyList(), 0)
         val ordinaryIds = root.optJSONArray("modules")?.let { m -> (0 until m.length()).map { m.getJSONObject(it).optString("id") }.toSet() } ?: emptySet()
-        checkRule(ordinaryIds.size + sealed.length() <= 100, "CATALOG_SIZE", "Catalog is too large")
+        // Count objects, not distinct IDs: an ordinary ID may repeat across objects with other versions.
+        checkRule((root.optJSONArray("modules")?.length() ?: 0) + sealed.length() <= 100, "CATALOG_SIZE", "Catalog is too large")
         val results = mutableListOf<EncryptedCatalogVersion>()
         val seenIds = mutableSetOf<String>()
         var rejected = 0
