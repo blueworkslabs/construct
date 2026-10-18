@@ -99,17 +99,22 @@ internal class ModuleAudio(
 
     private fun state() = JSONObject().put("open", open).put("waitingForGesture", open && !audible)
 
+    /**
+     * The bridge's whole audio.play path: [run] holds the session gate, the stored-grant check and
+     * [request], in the bridge's order. A refused well-formed open is logged once, here, as
+     * AUDIO_REFUSED with the code the page gets, whichever of those checks refused it.
+     */
+    fun dispatch(params: JSONObject, run: () -> Any): Any = try { run() } catch (refused: ConstructError) {
+        if (params.length() == 1 && params.opt("op") == "open") event("AUDIO_REFUSED", refused.code)
+        throw refused
+    }
+
     private fun openAudio(): JSONObject {
-        try {
-            authorize()
-            if (open) return state()
-            checkRule(platform.canMute, "AUDIO_UNAVAILABLE", "This WebView cannot keep audio under host control")
-            checkRule(platform.soundAllowed(), "AUDIO_MUTED", "Media volume is muted, the ringer is on silent or vibrate, or Do Not Disturb is on")
-            checkRule(platform.requestFocus { suspend("focus") }, "AUDIO_UNAVAILABLE", "Audio focus is unavailable")
-        } catch (refused: ConstructError) {
-            event("AUDIO_REFUSED", refused.code)
-            throw refused
-        }
+        authorize()
+        if (open) return state()
+        checkRule(platform.canMute, "AUDIO_UNAVAILABLE", "This WebView cannot keep audio under host control")
+        checkRule(platform.soundAllowed(), "AUDIO_MUTED", "Media volume is muted, the ringer is on silent or vibrate, or Do Not Disturb is on")
+        checkRule(platform.requestFocus { suspend("focus") }, "AUDIO_UNAVAILABLE", "Audio focus is unavailable")
         open = true
         platform.watchPolicy { policyChanged() }
         event("AUDIO_OPENED", "")

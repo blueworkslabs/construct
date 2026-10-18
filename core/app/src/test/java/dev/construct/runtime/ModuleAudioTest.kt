@@ -41,6 +41,10 @@ class ModuleAudioTest {
         { checkRule(authorized, "CAPABILITY_DENIED", "Not granted") }, { pushed += it.toString() }, { code, detail -> events += if (detail.isEmpty()) code else "$code $detail" }, { now })
         .also { it.install() }
     private fun op(name: String) = JSONObject().put("op", name)
+    /** The bridge's audio.play path (ModuleWebView): session gate, stored grant, then the request, all inside dispatch. */
+    private fun bridge(a: ModuleAudio, params: JSONObject, gate: () -> Unit = {}, stored: Boolean = true): Any = a.dispatch(params) {
+        gate(); checkRule(stored, "CAPABILITY_DENIED", "Access is off. Enable it in Module access."); a.request(params)
+    }
     private fun denied(code: String, action: () -> Unit) {
         try { action(); fail("Expected $code") } catch (e: ConstructError) { assertEquals(code, e.code) }
     }
@@ -59,14 +63,14 @@ class ModuleAudioTest {
     @Test fun openChecksThePolicyAndFocusAndStaysSilentUntilATrustedGesture() {
         val p = FakePlatform(); val a = audio(p)
         p.allowed = false
-        denied("AUDIO_MUTED") { a.request(op("open")) }
+        denied("AUDIO_MUTED") { bridge(a, op("open")) }
         p.allowed = true; p.focusGranted = false
-        denied("AUDIO_UNAVAILABLE") { a.request(op("open")) }
+        denied("AUDIO_UNAVAILABLE") { bridge(a, op("open")) }
         p.focusGranted = true; authorized = false
-        denied("CAPABILITY_DENIED") { a.request(op("open")) }
+        denied("CAPABILITY_DENIED") { bridge(a, op("open")) }
         authorized = true
         // Opened at load: focus held, still muted until the person touches the page.
-        assertEquals(opened(false), a.request(op("open")).toString())
+        assertEquals(opened(false), bridge(a, op("open")).toString())
         assertEquals(true, p.muted); assertTrue(p.focusHeld)
         now += 60_000
         a.userGesture()
@@ -75,6 +79,25 @@ class ModuleAudioTest {
         // Each refused open is logged with its code (S5.1 follow-up: the log says why).
         assertEquals(listOf("AUDIO_REFUSED AUDIO_MUTED", "AUDIO_REFUSED AUDIO_UNAVAILABLE", "AUDIO_REFUSED CAPABILITY_DENIED",
             "AUDIO_OPENED", "AUDIO_AUDIBLE"), events)
+    }
+
+    @Test fun everyRefusedOpenThroughTheBridgeIsLoggedOnceWithItsCode() {
+        // The sound switch off: the stored-grant check refuses before ModuleAudio runs.
+        val a = audio(FakePlatform()); events.clear()
+        denied("CAPABILITY_DENIED") { bridge(a, op("open"), stored = false) }
+        // The Construct menu is open: the session gate refuses first.
+        denied("RUN_PAUSED") { bridge(a, op("open"), gate = { throw ConstructError("RUN_PAUSED", "Return to the module") }) }
+        assertEquals(listOf("AUDIO_REFUSED CAPABILITY_DENIED", "AUDIO_REFUSED RUN_PAUSED"), events)
+        // An undeclared module, refused inside the request.
+        val undeclared = audio(FakePlatform(), declared = false); events.clear()
+        denied("CAPABILITY_DENIED") { bridge(undeclared, op("open")) }
+        assertEquals(listOf("AUDIO_REFUSED CAPABILITY_DENIED"), events)
+        // Other operations and malformed requests are not opens; a successful open logs no refusal.
+        events.clear()
+        denied("CAPABILITY_DENIED") { bridge(a, op("state"), stored = false) }
+        denied("CAPABILITY_DENIED") { bridge(a, op("open").put("extra", 1), stored = false) }
+        bridge(a, op("open"))
+        assertEquals(listOf("AUDIO_OPENED"), events)
     }
 
     @Test fun theTapWhoseHandlerOpensCountsButAStaleOneDoesNot() {
