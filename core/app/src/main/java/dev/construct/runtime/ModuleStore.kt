@@ -217,11 +217,28 @@ class ModuleStore(private val context: Context, publisherKey: ByteArray? = null,
                 log("keys", "MODULE_UNLOCKED", message = "Installed version ${binding.getString("version")} unlocked")
             } catch (error: Exception) {
                 val code = (error as? ConstructError)?.code ?: "INSTALL_IO"
-                // A pending cleanup is retried by the next addKey, which refuses until it is done.
-                runCatching { forgetKey(id, keyId) }
+                rejectKey(id, keyId)
                 log("keys", code, message = "Installed version ${binding.getString("version")} stays locked")
                 throw if (error is ConstructError) error else ConstructError(code, "Could not restore the unlocked module; it stays locked")
             }
+        }
+    }
+
+    /**
+     * Drops a key whose re-import failed. The journaled forget comes first; a pending cleanup is
+     * retried by the next addKey, which refuses until it is done. If the forget stops before the
+     * key is removed (the journal cannot be read or written), the key and the code unlocked under
+     * it are removed here directly, so neither a usable key nor a partial restore stays behind.
+     */
+    private fun rejectKey(id: String, keyId: String) {
+        if (runCatching { forgetKey(id, keyId) }.isSuccess) return
+        keyEpoch++
+        unwrapped.remove(id to keyId)
+        runCatching { if (keys.list().any { it.id == id && it.keyId == keyId }) keys.forget(id, keyId) }
+        runCatching {
+            val sealed = readState().optJSONObject(id)?.optJSONObject("sealed")
+            sealed?.keys()?.asSequence()?.filter { sealed.getJSONObject(it).optString("keyId") == keyId }?.forEach { directory(it).deleteRecursively() }
+            root.listFiles()?.filter { it.name.startsWith("staging-") }?.forEach { it.deleteRecursively() }
         }
     }
 

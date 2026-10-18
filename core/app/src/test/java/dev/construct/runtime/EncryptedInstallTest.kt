@@ -211,6 +211,56 @@ class EncryptedInstallTest {
         assertTrue(store.keys.list().isEmpty())
     }
 
+    /** Two versions under one key; the newer one's kept envelope is changed after the forget. */
+    private fun twoVersionsForgottenWithTheNewerChanged(): Pair<String, ByteArray> {
+        installed()
+        store.confirm(id)
+        val (envelopeB, entryB) = seal("1.1.0", key(), keyId)
+        store.install(store.unlock(envelopeB, entryB))
+        assertEquals(digest, store.inventory().modules.single().previous)
+        store.forgetKey(id, keyId)
+        val keptB = File(app.filesDir, "sealed/${entryB.sha256}.cenc")
+        keptB.writeBytes(envelopeB.copyOf().also { it[it.size - 1] = (it[it.size - 1] + 1).toByte() })
+        return entryB.sha256 to envelopeB
+    }
+
+    private fun retryAfterRepairRestoresBoth(digestB: String, envelopeB: ByteArray) {
+        File(app.filesDir, "sealed/$digestB.cenc").writeBytes(envelopeB)
+        store.addKey(id, keyId, key(), "")
+        assertEquals(digestB, store.inventory().modules.single().digest)
+        assertTrue(store.directory(digest).exists())
+        assertTrue(store.directory(digestB).exists())
+    }
+
+    @Test fun aRejectedImportUndoesTheVersionsItAlreadyRestored() {
+        val (digestB, envelopeB) = twoVersionsForgottenWithTheNewerChanged()
+        assertEquals("CHECKSUM_FAILED", code { store.addKey(id, keyId, key(), "") })
+        assertTrue(store.keys.list().isEmpty())
+        // Version 1.0.0 was restored before 1.1.0 failed; its unlocked code is removed again.
+        assertFalse(store.directory(digest).exists())
+        assertFalse(store.directory(digestB).exists())
+        assertEquals("[]", File(app.filesDir, "key-cleanup.json").readText())
+        retryAfterRepairRestoresBoth(digestB, envelopeB)
+    }
+
+    @Test fun aRejectedImportWhoseCleanupJournalCannotBeWrittenStillDropsTheKeyAndTheCode() {
+        val (digestB, envelopeB) = twoVersionsForgottenWithTheNewerChanged()
+        // The journal can be read but not written: the file and filesDir are read-only (keys live in
+        // noBackupFilesDir, unlocked code in filesDir/modules, both still writable).
+        val journal = File(app.filesDir, "key-cleanup.json")
+        assertTrue(journal.isFile)
+        try {
+            assertTrue(journal.setWritable(false) && app.filesDir.setWritable(false))
+            assertEquals("CHECKSUM_FAILED", code { store.addKey(id, keyId, key(), "") })
+            assertTrue(store.keys.list().isEmpty())
+            assertFalse(store.directory(digest).exists())
+            assertFalse(store.directory(digestB).exists())
+        } finally {
+            app.filesDir.setWritable(true); journal.setWritable(true)
+        }
+        retryAfterRepairRestoresBoth(digestB, envelopeB)
+    }
+
     @Test fun aReimportThatCannotRestoreItsVersionIsNotKeptAndACorrectedRetryWorks() {
         installed()
         store.forgetKey(id, keyId)
