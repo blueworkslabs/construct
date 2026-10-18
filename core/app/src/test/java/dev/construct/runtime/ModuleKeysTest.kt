@@ -99,6 +99,24 @@ class ModuleKeysTest {
         assertEquals("KEY_FORMAT", code { keys.add("dev.example.plain", keyId, keyBytes()) })
     }
 
+    private fun recordLine(publisher: String = this.publisher, format: String = "construct-key-v1", extra: String = "") =
+        """{"format":"$format","publisher":"$publisher","id":"$id","keyId":"$keyId","key":"$keyHex"$extra}"""
+
+    @Test fun aWholeKeyRecordIsTakenInOnePaste() {
+        val keys = ModuleKeys(dir(), FakeWrapper(), publisher)
+        // Exactly the line encrypt_module.py key-record prints (key_record_line), with stray whitespace from a paste.
+        val (pid, pkid, pkey) = keys.parseRecord("  " + recordLine() + "\n")
+        assertEquals(id, pid); assertEquals(keyId, pkid); assertArrayEquals(keyBytes(), pkey)
+        assertEquals("KEY_PUBLISHER", code { keys.parseRecord(recordLine(publisher = "cd".repeat(32))) })
+        for (bad in listOf(recordLine(format = "construct-key-v2"), recordLine(extra = ",\"x\":\"y\""), recordLine(extra = ",\"key\":\"$keyHex\""),
+                recordLine().replace("\"keyId\":\"$keyId\",", ""), recordLine().dropLast(1), "$keyHex", "")) {
+            try { keys.parseRecord(bad); fail("accepted $bad") } catch (e: ConstructError) {
+                assertEquals(bad, "KEY_FORMAT", e.code)
+                assertFalse(e.message!!.contains(keyHex.take(16)))
+            }
+        }
+    }
+
     @Test fun refusesDuplicatesAndTheHundredFirstRecord() {
         val keys = ModuleKeys(dir(), FakeWrapper(), publisher)
         keys.add(id, keyId, keyBytes())

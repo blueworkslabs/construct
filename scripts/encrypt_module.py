@@ -217,6 +217,16 @@ def verify_then_open(envelope, entry, public_key, key_for):
     return open_envelope(envelope, key)
 
 
+KEY_RECORD_FORMAT = 'construct-key-v1'
+
+
+def key_record_line(record, publisher):
+    """The one-line handoff record Construct's Module keys screen takes in a single paste: format,
+    publisher fingerprint, opaque ID, key ID and key. It contains the key; hand it over privately."""
+    return json.dumps(dict(format=KEY_RECORD_FORMAT, publisher=publisher, id=record['id'], keyId=record['keyId'],
+        key=record['key']), separators=(',', ':'))
+
+
 def fingerprint(public_key):
     der = public_key.public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
     return hashlib.sha256(der).hexdigest()
@@ -361,7 +371,7 @@ def main():
     p = sub.add_parser('open', help='private verification of a sealed artifact with its content key')
     p.add_argument('envelope', type=Path)
     p.add_argument('--keys', required=True, type=Path)
-    p = sub.add_parser('key-record', help='print the import fields for private handoff (contains the key)')
+    p = sub.add_parser('key-record', help='print the one-line key record for private handoff (contains the key)')
     p.add_argument('--keys', required=True, type=Path)
     p.add_argument('--key-id', required=True)
     args = parser.parse_args()
@@ -383,7 +393,7 @@ def main():
         print(f"Opened {header['id']} {header['version']}: ZIP {len(blob)} B, entry {manifest['entry']}, {len(manifest['capabilities'])} capabilities")
     elif args.command == 'key-record':
         record = load_record(key_dir(args.keys), args.key_id)
-        print(json.dumps(dict(publisher=fingerprint(signing_key().public_key()), id=record['id'], keyId=record['keyId'], key=record['key'])))
+        print(key_record_line(record, fingerprint(signing_key().public_key())))
 
 
 if __name__ == '__main__':

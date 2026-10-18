@@ -338,6 +338,15 @@ class Publisher(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'ordinary module'):
             em.publish_encrypted(self.output, envelope, entry)
 
+    def test_key_record_is_one_line_with_the_fields_construct_reads(self):
+        record = em.load_record(self.keys, self.key_id)
+        publisher = em.fingerprint(self.signer.public_key())
+        line = em.key_record_line(record, publisher)
+        self.assertNotIn('\n', line)
+        self.assertEqual(json.loads(line), dict(format='construct-key-v1', publisher=publisher, id=self.opaque,
+            keyId=self.key_id, key=record['key']))
+        self.assertEqual(list(json.loads(line)), ['format', 'publisher', 'id', 'keyId', 'key'])
+
     def test_keys_stay_private(self):
         with self.assertRaisesRegex(ValueError, 'outside the repository'):
             em.key_dir(em.ROOT / 'keys-here')

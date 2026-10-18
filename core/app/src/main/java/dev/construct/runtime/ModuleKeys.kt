@@ -65,6 +65,8 @@ class ModuleKeys(directory: File, private val wrapper: KeyWrapper, val publisher
     companion object {
         const val MAX_RECORDS = 100
         const val MAX_IMPORT = 1024
+        const val RECORD_FORMAT = "construct-key-v1"
+        private val RECORD_FIELDS = setOf("format", "publisher", "id", "keyId", "key")
         private val hex32 = Regex("[0-9a-f]{32}")
         private val hex64 = Regex("[0-9a-f]{64}")
     }
@@ -98,6 +100,20 @@ class ModuleKeys(directory: File, private val wrapper: KeyWrapper, val publisher
         r.getString("publisher") == publisher && r.getString("id") == id && r.getString("keyId") == keyId
 
     /** This publisher's records; another trust anchor's records are neither listed nor used. */
+    /**
+     * The one-line key record the publisher tool prints (`encrypt_module.py key-record`), taken in
+     * a single paste: {"format":"construct-key-v1","publisher","id","keyId","key"}, strict JSON,
+     * exactly those fields. A record for another publisher is refused. Errors never echo it.
+     */
+    fun parseRecord(text: String): Triple<String, String, ByteArray> {
+        checkRule(text.length <= MAX_IMPORT, "KEY_FORMAT", "Check the key record")
+        val fields = try { StrictHeaderJson(text.trim()).parse() } catch (_: ConstructError) { throw ConstructError("KEY_FORMAT", "Check the key record") }
+        checkRule(fields.keys == RECORD_FIELDS && fields.values.all { it is String }, "KEY_FORMAT", "Check the key record")
+        checkRule(fields["format"] == RECORD_FORMAT, "KEY_FORMAT", "This key record needs a newer Construct")
+        checkRule(fields["publisher"] == publisher, "KEY_PUBLISHER", "This key is for another publisher")
+        return parse(fields["id"] as String, fields["keyId"] as String, fields["key"] as String)
+    }
+
     @Synchronized fun list(): List<ModuleKeyRecord> {
         val records = read()
         return (0 until records.length()).map { records.getJSONObject(it) }.filter { it.getString("publisher") == publisher }.map {

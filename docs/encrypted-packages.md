@@ -221,7 +221,9 @@ results; any budget revision requires a documented reason.
 Settings gains **Module keys**: add, list opaque references/local labels, forget.
 Support manual entry of a 64-hex-character key; allow whitespace grouping but no
 passwords or key derivation in v1. Import also specifies the opaque module ID and
-key ID. A versioned QR record carries those same fields plus publisher fingerprint;
+key ID. The usual way in is one paste of the publisher's one-line key record
+(`encrypt_module.py key-record`): strict JSON with exactly `format` (`construct-key-v1`),
+`publisher`, `id`, `keyId` and `key`; a record for another publisher is refused. A versioned QR record carries those same fields plus publisher fingerprint;
 it is data, never a URL or intent. Validate all fields and show the binding before
 saving. A key record's publisher must match the APK's trusted publisher.
 

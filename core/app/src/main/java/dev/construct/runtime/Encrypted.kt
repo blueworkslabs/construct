@@ -144,7 +144,7 @@ object EncryptedPackages {
  * duplicate keys, which the format forbids). Digits and \u escapes are ASCII only, exactly as
  * the JSON grammar and the publisher's parser have them: no other Unicode digits, no signs.
  */
-private class StrictHeaderJson(private val s: String) {
+internal class StrictHeaderJson(private val s: String) {
     private var i = 0
     private fun fail(): Nothing = throw ConstructError("PACKAGE_INVALID", "Package validation failed (header JSON)")
     private fun ws() { while (i < s.length && s[i] in " \t\r\n") i++ }

@@ -32,6 +32,8 @@ class ModuleKeysActivity : ComponentActivity() {
     private val worker = Executors.newSingleThreadExecutor()
     private lateinit var store: ModuleStore
 
+    /** The publisher's one-line key record, the usual way in: one paste, all fields. */
+    private var record by mutableStateOf("")
     private var moduleId by mutableStateOf("")
     private var keyId by mutableStateOf("")
     private var keyText by mutableStateOf("")
@@ -52,7 +54,7 @@ class ModuleKeysActivity : ComponentActivity() {
 
     private fun clearInput() {
         pending?.third?.fill(0)
-        pending = null; moduleId = ""; keyId = ""; keyText = ""; label = ""
+        pending = null; record = ""; moduleId = ""; keyId = ""; keyText = ""; label = ""
     }
 
     @Composable private fun Screen() {
@@ -95,6 +97,13 @@ class ModuleKeysActivity : ComponentActivity() {
                 }
 
                 Text("Add a key", style = MaterialTheme.typography.titleMedium)
+                Text("Paste the key record from the publisher (one line). Copy it before you open this screen: leaving Construct clears everything here.",
+                    style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value = record, onValueChange = { record = it.take(ModuleKeys.MAX_IMPORT) }, enabled = !busy && pending == null,
+                    label = { Text("Key record") }, visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = hexOptions.copy(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                    supportingText = { Text(if (record.isBlank()) "Or enter the three fields below by hand" else "${record.trim().length} characters") },
+                    modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = moduleId, onValueChange = { moduleId = it.take(64) }, enabled = !busy && pending == null, singleLine = true,
                     label = { Text("Module ID (sealed.a…)") }, keyboardOptions = hexOptions.copy(keyboardType = KeyboardType.Ascii), modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = keyId, onValueChange = { keyId = it.take(64) }, enabled = !busy && pending == null, singleLine = true,
@@ -107,9 +116,11 @@ class ModuleKeysActivity : ComponentActivity() {
                     label = { Text("Label on this phone (optional)") }, keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Done),
                     modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(enabled = !busy && pending == null && keyText.isNotBlank(), onClick = {
-                        try { pending = store.keys.parse(moduleId, keyId, keyText); keyText = "" }
-                        catch (error: ConstructError) { keyText = ""; status = "[${error.code}] ${error.message}" }
+                    Button(enabled = !busy && pending == null && (record.isNotBlank() || keyText.isNotBlank()), onClick = {
+                        try {
+                            pending = if (record.isNotBlank()) store.keys.parseRecord(record) else store.keys.parse(moduleId, keyId, keyText)
+                            record = ""; keyText = ""
+                        } catch (error: ConstructError) { record = ""; keyText = ""; status = "[${error.code}] ${error.message}" }
                     }) { Text("Check key") }
                     TextButton(enabled = !busy, onClick = { clearInput(); status = "Cancelled. Nothing was saved." }) { Text("Cancel") }
                 }
