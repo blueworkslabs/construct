@@ -1,7 +1,8 @@
 # Encrypted packages — design proposal
 
-Status: **host implementation under review, not approved for release** (2026-10-18;
-draft 2026-10-17). Implemented: envelope verification, the catalog array, manual key
+Status: **released in 0.1.0-alpha39** (2026-10-18; host #62 merged as `891d485`, release
+from `72991e9`; draft 2026-10-17). The first production encrypted module was published in the
+public catalog by #67 (`9d8abd1`) and installed on the physical phone. Implemented: envelope verification, the catalog array, manual key
 import in Settings › Module keys, locked inventory, forget-key cleanup and re-import.
 QR import is deferred and not offered.
 This note specifies a generic host-owned installation feature. It does not add a
@@ -393,7 +394,7 @@ Baseline inspected: `49c4796` (2026-10-17). Relevant code:
 [backup rules](../core/app/src/main/res/xml/data_extraction_rules.xml).
 
 Recorded with the implementation (2026-10-18): the minimum host is the first release
-carrying it (planned 0.1.0-alpha39); APKs up to 0.1.0-alpha38 read only
+carrying it, 0.1.0-alpha39 (published 2026-10-18); APKs up to 0.1.0-alpha38 read only
 `modules` and ignore `encryptedModules`, so the encrypted subset stays hidden there;
 QR import is deferred. The legacy matrix is part of the staging report.
 
