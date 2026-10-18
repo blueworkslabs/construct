@@ -27,6 +27,8 @@ import java.util.concurrent.Executors
 class MainActivity : ComponentActivity() {
     private val worker = Executors.newSingleThreadExecutor()
     private lateinit var store: ModuleStore
+    private var keysOpened = false
+    private val preparation = PreparationGate()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,8 +43,10 @@ class MainActivity : ComponentActivity() {
     @Composable private fun ConstructApp() {
         var modules by remember { mutableStateOf(emptyList<Installed>()) }
         var damaged by remember { mutableStateOf(emptyList<DamagedModule>()) }
+        var locked by remember { mutableStateOf(emptyList<LockedModule>()) }
         var indexError by remember { mutableStateOf<String?>(null) }
         var catalog by remember { mutableStateOf(emptyList<CatalogVersion>()) }
+        var lockedCatalog by remember { mutableStateOf(emptyList<EncryptedCatalogVersion>()) }
         var catalogSource by remember { mutableStateOf("demo") }
         var source by remember { mutableStateOf(store.registry) }
         var status by remember { mutableStateOf("Installed tools are available offline.") }
@@ -93,13 +97,13 @@ class MainActivity : ComponentActivity() {
                     val complete = task()
                     val refreshed = if (refresh) store.inventory() else null
                     runOnUiThread { if (!isDestroyed) {
-                        if (refreshed != null) { modules = refreshed.modules; damaged = refreshed.damaged; indexError = refreshed.indexError }
+                        if (refreshed != null) { modules = refreshed.modules; damaged = refreshed.damaged; locked = refreshed.locked; indexError = refreshed.indexError }
                         complete(); busy = false
                     } }
                 } catch (error: Exception) {
                     val refreshed = store.inventory()
                     runOnUiThread { if (!isDestroyed) {
-                        modules = refreshed.modules; damaged = refreshed.damaged; indexError = refreshed.indexError
+                        modules = refreshed.modules; damaged = refreshed.damaged; locked = refreshed.locked; indexError = refreshed.indexError
                         report(error); busy = false
                     } }
                 }
@@ -132,15 +136,22 @@ class MainActivity : ComponentActivity() {
         }
         DisposableEffect(lifecycle) {
             val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                // An unlocked candidate, shown or still unlocking, does not survive leaving Construct before consent.
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) { preparation.leave(); if (candidate?.sealed != null) candidate = null }
                 if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                     androidContacts = ContactsReader.hasPermission(this@MainActivity)
                     androidCamera = PhotoCaptureActivity.hasPermission(this@MainActivity)
                     androidLocation = ModuleLocation.hasPermission(this@MainActivity)
+                    // Back from Module keys: a key added or forgotten there changes what is locked.
+                    if (keysOpened) { keysOpened = false; work { { } } }
                 }
             }
             lifecycle.addObserver(observer)
             onDispose { lifecycle.removeObserver(observer) }
         }
+        // Leaving Browse (Back, Library, Settings, About, Diagnostics, Module access) drops an unlock still running.
+        val onPreparation = page == "browse" && !showLogs && accessModuleId == null
+        LaunchedEffect(onPreparation) { if (!onPreparation) preparation.leave() }
         // Launch is local-only. Catalog IO is an explicit Browse/Settings action.
         LaunchedEffect(Unit) { work { { } } }
         BackHandler(showLogs || accessModuleId != null || page !in listOf("library")) {
@@ -149,9 +160,9 @@ class MainActivity : ComponentActivity() {
         }
         fun refreshCatalog(selected: String) {
             work {
-                val result = store.catalog(selected)
+                val (result, encrypted) = store.catalogs(selected)
                 store.registry = selected
-                { catalog = result; catalogSource = selected; source = selected; page = "browse"; status = "Catalog refreshed." }
+                { catalog = result; lockedCatalog = encrypted; catalogSource = selected; source = selected; page = "browse"; status = "Catalog refreshed." }
             }
         }
         fun choice(version: CatalogVersion, explicit: Boolean = false): CatalogInstallChoice {
@@ -170,6 +181,10 @@ class MainActivity : ComponentActivity() {
             }
         }
         val cards = remember(catalog) { CatalogPresentation.cards(catalog) }
+        // Latest locked version per opaque ID; the catalog carries no name or description for these.
+        val lockedCards = remember(lockedCatalog) { lockedCatalog.groupBy { it.id }.values.map { versions ->
+            versions.reduce { a, b -> if (CatalogPresentation.compareVersions(b.version, a.version) > 0) b else a } } }
+        fun openKeys() { keysOpened = true; startActivity(android.content.Intent(this@MainActivity, ModuleKeysActivity::class.java)) }
         @Composable fun ReleaseCard(version: CatalogVersion, explicit: Boolean = false) {
             val action = choice(version, explicit)
             WorkshopCard(WorkshopCardModel(id = "${version.id}@${version.version}", title = version.name,
@@ -193,7 +208,7 @@ class MainActivity : ComponentActivity() {
                             "browse" -> "Browse"; "settings" -> "Settings"; "about" -> "About"; else -> "Construct"
                         }, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
                         if (!showLogs && accessModuleId == null && page == "library")
-                            Text("Library · ${modules.size} tools", style = MaterialTheme.typography.bodySmall)
+                            Text("Library · ${modules.size + locked.size} tools", style = MaterialTheme.typography.bodySmall)
                     }
                     Box {
                         IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Menu, contentDescription = "Construct menu") }
@@ -308,6 +323,9 @@ class MainActivity : ComponentActivity() {
                                     label = { Text("Catalog: demo or HTTPS index URL") }, modifier = Modifier.fillMaxWidth())
                                 Button(enabled = !busy, onClick = { refreshCatalog(source.trim()) }) { Text("Use catalog") }
                                 Text("Removing a tool keeps its saved data. Uninstalling Construct deletes private app data.", style = MaterialTheme.typography.bodySmall)
+                                Text("Module keys", style = MaterialTheme.typography.titleMedium)
+                                Text("Keys from a publisher unlock its encrypted modules on this phone.")
+                                TextButton(enabled = !busy, onClick = { openKeys() }) { Text("Module keys") }
                             }
                             "about" -> {
                                 TextButton(onClick = { page = "library" }) { Text("Back to Library") }
@@ -325,16 +343,47 @@ class MainActivity : ComponentActivity() {
                                 }
                                 if (catalog.isNotEmpty()) Text("Showing the latest normal release per tool. Versions includes older code and labelled test releases.", style = MaterialTheme.typography.bodySmall)
                                 cards.forEach { ReleaseCard(it.latest) }
+                                lockedCards.forEach { version ->
+                                    val current = modules.firstOrNull { it.manifest.id == version.id }
+                                    val installed = current?.digest == version.sha256
+                                    WorkshopCard(WorkshopCardModel("sealed:${version.id}@${version.version}", EncryptedPackages.LABEL,
+                                        version = version.version, badges = listOf(WorkshopBadge("Encrypted")),
+                                        message = WorkshopMessage(if (installed) "Installed." else "Needs a key from its publisher. Add it in Settings › Module keys, then unlock to review."),
+                                        primary = WorkshopAction(WorkshopActionId.REVIEW_INSTALL, if (installed) "Installed" else "Unlock & review", !busy && !installed && indexError == null),
+                                        secondary = listOf(WorkshopAction(WorkshopActionId.MODULE_KEYS, "Module keys", !busy))),
+                                        onAction = { action -> if (action == WorkshopActionId.MODULE_KEYS) openKeys() else {
+                                            val selectedSource = catalogSource
+                                            val token = preparation.begin()
+                                            work { val verified = store.prepareEncrypted(selectedSource, version)
+                                                CapabilityLifecycle.requireRunnable(verified.manifest);
+                                                { if (preparation.deliverable(token, page == "browse" && !showLogs && accessModuleId == null)) { candidate = verified; status = "Unlocked and verified. Review access before installing." }
+                                                  else status = "Unlock discarded because you left Browse or Construct before reviewing. Unlock again to review." } }
+                                        } })
+                                }
                             }
                             else -> {
                                 if (indexError != null) WorkshopCard(WorkshopCardModel("index-repair", "Module index cannot be read",
                                     message = WorkshopMessage("[$indexError] Saved module data is untouched. Repair archives the damaged index and removes installed code so tools can be reinstalled.", WorkshopTone.ERROR),
                                     primary = WorkshopAction(WorkshopActionId.REPAIR_INDEX, "Repair module index", !busy)),
                                     onAction = { resetIndex = true })
-                                if (modules.isEmpty() && damaged.isEmpty() && indexError == null) {
+                                if (modules.isEmpty() && damaged.isEmpty() && locked.isEmpty() && indexError == null) {
                                     Text("Your tools will appear here", style = MaterialTheme.typography.titleMedium)
                                     Text("Choose a catalog to find and install your first tool.")
                                     Button(enabled = !busy, onClick = { page = "settings" }) { Text("Choose a catalog") }
+                                }
+                                locked.forEach { module ->
+                                    WorkshopCard(WorkshopCardModel("locked:${module.id}", EncryptedPackages.LABEL, version = module.version,
+                                        badges = listOf(WorkshopBadge("Locked", WorkshopTone.ATTENTION)),
+                                        message = WorkshopMessage("[${module.code}] Add the matching key in Settings › Module keys. Saved data and access choices are kept.", WorkshopTone.ATTENTION),
+                                        primary = WorkshopAction(WorkshopActionId.MODULE_KEYS, "Module keys", !busy),
+                                        // The previous version may use a key that is still stored: restoring it is the existing rollback.
+                                        secondary = listOfNotNull(module.previousVersion?.let { WorkshopAction(WorkshopActionId.ROLLBACK, "Restore $it", !busy) },
+                                            WorkshopAction(WorkshopActionId.REMOVE, "Remove · keep data", !busy, true))),
+                                        onAction = { when (it) {
+                                            WorkshopActionId.MODULE_KEYS -> openKeys()
+                                            WorkshopActionId.ROLLBACK -> rollbackTarget = module.id
+                                            else -> removeTarget = module.id
+                                        } })
                                 }
                                 damaged.forEach { broken ->
                                     WorkshopCard(WorkshopCardModel("damaged:${broken.id}", broken.id,

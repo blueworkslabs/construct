@@ -161,6 +161,7 @@ def publish(output, blob, metadata, latest=False, fixture=False):
         require(not index_path.is_symlink(), 'Symlink index')
         index = json.loads(index_path.read_text()) if index_path.exists() else {'schemaVersion': 1, 'modules': []}
         require(index['schemaVersion'] == 1, 'Unsupported existing index')
+        require(all(m['id'] != metadata['id'] for m in index.get('encryptedModules', [])), 'ID already used by an encrypted module')
         module = next((m for m in index['modules'] if m['id'] == metadata['id']), None)
         if module is None:
             module = {'id': metadata['id'], 'name': metadata['name'], 'versions': []}
@@ -175,7 +176,8 @@ def publish(output, blob, metadata, latest=False, fixture=False):
             module['versions'].append(metadata)
         if latest:
             module['latest'] = metadata['version']
-        require(len(index['modules']) <= 100 and all(len(m['versions']) <= 50 for m in index['modules']), 'Catalog limits')
+        every = index['modules'] + index.get('encryptedModules', [])
+        require(len(every) <= 100 and all(len(m['versions']) <= 50 for m in every), 'Catalog limits')
         encoded = (json.dumps(index, indent=2) + '\n').encode()
         require(len(encoded) <= 512 * 1024, 'Catalog size')
         if not target.exists():

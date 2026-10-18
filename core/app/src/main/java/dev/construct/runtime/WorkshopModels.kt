@@ -4,7 +4,7 @@ package dev.construct.runtime
 internal enum class WorkshopTone { NEUTRAL, ATTENTION, ERROR }
 internal enum class WorkshopActionId {
     BROWSE_UPDATES, OPEN, ENABLE, DISABLE, ROLLBACK, MODULE_ACCESS, REMOVE, DISCARD_TRIAL,
-    REVIEW_INSTALL, VERSIONS, REPAIR_INDEX
+    REVIEW_INSTALL, VERSIONS, REPAIR_INDEX, MODULE_KEYS
 }
 internal data class WorkshopAction(
     val id: WorkshopActionId,

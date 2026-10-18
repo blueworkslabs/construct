@@ -1,6 +1,9 @@
 # Encrypted packages — design proposal
 
-Status: **draft for review, not implemented or approved for release** (2026-10-17).
+Status: **host implementation under review, not approved for release** (2026-10-18;
+draft 2026-10-17). Implemented: envelope verification, the catalog array, manual key
+import in Settings › Module keys, locked inventory, forget-key cleanup and re-import.
+QR import is deferred and not offered.
 This note specifies a generic host-owned installation feature. It does not add a
 module bridge capability, change the runtime sandbox, or authorize publication of
 any particular payload. Existing private test delivery remains unchanged.
@@ -218,7 +221,9 @@ results; any budget revision requires a documented reason.
 Settings gains **Module keys**: add, list opaque references/local labels, forget.
 Support manual entry of a 64-hex-character key; allow whitespace grouping but no
 passwords or key derivation in v1. Import also specifies the opaque module ID and
-key ID. A versioned QR record carries those same fields plus publisher fingerprint;
+key ID. The usual way in is one paste of the publisher's one-line key record
+(`encrypt_module.py key-record`): strict JSON with exactly `format` (`construct-key-v1`),
+`publisher`, `id`, `keyId` and `key`; a record for another publisher is refused. A versioned QR record carries those same fields plus publisher fingerprint;
 it is data, never a URL or intent. Validate all fields and show the binding before
 saving. A key record's publisher must match the APK's trusted publisher.
 
@@ -386,6 +391,11 @@ Baseline inspected: `49c4796` (2026-10-17). Relevant code:
 [ModuleStore.kt](../core/app/src/main/java/dev/construct/runtime/ModuleStore.kt),
 [ModuleWebView.kt](../core/app/src/main/java/dev/construct/runtime/ModuleWebView.kt),
 [backup rules](../core/app/src/main/res/xml/data_extraction_rules.xml).
+
+Recorded with the implementation (2026-10-18): the minimum host is the first release
+carrying it (planned 0.1.0-alpha39); APKs up to 0.1.0-alpha38 read only
+`modules` and ignore `encryptedModules`, so the encrypted subset stays hidden there;
+QR import is deferred. The legacy matrix is part of the staging report.
 
 Before implementation lands, record the actual minimum host release/build for
 `construct-encrypted-v1`, the supported legacy APK compatibility matrix, and
