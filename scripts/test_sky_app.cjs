@@ -6,12 +6,15 @@ const assert = require('node:assert/strict');
 const root = 'examples/sky-watch-module/ui/';
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const hostSample = require('./space-fixture/orientation-sample.cjs');
+// The rig's clock starts at a fixed instant, not the wall clock: the app's WMM2025
+// declination depends on the date, and the guidance below must not drift with it.
+const T0 = Date.parse('2026-10-18T12:00:00Z');
 // A fixture aircraft 18 km north of the rig's location, at 10,000 m, flying east.
 const PLANE = {hex: 'abc123', flight: 'DLH123', r: 'D-AIXX', t: 'A320', category: 'A3', lat: 50.2, lon: 8.5622, alt_baro: 32808, gs: 486, track: 90, seen_pos: 0};
 function rig({saved = {}, pendingLocation = false, pendingHttp = false, pendingStorage = false, error = null, aircraft = [], orientError = null} = {}) {
   const elements = new Map(), events = {}, timers = [], calls = [], locations = [], requests = [], reads = [], turns = [], expiryTimers = new Set(), follows = [];
   const storage = structuredClone(saved);
-  let now = Date.now();
+  let now = T0;
   class Element {
     constructor() { this.hidden = false; this.disabled = false; this.open = false; this.value = ''; this.textContent = ''; this.className = ''; this.dataset = {}; this.children = []; this.listeners = {}; this.attributes = {}; this.style = {}; }
     append(...children) { this.children.push(...children); }
@@ -91,12 +94,12 @@ function rig({saved = {}, pendingLocation = false, pendingHttp = false, pendingS
     assert(!r.el('welcome').hidden); assert(r.el('workspace').hidden);
     assert.equal(r.el('retry-location').hidden, code !== 'LOCATION_TIMEOUT');
   }
-  r = rig({saved: {'provider-cooldowns': {adsb: {last: Date.now(), until: 0}}}}); await flush();
+  r = rig({saved: {'provider-cooldowns': {adsb: {last: T0, until: 0}}}}); await flush();
   assert.match(r.el('status').textContent, /Retrying/); assert.equal(r.calls.filter(c => c.method === 'net.http').length, 0);
   r.advance(16000); await flush(); assert.equal(r.calls.filter(c => c.method === 'net.http').length, 1);
   // Combined must not alternate provider-floor failures indefinitely when their
   // previous refresh times differ. Wait until both sources can be retried.
-  r = rig({saved: {preferences: {mode: 'combined'}, 'provider-cooldowns': {adsb: {last: Date.now() - 10000, until: 0}}}}); await flush();
+  r = rig({saved: {preferences: {mode: 'combined'}, 'provider-cooldowns': {adsb: {last: T0 - 10000, until: 0}}}}); await flush();
   assert.equal(r.calls.filter(c => c.method === 'net.http').length, 1);
   r.advance(6000); await flush(); assert.equal(r.calls.filter(c => c.method === 'net.http').length, 1, 'do not put the other provider back inside its floor');
   r.advance(10000); await flush(); assert.equal(r.calls.filter(c => c.method === 'net.http').length, 3);
@@ -152,12 +155,15 @@ function rig({saved = {}, pendingLocation = false, pendingHttp = false, pendingS
   assert.equal(r.el('point-guide').className, 'locked');
   assert.match(r.el('follow-status').textContent, /^Pointing N, 3 fists up · compass ±8°$/);
   assert(r.card().children.find(c => c.className === 'selected-turn').hidden, 'the viewfinder gives the guidance while pointing');
-  for (let i = 0; i < 25; i++) r.orient(sample(20, 29));
+  // 21° off at 29° up is 18.4° of sky, inside "2 fists" (17.5°–22.5°) with margin. At 20° it was
+  // 17.47°, just under the boundary: it read "2 fists" only on dates where the host sample's 0.1°
+  // azimuth rounding against the drifting declination happened to nudge it over.
+  for (let i = 0; i < 25; i++) r.orient(sample(21, 29));
   assert.equal(r.el('point-guide').textContent, 'Move the phone 2 fists to the left.');
   assert.equal(r.el('follow-announcement').textContent, 'Move the phone to the left.');
-  r.orient({...sample(20, 29), calibrate: true});
+  r.orient({...sample(21, 29), calibrate: true});
   assert.match(r.el('follow-announcement').textContent, /calibrate/);
-  r.orient({...sample(20, 29), calibrate: false});
+  r.orient({...sample(21, 29), calibrate: false});
   assert.equal(r.el('follow-announcement').textContent, 'Move the phone to the left.', 'calibration recovery restores unchanged pointing guidance');
   // Nothing selected: name what sits in the middle.
   r.card().children.at(-1).children.find(c => c.textContent === 'Dismiss details').click(); await flush();
