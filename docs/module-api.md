@@ -410,6 +410,9 @@ it is heard. See the [audio brief](audio-brief.md).
   by itself; ask `open` again after the next tap.
 - On a WebView without native mute, no module opens (`WEBVIEW_UNSUPPORTED`): the host could not
   keep them quiet.
+- Construct diagnostics record `AUDIO_OPENED`, `AUDIO_AUDIBLE`, `AUDIO_SUSPENDED` with its reason
+  and `AUDIO_REFUSED` with the refused open's code, so a silent session can be explained from
+  Copy diagnostics.
 - `{open:true}` is native submission, not audibility. There is no background audio, network
   streaming, microphone, system volume or media-session control. `device.tone` is unchanged.
 

@@ -73,7 +73,8 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
         authorizeCapability("audio.play")
     }, { detail ->
         if (active.get()) view.evaluateJavascript("window.dispatchEvent(new CustomEvent('constructaudio',{detail:$detail}));", null)
-    }, event = { code -> store.log("audio", code, module, "Web Audio output under host policy; not proof of audibility") })
+    }, event = { code, detail -> store.log("audio", code, module,
+        (if (detail.isEmpty()) "" else "$detail; ") + "Web Audio output under host policy; not proof of audibility") })
     audio.install()
     view.onUserInput = { audio.userGesture() }
     view.stopForeground = { audio.suspend("background") }
@@ -227,6 +228,12 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
             checkRule(Regex("[A-Za-z0-9_-]{1,64}").matches(requestId), "BRIDGE_ID", "Invalid request identifier")
             val method = request.getString("method")
             val params = request.getJSONObject("params")
+            if (method == "audio.play") {
+                // Same checks in the same order as every capability; ModuleAudio logs a refused open once.
+                val result = audio.dispatch(params) { view.gate.authorize(method); store.withCapability(installed, method) { audio.request(params) } }
+                reply.postMessage(JSONObject().put("id", requestId).put("result", result).toString())
+                return@addWebMessageListener
+            }
             view.gate.authorize(method)
             if (method == "net.http" || method == "location.read" || method == "orientation.read") {
                 authorizeCapability(method)
@@ -335,7 +342,6 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
                 }
                 "storage.kv" -> store.storage(module.id, params)
                 "device.tone" -> tone.play(params)
-                "audio.play" -> audio.request(params)
                 else -> throw ConstructError("CAPABILITY_DENIED", "Unsupported capability")
             }
             }
