@@ -327,5 +327,21 @@
       ],
       "latest": "0.2.14"
     }
+  ],
+  "encryptedModules": [
+    {
+      "id": "sealed.a0679fbbd182901ad5243da810daef7b5",
+      "name": "Locked module",
+      "versions": [
+        {
+          "version": "0.6.0",
+          "format": "construct-encrypted-v1",
+          "artifact": "sealed/a0679fbbd182901ad5243da810daef7b5/0.6.0.cenc",
+          "sha256": "9c8d33b768b4397a8b2834b26620e99d83f6cb8c54ec0c81f67cd8d37e41044a",
+          "signature": "IHFPIJIkojVEeUiS+l4EOrI6rmmBQSpB8hwj7ngrfm0sJFGbZczz73EdvW2iSCfcR/PE1PZpKJZH1/i+piUKBJNsnq2C7ubyHprZItUHEt53ELobS0fQG7R1N6QEMfs64UAHtmhDbISRomjBoq03RiQtkLIeE2SsHRzi2XyRzOQVGzQZXWUTmFTjldxeAUBX+axkRqtWiTLSSvV81t8/jdBoLagu2R6aiVmOV2XgtyFaHaFOWC4OpmXo1oXbYxH7wFLpUT3gteTMR0YCXAMYlW/tr6c/gSTsysBLq60q3I0RkyMSpLZH6XHNb/QLAeb/Z2YesT0hkVYCVCS7j8tHSA=="
+        }
+      ],
+      "latest": "0.6.0"
+    }
   ]
 }
