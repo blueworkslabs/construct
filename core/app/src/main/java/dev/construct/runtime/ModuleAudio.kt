@@ -34,7 +34,8 @@ internal class ModuleAudio(
     private val declared: Boolean,
     private val authorize: () -> Unit,
     private val notify: (JSONObject) -> Unit,
-    private val event: (String) -> Unit,
+    /** A diagnostics event: its code, and for AUDIO_SUSPENDED the reason, for AUDIO_REFUSED the refused open's code. */
+    private val event: (String, String) -> Unit,
     private val clock: () -> Long = SystemClock::elapsedRealtime,
 ) {
     private var open = false
@@ -52,7 +53,7 @@ internal class ModuleAudio(
         checkRule(platform.canMute, "WEBVIEW_UNSUPPORTED", "Update Android System WebView or Chrome before opening modules")
         platform.setMuted(true)
         if (!declared && platform.canBlock) platform.blockConstructors()
-        if (!platform.canBlock) event("AUDIO_LIMITED")
+        if (!platform.canBlock) event("AUDIO_LIMITED", "")
     }
 
     /** Native input reached the page (touch up, key up). Synthetic DOM events never get here. */
@@ -81,7 +82,7 @@ internal class ModuleAudio(
     private fun unmute() {
         audible = true
         platform.setMuted(false)
-        event("AUDIO_AUDIBLE")
+        event("AUDIO_AUDIBLE", "")
     }
 
     fun request(params: JSONObject): Any {
@@ -99,14 +100,19 @@ internal class ModuleAudio(
     private fun state() = JSONObject().put("open", open).put("waitingForGesture", open && !audible)
 
     private fun openAudio(): JSONObject {
-        authorize()
-        if (open) return state()
-        checkRule(platform.canMute, "AUDIO_UNAVAILABLE", "This WebView cannot keep audio under host control")
-        checkRule(platform.soundAllowed(), "AUDIO_MUTED", "Media volume is muted, the ringer is on silent or vibrate, or Do Not Disturb is on")
-        checkRule(platform.requestFocus { suspend("focus") }, "AUDIO_UNAVAILABLE", "Audio focus is unavailable")
+        try {
+            authorize()
+            if (open) return state()
+            checkRule(platform.canMute, "AUDIO_UNAVAILABLE", "This WebView cannot keep audio under host control")
+            checkRule(platform.soundAllowed(), "AUDIO_MUTED", "Media volume is muted, the ringer is on silent or vibrate, or Do Not Disturb is on")
+            checkRule(platform.requestFocus { suspend("focus") }, "AUDIO_UNAVAILABLE", "Audio focus is unavailable")
+        } catch (refused: ConstructError) {
+            event("AUDIO_REFUSED", refused.code)
+            throw refused
+        }
         open = true
         platform.watchPolicy { policyChanged() }
-        event("AUDIO_OPENED")
+        event("AUDIO_OPENED", "")
         val at = gesture
         if (at != null && clock() - at <= GESTURE_WINDOW_MS) unmute()
         return state()
@@ -121,7 +127,7 @@ internal class ModuleAudio(
         platform.setMuted(true)
         platform.abandonFocus()
         platform.unwatchPolicy()
-        event("AUDIO_SUSPENDED")
+        event("AUDIO_SUSPENDED", reason)
         if (!closed) notify(JSONObject().put("state", "suspended").put("reason", reason))
     }
 

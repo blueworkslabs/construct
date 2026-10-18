@@ -38,7 +38,7 @@ class ModuleAudioTest {
     private val pushed = mutableListOf<String>()
     private val events = mutableListOf<String>()
     private fun audio(platform: FakePlatform, declared: Boolean = true) = ModuleAudio(platform, declared,
-        { checkRule(authorized, "CAPABILITY_DENIED", "Not granted") }, { pushed += it.toString() }, { events += it }, { now })
+        { checkRule(authorized, "CAPABILITY_DENIED", "Not granted") }, { pushed += it.toString() }, { code, detail -> events += if (detail.isEmpty()) code else "$code $detail" }, { now })
         .also { it.install() }
     private fun op(name: String) = JSONObject().put("op", name)
     private fun denied(code: String, action: () -> Unit) {
@@ -72,7 +72,9 @@ class ModuleAudioTest {
         a.userGesture()
         assertEquals(false, p.muted)
         assertEquals(opened(true), a.request(op("state")).toString())
-        assertEquals(listOf("AUDIO_OPENED", "AUDIO_AUDIBLE"), events)
+        // Each refused open is logged with its code (S5.1 follow-up: the log says why).
+        assertEquals(listOf("AUDIO_REFUSED AUDIO_MUTED", "AUDIO_REFUSED AUDIO_UNAVAILABLE", "AUDIO_REFUSED CAPABILITY_DENIED",
+            "AUDIO_OPENED", "AUDIO_AUDIBLE"), events)
     }
 
     @Test fun theTapWhoseHandlerOpensCountsButAStaleOneDoesNot() {
@@ -88,7 +90,7 @@ class ModuleAudioTest {
 
     @Test fun focusLossPauseAndCloseMuteNotifyAndNeedANewOpenAndGesture() {
         for (reason in listOf("focus", "pause", "background", "module")) {
-            val p = FakePlatform(); val a = audio(p); pushed.clear()
+            val p = FakePlatform(); val a = audio(p); pushed.clear(); events.clear()
             a.userGesture(); a.request(op("open"))
             assertEquals(reason, false, p.muted)
             when (reason) {
@@ -97,6 +99,8 @@ class ModuleAudioTest {
                 else -> a.suspend(reason)
             }
             assertEquals(reason, true, p.muted); assertFalse(reason, p.focusHeld)
+            // The log names the reason, as the page's event does.
+            assertEquals(reason, listOf("AUDIO_OPENED", "AUDIO_AUDIBLE", "AUDIO_SUSPENDED $reason"), events)
             assertEquals(reason, listOf(JSONObject().put("state", "suspended").put("reason", reason).toString()), pushed)
             assertEquals(JSONObject().put("open", false).put("waitingForGesture", false).toString(), a.request(op("state")).toString())
             a.userGesture()
@@ -122,7 +126,7 @@ class ModuleAudioTest {
         // Removing the constructors alone is not proof that every audio route is silent.
         for (canBlock in listOf(true, false)) for (declared in listOf(true, false)) {
             val p = FakePlatform(canMute = false, canBlock = canBlock)
-            denied("WEBVIEW_UNSUPPORTED") { ModuleAudio(p, declared, {}, {}, {}, { now }).install() }
+            denied("WEBVIEW_UNSUPPORTED") { ModuleAudio(p, declared, {}, {}, { _, _ -> }, { now }).install() }
             assertEquals(0, p.blocked)
         }
     }

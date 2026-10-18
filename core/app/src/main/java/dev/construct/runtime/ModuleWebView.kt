@@ -73,7 +73,8 @@ internal fun moduleWebView(context: Context, store: ModuleStore, installed: Inst
         authorizeCapability("audio.play")
     }, { detail ->
         if (active.get()) view.evaluateJavascript("window.dispatchEvent(new CustomEvent('constructaudio',{detail:$detail}));", null)
-    }, event = { code -> store.log("audio", code, module, "Web Audio output under host policy; not proof of audibility") })
+    }, event = { code, detail -> store.log("audio", code, module,
+        (if (detail.isEmpty()) "" else "$detail; ") + "Web Audio output under host policy; not proof of audibility") })
     audio.install()
     view.onUserInput = { audio.userGesture() }
     view.stopForeground = { audio.suspend("background") }
