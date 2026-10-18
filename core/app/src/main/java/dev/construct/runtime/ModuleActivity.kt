@@ -189,6 +189,9 @@ class ModuleActivity : ComponentActivity() {
         // Never resurrect a stopped runtime after process death. Rotation is handled in-place.
         if (savedInstanceState != null) { finishSession(); return }
         store = ModuleStore.shared(this)
+        // A key forgotten while this module runs (split screen) stops it before the store reports success.
+        val moduleId = intent.getStringExtra("module")
+        stopOnLock = store.onLocked { id -> if (id == moduleId) runOnUiThread { finishSession(error = "PACKAGE_LOCKED") } }
         setContent { ConstructTheme { Session() } }
         worker.execute {
             try {
@@ -220,6 +223,8 @@ class ModuleActivity : ComponentActivity() {
         }
     }
 
+    private var stopOnLock: (() -> Unit)? = null
+
     private fun finishSession(action: String = "close", error: String? = null) {
         if (ending) return
         ending = true
@@ -239,6 +244,7 @@ class ModuleActivity : ComponentActivity() {
 
     override fun onStop() { if (!pickingImage && !capturingPhoto) finishSession(); super.onStop() }
     override fun onDestroy() {
+        stopOnLock?.invoke()
         privacyCurtains.close()
         webView?.destroy(); webView = null
         worker.shutdown()

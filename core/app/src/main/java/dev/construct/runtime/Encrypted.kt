@@ -15,6 +15,8 @@ data class EncryptedCatalogVersion(val id: String, val version: String, val arti
     val sha256: String, val signature: String)
 
 /** The authenticated, not yet decrypted, framing of a `construct-encrypted-v1` envelope. */
+/** The signed envelope and catalog entry behind an unlocked package, and the key epoch it was unlocked in. */
+class SealedSource(val version: EncryptedCatalogVersion, val envelope: ByteArray, val keyId: String, val epoch: Long)
 data class EnvelopeHeader(val id: String, val version: String, val keyId: String,
     val zipBytes: Int, val manifestCommitment: String)
 

@@ -12,15 +12,20 @@ data class Installed(val manifest: ModuleManifest, val digest: String, val previ
     /** Per-module "Allow screenshots" choice; off unless explicitly turned on. See [ScreenCapturePolicy]. */
     val allowScreenshots: Boolean = false)
 data class DamagedModule(val id: String, val code: String, val previousVersion: String?)
-data class Inventory(val modules: List<Installed>, val damaged: List<DamagedModule>, val indexError: String? = null)
+/** An encrypted module whose active version cannot run: its key is missing or its unlocked code is gone. No decrypted metadata. */
+data class LockedModule(val id: String, val version: String, val code: String)
+data class Inventory(val modules: List<Installed>, val damaged: List<DamagedModule>, val indexError: String? = null,
+    val locked: List<LockedModule> = emptyList())
 
 // A deployment supplies the initial choice, never a replacement for a saved choice.
 internal fun initialRegistry(saved: String?, configured: String): String =
     saved ?: configured.takeIf { it.isNotBlank() } ?: "demo"
 
-class ModuleStore(private val context: Context) {
+/** [publisherKey] and [keyWrapper] replace the APK's trust anchor and the Android Keystore in JVM tests only. */
+class ModuleStore(private val context: Context, publisherKey: ByteArray? = null, private val keyWrapper: KeyWrapper? = null) {
     companion object {
         @Volatile private var instance: ModuleStore? = null
+        private const val UNLOCK_DEADLINE_NANOS = 15_000_000_000L
         fun shared(context: Context): ModuleStore = instance ?: synchronized(this) {
             instance ?: ModuleStore(context.applicationContext).also { instance = it }
         }
@@ -29,10 +34,17 @@ class ModuleStore(private val context: Context) {
     private val stateFile = AtomicFile(File(context.filesDir, "module-state.json"))
     private val logsFile = AtomicFile(File(context.filesDir, "diagnostics.jsonl"))
     private val moduleLogsFile = AtomicFile(File(context.filesDir, "diagnostics-modules.jsonl"))
+    /** Signed envelopes of installed encrypted versions, kept while locked so a re-import can verify them again. */
+    private val sealedRoot = File(context.filesDir, "sealed").apply { mkdirs() }
+    /** Forgotten key bindings whose unlocked code is not yet confirmed removed (docs/encrypted-packages.md, "Forget key"). */
+    private val cleanupFile = AtomicFile(File(context.filesDir, "key-cleanup.json"))
+    /** Bumped when a key is forgotten, so a prepare from before it cannot install. */
+    @Volatile private var keyEpoch = 0L
+    private val lockListeners = java.util.concurrent.CopyOnWriteArraySet<(String) -> Unit>()
     private val logWindows = mutableMapOf<String, Pair<Long, Int>>()
     private val failedRuns = mutableSetOf<Pair<String, String>>()
     private val preferences = context.getSharedPreferences("construct", Context.MODE_PRIVATE)
-    val publicKey: ByteArray = context.assets.open("registry-public.der").use { it.readBytes() }
+    val publicKey: ByteArray = publisherKey ?: context.assets.open("registry-public.der").use { it.readBytes() }
 
     var registry: String
         get() = initialRegistry(preferences.getString("registry", null),
@@ -71,14 +83,136 @@ class ModuleStore(private val context: Context) {
         } finally { connection.disconnect() }
     }
 
-    fun catalog(source: String): List<CatalogVersion> {
-        val result = Packages.catalog(fetch(source, null, 512 * 1024))
-        log("catalog", "CATALOG_READY", message = "${result.size} versions available (${if (source == "demo") "bundled" else "HTTPS"})")
-        return result
+    fun catalog(source: String): List<CatalogVersion> = catalogs(source).first
+
+    /** Ordinary versions and opaque encrypted entries from one fetch of the index. */
+    fun catalogs(source: String): Pair<List<CatalogVersion>, List<EncryptedCatalogVersion>> {
+        val bytes = fetch(source, null, 512 * 1024)
+        val result = Packages.catalog(bytes)
+        val encrypted = Packages.encryptedCatalog(bytes)
+        log("catalog", "CATALOG_READY", message = "${result.size} versions available (${if (source == "demo") "bundled" else "HTTPS"})" +
+            if (encrypted.versions.isEmpty() && encrypted.rejected == 0) "" else "; ${encrypted.versions.size} locked, ${encrypted.rejected} rejected")
+        return result to encrypted.versions
     }
 
     fun prepare(source: String, version: CatalogVersion): VerifiedPackage =
         Packages.verify(fetch(source, version.artifact, Packages.MAX_ZIP), version, publicKey)
+
+    /**
+     * Publisher signature and binding first, then the stored key for exactly that (ID, key ID).
+     * PACKAGE_LOCKED when it is missing; nothing is installed until [install] with consent.
+     */
+    fun prepareEncrypted(source: String, version: EncryptedCatalogVersion): VerifiedPackage =
+        unlock(fetch(source, version.artifact, EncryptedPackages.MAX_ENVELOPE), version)
+
+    internal fun unlock(envelope: ByteArray, version: EncryptedCatalogVersion): VerifiedPackage {
+        val epoch = keyEpoch
+        val started = System.nanoTime()
+        var keyId = ""
+        val verified = EncryptedPackages.verify(envelope, version, publicKey) { header ->
+            keyId = header.keyId
+            if (cleanupPending(header.id, header.keyId)) null else keys.key(header.id, header.keyId)
+        }
+        // The 15-second local deadline: a late result is discarded, even though the crypto call itself could not be stopped.
+        checkRule(System.nanoTime() - started <= UNLOCK_DEADLINE_NANOS, "PREPARE_TIMEOUT", "Unlocking took too long; try again")
+        checkRule(epoch == keyEpoch, "INSTALL_STALE", "Keys changed; review the module again")
+        return verified.copy(sealed = SealedSource(version, envelope, keyId, epoch))
+    }
+
+    /** [listener] gets a module ID whenever a forgotten key locks it; returns the unsubscribe call. */
+    fun onLocked(listener: (String) -> Unit): () -> Unit { lockListeners.add(listener); return { lockListeners.remove(listener) } }
+
+    /** Content keys for encrypted modules, bound to this APK's trusted publisher. */
+    val keys: ModuleKeys by lazy { ModuleKeys(context.noBackupFilesDir, keyWrapper ?: AndroidKeystoreWrapper(), EncryptedPackages.sha256(publicKey)) }
+
+    private fun hasKey(id: String, keyId: String) = !cleanupPending(id, keyId) && keys.list().any { it.id == id && it.keyId == keyId }
+
+    private fun sealedBinding(id: String, digest: String): JSONObject? =
+        runCatching { readState().optJSONObject(id)?.optJSONObject("sealed")?.optJSONObject(digest) }.getOrNull()
+
+    /** The gate every open, rollback, bridge call and inventory passes: an encrypted version runs only while its key is stored. */
+    private fun requireUnlocked(id: String, digest: String) {
+        val binding = sealedBinding(id, digest)
+        // An opaque ID is always encrypted: a record that lost its envelope binding fails closed, never runs as plain.
+        if (binding == null) { checkRule(!EncryptedPackages.opaqueId.matches(id), "STATE_INVALID", "Encrypted module record is incomplete; remove and reinstall"); return }
+        checkRule(hasKey(id, binding.getString("keyId")), "PACKAGE_LOCKED", "Add the matching key in Settings")
+    }
+
+    /**
+     * Stores a key, then restores the code of installed versions that need it: each envelope is
+     * verified again from its signed bytes. Grants stay as they were; nothing opens by itself.
+     * A key that fails to unlock its own installed version is not kept.
+     */
+    @Synchronized fun addKey(id: String, keyId: String, key: ByteArray, label: String) {
+        retryCleanup()
+        checkRule(!cleanupPending(id, keyId), "KEY_CLEANUP_PENDING", "Removing the code this key unlocked earlier is still pending; try again")
+        keys.add(id, keyId, key, label)
+        log("keys", "KEY_ADDED", message = "Module key added")
+        val record = readState().optJSONObject(id) ?: return
+        val sealed = record.optJSONObject("sealed") ?: return
+        for (digest in sealed.keys().asSequence().toList()) {
+            val binding = sealed.getJSONObject(digest)
+            if (binding.getString("keyId") != keyId || directory(digest).exists()) continue
+            try {
+                val envelope = File(sealedRoot, "$digest.cenc").inputStream().use { it.readBytesBounded(EncryptedPackages.MAX_ENVELOPE) }
+                val verified = EncryptedPackages.verify(envelope, EncryptedCatalogVersion(id, binding.getString("version"),
+                    binding.getString("artifact"), digest, binding.getString("signature")), publicKey) { keys.key(it.id, it.keyId) }
+                stage(verified)
+                verifiedInstalled(id, digest)
+                log("keys", "MODULE_UNLOCKED", message = "Installed version ${binding.getString("version")} unlocked")
+            } catch (error: Exception) {
+                val code = (error as? ConstructError)?.code ?: "INSTALL_IO"
+                if (code == "PACKAGE_WRONG_KEY") keys.forget(id, keyId)
+                log("keys", code, message = "Installed version ${binding.getString("version")} stays locked")
+                throw if (error is ConstructError) error else ConstructError(code, "Could not restore the unlocked module; it stays locked")
+            }
+        }
+    }
+
+    /**
+     * Forget key: durably mark the binding unavailable and invalidate prepares, stop live
+     * sessions, remove the wrapped key, then remove the unlocked code of every version that
+     * needs it. Signed envelopes, the inventory record, grants and saved data stay.
+     */
+    @Synchronized fun forgetKey(id: String, keyId: String) {
+        checkRule(keys.list().any { it.id == id && it.keyId == keyId }, "KEY_MISSING", "This key is no longer stored")
+        val pending = readCleanup()
+        if ((0 until pending.length()).none { pending.getJSONObject(it).let { e -> e.getString("id") == id && e.getString("keyId") == keyId } })
+            writeAtomic(cleanupFile, pending.put(JSONObject().put("id", id).put("keyId", keyId)).toString())
+        keyEpoch++
+        lockListeners.forEach { runCatching { it(id) } }
+        keys.forget(id, keyId)
+        log("keys", "KEY_FORGOTTEN", message = "Module key forgotten")
+        checkRule(retryCleanup(), "KEY_CLEANUP_PENDING", "Key forgotten. Removing the unlocked code is pending and will be retried; the module stays locked.")
+    }
+
+    private fun readCleanup(): org.json.JSONArray = if (cleanupFile.baseFile.exists() || File(cleanupFile.baseFile.path + ".bak").exists())
+        org.json.JSONArray(cleanupFile.openRead().use { it.readBytesBounded(64 * 1024).toString(Charsets.UTF_8) }) else org.json.JSONArray()
+
+    private fun cleanupPending(id: String, keyId: String): Boolean = runCatching {
+        val pending = readCleanup()
+        (0 until pending.length()).any { pending.getJSONObject(it).let { e -> e.getString("id") == id && e.getString("keyId") == keyId } }
+    }.getOrDefault(true)
+
+    /** Journaled and idempotent; true once no forgotten binding has unlocked code or staging left. */
+    @Synchronized private fun retryCleanup(): Boolean {
+        val pending = runCatching { readCleanup() }.getOrNull() ?: return false
+        if (pending.length() == 0) return true
+        val state = runCatching { readState() }.getOrNull() ?: return false
+        val remaining = org.json.JSONArray()
+        for (i in 0 until pending.length()) {
+            val entry = pending.getJSONObject(i)
+            val sealed = state.optJSONObject(entry.getString("id"))?.optJSONObject("sealed")
+            val digests = sealed?.keys()?.asSequence()?.filter { sealed.getJSONObject(it).optString("keyId") == entry.getString("keyId") }?.toList().orEmpty()
+            root.listFiles()?.filter { it.name.startsWith("staging-") }?.forEach { it.deleteRecursively() }
+            digests.forEach { directory(it).deleteRecursively() }
+            if (digests.any { directory(it).exists() } || root.listFiles()?.any { it.name.startsWith("staging-") } == true) remaining.put(entry)
+        }
+        runCatching { syncDirectory(root) }
+        if (remaining.length() != pending.length()) writeAtomic(cleanupFile, remaining.toString())
+        if (remaining.length() == 0) log("keys", "KEY_CLEANUP_DONE", message = "Unlocked code of forgotten keys removed")
+        return remaining.length() == 0
+    }
 
     private fun readState(): JSONObject = if (stateFile.baseFile.exists() || File(stateFile.baseFile.path + ".bak").exists())
         JSONObject(stateFile.openRead().use { it.readBytesBounded(512 * 1024).toString(Charsets.UTF_8) }) else JSONObject()
@@ -106,7 +240,9 @@ class ModuleStore(private val context: Context) {
         files.forEach { (path, bytes) -> put(path, hash(bytes)) }
     }
 
-    private fun verifiedInstalled(id: String, digest: String): ModuleManifest {
+    /** [gate] is off only in [install], which checked the key itself before the record (and its binding) exists. */
+    private fun verifiedInstalled(id: String, digest: String, gate: Boolean = true): ModuleManifest {
+        if (gate) requireUnlocked(id, digest)
         val dir = directory(digest)
         checkRule(dir.isDirectory, "PACKAGE_MISSING", "Installed package is missing")
         val index = File(dir, ".files.json")
@@ -184,6 +320,7 @@ class ModuleStore(private val context: Context) {
         checkRule(record != null && record.optString("active") == module.digest && record.optBoolean("enabled") &&
             record.optString("failureCode").isEmpty() && (module.manifest.id to module.digest) !in failedRuns,
             "RUN_STALE", "Module is no longer running; reopen it")
+        requireUnlocked(module.manifest.id, module.digest)
         CapabilityLifecycle.requireAvailable(capability)
         checkRule(module.manifest.capabilities.any { it.id == capability } && grants(record!!, module.manifest).optBoolean(capability),
             "CAPABILITY_DENIED", "Access is off. Enable it in Module access.")
@@ -191,9 +328,11 @@ class ModuleStore(private val context: Context) {
     }
 
     @Synchronized fun inventory(): Inventory {
+        retryCleanup()
         val state = try { readState() } catch (_: Exception) { return Inventory(emptyList(), emptyList(), "STATE_UNREADABLE") }
         val modules = mutableListOf<Installed>()
         val damaged = mutableListOf<DamagedModule>()
+        val locked = mutableListOf<LockedModule>()
         for (id in state.keys().asSequence().toList().sorted()) {
             try {
                 val record = state.getJSONObject(id)
@@ -205,11 +344,14 @@ class ModuleStore(private val context: Context) {
                     m.capabilities.map { it.id }.filter { grants(record, m).optBoolean(it) }.toSet(), screenshotsAllowed(record)))
             } catch (error: Exception) {
                 val record = state.optJSONObject(id)
+                val code = (error as? ConstructError)?.code ?: "STATE_INVALID"
+                val binding = record?.optJSONObject("sealed")?.optJSONObject(record.optString("active"))
+                if (binding != null) { locked.add(LockedModule(id, binding.optString("version"), code)); continue }
                 val previous = record?.optString("previous")?.let { runCatching { verifiedInstalled(id, it).version }.getOrNull() }
-                damaged.add(DamagedModule(id, (error as? ConstructError)?.code ?: "STATE_INVALID", previous))
+                damaged.add(DamagedModule(id, code, previous))
             }
         }
-        return Inventory(modules, damaged)
+        return Inventory(modules, damaged, locked = locked)
     }
 
     @Synchronized fun installed(): List<Installed> = inventory().modules
@@ -226,24 +368,30 @@ class ModuleStore(private val context: Context) {
         val oldManifest = old?.let { verifiedInstalled(id, it.getString("active")) }
         checkRule(old == null || old.getBoolean("confirmed") || CapabilityLifecycle.needsUpdate(oldManifest!!), "TRIAL_PENDING", "Keep or roll back the current trial before another update")
         checkRule(old?.getString("active") != candidate.digest, "ALREADY_INSTALLED", "This exact package is already installed")
-        val destination = directory(candidate.digest)
-        if (!destination.exists()) {
-            val staging = File(root, "staging-${java.util.UUID.randomUUID()}")
-            staging.mkdirs()
-            try {
-                for ((path, bytes) in candidate.files) {
-                    val file = File(staging, path)
-                    file.parentFile!!.mkdirs()
-                    java.io.FileOutputStream(file).use { stream -> stream.write(bytes); stream.fd.sync() }
-                }
-                val index = File(staging, ".files.json")
-                java.io.FileOutputStream(index).use { stream -> stream.write(fileHashes(candidate.files).toString().toByteArray()); stream.fd.sync() }
-                staging.walkBottomUp().filter { it.isDirectory }.forEach { syncDirectory(it) }
-                checkRule(staging.renameTo(destination), "INSTALL_IO", "Could not stage module package")
-                syncDirectory(root)
-            } finally { if (staging.exists()) staging.deleteRecursively() }
+        // An encrypted ID never takes a plain package (no silent loss of confidentiality), and an
+        // unlock from before a forgotten key cannot install.
+        val sealed = candidate.sealed
+        checkRule(sealed != null || (!EncryptedPackages.opaqueId.matches(id) && old?.has("sealed") != true),
+            "PACKAGE_INVALID", "Package validation failed (plain package for an encrypted module)")
+        if (sealed != null) {
+            checkRule(sealed.epoch == keyEpoch && hasKey(id, sealed.keyId), "INSTALL_STALE", "Keys changed; review the module again")
+            val target = File(sealedRoot, "${candidate.digest}.cenc")
+            if (!target.exists()) {
+                val temp = File(sealedRoot, "staging-${java.util.UUID.randomUUID()}")
+                try {
+                    java.io.FileOutputStream(temp).use { stream -> stream.write(sealed.envelope); stream.fd.sync() }
+                    checkRule(temp.renameTo(target), "INSTALL_IO", "Could not store module package")
+                    syncDirectory(sealedRoot)
+                } finally { if (temp.exists()) temp.delete() }
+            }
         }
-        verifiedInstalled(id, candidate.digest)
+        stage(candidate)
+        verifiedInstalled(id, candidate.digest, gate = sealed == null)
+        val bindings = JSONObject()
+        val oldSealed = old?.optJSONObject("sealed")
+        old?.optString("active")?.let { previous -> oldSealed?.optJSONObject(previous)?.let { bindings.put(previous, it) } }
+        if (sealed != null) bindings.put(candidate.digest, JSONObject().put("keyId", sealed.keyId).put("version", sealed.version.version)
+            .put("artifact", sealed.version.artifact).put("signature", sealed.version.signature))
         val approved = if (old == null) JSONObject() else grants(old, oldManifest!!)
         val previouslyDeclared = oldManifest?.capabilities.orEmpty().map { it.id }.toSet()
         // Match the trusted install switch: an absent capability is a new request,
@@ -265,9 +413,30 @@ class ModuleStore(private val context: Context) {
         state.put(id, JSONObject().put("httpOrigins", org.json.JSONArray(httpOrigins)).put("grants", approved).put("active", candidate.digest)
             .put("previous", old?.getString("active") ?: JSONObject.NULL)
             .put("confirmed", false).put("enabled", true).put("allowScreenshots", screenshotsAllowed(old)))
+        if (bindings.length() > 0) state.getJSONObject(id).put("sealed", bindings)
         writeAtomic(stateFile, state.toString())
         log("install", "INSTALLED_TRIAL", candidate.manifest, "Installed; waiting for you to mark it working")
         collectUnused(state)
+    }
+
+    /** Writes verified files to their digest directory once; an existing directory is left for [verifiedInstalled] to check. */
+    private fun stage(candidate: VerifiedPackage) {
+        val destination = directory(candidate.digest)
+        if (destination.exists()) return
+        val staging = File(root, "staging-${java.util.UUID.randomUUID()}")
+        staging.mkdirs()
+        try {
+            for ((path, bytes) in candidate.files) {
+                val file = File(staging, path)
+                file.parentFile!!.mkdirs()
+                java.io.FileOutputStream(file).use { stream -> stream.write(bytes); stream.fd.sync() }
+            }
+            val index = File(staging, ".files.json")
+            java.io.FileOutputStream(index).use { stream -> stream.write(fileHashes(candidate.files).toString().toByteArray()); stream.fd.sync() }
+            staging.walkBottomUp().filter { it.isDirectory }.forEach { syncDirectory(it) }
+            checkRule(staging.renameTo(destination), "INSTALL_IO", "Could not stage module package")
+            syncDirectory(root)
+        } finally { if (staging.exists()) staging.deleteRecursively() }
     }
 
     @Synchronized fun confirm(id: String) {
@@ -297,6 +466,7 @@ class ModuleStore(private val context: Context) {
         record.put("grants", grants(record, m))
         record.put("active", previous).put("previous", JSONObject.NULL).put("confirmed", true).put("enabled", true)
         record.remove("failureCode")
+        record.optJSONObject("sealed")?.let { sealed -> sealed.keys().asSequence().toList().filter { it != previous }.forEach { sealed.remove(it) } }
         writeAtomic(stateFile, state.toString())
         log("rollback", "ROLLED_BACK", m, "Code restored; module data retained")
         collectUnused(state)
@@ -374,6 +544,7 @@ class ModuleStore(private val context: Context) {
             }
         }
         root.listFiles()?.filter { it.name !in retained }?.forEach { it.deleteRecursively() }
+        sealedRoot.listFiles()?.filter { it.name.removeSuffix(".cenc") !in retained }?.forEach { it.delete() }
     }
 
     @Synchronized fun storage(id: String, params: JSONObject): Any {
@@ -410,7 +581,7 @@ class ModuleStore(private val context: Context) {
         val record = JSONObject().put("time", java.time.Instant.now().toString())
             .put("hostVersion", BuildConfig.VERSION_NAME).put("phase", phase).put("code", code)
             .put("moduleId", module?.id ?: JSONObject.NULL).put("moduleVersion", module?.version ?: JSONObject.NULL)
-            .put("message", message.take(500))
+            .put("message", if (moduleWritten && EncryptedPackages.opaqueId.matches(module?.id ?: "")) "Encrypted module message omitted" else message.take(500))
             .put("source", if (moduleWritten) "module" else "host")
             .put("packageDigest", artifact?.opt("active") ?: JSONObject.NULL)
             .put("previousDigest", artifact?.opt("previous") ?: JSONObject.NULL)
