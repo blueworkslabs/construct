@@ -250,6 +250,37 @@ class EncryptedInstallTest {
         assertTrue(restored.locked.isEmpty())
     }
 
+    @Test fun aWrongKeyAfterAKeystoreLossDoesNotUnlockTheKeptCode() {
+        installed()
+        store = ModuleStore(app, publisher.public.encoded, FakeWrapper(ByteArray(32) { 9 }))
+        assertTrue(store.directory(digest).exists())
+        assertEquals("PACKAGE_WRONG_KEY", code { store.addKey(id, keyId, ByteArray(32) { 7 }, "") })
+        assertTrue(store.keys.list().isEmpty())
+        assertTrue(store.inventory().modules.isEmpty())
+        store.addKey(id, keyId, key(), "")
+        assertEquals(digest, store.inventory().modules.single().digest)
+    }
+
+    @Test fun updatingALockedTrialKeepsTheWorkingRollback() {
+        installed()
+        store.confirm(id)
+        val keyB = ByteArray(32) { (it * 5 + 1).toByte() }
+        val (envelopeB, entryB) = seal("1.1.0", keyB.copyOf(), "b".repeat(32))
+        store.addKey(id, "b".repeat(32), keyB.copyOf(), "")
+        store.install(store.unlock(envelopeB, entryB))
+        store.forgetKey(id, "b".repeat(32))
+        assertEquals("1.1.0", store.inventory().locked.single().version)
+        val keyC = ByteArray(32) { (it * 3 + 2).toByte() }
+        val (envelopeC, entryC) = seal("1.2.0", keyC.copyOf(), "c".repeat(32))
+        store.addKey(id, "c".repeat(32), keyC.copyOf(), "")
+        store.install(store.unlock(envelopeC, entryC))
+        val updated = store.inventory().modules.single()
+        assertEquals("1.2.0", updated.manifest.version)
+        assertEquals(digest, updated.previous)
+        store.rollback(id)
+        assertEquals("1.0.0", store.inventory().modules.single().manifest.version)
+    }
+
     @Test fun removingTheModuleDropsItsEnvelopeButNotTheKey() {
         installed()
         store.remove(id)

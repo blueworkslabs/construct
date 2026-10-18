@@ -196,7 +196,9 @@ class ModuleStore(private val context: Context, publisherKey: ByteArray? = null,
         val sealed = record.optJSONObject("sealed") ?: return
         for (digest in sealed.keys().asSequence().toList()) {
             val binding = sealed.getJSONObject(digest)
-            if (binding.getString("keyId") != keyId || directory(digest).exists()) continue
+            // Every installed version under this key is checked against the new key, also when its
+            // code is still on disk (a Keystore loss keeps it): a wrong key never unlocks kept code.
+            if (binding.getString("keyId") != keyId) continue
             try {
                 val envelope = File(sealedRoot, "$digest.cenc").inputStream().use { it.readBytesBounded(EncryptedPackages.MAX_ENVELOPE) }
                 val verified = EncryptedPackages.verify(envelope, EncryptedCatalogVersion(id, binding.getString("version"),
@@ -209,7 +211,7 @@ class ModuleStore(private val context: Context, publisherKey: ByteArray? = null,
                 log("keys", "MODULE_UNLOCKED", message = "Installed version ${binding.getString("version")} unlocked")
             } catch (error: Exception) {
                 val code = (error as? ConstructError)?.code ?: "INSTALL_IO"
-                if (code == "PACKAGE_WRONG_KEY") keys.forget(id, keyId)
+                if (code == "PACKAGE_WRONG_KEY") { keys.forget(id, keyId); unwrapped.remove(id to keyId) }
                 log("keys", code, message = "Installed version ${binding.getString("version")} stays locked")
                 throw if (error is ConstructError) error else ConstructError(code, "Could not restore the unlocked module; it stays locked")
             }
@@ -468,9 +470,15 @@ class ModuleStore(private val context: Context, publisherKey: ByteArray? = null,
         }
         stage(candidate)
         verifiedInstalled(id, candidate.digest, gate = sealed == null)
+        // The version kept for rollback: normally the old active one. When that is locked, a still
+        // runnable previous version stays the rollback target instead of the locked one.
+        val keptPrevious = old?.let { record ->
+            val previous = record.optString("previous").takeIf { Regex("[a-f0-9]{64}").matches(it) }
+            if (oldLocked && previous != null && runCatching { verifiedInstalled(id, previous) }.isSuccess) previous else record.getString("active")
+        }
         val bindings = JSONObject()
         val oldSealed = old?.optJSONObject("sealed")
-        old?.optString("active")?.let { previous -> oldSealed?.optJSONObject(previous)?.let { bindings.put(previous, it) } }
+        keptPrevious?.let { previous -> oldSealed?.optJSONObject(previous)?.let { bindings.put(previous, it) } }
         if (sealed != null) bindings.put(candidate.digest, JSONObject().put("keyId", sealed.keyId).put("version", sealed.version.version)
             .put("artifact", sealed.version.artifact).put("signature", sealed.version.signature))
         val approved = when {
@@ -496,7 +504,7 @@ class ModuleStore(private val context: Context, publisherKey: ByteArray? = null,
             else -> http.origins.filter { it in previousOrigins }
         }
         state.put(id, JSONObject().put("httpOrigins", org.json.JSONArray(httpOrigins)).put("grants", approved).put("active", candidate.digest)
-            .put("previous", old?.getString("active") ?: JSONObject.NULL)
+            .put("previous", keptPrevious ?: JSONObject.NULL)
             .put("confirmed", false).put("enabled", true).put("allowScreenshots", screenshotsAllowed(old)))
         if (bindings.length() > 0) state.getJSONObject(id).put("sealed", bindings)
         writeAtomic(stateFile, state.toString())
