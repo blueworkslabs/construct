@@ -241,8 +241,8 @@ skylines. Different error distributions and difficult geometries can differ.
 
 **Landmark cells (decided 2026-09-27, replaces live Overpass queries).** The
 public Overpass instance failed every spike request within the host's 15 s
-limit, once silently as an empty result
-(`experiments/aime-overture-spike/README.md`). Landmarks now come from
+limit, once silently as an empty result (spike report: [`experiments/aime-overture-spike/README.md`](https://github.com/blueworkslabs/construct/blob/9fa18a1f2789e7e43a81474e011d5b1763af27db/experiments/aime-overture-spike/README.md),
+kept on the `spike/aime-overture` branch, draft PR #36, not merged). Landmarks now come from
 pre-built static files, built monthly from Overture Maps in the separate
 `blueworkslabs/aime-data` repository and served from Cloudflare Pages. The
 **data contract (schema 1) lives in that repository's README**; the module
