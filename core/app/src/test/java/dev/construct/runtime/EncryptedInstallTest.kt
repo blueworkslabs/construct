@@ -12,6 +12,11 @@ import java.io.File
 import java.security.KeyPairGenerator
 import java.security.Signature
 import java.util.Base64
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+import javax.crypto.Cipher
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 /**
  * Encrypted modules in the store (docs/encrypted-packages.md, "Plaintext, forgetting keys,
@@ -45,6 +50,26 @@ class EncryptedInstallTest {
         app.filesDir.listFiles()?.forEach { it.deleteRecursively() }
         app.noBackupFilesDir.listFiles()?.forEach { it.deleteRecursively() }
         store = newStore()
+    }
+
+    private fun sign(bytes: ByteArray) =
+        Base64.getEncoder().encodeToString(Signature.getInstance("SHA256withRSA").run { initSign(publisher.private); update(bytes); sign() })
+
+    /** Another version of the vector module, sealed here under [key]/[keyId] the way the publisher tool does. */
+    private fun seal(version: String, key: ByteArray, keyId: String): Pair<ByteArray, EncryptedCatalogVersion> {
+        val files = EncryptedPackages.open(envelope, key()).files.toMutableMap()
+        files["manifest.json"] = String(files.getValue("manifest.json")).replace("\"version\": \"1.0.0\"", "\"version\": \"$version\"").toByteArray()
+        val zip = java.io.ByteArrayOutputStream().also { out -> ZipOutputStream(out).use { z ->
+            for ((name, bytes) in files) { z.putNextEntry(ZipEntry(name)); z.write(bytes); z.closeEntry() } } }.toByteArray()
+        val salt = ByteArray(32) { (it + 1).toByte() }
+        val commitment = EncryptedPackages.sha256("ConstructManifestV1".toByteArray() + byteArrayOf(0) + salt + files.getValue("manifest.json"))
+        val header = """{"format":"construct-encrypted-v1","id":"$id","version":"$version","keyId":"$keyId","zipBytes":${zip.size},"manifestCommitment":"$commitment"}""".toByteArray()
+        val prefix = "CENC0001".toByteArray() + java.nio.ByteBuffer.allocate(4).putInt(header.size).array() + header
+        val nonce = ByteArray(12) { (it + 9).toByte() }
+        val sealed = Cipher.getInstance("AES/GCM/NoPadding").run {
+            init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, nonce)); updateAAD(prefix); doFinal(salt + zip) }
+        val bytes = prefix + nonce + sealed
+        return bytes to EncryptedCatalogVersion(id, version, "sealed/${id.removePrefix("sealed.")}/$version.cenc", EncryptedPackages.sha256(bytes), sign(bytes))
     }
 
     private fun installed(): Installed {
@@ -138,7 +163,51 @@ class EncryptedInstallTest {
         // The key is still stored and the code still on disk, but the binding is marked forgotten.
         assertEquals("PACKAGE_LOCKED", code { store.withCapability(module, "storage.kv") { } })
         assertEquals("PACKAGE_LOCKED", code { store.unlock(envelope, entry) })
-        assertEquals("KEY_EXISTS", code { store.addKey(id, keyId, key(), "") })
+        // Re-import finishes the forget first (key removed, code deleted), then restores from the envelope.
+        store.addKey(id, keyId, key(), "")
+        assertEquals(digest, store.inventory().modules.single().digest)
+        assertEquals("[]", File(app.filesDir, "key-cleanup.json").readText())
+    }
+
+    @Test fun aCrashBetweenTheMarkAndTheKeyRemovalStillForgetsTheKey() {
+        installed()
+        File(app.filesDir, "key-cleanup.json").writeText("[{\"id\":\"$id\",\"keyId\":\"$keyId\"}]")
+        store = newStore()
+        assertEquals("PACKAGE_LOCKED", store.inventory().locked.single().code)
+        assertTrue(store.keys.list().isEmpty())
+        assertFalse(store.directory(digest).exists())
+    }
+
+    @Test fun aLostKeystoreKeyLocksAndAReimportReplacesTheDeadRecord() {
+        val module = installed()
+        // A new wrapping key: the stored record no longer unwraps, as after a Keystore reset.
+        store = ModuleStore(app, publisher.public.encoded, FakeWrapper(ByteArray(32) { 9 }))
+        assertEquals("KEY_UNAVAILABLE", store.inventory().locked.single().code)
+        assertEquals("KEY_UNAVAILABLE", code { store.beginRun(module) })
+        assertEquals("KEY_UNAVAILABLE", code { store.unlock(envelope, entry) })
+        store.addKey(id, keyId, key(), "")
+        assertEquals(digest, store.inventory().modules.single().digest)
+        assertEquals(1, store.keys.list().size)
+    }
+
+    @Test fun aChangedOrMissingKeptEnvelopeStopsTheModule() {
+        val module = installed()
+        File(app.filesDir, "sealed/$digest.cenc").writeBytes(envelope.copyOf().also { it[it.size - 1] = (it[it.size - 1] + 1).toByte() })
+        assertEquals("PACKAGE_CORRUPT", store.inventory().locked.single().code)
+        assertEquals("PACKAGE_CORRUPT", code { store.beginRun(module) })
+        File(app.filesDir, "sealed/$digest.cenc").delete()
+        assertEquals("PACKAGE_CORRUPT", code { store.beginRun(module) })
+    }
+
+    @Test fun reimportChecksTheEnvelopeAgainstTheRecordedKeyId() {
+        installed()
+        store.forgetKey(id, keyId)
+        val other = "c".repeat(32)
+        val state = state()
+        state.getJSONObject(id).getJSONObject("sealed").getJSONObject(digest).put("keyId", other)
+        File(app.filesDir, "module-state.json").writeText(state.toString())
+        assertEquals("STATE_INVALID", code { store.addKey(id, other, key(), "") })
+        assertTrue(store.inventory().modules.isEmpty())
     }
 
     @Test fun anEncryptedRecordWithoutItsBindingNeverRunsAsPlain() {
@@ -149,6 +218,36 @@ class EncryptedInstallTest {
         val inventory = store.inventory()
         assertTrue(inventory.modules.isEmpty())
         assertEquals("STATE_INVALID", inventory.damaged.single().code)
+    }
+
+    @Test fun anInstallInterruptedBeforeItsRecordLeavesNoPlaintext() {
+        installed()
+        // As if the process died after staging and the rename, before module-state.json was written.
+        File(app.filesDir, "module-state.json").writeText("{}")
+        File(store.directory(digest).parentFile, "staging-0000").apply { mkdirs(); File(this, "index.html").writeText("partial") }
+        store = newStore()
+        assertTrue(store.inventory().modules.isEmpty())
+        assertFalse(store.directory(digest).exists())
+        assertEquals(emptyList<String>(), store.directory(digest).parentFile!!.list()!!.toList())
+        assertFalse(File(app.filesDir, "sealed/$digest.cenc").exists())
+    }
+
+    @Test fun forgettingOnlyTheNewKeyOffersTheStillUnlockedPreviousVersion() {
+        installed()
+        store.confirm(id)
+        val keyB = ByteArray(32) { (it * 7 + 3).toByte() }
+        val (envelopeB, entryB) = seal("1.1.0", keyB.copyOf(), "b".repeat(32))
+        store.addKey(id, "b".repeat(32), keyB.copyOf(), "")
+        store.install(store.unlock(envelopeB, entryB))
+        assertEquals("1.1.0", store.inventory().modules.single().manifest.version)
+        store.forgetKey(id, "b".repeat(32))
+        // Version 1.0.0 still has its key A and its code: the locked card offers restoring it.
+        assertTrue(store.directory(digest).exists())
+        assertEquals(listOf(LockedModule(id, "1.1.0", "PACKAGE_LOCKED", "1.0.0")), store.inventory().locked)
+        store.rollback(id)
+        val restored = store.inventory()
+        assertEquals("1.0.0", restored.modules.single().manifest.version)
+        assertTrue(restored.locked.isEmpty())
     }
 
     @Test fun removingTheModuleDropsItsEnvelopeButNotTheKey() {

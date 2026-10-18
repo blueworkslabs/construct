@@ -28,6 +28,7 @@ class MainActivity : ComponentActivity() {
     private val worker = Executors.newSingleThreadExecutor()
     private lateinit var store: ModuleStore
     private var keysOpened = false
+    private val foreground = ForegroundGeneration()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -135,8 +136,8 @@ class MainActivity : ComponentActivity() {
         }
         DisposableEffect(lifecycle) {
             val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-                // An unlocked candidate does not survive leaving Construct before consent.
-                if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && candidate?.sealed != null) candidate = null
+                // An unlocked candidate, shown or still unlocking, does not survive leaving Construct before consent.
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) { foreground.invalidate(); if (candidate?.sealed != null) candidate = null }
                 if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                     androidContacts = ContactsReader.hasPermission(this@MainActivity)
                     androidCamera = PhotoCaptureActivity.hasPermission(this@MainActivity)
@@ -349,9 +350,11 @@ class MainActivity : ComponentActivity() {
                                         secondary = listOf(WorkshopAction(WorkshopActionId.MODULE_KEYS, "Module keys", !busy))),
                                         onAction = { action -> if (action == WorkshopActionId.MODULE_KEYS) openKeys() else {
                                             val selectedSource = catalogSource
+                                            val token = foreground.token()
                                             work { val verified = store.prepareEncrypted(selectedSource, version)
                                                 CapabilityLifecycle.requireRunnable(verified.manifest);
-                                                { candidate = verified; status = "Unlocked and verified. Review access before installing." } }
+                                                { if (foreground.current(token)) { candidate = verified; status = "Unlocked and verified. Review access before installing." }
+                                                  else status = "Unlock discarded because Construct left the screen. Unlock again to review." } }
                                         } })
                                 }
                             }
@@ -370,8 +373,14 @@ class MainActivity : ComponentActivity() {
                                         badges = listOf(WorkshopBadge("Locked", WorkshopTone.ATTENTION)),
                                         message = WorkshopMessage("[${module.code}] Add the matching key in Settings › Module keys. Saved data and access choices are kept.", WorkshopTone.ATTENTION),
                                         primary = WorkshopAction(WorkshopActionId.MODULE_KEYS, "Module keys", !busy),
-                                        secondary = listOf(WorkshopAction(WorkshopActionId.REMOVE, "Remove · keep data", !busy, true))),
-                                        onAction = { if (it == WorkshopActionId.MODULE_KEYS) openKeys() else removeTarget = module.id })
+                                        // The previous version may use a key that is still stored: restoring it is the existing rollback.
+                                        secondary = listOfNotNull(module.previousVersion?.let { WorkshopAction(WorkshopActionId.ROLLBACK, "Restore $it", !busy) },
+                                            WorkshopAction(WorkshopActionId.REMOVE, "Remove · keep data", !busy, true))),
+                                        onAction = { when (it) {
+                                            WorkshopActionId.MODULE_KEYS -> openKeys()
+                                            WorkshopActionId.ROLLBACK -> rollbackTarget = module.id
+                                            else -> removeTarget = module.id
+                                        } })
                                 }
                                 damaged.forEach { broken ->
                                     WorkshopCard(WorkshopCardModel("damaged:${broken.id}", broken.id,

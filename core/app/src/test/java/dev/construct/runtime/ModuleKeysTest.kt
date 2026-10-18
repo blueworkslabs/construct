@@ -120,6 +120,28 @@ class ModuleKeysTest {
         assertEquals(1, JSONArray(File(d, "module-keys.json").readText()).length())
     }
 
+    @Test fun anotherPublishersRecordsAreNotListedOrUsed() {
+        val d = dir()
+        ModuleKeys(d, FakeWrapper(), "cd".repeat(32)).add(id, keyId, keyBytes())
+        val keys = ModuleKeys(d, FakeWrapper(), publisher)
+        assertTrue(keys.list().isEmpty())
+        assertFalse(keys.forget(id, keyId))
+        keys.add(id, keyId, keyBytes())
+        assertEquals(1, keys.list().size)
+        assertEquals(2, JSONArray(File(d, "module-keys.json").readText()).length())
+    }
+
+    @Test fun aRecordThatNoLongerUnwrapsIsReplacedByAReimport() {
+        val d = dir()
+        ModuleKeys(d, FakeWrapper(), publisher).add(id, keyId, keyBytes())
+        val afterReset = ModuleKeys(d, FakeWrapper(ByteArray(32) { 9 }), publisher)
+        assertEquals("KEY_UNAVAILABLE", code { afterReset.key(id, keyId) })
+        afterReset.add(id, keyId, keyBytes())
+        assertArrayEquals(keyBytes(), afterReset.key(id, keyId))
+        assertEquals(1, afterReset.list().size)
+        assertEquals("KEY_EXISTS", code { afterReset.add(id, keyId, keyBytes()) })
+    }
+
     @Test fun anUnreadableStoreIsAnErrorNotAnEmptyList() {
         val d = dir()
         File(d, "module-keys.json").writeText("{not json")

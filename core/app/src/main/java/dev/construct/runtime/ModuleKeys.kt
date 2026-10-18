@@ -94,21 +94,33 @@ class ModuleKeys(directory: File, private val wrapper: KeyWrapper, val publisher
         return Triple(cleanId, cleanKeyId, ByteArray(32) { hex.substring(2 * it, 2 * it + 2).toInt(16).toByte() })
     }
 
+    private fun mine(r: JSONObject, id: String, keyId: String) =
+        r.getString("publisher") == publisher && r.getString("id") == id && r.getString("keyId") == keyId
+
+    /** This publisher's records; another trust anchor's records are neither listed nor used. */
     @Synchronized fun list(): List<ModuleKeyRecord> {
         val records = read()
-        return (0 until records.length()).map { records.getJSONObject(it) }.map {
+        return (0 until records.length()).map { records.getJSONObject(it) }.filter { it.getString("publisher") == publisher }.map {
             ModuleKeyRecord(it.getString("publisher"), it.getString("id"), it.getString("keyId"), it.optString("label"))
         }
     }
 
-    /** Stores a key for the trusted publisher. Replacing an existing (id, keyId) is refused: forget it first. */
+    /**
+     * Stores a key for the trusted publisher. A working record for the same (ID, key ID) is
+     * refused (forget it first); one that no longer unwraps (Keystore loss) is replaced, which is
+     * the private re-import the design note asks for.
+     */
     @Synchronized fun add(id: String, keyId: String, key: ByteArray, label: String = "") {
         try {
             checkRule(EncryptedPackages.opaqueId.matches(id) && hex32.matches(keyId) && key.size == 32, "KEY_FORMAT", "Check the key format")
-            val records = read()
+            var records = read()
+            if ((0 until records.length()).any { mine(records.getJSONObject(it), id, keyId) }) {
+                val usable = try { key(id, keyId)?.also { it.fill(0) } != null } catch (e: ConstructError) { if (e.code != "KEY_UNAVAILABLE") throw e; false }
+                checkRule(!usable, "KEY_EXISTS", "This key is already stored")
+                forget(id, keyId)
+                records = read()
+            }
             checkRule(records.length() < MAX_RECORDS, "KEY_LIMIT", "Forget a key before adding another")
-            checkRule((0 until records.length()).none { records.getJSONObject(it).let { r -> r.getString("id") == id && r.getString("keyId") == keyId } },
-                "KEY_EXISTS", "This key is already stored")
             val (nonce, sealed) = wrapper.wrap(key, aad(publisher, id, keyId))
             val enc = Base64.getEncoder()
             records.put(JSONObject().put("publisher", publisher).put("id", id).put("keyId", keyId)
@@ -122,7 +134,7 @@ class ModuleKeys(directory: File, private val wrapper: KeyWrapper, val publisher
         val records = read()
         for (i in 0 until records.length()) {
             val r = records.getJSONObject(i)
-            if (r.getString("publisher") != publisher || r.getString("id") != id || r.getString("keyId") != keyId) continue
+            if (!mine(r, id, keyId)) continue
             val dec = Base64.getDecoder()
             return wrapper.unwrap(dec.decode(r.getString("nonce")), dec.decode(r.getString("wrapped")), aad(publisher, id, keyId))
         }
@@ -136,7 +148,7 @@ class ModuleKeys(directory: File, private val wrapper: KeyWrapper, val publisher
         var removed = false
         for (i in 0 until records.length()) {
             val r = records.getJSONObject(i)
-            if (r.getString("id") == id && r.getString("keyId") == keyId) removed = true else kept.put(r)
+            if (mine(r, id, keyId)) removed = true else kept.put(r)
         }
         if (removed) write(kept)
         return removed
