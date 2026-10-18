@@ -154,6 +154,17 @@ object Packages {
         verifier.initVerify(KeyFactory.getInstance("RSA").generatePublic(X509EncodedKeySpec(publicKey)))
         verifier.update(blob)
         checkRule(verifier.verify(Base64.getDecoder().decode(expected.signature)), "SIGNATURE_FAILED", "Package is not signed by the trusted publisher")
+        val files = zipFiles(blob)
+        val m = checkFiles(files, expected.id, expected.version)
+        return VerifiedPackage(m, files, hash)
+    }
+
+    /**
+     * The shared ZIP rules for every authenticated package (ordinary signed ZIPs and decrypted
+     * `construct-encrypted-v1` payloads): paths, extensions, duplicates, entry count, bounded
+     * reads and the expanded-size budget. Only callers that already authenticated `blob`.
+     */
+    internal fun zipFiles(blob: ByteArray): Map<String, ByteArray> {
         val files = linkedMapOf<String, ByteArray>()
         var expanded = 0
         ZipInputStream(ByteArrayInputStream(blob)).use { zip ->
@@ -167,14 +178,65 @@ object Packages {
                 files[entry.name] = content
             }
         }
+        return files
+    }
+
+    /** Manifest, identity, entry and path-collision checks shared by both package formats. */
+    internal fun checkFiles(files: Map<String, ByteArray>, id: String, version: String): ModuleManifest {
         val m = manifest(files["manifest.json"] ?: throw ConstructError("MANIFEST_MISSING", "Package has no manifest"))
-        checkRule(m.id == expected.id && m.version == expected.version, "IDENTITY_MISMATCH", "Signed package does not match catalog identity")
+        checkRule(m.id == id && m.version == version, "IDENTITY_MISMATCH", "Signed package does not match catalog identity")
         checkRule(files.containsKey(m.entry), "ENTRY_MISSING", "Module entry file is missing")
         // Every extraction path is a regular file. Reject file/directory collisions before writing.
         checkRule(files.keys.none { name -> files.keys.any { other -> other.startsWith("$name/") } }, "ZIP_PATH", "Conflicting package paths")
-        return VerifiedPackage(m, files, hash)
+        return m
+    }
+
+    /**
+     * The optional `encryptedModules` array (docs/encrypted-packages.md). Entries are opaque:
+     * the neutral label only, an opaque `sealed.a…` ID, `.cenc` artifacts. A malformed or
+     * unsupported entry is dropped (counted in [EncryptedCatalog.rejected]) and never falls
+     * back to ordinary ZIP handling; the ordinary `modules` list is unaffected by it. Limits
+     * and duplicate IDs count across both arrays.
+     */
+    fun encryptedCatalog(bytes: ByteArray): EncryptedCatalog {
+        val root = JSONObject(bytes.toString(Charsets.UTF_8))
+        checkRule(root.get("schemaVersion") == 1, "CATALOG_SCHEMA", "Unsupported catalog schema")
+        val sealed = root.optJSONArray("encryptedModules") ?: return EncryptedCatalog(emptyList(), 0)
+        val ordinaryIds = root.optJSONArray("modules")?.let { m -> (0 until m.length()).map { m.getJSONObject(it).optString("id") }.toSet() } ?: emptySet()
+        checkRule(ordinaryIds.size + sealed.length() <= 100, "CATALOG_SIZE", "Catalog is too large")
+        val results = mutableListOf<EncryptedCatalogVersion>()
+        val seenIds = mutableSetOf<String>()
+        var rejected = 0
+        for (i in 0 until sealed.length()) {
+            val module = sealed.optJSONObject(i)
+            val id = module?.optString("id").orEmpty()
+            checkRule(id !in ordinaryIds && seenIds.add(id), "CATALOG_SCHEMA", "Duplicate catalog module")
+            val entry = runCatching {
+                val fields = module!!.keys().asSequence().toSet()
+                checkRule(fields.containsAll(setOf("id", "name", "versions")) && (fields - setOf("id", "name", "versions", "latest")).isEmpty(), "CATALOG_SCHEMA", "Encrypted entry fields")
+                checkRule(EncryptedPackages.opaqueId.matches(id) && module.getString("name") == EncryptedPackages.LABEL, "CATALOG_SCHEMA", "Encrypted entry identity")
+                val versions = module.getJSONArray("versions")
+                checkRule(versions.length() in 1..50, "CATALOG_SCHEMA", "Encrypted entry versions")
+                val parsed = (0 until versions.length()).map { j ->
+                    val v = versions.getJSONObject(j)
+                    checkRule(v.keys().asSequence().toSet() == setOf("version", "format", "artifact", "sha256", "signature"), "CATALOG_SCHEMA", "Encrypted version fields")
+                    checkRule(v.getString("format") == EncryptedPackages.FORMAT, "PACKAGE_FORMAT_UNSUPPORTED", "Unsupported encrypted format")
+                    val version = v.getString("version"); val artifact = v.getString("artifact"); val hash = v.getString("sha256"); val signature = v.getString("signature")
+                    checkRule(versionPattern.matches(version) && version.length <= 50 && safePath(artifact) &&
+                        artifact == "sealed/${id.removePrefix("sealed.")}/$version.cenc" && Regex("[a-f0-9]{64}").matches(hash) && signature.length <= 1024,
+                        "CATALOG_SCHEMA", "Invalid encrypted artifact")
+                    EncryptedCatalogVersion(id, version, artifact, hash, signature)
+                }
+                checkRule(parsed.map { it.version }.distinct().size == parsed.size && (!module.has("latest") || parsed.any { it.version == module.getString("latest") }), "CATALOG_SCHEMA", "Encrypted entry versions")
+                parsed
+            }.getOrNull()
+            if (entry == null) rejected++ else results += entry
+        }
+        return EncryptedCatalog(results, rejected)
     }
 }
+
+data class EncryptedCatalog(val versions: List<EncryptedCatalogVersion>, val rejected: Int)
 
 fun java.io.InputStream.readBytesBounded(limit: Int): ByteArray {
     val output = java.io.ByteArrayOutputStream()
